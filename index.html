@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Red West: Modular</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+    <div id="crosshair"></div>
+
+    <div id="ui-layer">
+        <div class="hud-text">SCORE: <span id="score">0</span></div>
+        <div id="health-container">❤❤❤❤❤</div>
+    </div>
+
+    <div id="dash-bar-container"><div id="dash-bar"></div></div>
+
+    <div id="gameover">
+        <h1>WASTED</h1>
+        <p>Final Score: <span id="finalScore">0</span></p>
+        <p>Press <span class="key">R</span> to Restart</p>
+    </div>
+
+    <script type="importmap">
+    {
+        "imports": {
+            "three": "https://unpkg.com/three@0.160.0/build/three.module.js"
+        }
+    }
+    </script>
+
+    <script type="module" src="./src/main.js"></script>
+</body>
+</html>
