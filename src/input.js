@@ -1,4 +1,3 @@
-// src/input.js
 import * as THREE from 'three';
 import { gameState } from './state.js';
 

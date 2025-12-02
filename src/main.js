@@ -1,4 +1,3 @@
-// src/main.js
 import * as THREE from 'three';
 import { setupInputs, keys, mouse } from './input.js';
 import { 
@@ -6,7 +5,7 @@ import {
     createAmmoMesh, createCrate, createCactus, createWhiskeyMesh,
     createRock, createDeadTree, createFence 
 } from './assets.js';
-import { checkCollision } from './physics.js';
+import { checkCollision, getObstacleAt } from './physics.js';
 import { gameState, playerStats, enemies, bullets, particles, obstacles } from './state.js';
 
 // --- SETUP SCENE ---
@@ -342,7 +341,29 @@ function animate(time) {
     for(let i=bullets.length-1; i>=0; i--) {
         const b = bullets[i]; b.position.addScaledVector(b.userData.velocity, dt);
         if(b.position.distanceTo(playerGroup.position) > 100) { scene.remove(b); bullets.splice(i,1); continue; }
-        if(checkCollision(b.position.x, b.position.z, 0.5)) { createExplosion(b.position, 0x8B4513); scene.remove(b); bullets.splice(i,1); continue; }
+        
+        // [DESTRUCTION CHECK]
+        const hitObs = getObstacleAt(b.position.x, b.position.z, 0.5);
+        if(hitObs) { 
+            createExplosion(b.position, 0x8B4513); scene.remove(b); bullets.splice(i,1); 
+            if(hitObs.destructible) {
+                playSound('thud'); scene.remove(hitObs.mesh);
+                const idx = obstacles.indexOf(hitObs); if(idx > -1) obstacles.splice(idx, 1);
+                createExplosion(hitObs.mesh.position, 0x8B4513); createExplosion(hitObs.mesh.position, 0xdeb887);
+                if(Math.random() < 0.3) spawnLoot(hitObs.x, hitObs.z);
+                
+                // [RESPAWN]
+                setTimeout(() => {
+                    const p = getRandomPos(15); 
+                    if(hitObs.type === 'crate') createCrate(scene, p.x, p.z);
+                    else if(hitObs.type === 'cactus') createCactus(scene, p.x, p.z);
+                    else if(hitObs.type === 'tree') createDeadTree(scene, p.x, p.z);
+                    else if(hitObs.type === 'fence') createFence(scene, p.x, p.z, Math.random() * Math.PI);
+                }, 10000); 
+            }
+            continue; 
+        }
+
         if(b.userData.owner === 'enemy') {
             const dist = new THREE.Vector3(b.position.x - playerGroup.position.x, 0, b.position.z - playerGroup.position.z).length();
             if(dist < 1.0 && !playerStats.isDashing) { 

@@ -16,10 +16,9 @@ export const playerStats = {
     dashDuration: 0,
     shootCooldown: 0,
     fireRate: 0.2,
-    tripleShotTimer: 0 // [NEW] Timer for powerup
+    tripleShotTimer: 0
 };
 
-// Lists to manage objects
 export const obstacles = []; 
 export const bullets = [];
 export const enemies = [];
