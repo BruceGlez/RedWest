@@ -3,6 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <title>Red West: Modular</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&family=Rye&display=swap" rel="stylesheet">
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
@@ -10,16 +13,41 @@
     <div id="crosshair"></div>
 
     <div id="ui-layer">
-        <div class="hud-text">SCORE: <span id="score">0</span></div>
-        <div id="health-container">❤❤❤❤❤</div>
+        <div class="hud-top-left">
+            <div class="hud-row">SCORE: <span id="score">0</span></div>
+            <div id="health-container" class="hud-row">❤❤❤❤❤</div>
+            <div id="status-msg"></div> </div>
     </div>
 
-    <div id="dash-bar-container"><div id="dash-bar"></div></div>
+    <div id="dash-bar-container">
+        <div id="dash-bar-label">STAMINA</div>
+        <div id="dash-bar"></div>
+    </div>
 
-    <div id="gameover">
-        <h1>WASTED</h1>
-        <p>Final Score: <span id="finalScore">0</span></p>
-        <p>Press <span class="key">R</span> to Restart</p>
+    <div id="start-screen" class="modal-overlay">
+        <div class="modal-content">
+            <h1 class="western-title">RED WEST</h1>
+            <div class="leaderboard-box">
+                <h3>WANTED LIST (TOP 3)</h3>
+                <ul id="highscore-list">
+                    <li>LOADING...</li>
+                </ul>
+            </div>
+            <div class="controls-box">
+                <p><span>WASD</span> MOVE</p>
+                <p><span>MOUSE</span> AIM / SHOOT</p>
+                <p><span>SHIFT</span> DASH</p>
+            </div>
+            <p class="blink-text">PRESS <span class="key-highlight">SPACE</span> TO DRAW</p>
+        </div>
+    </div>
+
+    <div id="gameover" class="modal-overlay" style="display: none;">
+        <div class="modal-content">
+            <h1 class="western-title wasted-text">WASTED</h1>
+            <p class="score-text">FINAL SCORE: <span id="finalScore">0</span></p>
+            <p class="restart-text">PRESS <span class="key-highlight">R</span> TO RESTART</p>
+        </div>
     </div>
 
     <script type="importmap">
@@ -29,7 +57,6 @@
         }
     }
     </script>
-
     <script type="module" src="./src/main.js"></script>
 </body>
 </html>

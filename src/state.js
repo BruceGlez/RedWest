@@ -1,6 +1,7 @@
 export const gameState = {
     score: 0,
     isGameOver: false,
+    isGameStarted: false,
     enemySpawnTimer: 0,
     MAP_SIZE: 140
 };
