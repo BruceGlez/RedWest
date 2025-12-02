@@ -23,10 +23,15 @@ const mat = {
     darkGrey: new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 }),
     gold: new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.2, metalness: 0.8 }),
     
-    // SPECIAL
+
     glass: new THREE.MeshStandardMaterial({ color: 0x8B4513, transparent: true, opacity: 0.8, roughness: 0.1 }),
     hpRed: new THREE.MeshBasicMaterial({ color: 0xff0000 }),
-    hpGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00 })
+    hpGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00 }),
+    
+
+    stone: new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 }),
+    sandStone: new THREE.MeshStandardMaterial({ color: 0xa0825f, roughness: 1.0 }),
+    deadWood: new THREE.MeshStandardMaterial({ color: 0x4d3319, roughness: 1.0 }),
 };
 
 
@@ -473,4 +478,89 @@ export function createBossMesh() {
     // Store reference to gun and HP bar
     group.userData = { muzzle: gunReal.userData.muzzle, hpBar: hpFg, type: 'boss' };
     return group;
+}
+
+export function createRock(scene, x, z) {
+    // Low poly rock using Dodecahedron
+    const scale = 0.5 + Math.random();
+    const geo = new THREE.DodecahedronGeometry(scale, 0); // 0 detail = sharp faces
+    const mesh = new THREE.Mesh(geo, Math.random() > 0.5 ? mat.stone : mat.sandStone);
+    
+    // Random rotation for variety
+    mesh.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3);
+    // Sink it slightly into the ground
+    mesh.position.set(x, scale * 0.3, z);
+    
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+    
+    // Add collision (smaller radius than visual so you can slide over edges)
+    obstacles.push({ mesh: mesh, x: x, z: z, radius: scale * 0.5 });
+}
+
+export function createDeadTree(scene, x, z) {
+    const group = new THREE.Group();
+    
+    // Crooked Trunk
+    const trunkHeight = 4 + Math.random() * 2;
+    const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.6, trunkHeight, 0.6), mat.deadWood);
+    trunk.position.y = trunkHeight / 2;
+    trunk.rotation.z = (Math.random() - 0.5) * 0.3; // Lean slightly
+    trunk.castShadow = true;
+    group.add(trunk);
+
+    // Random Branches
+    const branchCount = 2 + Math.floor(Math.random() * 3);
+    for(let i=0; i<branchCount; i++) {
+        const len = 1.5 + Math.random();
+        const branch = new THREE.Mesh(new THREE.BoxGeometry(0.3, len, 0.3), mat.deadWood);
+        branch.position.y = (trunkHeight * 0.4) + Math.random() * (trunkHeight * 0.5);
+        
+        // Random stick direction
+        const angle = Math.random() * Math.PI * 2;
+        branch.rotation.y = angle;
+        branch.rotation.z = Math.PI / 3 + Math.random() * 0.5; // Angled up
+        
+        // Offset from center so it sticks out
+        branch.translateOnAxis(new THREE.Vector3(0,1,0), len/2);
+        group.add(branch);
+    }
+
+    group.position.set(x, 0, z);
+    scene.add(group);
+    obstacles.push({ mesh: group, x: x, z: z, radius: 1.0 });
+}
+
+export function createFence(scene, x, z, angle) {
+    const group = new THREE.Group();
+    
+    // Two Posts
+    const postGeo = new THREE.BoxGeometry(0.4, 2.5, 0.4);
+    const p1 = new THREE.Mesh(postGeo, mat.wood);
+    p1.position.set(-1.5, 1.25, 0); p1.castShadow = true;
+    group.add(p1);
+    
+    const p2 = new THREE.Mesh(postGeo, mat.wood);
+    p2.position.set(1.5, 1.25, 0); p2.castShadow = true;
+    group.add(p2);
+
+    // Rails
+    const railGeo = new THREE.BoxGeometry(3.4, 0.2, 0.1);
+    const r1 = new THREE.Mesh(railGeo, mat.wood);
+    r1.position.set(0, 1.8, 0); 
+    // Randomize slight tilt for "rickety" look
+    r1.rotation.z = (Math.random()-0.5)*0.1;
+    group.add(r1);
+
+    const r2 = new THREE.Mesh(railGeo, mat.wood);
+    r2.position.set(0, 1.0, 0);
+    r2.rotation.z = (Math.random()-0.5)*0.1;
+    group.add(r2);
+
+    group.position.set(x, 0, z);
+    group.rotation.y = angle;
+    scene.add(group);
+    // Fences are obstacles
+    obstacles.push({ mesh: group, x: x, z: z, radius: 1.5 });
 }

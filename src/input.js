@@ -7,7 +7,7 @@ export const mouse = new THREE.Vector2();
 
 export function setupInputs() {
     window.addEventListener('keydown', e => {
-        // [FIX] Ignore keys if user is typing in the Name Input field
+        // [FIX] Ignore game controls if typing in the Name Input
         if (e.target.tagName === 'INPUT') return;
 
         if(e.code === 'KeyW' || e.code === 'ArrowUp') keys.w = true;
@@ -17,8 +17,8 @@ export function setupInputs() {
         if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
         if(e.code === 'Space') keys.space = true;
         
-        // Only allow reload if the score has been submitted (we track this via a class or state)
-        if(e.code === 'KeyR' && gameState.isGameOver && document.getElementById('restart-msg').style.display !== 'none') {
+        // Only allow reload if the input section is hidden (meaning score is saved)
+        if(e.code === 'KeyR' && gameState.isGameOver && document.getElementById('input-section').style.display === 'none') {
             location.reload();
         }
     });

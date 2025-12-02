@@ -1,3 +1,4 @@
+/* style.css */
 body { 
     margin: 0; 
     overflow: hidden; 
@@ -153,9 +154,12 @@ canvas {
     animation: blinker 1.5s linear infinite; 
     color: white;
 }
+@keyframes blinker { 50% { opacity: 0.3; } }
 
-/* Add these to your style.css */
+.score-text { font-size: 32px; font-family: 'Roboto Mono', monospace; margin: 20px 0; }
+.restart-text { font-size: 18px; color: #aaa; }
 
+/* --- INPUT SECTION --- */
 #input-section {
     margin: 20px 0;
     display: flex;
@@ -169,7 +173,7 @@ canvas {
     border: 2px solid #b71c1c;
     color: #ffd700;
     padding: 10px;
-    font-family: 'Rye', serif; /* Use your western font */
+    font-family: 'Rye', serif; 
     font-size: 24px;
     text-align: center;
     width: 200px;
@@ -197,8 +201,3 @@ canvas {
     background: #8d6e63;
     transform: scale(1.05);
 }
-
-@keyframes blinker { 50% { opacity: 0.3; } }
-
-.score-text { font-size: 32px; font-family: 'Roboto Mono', monospace; margin: 20px 0; }
-.restart-text { font-size: 18px; color: #aaa; }
