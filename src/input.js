@@ -1,3 +1,4 @@
+// src/input.js
 import * as THREE from 'three';
 import { gameState } from './state.js';
 
@@ -6,16 +7,25 @@ export const mouse = new THREE.Vector2();
 
 export function setupInputs() {
     window.addEventListener('keydown', e => {
+        // [FIX] Ignore keys if user is typing in the Name Input field
+        if (e.target.tagName === 'INPUT') return;
+
         if(e.code === 'KeyW' || e.code === 'ArrowUp') keys.w = true;
         if(e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = true;
         if(e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = true;
         if(e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = true;
         if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
         if(e.code === 'Space') keys.space = true;
-        if(e.code === 'KeyR' && gameState.isGameOver) location.reload();
+        
+        // Only allow reload if the score has been submitted (we track this via a class or state)
+        if(e.code === 'KeyR' && gameState.isGameOver && document.getElementById('restart-msg').style.display !== 'none') {
+            location.reload();
+        }
     });
 
     window.addEventListener('keyup', e => {
+        if (e.target.tagName === 'INPUT') return;
+        
         if(e.code === 'KeyW' || e.code === 'ArrowUp') keys.w = false;
         if(e.code === 'KeyA' || e.code === 'ArrowLeft') keys.a = false;
         if(e.code === 'KeyS' || e.code === 'ArrowDown') keys.s = false;

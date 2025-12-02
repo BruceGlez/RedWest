@@ -80,19 +80,36 @@ for(let i=0; i<20; i++) { const p = getRandomPos(10); createCrate(scene, p.x, p.
 for(let i=0; i<30; i++) { const p = getRandomPos(10); createCactus(scene, p.x, p.z); }
 
 
-// --- [NEW] HIGH SCORE SYSTEM ---
+// --- HIGH SCORE SYSTEM (UPDATED) ---
+
 function loadHighScores() {
     const stored = localStorage.getItem('redWestScores');
-    let scores = stored ? JSON.parse(stored) : [];
-    if(scores.length === 0) scores = [0, 0, 0]; // Defaults
+    // If no scores, or if the stored data is the old format (just numbers), reset it
+    let scores;
+    try {
+        scores = stored ? JSON.parse(stored) : [];
+        // Check if it's the old format (array of numbers) and reset if so
+        if (scores.length > 0 && typeof scores[0] === 'number') {
+            scores = []; 
+        }
+    } catch (e) {
+        scores = [];
+    }
     return scores;
 }
 
-function saveHighScore(newScore) {
+function saveHighScore(name, newScore) {
     let scores = loadHighScores();
-    scores.push(newScore);
-    scores.sort((a, b) => b - a); // Sort descending
-    scores = scores.slice(0, 3); // Keep top 3
+    
+    // Add new object
+    scores.push({ name: name.toUpperCase(), score: newScore });
+    
+    // Sort Descending by Score
+    scores.sort((a, b) => b.score - a.score);
+    
+    // Keep Top 5
+    scores = scores.slice(0, 5);
+    
     localStorage.setItem('redWestScores', JSON.stringify(scores));
     updateLeaderboardUI(scores);
 }
@@ -101,15 +118,58 @@ function updateLeaderboardUI(scores) {
     const list = document.getElementById('highscore-list');
     if(list) {
         list.innerHTML = '';
+        if(scores.length === 0) {
+            list.innerHTML = '<li>NO RECORDS YET</li>';
+            return;
+        }
         scores.forEach((s, index) => {
             const li = document.createElement('li');
-            li.innerHTML = `<span>#${index+1}</span> <span style="color:#ffd700">${s}</span>`;
+            // Display: #1  NAME .... SCORE
+            li.innerHTML = `
+                <span>#${index+1} ${s.name}</span> 
+                <span style="color:#ffd700">${s.score}</span>
+            `;
             list.appendChild(li);
         });
     }
 }
-// Init Leaderboard
+
+// Init Leaderboard on load
 updateLeaderboardUI(loadHighScores());
+
+// Setup Save Button Listener
+document.getElementById('saveScoreBtn').addEventListener('click', () => {
+    const nameInput = document.getElementById('playerName');
+    const name = nameInput.value.trim() || "UNKNOWN"; // Default if empty
+    
+    saveHighScore(name, gameState.score);
+    
+    // UI Updates after saving
+    document.getElementById('input-section').style.display = 'none'; // Hide input
+    document.getElementById('restart-msg').style.display = 'block'; // Show restart text
+});
+
+
+// --- GAME OVER LOGIC (UPDATED) ---
+
+function gameOver() {
+    if(gameState.isGameOver) return; // Prevent double trigger
+    gameState.isGameOver = true;
+    
+    // Don't save automatically anymore. Wait for input.
+    
+    const goScreen = document.getElementById('gameover');
+    goScreen.style.display = 'flex'; 
+    document.getElementById('finalScore').innerText = gameState.score;
+    
+    // Reset UI for the Game Over screen
+    document.getElementById('input-section').style.display = 'flex';
+    document.getElementById('restart-msg').style.display = 'none';
+    document.getElementById('playerName').value = '';
+    document.getElementById('playerName').focus(); // Focus the cursor for typing
+
+    playerGroup.visible = false;
+}
 
 
 // --- GAME LOGIC ---
@@ -285,20 +345,6 @@ function animateCharacter(mesh, time, isMoving) {
             } else { rightArm.rotation.x = 0; }
         }
     }
-}
-
-function gameOver() {
-    gameState.isGameOver = true;
-    
-    // Save Score
-    saveHighScore(gameState.score);
-
-    // Show Game Over Screen
-    const goScreen = document.getElementById('gameover');
-    goScreen.style.display = 'flex'; // Use Flex for centering in new CSS
-    document.getElementById('finalScore').innerText = gameState.score;
-    
-    playerGroup.visible = false;
 }
 
 // --- MAIN LOOP ---

@@ -153,6 +153,51 @@ canvas {
     animation: blinker 1.5s linear infinite; 
     color: white;
 }
+
+/* Add these to your style.css */
+
+#input-section {
+    margin: 20px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+#playerName {
+    background: rgba(0, 0, 0, 0.5);
+    border: 2px solid #b71c1c;
+    color: #ffd700;
+    padding: 10px;
+    font-family: 'Rye', serif; /* Use your western font */
+    font-size: 24px;
+    text-align: center;
+    width: 200px;
+    outline: none;
+    text-transform: uppercase;
+}
+
+#playerName::placeholder {
+    color: rgba(255, 215, 0, 0.3);
+}
+
+#saveScoreBtn {
+    background: #5d4037;
+    color: white;
+    border: 2px solid #ffd700;
+    padding: 8px 20px;
+    font-family: 'Roboto Mono', monospace;
+    font-weight: bold;
+    cursor: pointer;
+    font-size: 18px;
+    transition: 0.2s;
+}
+
+#saveScoreBtn:hover {
+    background: #8d6e63;
+    transform: scale(1.05);
+}
+
 @keyframes blinker { 50% { opacity: 0.3; } }
 
 .score-text { font-size: 32px; font-family: 'Roboto Mono', monospace; margin: 20px 0; }
