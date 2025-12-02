@@ -2,29 +2,34 @@ import * as THREE from 'three';
 import { obstacles } from './state.js';
 
 const mat = {
-    skin: new THREE.MeshStandardMaterial({ color: 0xf5d7b8 }),
-    coat: new THREE.MeshStandardMaterial({ color: 0x8b4513 }),
-    enemyCoat: new THREE.MeshStandardMaterial({ color: 0x5a2c1c }),
-    poncho: new THREE.MeshStandardMaterial({ color: 0x4a5d23 }),
-    hat: new THREE.MeshStandardMaterial({ color: 0x42210b }),
-    blackHat: new THREE.MeshStandardMaterial({ color: 0x111111 }),
-    pants: new THREE.MeshStandardMaterial({ color: 0x333333 }),
-    belt: new THREE.MeshStandardMaterial({ color: 0x2e1a0f }),
-    red: new THREE.MeshStandardMaterial({ color: 0x8a0303 }),
-    green: new THREE.MeshStandardMaterial({ color: 0x2e7d32 }),
-    wood: new THREE.MeshStandardMaterial({ color: 0x8B4513 }),
-    gunMetal: new THREE.MeshStandardMaterial({ color: 0x222222 }), 
-    darkSteel: new THREE.MeshStandardMaterial({ color: 0x111111 }),
-    grey: new THREE.MeshStandardMaterial({ color: 0x808080 }), 
-    darkGrey: new THREE.MeshStandardMaterial({ color: 0x333333 }),
-    glass: new THREE.MeshStandardMaterial({ color: 0x8B4513, transparent: true, opacity: 0.8 }),
-    cork: new THREE.MeshStandardMaterial({ color: 0xd2b48c }),
-    gold: new THREE.MeshStandardMaterial({ color: 0xffd700 }),
+    // ROUGH TEXTURES (Cloth, Skin, Wood)
+    skin: new THREE.MeshStandardMaterial({ color: 0xf5d7b8, roughness: 1.0 }),
+    coat: new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 1.0 }),
+    enemyCoat: new THREE.MeshStandardMaterial({ color: 0x5a2c1c, roughness: 1.0 }),
+    poncho: new THREE.MeshStandardMaterial({ color: 0x4a5d23, roughness: 1.0 }),
+    hat: new THREE.MeshStandardMaterial({ color: 0x42210b, roughness: 1.0 }),
+    blackHat: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1.0 }),
+    pants: new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 }),
+    belt: new THREE.MeshStandardMaterial({ color: 0x2e1a0f, roughness: 0.8 }),
+    red: new THREE.MeshStandardMaterial({ color: 0x8a0303, roughness: 1.0 }),
+    green: new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 1.0 }),
+    wood: new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 }),
+    cork: new THREE.MeshStandardMaterial({ color: 0xd2b48c, roughness: 1.0 }),
+    
+    // SHINY METALS (Gun, Gold, Steel)
+    gunMetal: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.6 }), 
+    darkSteel: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3, metalness: 0.7 }),
+    grey: new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.5 }), 
+    darkGrey: new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 }),
+    gold: new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.2, metalness: 0.8 }),
+    
+    // SPECIAL
+    glass: new THREE.MeshStandardMaterial({ color: 0x8B4513, transparent: true, opacity: 0.8, roughness: 0.1 }),
     hpRed: new THREE.MeshBasicMaterial({ color: 0xff0000 }),
     hpGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00 })
 };
 
-// --- HELPER: Create a Detailed Revolver (Aligned -Z) ---
+
 function createRevolverMesh() {
     const gunGroup = new THREE.Group();
 
@@ -69,8 +74,7 @@ function createRevolverMesh() {
     return gunGroup;
 }
 
-// REPLACE THESE 2 FUNCTIONS IN src/assets.js
-
+// src/assets.js - Partial Update for Player
 export function createPlayerMesh() {
     const group = new THREE.Group();
     
@@ -79,16 +83,24 @@ export function createPlayerMesh() {
     mesh.rotation.y = Math.PI;
     group.add(mesh);
 
+    // Body & Clothes
     const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.5), mat.coat);
     body.position.y = 2.5; body.castShadow = true; mesh.add(body);
+    
     const belt = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.4, 1.6), mat.belt);
     belt.position.y = 1.6; mesh.add(belt);
+    // Gold Belt Buckle (Moved to -Z)
+    const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.1), mat.gold);
+    buckle.position.set(0, 0, -0.85); // [FIXED] Negative Z
+    belt.add(buckle);
 
+    // Legs
     const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants);
     leftLeg.position.set(-0.5, 0.75, 0); leftLeg.castShadow = true; leftLeg.name = 'leftLeg'; mesh.add(leftLeg);
     const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants);
     rightLeg.position.set(0.5, 0.75, 0); rightLeg.castShadow = true; rightLeg.name = 'rightLeg'; mesh.add(rightLeg);
 
+    // Arms
     const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), mat.coat);
     leftArm.position.set(-1.2, 2.5, 0); leftArm.castShadow = true; leftArm.name = 'leftArm'; mesh.add(leftArm);
     
@@ -105,23 +117,67 @@ export function createPlayerMesh() {
     rightHand.position.set(0, -1.5, 0); 
     rightArmPivot.add(rightHand);
 
+    // Gun
     const gunGroup = createRevolverMesh();
     gunGroup.position.set(0, -0.2, 0.2); 
-    // [FIX] Rotate -90 degrees (Negative)
     gunGroup.rotation.set(-Math.PI / 2, 0, 0); 
     rightHand.add(gunGroup); 
 
+    // --- DETAILED HEAD ---
+    const headGroup = new THREE.Group();
+    headGroup.position.y = 4.1;
+    mesh.add(headGroup);
+
+    // 1. Head Shape
     const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), mat.skin);
-    head.position.y = 4.1; head.castShadow = true; mesh.add(head);
+    head.castShadow = true; 
+    headGroup.add(head);
+
+    // 2. Eyes (Moved to -Z)
+    const eyeGeo = new THREE.BoxGeometry(0.25, 0.25, 0.1);
+    const pupilGeo = new THREE.BoxGeometry(0.1, 0.1, 0.11);
+    
+    const leftEye = new THREE.Group();
+    // [FIXED] Z is now -0.6 (Front of face)
+    leftEye.position.set(-0.3, 0.1, -0.6); 
+    const leWhite = new THREE.Mesh(eyeGeo, new THREE.MeshStandardMaterial({color: 0xffffff}));
+    const lePupil = new THREE.Mesh(pupilGeo, new THREE.MeshStandardMaterial({color: 0x000000}));
+    // Pupil pushed slightly forward in -Z direction
+    lePupil.position.z = -0.05; 
+    leftEye.add(leWhite); leftEye.add(lePupil);
+    headGroup.add(leftEye);
+
+    const rightEye = leftEye.clone();
+    rightEye.position.set(0.3, 0.1, -0.6); // [FIXED]
+    headGroup.add(rightEye);
+
+    // 3. Handlebar Mustache (Moved to -Z)
+    const stacheGeo = new THREE.BoxGeometry(0.8, 0.15, 0.1);
+    const stache = new THREE.Mesh(stacheGeo, mat.hat); 
+    // [FIXED] Z is now -0.6
+    stache.position.set(0, -0.25, -0.6); 
+    // Droopy bits
+    const stacheDrop = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 0.1), mat.hat);
+    stacheDrop.position.set(-0.4, -0.1, 0);
+    stache.add(stacheDrop);
+    const stacheDropR = stacheDrop.clone();
+    stacheDropR.position.set(0.4, -0.1, 0);
+    stache.add(stacheDropR);
+    headGroup.add(stache);
+
+    // 4. Hat
     const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 2.2), mat.hat);
-    hatBrim.position.y = 4.6; mesh.add(hatBrim);
+    hatBrim.position.y = 0.5; 
+    headGroup.add(hatBrim);
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 1.3), mat.hat);
-    hatTop.position.y = 5.0; mesh.add(hatTop);
+    hatTop.position.y = 0.9; 
+    headGroup.add(hatTop);
 
     group.userData = { muzzle: gunGroup.userData.muzzle, gunMesh: gunGroup, type: 'player' };
     return group;
 }
 
+// src/assets.js - Partial Update for Gunslinger
 export function createGunslingerMesh() {
     const group = new THREE.Group();
     
@@ -130,11 +186,32 @@ export function createGunslingerMesh() {
     mesh.rotation.y = Math.PI;
     group.add(mesh);
 
+    // Body
     const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.5), mat.blackHat);
     body.position.y = 2.5; body.castShadow = true; mesh.add(body);
+    
+    // Poncho
     const poncho = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 1.7), mat.poncho);
     poncho.position.y = 3.2; mesh.add(poncho);
 
+    // --- BANDOLIER (Moved to -Z to be on Front) ---
+    const bandolier = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.15, 1.6), mat.belt);
+    bandolier.rotation.z = -0.6; 
+    // [FIXED] Z changed from 0.05 to -0.05 (slightly forward) relative to body center? 
+    // Actually body depth is 1.5 (front is at -0.75).
+    // Let's attach it to the body surface:
+    bandolier.position.set(0, 0, -0.8); // [FIXED] Pushed to front
+    body.add(bandolier); 
+
+    // Add Bullets
+    for(let i = -0.8; i < 0.8; i += 0.4) {
+        const bullet = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.3, 0.15), mat.gold);
+        // Bullets stick out further in -Z
+        bullet.position.set(i, 0, -0.1); 
+        bandolier.add(bullet);
+    }
+
+    // Legs & Arms (Standard)
     const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants);
     leftLeg.position.set(-0.5, 0.75, 0); leftLeg.name = 'leftLeg'; mesh.add(leftLeg);
     const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants);
@@ -158,14 +235,23 @@ export function createGunslingerMesh() {
 
     const gunGroup = createRevolverMesh();
     gunGroup.position.set(0, -0.2, 0.2);
-    // [FIX] Rotate -90 degrees (Negative)
     gunGroup.rotation.set(-Math.PI / 2, 0, 0);
     rightHand.add(gunGroup); 
 
+    // Head
     const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), mat.skin);
     head.position.y = 4.1; mesh.add(head);
+    
+    // Bandana
     const bandana = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.6, 1.25), mat.red);
     bandana.position.y = 3.9; mesh.add(bandana);
+    
+    // Bandana Knot (On the BACK, which is +Z)
+    const knot = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.2), mat.red);
+    knot.position.set(0, 3.9, 0.7); // [FIXED] +Z is Back
+    knot.rotation.z = Math.PI / 4;
+    mesh.add(knot);
+
     const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 2.4), mat.blackHat);
     hatBrim.position.y = 4.6; mesh.add(hatBrim);
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.4), mat.blackHat);
