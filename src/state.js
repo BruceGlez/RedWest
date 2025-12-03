@@ -19,7 +19,9 @@ export const playerStats = {
     tripleShotTimer: 0
 };
 
+// Global Arrays
 export const obstacles = []; 
 export const bullets = [];
 export const enemies = [];
 export const particles = [];
+export const loots = []; 
