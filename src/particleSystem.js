@@ -2,10 +2,36 @@ import * as THREE from 'three';
 import { particles } from './state.js'; // Direct access to state
 import { playSound } from './audio.js';
 
+const PARTICLE_GEOMETRY = new THREE.BoxGeometry(0.5,0.5,0.5);
+const particlePool = [];
+
+function createParticleMesh() {
+    return new THREE.Mesh(PARTICLE_GEOMETRY, new THREE.MeshBasicMaterial({ color: 0xffffff }));
+}
+
+function acquireParticle() {
+    return particlePool.pop() || createParticleMesh();
+}
+
+function releaseParticle(scene, particle, index) {
+    scene.remove(particle);
+    particle.visible = false;
+    if(index >= 0) particles.splice(index, 1);
+    particlePool.push(particle);
+}
+
+export function clearParticles(scene) {
+    for(let i = particles.length - 1; i >= 0; i--) {
+        releaseParticle(scene, particles[i], i);
+    }
+}
+
 export function createExplosion(scene, pos, color) {
     playSound('boom');
     for(let i=0; i<8; i++) {
-        const m = new THREE.Mesh(new THREE.BoxGeometry(0.5,0.5,0.5), new THREE.MeshBasicMaterial({color:color}));
+        const m = acquireParticle();
+        m.visible = true;
+        m.material.color.setHex(color);
         m.position.copy(pos); 
         m.position.y += 1.5;
         m.userData = { 
@@ -25,8 +51,7 @@ export function updateParticles(dt, scene) {
         p.userData.vel.y -= 20 * dt; // Gravity
         
         if(p.userData.life <= 0 || p.position.y < 0) { 
-            scene.remove(p); 
-            particles.splice(i,1); 
+            releaseParticle(scene, p, i);
         }
     }
 }

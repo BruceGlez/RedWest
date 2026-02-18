@@ -1,5 +1,11 @@
 import * as THREE from 'three';
 import { obstacles } from './state.js';
+import { markObstacleGridDirty } from './physics.js';
+
+function addObstacle(obstacle) {
+    obstacles.push(obstacle);
+    markObstacleGridDirty();
+}
 
 const mat = {
     // ROUGH TEXTURES (Cloth, Skin, Wood)
@@ -169,12 +175,24 @@ export function createWhiskeyMesh() {
 
 export function createCrate(scene, x, z) {
     const size = 3.5;
+    const group = new THREE.Group();
     const crate = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), mat.wood);
-    crate.position.set(x, size/2, z); crate.castShadow = true; crate.receiveShadow = true;
-    const detail = new THREE.Mesh(new THREE.BoxGeometry(size+0.2, size*0.1, 0.2), mat.coat); detail.position.set(x, size/2, z+size/2); detail.rotation.z = Math.PI/4; scene.add(detail);
-    const detail2 = new THREE.Mesh(new THREE.BoxGeometry(size+0.2, size*0.1, 0.2), mat.coat); detail2.position.set(x, size/2, z+size/2); detail2.rotation.z = -Math.PI/4; scene.add(detail2);
-    scene.add(crate);
-    obstacles.push({ mesh: crate, x: x, z: z, radius: size * 0.7, destructible: true, type: 'crate' });
+    crate.position.set(0, size / 2, 0);
+    crate.castShadow = true;
+    crate.receiveShadow = true;
+    group.add(crate);
+
+    const detail = new THREE.Mesh(new THREE.BoxGeometry(size + 0.2, size * 0.1, 0.2), mat.coat);
+    detail.position.set(0, size / 2, size / 2);
+    detail.rotation.z = Math.PI / 4;
+    group.add(detail);
+    const detail2 = detail.clone();
+    detail2.rotation.z = -Math.PI / 4;
+    group.add(detail2);
+
+    group.position.set(x, 0, z);
+    scene.add(group);
+    addObstacle({ mesh: group, x: x, z: z, radius: size * 0.7, destructible: true, type: 'crate' });
 }
 
 
@@ -184,7 +202,7 @@ export function createCactus(scene, x, z) {
     const arm = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 1), mat.green); arm.position.set(1, 4, 0); group.add(arm);
     const armUp = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat.green); armUp.position.set(2, 5, 0); group.add(armUp);
     group.position.set(x, 0, z); scene.add(group);
-    obstacles.push({ mesh: group, x: x, z: z, radius: 1.5, destructible: true, type: 'cactus' });
+    addObstacle({ mesh: group, x: x, z: z, radius: 1.5, destructible: true, type: 'cactus' });
 }
 
 export function createAmmoMesh() {
@@ -230,7 +248,7 @@ export function createRock(scene, x, z) {
     mesh.position.set(x, scale * 0.3, z);
     mesh.castShadow = true; mesh.receiveShadow = true;
     scene.add(mesh);
-    obstacles.push({ mesh: mesh, x: x, z: z, radius: scale * 0.5, destructible: true, type: 'rock' });
+    addObstacle({ mesh: mesh, x: x, z: z, radius: scale * 0.5, destructible: true, type: 'rock' });
 }
 
 
@@ -249,7 +267,7 @@ export function createDeadTree(scene, x, z) {
         group.add(branch);
     }
     group.position.set(x, 0, z); scene.add(group);
-    obstacles.push({ mesh: group, x: x, z: z, radius: 1.0, destructible: true, type: 'tree' });
+    addObstacle({ mesh: group, x: x, z: z, radius: 1.0, destructible: true, type: 'tree' });
 }
 
 // [DESTRUCTIBLE] Fence
@@ -262,5 +280,5 @@ export function createFence(scene, x, z, angle) {
     const r1 = new THREE.Mesh(railGeo, mat.wood); r1.position.set(0, 1.8, 0); r1.rotation.z = (Math.random()-0.5)*0.1; group.add(r1);
     const r2 = new THREE.Mesh(railGeo, mat.wood); r2.position.set(0, 1.0, 0); r2.rotation.z = (Math.random()-0.5)*0.1; group.add(r2);
     group.position.set(x, 0, z); group.rotation.y = angle; scene.add(group);
-    obstacles.push({ mesh: group, x: x, z: z, radius: 1.5, destructible: true, type: 'fence' });
+    addObstacle({ mesh: group, x: x, z: z, radius: 1.5, destructible: true, type: 'fence' });
 }

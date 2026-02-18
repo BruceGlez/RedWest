@@ -1,9 +1,10 @@
 import * as THREE from 'three';
 import { createBossMesh, createWolfMesh, createGunslingerMesh, createEnemyMesh } from './assets.js';
-import { gameState, enemies, bullets, playerStats } from './state.js';
+import { gameState, enemies, playerStats } from './state.js';
 import { checkCollision } from './physics.js';
 import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
+import { spawnBullet } from './bulletSystem.js';
 
 /**
  * Handles enemy shooting logic (creation of bullets and sound)
@@ -17,10 +18,8 @@ export function enemyShoot(enemy, playerPos, scene) {
     const shotCount = isBoss ? 3 : 1;
 
     for(let i = 0; i < shotCount; i++) {
-        const bullet = new THREE.Mesh(new THREE.SphereGeometry(0.35), new THREE.MeshBasicMaterial({ color: 0xff0000 }));
         const gunPos = new THREE.Vector3(); 
         muzzle.getWorldPosition(gunPos); 
-        bullet.position.copy(gunPos);
         
         // Add slight inaccuracy/spread
         const target = playerPos.clone(); 
@@ -35,9 +34,7 @@ export function enemyShoot(enemy, playerPos, scene) {
             dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), (i - 1) * 0.15);
         }
         
-        bullet.userData = { velocity: dir.multiplyScalar(40), owner: 'enemy' };
-        scene.add(bullet); 
-        bullets.push(bullet);
+        spawnBullet(scene, 'enemy', gunPos, dir.multiplyScalar(40));
     }
 
     // Muzzle flash visual

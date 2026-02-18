@@ -25,3 +25,27 @@ export const bullets = [];
 export const enemies = [];
 export const particles = [];
 export const loots = []; 
+
+export function resetGameState() {
+    gameState.score = 0;
+    gameState.isGameOver = false;
+    gameState.isGameStarted = false;
+    gameState.enemySpawnTimer = 0;
+}
+
+export function resetPlayerStats() {
+    playerStats.hp = playerStats.maxHp;
+    playerStats.isDashing = false;
+    playerStats.dashCooldown = 0;
+    playerStats.dashDuration = 0;
+    playerStats.shootCooldown = 0;
+    playerStats.tripleShotTimer = 0;
+}
+
+export function clearDynamicState() {
+    obstacles.length = 0;
+    bullets.length = 0;
+    enemies.length = 0;
+    particles.length = 0;
+    loots.length = 0;
+}
