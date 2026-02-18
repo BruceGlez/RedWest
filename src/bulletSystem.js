@@ -98,7 +98,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
             
             if(hitObs.destructible) {
                 runStats.obstaclesDestroyed++;
-                playSound('thud'); 
+                playSound('break'); 
                 scene.remove(hitObs.mesh);
                 
                 // Remove from obstacles array
@@ -123,6 +123,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
             if(dist < 1.0 && !playerStats.isDashing) { 
                 playerStats.hp--; 
                 runStats.damageTaken++;
+                playSound('hit');
                 callbacks.onUpdateHUD(); 
                 createExplosion(scene, playerGroup.position, 0xff0000); 
                 releaseBullet(scene, b, i);
@@ -165,7 +166,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     callbacks.onUpdateHUD();
                 } else { 
                     // Enemy Hit
-                    playSound('thud'); 
+                    playSound('hit'); 
                     createExplosion(scene, e.position, 0xffaa00); 
                     // Knockback (except boss)
                     if(e.userData.type !== 'boss') {

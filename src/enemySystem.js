@@ -163,6 +163,7 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         if(e.position.distanceTo(playerGroup.position) < 2.5 && !playerStats.isDashing) {
             playerStats.hp--; 
             gameState.runStats.damageTaken++;
+            playSound('hit');
             
             // Trigger UI update callback
             if (callbacks.onUpdateHUD) callbacks.onUpdateHUD(); 
