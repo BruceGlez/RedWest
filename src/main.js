@@ -29,17 +29,24 @@ ui.updateLeaderboard(loadHighScores());
 ui.setPreferredName(getPreferredPlayerName());
 ui.updateHUD();
 ui.updateDashBar(1);
-ui.bindAudioControls(() => {
-    toggleMusicEnabled();
-    ui.updateAudioControls(getAudioSettings());
-}, () => {
-    toggleSfxEnabled();
-    ui.updateAudioControls(getAudioSettings());
-});
-ui.updateAudioControls(getAudioSettings());
 
 const playerSystem = createPlayerSystem(scene, camera, gameState, playerStats);
 const gameLoop = createGameLoop(scene, camera, renderer, playerSystem, ui);
+ui.bindControlHandlers({
+    onResumeGame: () => gameLoop.resumeGame(),
+    onOpenSettings: () => gameLoop.openSettings(),
+    onCloseSettings: () => gameLoop.closeSettings(),
+    onRestartRun: () => gameLoop.resetGame(),
+    onToggleMusic: () => {
+        toggleMusicEnabled();
+        ui.updateAudioControls(getAudioSettings());
+    },
+    onToggleSfx: () => {
+        toggleSfxEnabled();
+        ui.updateAudioControls(getAudioSettings());
+    }
+});
+ui.updateAudioControls(getAudioSettings());
 gameLoop.start();
 
 window.addEventListener('resize', () => {

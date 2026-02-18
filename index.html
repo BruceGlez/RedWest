@@ -15,15 +15,20 @@
     <div id="ui-layer">
         <div class="hud-top-left">
             <div class="hud-row">SCORE: <span id="score">0</span></div>
+            <div class="hud-row">WAVE: <span id="wave">1</span> <span id="wave-timer"></span></div>
+            <div class="hud-row">WEAPON: <span id="weapon-label">REVOLVER</span></div>
             <div id="health-container" class="hud-row">&#10084;&#10084;&#10084;&#10084;&#10084;</div>
             <div id="status-msg"></div> </div>
     </div>
-    <div id="pause-overlay" class="pause-overlay" style="display:none;">PAUSED</div>
-    <div id="debug-panel" class="debug-panel"></div>
-    <div id="audio-controls" class="audio-controls">
-        <button id="toggle-music-btn" type="button">Music: ON</button>
-        <button id="toggle-sfx-btn" type="button">SFX: ON</button>
+    <div id="wave-banner" class="wave-banner" style="display:none;"></div>
+    <div id="pause-overlay" class="pause-overlay" style="display:none;">
+        <div class="pause-title">PAUSED</div>
+        <div class="pause-actions">
+            <button id="pause-resume-btn" type="button">RESUME</button>
+            <button id="pause-settings-btn" type="button">SETTINGS</button>
+        </div>
     </div>
+    <div id="debug-panel" class="debug-panel"></div>
 
     <div id="dash-bar-container">
         <div id="dash-bar-label">STAMINA</div>
@@ -43,9 +48,10 @@
                 <p><span>WASD</span> MOVE</p>
                 <p><span>MOUSE</span> AIM / SHOOT</p>
                 <p><span>SHIFT</span> DASH</p>
+                <p><span>Q</span> SWITCH WEAPON</p>
                 <p><span>P / ESC</span> PAUSE</p>
-                <p><span>M</span> TOGGLE MUSIC</p>
-                <p><span>N</span> TOGGLE SFX</p>
+                <p><span>O</span> SETTINGS</p>
+                <p><span>M / N</span> TOGGLE MUSIC / SFX</p>
             </div>
             <p class="blink-text">PRESS <span class="key-highlight">SPACE</span> TO DRAW</p>
         </div>
@@ -69,6 +75,21 @@
             <p id="restart-msg" class="restart-text" style="display: none;">
                 PRESS <span class="key-highlight">R</span> TO RESTART
             </p>
+        </div>
+    </div>
+
+    <div id="settings-modal" class="modal-overlay" style="display:none;">
+        <div class="modal-content settings-modal-content">
+            <h2 class="settings-title">SETTINGS</h2>
+            <div class="settings-actions">
+                <button id="settings-music-btn" type="button">Music: ON</button>
+                <button id="settings-sfx-btn" type="button">SFX: ON</button>
+            </div>
+            <div class="settings-actions">
+                <button id="settings-resume-btn" type="button">RESUME</button>
+                <button id="settings-restart-btn" type="button">RESTART RUN</button>
+                <button id="settings-close-btn" type="button">CLOSE</button>
+            </div>
         </div>
     </div>
 

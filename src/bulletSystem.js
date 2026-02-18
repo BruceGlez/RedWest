@@ -150,6 +150,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                 releaseBullet(scene, b, i);
                 bulletHit = true;
                 e.userData.hp--;
+                runStats.shotsHit++;
                 
                 if(e.userData.hp <= 0) { 
                     // Enemy Dead

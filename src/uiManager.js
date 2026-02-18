@@ -1,11 +1,24 @@
 export function createUIManager(gameState, playerStats, onSaveScore) {
     let preferredName = '';
+    let waveBannerTimeoutId = null;
     const els = {
         score: document.getElementById('score'),
+        wave: document.getElementById('wave'),
+        waveTimer: document.getElementById('wave-timer'),
+        weaponLabel: document.getElementById('weapon-label'),
         health: document.getElementById('health-container'),
         status: document.getElementById('status-msg'),
+        waveBanner: document.getElementById('wave-banner'),
         dashBar: document.getElementById('dash-bar'),
         pauseOverlay: document.getElementById('pause-overlay'),
+        pauseResumeBtn: document.getElementById('pause-resume-btn'),
+        pauseSettingsBtn: document.getElementById('pause-settings-btn'),
+        settingsModal: document.getElementById('settings-modal'),
+        settingsMusicBtn: document.getElementById('settings-music-btn'),
+        settingsSfxBtn: document.getElementById('settings-sfx-btn'),
+        settingsResumeBtn: document.getElementById('settings-resume-btn'),
+        settingsRestartBtn: document.getElementById('settings-restart-btn'),
+        settingsCloseBtn: document.getElementById('settings-close-btn'),
         startScreen: document.getElementById('start-screen'),
         gameOver: document.getElementById('gameover'),
         finalScore: document.getElementById('finalScore'),
@@ -14,8 +27,6 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         playerName: document.getElementById('playerName'),
         playerNameList: document.getElementById('player-name-list'),
         saveButton: document.getElementById('saveScoreBtn'),
-        toggleMusicBtn: document.getElementById('toggle-music-btn'),
-        toggleSfxBtn: document.getElementById('toggle-sfx-btn'),
         leaderboard: document.getElementById('highscore-list'),
         debugPanel: document.getElementById('debug-panel'),
         runStatsTable: document.getElementById('run-stats-table')
@@ -39,7 +50,17 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         }
         els.health.innerHTML = hearts.join('');
         els.score.innerText = gameState.score;
+        els.wave.innerText = gameState.waveNumber;
+        els.weaponLabel.innerText = playerStats.weapon.toUpperCase();
 
+        if(gameState.isIntermission) {
+            els.waveTimer.innerText = `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
+            els.status.className = '';
+            els.status.innerText = 'GET READY FOR NEXT WAVE';
+            return;
+        }
+
+        els.waveTimer.innerText = `${Math.ceil(Math.max(0, gameState.waveTimer))}s`;
         if(playerStats.tripleShotTimer > 0) {
             els.status.className = 'status-power';
             els.status.innerText = `TRIPLE SHOT: ${Math.ceil(playerStats.tripleShotTimer)}s`;
@@ -54,16 +75,30 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.dashBar.className = percent >= 1 ? 'dash-ready' : 'dash-cooldown';
     }
 
+    function showWaveBanner(text, durationMs = 1800) {
+        if(!els.waveBanner) return;
+        els.waveBanner.innerText = text;
+        els.waveBanner.style.display = 'block';
+        if(waveBannerTimeoutId) clearTimeout(waveBannerTimeoutId);
+        waveBannerTimeoutId = setTimeout(() => {
+            els.waveBanner.style.display = 'none';
+            waveBannerTimeoutId = null;
+        }, durationMs);
+    }
+
     function renderRunStats() {
         if(!els.runStatsTable) return;
         const s = gameState.runStats;
+        const accuracy = s.shotsFired > 0 ? `${Math.round((s.shotsHit / s.shotsFired) * 100)}%` : '0%';
         const rows = [
+            ['Wave reached', s.waveReached],
             ['Enemies destroyed', s.enemiesKilled],
             ['Bandits destroyed', s.banditsKilled],
             ['Gunslingers destroyed', s.gunslingersKilled],
             ['Wolves destroyed', s.wolvesKilled],
             ['Bosses destroyed', s.bossesKilled],
             ['Shots fired', s.shotsFired],
+            ['Shot accuracy', accuracy],
             ['Damage taken', s.damageTaken],
             ['Obstacles destroyed', s.obstaclesDestroyed],
             ['Loot collected', s.lootCollected],
@@ -84,6 +119,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
     }
 
     function showGameOver() {
+        hidePauseOverlay();
+        hideSettingsModal();
         els.gameOver.style.display = 'flex';
         els.finalScore.innerText = gameState.score;
         renderRunStats();
@@ -156,6 +193,35 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         if(els.pauseOverlay) els.pauseOverlay.style.display = 'none';
     }
 
+    function showSettingsModal() {
+        if(els.settingsModal) els.settingsModal.style.display = 'flex';
+    }
+
+    function hideSettingsModal() {
+        if(els.settingsModal) els.settingsModal.style.display = 'none';
+    }
+
+    function bindControlHandlers(handlers) {
+        if(els.pauseResumeBtn) els.pauseResumeBtn.addEventListener('click', handlers.onResumeGame);
+        if(els.pauseSettingsBtn) els.pauseSettingsBtn.addEventListener('click', handlers.onOpenSettings);
+        if(els.settingsCloseBtn) els.settingsCloseBtn.addEventListener('click', handlers.onCloseSettings);
+        if(els.settingsResumeBtn) els.settingsResumeBtn.addEventListener('click', handlers.onResumeGame);
+        if(els.settingsRestartBtn) els.settingsRestartBtn.addEventListener('click', handlers.onRestartRun);
+        if(els.settingsMusicBtn) els.settingsMusicBtn.addEventListener('click', handlers.onToggleMusic);
+        if(els.settingsSfxBtn) els.settingsSfxBtn.addEventListener('click', handlers.onToggleSfx);
+    }
+
+    function updateAudioControls(settings) {
+        if(els.settingsMusicBtn) {
+            els.settingsMusicBtn.textContent = `Music: ${settings.musicEnabled ? 'ON' : 'OFF'}`;
+            els.settingsMusicBtn.className = settings.musicEnabled ? '' : 'off';
+        }
+        if(els.settingsSfxBtn) {
+            els.settingsSfxBtn.textContent = `SFX: ${settings.sfxEnabled ? 'ON' : 'OFF'}`;
+            els.settingsSfxBtn.className = settings.sfxEnabled ? '' : 'off';
+        }
+    }
+
     function updateDebug(debugData) {
         if(!els.debugPanel) return;
         els.debugPanel.textContent =
@@ -170,25 +236,10 @@ Grid cells: O=${debugData.obstacleCells} E=${debugData.enemyCells}
 Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
     }
 
-    function bindAudioControls(onToggleMusic, onToggleSfx) {
-        if(els.toggleMusicBtn) els.toggleMusicBtn.addEventListener('click', onToggleMusic);
-        if(els.toggleSfxBtn) els.toggleSfxBtn.addEventListener('click', onToggleSfx);
-    }
-
-    function updateAudioControls(settings) {
-        if(els.toggleMusicBtn) {
-            els.toggleMusicBtn.textContent = `Music: ${settings.musicEnabled ? 'ON' : 'OFF'}`;
-            els.toggleMusicBtn.className = settings.musicEnabled ? '' : 'off';
-        }
-        if(els.toggleSfxBtn) {
-            els.toggleSfxBtn.textContent = `SFX: ${settings.sfxEnabled ? 'ON' : 'OFF'}`;
-            els.toggleSfxBtn.className = settings.sfxEnabled ? '' : 'off';
-        }
-    }
-
     return {
         updateHUD,
         updateDashBar,
+        showWaveBanner,
         showGameOver,
         hideGameOverScreen,
         showStartScreen,
@@ -196,10 +247,12 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         updateLeaderboard,
         canRestart,
         updateDebug,
-        bindAudioControls,
+        bindControlHandlers,
         updateAudioControls,
         setPreferredName,
         showPauseOverlay,
-        hidePauseOverlay
+        hidePauseOverlay,
+        showSettingsModal,
+        hideSettingsModal
     };
 }

@@ -31,6 +31,7 @@ canvas {
 }
 
 #score { color: #ffd700; font-family: 'Roboto Mono', monospace; }
+#wave, #wave-timer, #weapon-label { color: #ffcc80; font-family: 'Roboto Mono', monospace; }
 #health-container { color: #ff0044; font-size: 32px; letter-spacing: 2px; }
 #status-msg { color: #00ffcc; font-size: 20px; font-weight: bold; margin-top: 5px; text-shadow: 1px 1px 4px black; }
 .heart-dim { opacity: 0.3; }
@@ -76,15 +77,51 @@ canvas {
     left: 50%;
     transform: translate(-50%, -50%);
     z-index: 18;
-    padding: 10px 18px;
+    padding: 18px 22px;
     border: 2px solid #ffd700;
     background: rgba(0, 0, 0, 0.55);
     color: #ffd700;
     font-family: 'Roboto Mono', monospace;
-    font-size: 28px;
+    font-size: 20px;
     letter-spacing: 2px;
     text-shadow: 2px 2px 0 #000;
-    pointer-events: none;
+    pointer-events: auto;
+    text-align: center;
+}
+
+.pause-title {
+    margin-bottom: 10px;
+}
+
+.pause-actions {
+    display: flex;
+    justify-content: center;
+    gap: 8px;
+}
+
+.pause-actions button {
+    background: rgba(15, 15, 15, 0.82);
+    color: #f5f5f5;
+    border: 1px solid #8d6e63;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 12px;
+    padding: 6px 10px;
+    cursor: pointer;
+}
+
+.wave-banner {
+    position: absolute;
+    top: 90px;
+    left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    padding: 8px 14px;
+    background: rgba(0, 0, 0, 0.45);
+    border: 1px solid #ffd700;
+    color: #ffd700;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 20px;
+    letter-spacing: 1px;
 }
 
 .debug-panel {
@@ -105,28 +142,38 @@ canvas {
     pointer-events: none;
 }
 
-.audio-controls {
-    position: absolute;
-    right: 20px;
-    bottom: 24px;
-    z-index: 13;
-    display: flex;
-    gap: 8px;
-}
-
-.audio-controls button {
+.settings-actions button {
     background: rgba(15, 15, 15, 0.82);
     color: #f5f5f5;
     border: 1px solid #8d6e63;
     font-family: 'Roboto Mono', monospace;
-    font-size: 12px;
-    padding: 6px 10px;
+    font-size: 14px;
+    padding: 8px 12px;
     cursor: pointer;
 }
 
-.audio-controls button.off {
+.settings-actions button.off {
     color: #ff8a80;
     border-color: #b71c1c;
+}
+
+.settings-modal-content {
+    max-width: 560px;
+}
+
+.settings-title {
+    margin: 0 0 18px 0;
+    color: #ffd700;
+    font-size: 34px;
+    letter-spacing: 2px;
+}
+
+.settings-actions {
+    display: flex;
+    justify-content: center;
+    gap: 10px;
+    margin-bottom: 10px;
+    flex-wrap: wrap;
 }
 
 .modal-overlay {

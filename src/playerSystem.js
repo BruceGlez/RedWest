@@ -13,22 +13,36 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     const raycaster = new THREE.Raycaster();
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
 
+    const WEAPONS = {
+        revolver: { pellets: 1, spread: 0, speed: 70, fireRate: 0.2 },
+        shotgun: { pellets: 7, spread: 0.38, speed: 62, fireRate: 0.75 }
+    };
+
     function shoot() {
         if(gameState.isGameOver || !gameState.isGameStarted) return;
         playerGroup.userData.isAiming = true;
         playerGroup.userData.aimTimer = 0.5;
         playSound('shoot');
 
-        const shotCount = playerStats.tripleShotTimer > 0 ? 3 : 1;
+        const weaponCfg = WEAPONS[playerStats.weapon] || WEAPONS.revolver;
+        const volleyOffsets = playerStats.tripleShotTimer > 0 ? [-0.15, 0, 0.15] : [0];
+        const pelletsPerVolley = weaponCfg.pellets;
         const gunPos = new THREE.Vector3();
         playerGroup.userData.muzzle.getWorldPosition(gunPos);
 
-        for(let i = 0; i < shotCount; i++) {
-            const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(playerGroup.quaternion);
-            if(shotCount > 1) dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), (i - 1) * 0.15);
-            spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(70));
+        for(const volleyOffset of volleyOffsets) {
+            for(let i = 0; i < pelletsPerVolley; i++) {
+                const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(playerGroup.quaternion);
+                let pelletOffset = 0;
+                if(pelletsPerVolley > 1) {
+                    const spreadStep = weaponCfg.spread / Math.max(1, pelletsPerVolley - 1);
+                    pelletOffset = (-weaponCfg.spread * 0.5) + (spreadStep * i);
+                }
+                dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), volleyOffset + pelletOffset);
+                spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(weaponCfg.speed));
+            }
         }
-        gameState.runStats.shotsFired += shotCount;
+        gameState.runStats.shotsFired += volleyOffsets.length * pelletsPerVolley;
 
         playerGroup.userData.muzzle.intensity = 5;
         setTimeout(() => playerGroup.userData.muzzle.intensity = 0, 50);
@@ -36,6 +50,14 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     }
 
     function update(dt, timeInSeconds) {
+        if(keys.weaponSwitchRequested) {
+            keys.weaponSwitchRequested = false;
+            playerStats.weapon = playerStats.weapon === 'revolver' ? 'shotgun' : 'revolver';
+        }
+
+        const weaponCfg = WEAPONS[playerStats.weapon] || WEAPONS.revolver;
+        playerStats.fireRate = weaponCfg.fireRate;
+
         if(keys.shift && playerStats.dashCooldown <= 0) {
             playerStats.isDashing = true;
             playerStats.dashDuration = 0.15;
@@ -94,6 +116,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         playerGroup.rotation.set(0, 0, 0);
         playerGroup.userData.isAiming = false;
         playerGroup.userData.aimTimer = 0;
+        playerStats.weapon = 'revolver';
     }
 
     return { playerGroup, update, reset };

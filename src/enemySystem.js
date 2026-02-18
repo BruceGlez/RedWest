@@ -45,34 +45,46 @@ export function enemyShoot(enemy, playerPos, scene) {
 /**
  * Spawns a random enemy at a safe distance from the player
  */
-export function spawnEnemy(scene, playerPos) {
+export function spawnEnemy(scene, playerPos, requestedType = null) {
     const r = Math.random();
     let enemy, speed, type, hp;
     const randomScale = 0.85 + Math.random() * 0.3;
+    const wave = gameState.waveNumber;
 
-    // 10% Boss, 30% Wolf, 30% Gunslinger, 30% Bandit
-    if (r < 0.1) { 
+    let spawnType = requestedType;
+    if(!spawnType) {
+        // Wave-driven enemy distribution
+        const bossChance = Math.min(0.05 + (wave * 0.01), 0.22);
+        const gunslingerChance = Math.min(0.15 + (wave * 0.03), 0.45);
+        const wolfChance = (wave < 4) ? 0.45 : 0.30;
+        if(r < bossChance && wave >= 3) spawnType = 'boss';
+        else if(r < bossChance + gunslingerChance) spawnType = 'gunslinger';
+        else if(r < bossChance + gunslingerChance + wolfChance) spawnType = 'wolf';
+        else spawnType = 'bandit';
+    }
+
+    if (spawnType === 'boss') { 
         enemy = createBossMesh(); 
         enemy.scale.setScalar(1.2); 
-        speed = 3.5; 
+        speed = 3.2 + Math.min(wave * 0.08, 1.5); 
         type = 'boss'; 
-        hp = 15; 
-    } else if (r < 0.4) { 
+        hp = 12 + Math.floor(wave * 1.5); 
+    } else if (spawnType === 'wolf') { 
         enemy = createWolfMesh(); 
         enemy.scale.setScalar(randomScale); 
-        speed = 12 + (gameState.score * 0.15); 
+        speed = 10 + Math.min(wave * 0.7, 8); 
         type = 'wolf'; 
         hp = 1;
-    } else if (r < 0.7) { 
+    } else if (spawnType === 'gunslinger') { 
         enemy = createGunslingerMesh(); 
         enemy.scale.setScalar(randomScale); 
-        speed = 5 + (gameState.score * 0.05); 
+        speed = 5 + Math.min(wave * 0.4, 4); 
         type = 'gunslinger'; 
-        hp = 1;
+        hp = Math.max(1, Math.floor(wave / 5));
     } else { 
         enemy = createEnemyMesh(); 
         enemy.scale.setScalar(randomScale); 
-        speed = 8 + (gameState.score * 0.1); 
+        speed = 7 + Math.min(wave * 0.5, 6); 
         type = 'bandit'; 
         hp = 1; 
     }

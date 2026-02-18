@@ -27,21 +27,26 @@ export function updateLoots(dt, scene, playerGroup) {
         l.position.y = 0.5 + Math.sin(time * 3 + l.userData.floatOffset) * 0.2;
         
         if(l.position.distanceTo(playerGroup.position) < 2.0) {
+            let consumeLoot = false;
             if(l.userData.type === 'ammo') { 
                 playerStats.tripleShotTimer = 10.0; 
                 playSound('powerup'); 
                 gameState.runStats.lootCollected++;
                 gameState.runStats.ammoCollected++;
+                consumeLoot = true;
                 needsHudUpdate = true;
             } else if (playerStats.hp < playerStats.maxHp) { 
                 playerStats.hp++; 
                 playSound('powerup'); 
                 gameState.runStats.lootCollected++;
                 gameState.runStats.whiskeyCollected++;
+                consumeLoot = true;
                 needsHudUpdate = true;
             }
-            scene.remove(l); 
-            loots.splice(i,1); 
+            if(consumeLoot) {
+                scene.remove(l); 
+                loots.splice(i,1); 
+            }
         }
     }
     return needsHudUpdate;

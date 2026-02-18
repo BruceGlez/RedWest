@@ -9,10 +9,69 @@ import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats }
 import { updateParticles, clearParticles, getParticlePoolStats } from './particleSystem.js';
 import { markObstacleGridDirty, getGridStats } from './physics.js';
 
+const ENEMY_COST = {
+    bandit: 1.0,
+    wolf: 1.2,
+    gunslinger: 2.0,
+    boss: 8.0
+};
+
+function getWaveDuration(wave) {
+    return Math.max(18, 34 - (wave * 1.25));
+}
+
+function getBaseSpawnInterval(wave) {
+    return Math.max(0.3, 1.25 - (wave * 0.06));
+}
+
+function getWaveBudget(wave) {
+    return 12 + (wave * 4.5);
+}
+
+function getWaveCaps(wave) {
+    return {
+        bandit: 10 + Math.floor(wave * 0.8),
+        wolf: 4 + Math.floor(wave * 0.45),
+        gunslinger: Math.max(1, Math.floor(wave / 2)),
+        boss: wave >= 5 ? 1 : 0
+    };
+}
+
+function getWaveWeights(wave) {
+    return {
+        bandit: Math.max(0.8, 2.4 - (wave * 0.12)),
+        wolf: Math.min(2.2, 0.8 + (wave * 0.16)),
+        gunslinger: Math.min(2.4, 0.3 + (wave * 0.2)),
+        boss: wave >= 5 ? 0.1 : 0
+    };
+}
+
+function getActiveEnemyCounts() {
+    const counts = { bandit: 0, wolf: 0, gunslinger: 0, boss: 0 };
+    for(const e of enemies) {
+        const t = e.userData.type;
+        if(counts[t] !== undefined) counts[t]++;
+    }
+    return counts;
+}
+
+function chooseWeightedType(candidates) {
+    let totalWeight = 0;
+    for(const c of candidates) totalWeight += c.weight;
+    if(totalWeight <= 0) return null;
+    let r = Math.random() * totalWeight;
+    for(const c of candidates) {
+        r -= c.weight;
+        if(r <= 0) return c.type;
+    }
+    return candidates[candidates.length - 1]?.type || null;
+}
+
 export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
     let lastTime = 0;
     let debugElapsed = 0;
     let fpsSmoothed = 60;
+    let pausedBeforeSettings = false;
 
     const callbacks = {
         onUpdateHUD: () => ui.updateHUD(),
@@ -24,13 +83,113 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         }
     };
 
+    function beginWave(waveNumber) {
+        gameState.waveNumber = waveNumber;
+        gameState.waveDuration = getWaveDuration(waveNumber);
+        gameState.waveTimer = gameState.waveDuration;
+        gameState.isIntermission = false;
+        gameState.intermissionTimer = 0;
+        gameState.waveBossSpawned = false;
+        gameState.waveBudgetRemaining = getWaveBudget(waveNumber);
+        gameState.enemySpawnTimer = 0.55;
+        gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, waveNumber);
+        ui.showWaveBanner(`WAVE ${waveNumber}`);
+    }
+
+    function beginIntermission() {
+        gameState.isIntermission = true;
+        gameState.intermissionTimer = 6;
+        gameState.enemySpawnTimer = 0;
+        ui.showWaveBanner('INTERMISSION', 1200);
+    }
+
+    function trySpawnDirectorEnemy() {
+        const wave = gameState.waveNumber;
+        const remaining = gameState.waveBudgetRemaining;
+        if(remaining < ENEMY_COST.bandit) return;
+
+        const caps = getWaveCaps(wave);
+        const weights = getWaveWeights(wave);
+        const active = getActiveEnemyCounts();
+        const candidates = [];
+        const timeElapsed = gameState.waveDuration - gameState.waveTimer;
+        const canSpawnBoss = !gameState.waveBossSpawned && wave >= 5 && (timeElapsed >= Math.max(6, gameState.waveDuration * 0.4));
+
+        for(const type of ['bandit', 'wolf', 'gunslinger', 'boss']) {
+            if(type === 'boss' && !canSpawnBoss) continue;
+            if(active[type] >= (caps[type] || 0)) continue;
+            if(ENEMY_COST[type] > remaining) continue;
+            candidates.push({ type, weight: weights[type] || 0 });
+        }
+
+        const chosenType = chooseWeightedType(candidates);
+        if(!chosenType) return;
+
+        spawnEnemy(scene, playerSystem.playerGroup.position, chosenType);
+        gameState.waveBudgetRemaining = Math.max(0, gameState.waveBudgetRemaining - ENEMY_COST[chosenType]);
+        if(chosenType === 'boss') gameState.waveBossSpawned = true;
+    }
+
+    function pauseGame() {
+        if(!gameState.isGameStarted || gameState.isGameOver) return;
+        gameState.isPaused = true;
+        ui.showPauseOverlay();
+    }
+
+    function resumeGame() {
+        gameState.isPaused = false;
+        gameState.isSettingsOpen = false;
+        pausedBeforeSettings = false;
+        ui.hidePauseOverlay();
+        ui.hideSettingsModal();
+    }
+
+    function openSettings() {
+        if(!gameState.isGameStarted || gameState.isGameOver) return;
+        if(gameState.isSettingsOpen) return;
+        pausedBeforeSettings = gameState.isPaused;
+        gameState.isPaused = true;
+        gameState.isSettingsOpen = true;
+        ui.hidePauseOverlay();
+        ui.showSettingsModal();
+    }
+
+    function closeSettings() {
+        if(!gameState.isSettingsOpen) return;
+        gameState.isSettingsOpen = false;
+        ui.hideSettingsModal();
+        gameState.isPaused = pausedBeforeSettings;
+        if(gameState.isPaused) ui.showPauseOverlay();
+        else ui.hidePauseOverlay();
+        pausedBeforeSettings = false;
+    }
+
+    function togglePause() {
+        if(!gameState.isGameStarted || gameState.isGameOver) return;
+        if(gameState.isPaused) resumeGame();
+        else pauseGame();
+    }
+
+    function toggleSettings() {
+        if(!gameState.isGameStarted || gameState.isGameOver) return;
+        if(gameState.isSettingsOpen) closeSettings();
+        else openSettings();
+    }
+
     function handlePauseToggle() {
         if(!keys.pauseToggleRequested) return;
         keys.pauseToggleRequested = false;
-        if(!gameState.isGameStarted || gameState.isGameOver) return;
-        gameState.isPaused = !gameState.isPaused;
-        if(gameState.isPaused) ui.showPauseOverlay();
-        else ui.hidePauseOverlay();
+        if(gameState.isSettingsOpen) {
+            closeSettings();
+            return;
+        }
+        togglePause();
+    }
+
+    function handleSettingsToggle() {
+        if(!keys.settingsToggleRequested) return;
+        keys.settingsToggleRequested = false;
+        toggleSettings();
     }
 
     function handleAudioToggles() {
@@ -91,13 +250,44 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         resetPlayerStats();
         keys.restartRequested = false;
         keys.pauseToggleRequested = false;
+        keys.settingsToggleRequested = false;
+        keys.weaponSwitchRequested = false;
+        keys.musicToggleRequested = false;
+        keys.sfxToggleRequested = false;
         playerSystem.reset();
         generateMap(scene);
         ui.hideGameOverScreen();
         ui.hidePauseOverlay();
+        ui.hideSettingsModal();
         ui.showStartScreen();
         ui.updateHUD();
         ui.updateDashBar(1);
+    }
+
+    function updateWaveFlow(dt) {
+        if(gameState.isIntermission) {
+            gameState.intermissionTimer -= dt;
+            if(gameState.intermissionTimer <= 0) beginWave(gameState.waveNumber + 1);
+            return;
+        }
+
+        gameState.waveTimer -= dt;
+        if(gameState.waveTimer <= 0) {
+            beginIntermission();
+            return;
+        }
+
+        gameState.enemySpawnTimer -= dt;
+        if(gameState.enemySpawnTimer > 0) return;
+
+        const phase = gameState.waveTimer / gameState.waveDuration;
+        let phaseMultiplier = 1;
+        if(phase > 0.66) phaseMultiplier = 1.15; // slower opener
+        else if(phase > 0.33) phaseMultiplier = 0.85; // pressure spike
+        else phaseMultiplier = 1.0; // stabilize ending
+
+        trySpawnDirectorEnemy();
+        gameState.enemySpawnTimer = getBaseSpawnInterval(gameState.waveNumber) * phaseMultiplier;
     }
 
     function tick(time) {
@@ -105,7 +295,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         const dt = Math.min((time - lastTime) / 1000, 0.1);
         lastTime = time;
         const timeInSeconds = time / 1000;
+
         handlePauseToggle();
+        handleSettingsToggle();
         handleAudioToggles();
 
         if(!gameState.isGameStarted) {
@@ -118,6 +310,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
                 ui.hideStartScreen();
                 camera.position.set(0, 35, 25);
                 resumeAudio();
+                beginWave(1);
             }
             return;
         }
@@ -129,8 +322,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             return;
         }
 
-        if(gameState.isPaused) {
+        if(gameState.isPaused || gameState.isSettingsOpen) {
             renderer.render(scene, camera);
+            ui.updateHUD();
             emitDebug(dt);
             return;
         }
@@ -140,6 +334,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         updateBullets(dt, scene, playerSystem.playerGroup, callbacks);
         updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
         playerSystem.update(dt, timeInSeconds);
+        updateWaveFlow(dt);
         ui.updateHUD();
 
         const dashPct = Math.max(0, 1 - (playerStats.dashCooldown / 2.0));
@@ -148,16 +343,16 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         camera.position.lerp(playerSystem.playerGroup.position.clone().add(new THREE.Vector3(0, 35, 25)), 5 * dt);
         camera.lookAt(playerSystem.playerGroup.position);
 
-        gameState.enemySpawnTimer -= dt;
-        if(gameState.enemySpawnTimer <= 0) {
-            spawnEnemy(scene, playerSystem.playerGroup.position);
-            gameState.enemySpawnTimer = Math.max(0.5, 2.0 - (gameState.score * 0.02));
-        }
-
         emitDebug(dt);
-
         renderer.render(scene, camera);
     }
 
-    return { start: () => tick(0), resetGame };
+    return {
+        start: () => tick(0),
+        resetGame,
+        pauseGame,
+        resumeGame,
+        openSettings,
+        closeSettings
+    };
 }
