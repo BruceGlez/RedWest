@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { loots, playerStats } from './state.js';
+import { loots, playerStats, gameState } from './state.js';
 import { createAmmoMesh, createWhiskeyMesh } from './assets.js';
 import { playSound } from './audio.js';
 
@@ -30,10 +30,14 @@ export function updateLoots(dt, scene, playerGroup) {
             if(l.userData.type === 'ammo') { 
                 playerStats.tripleShotTimer = 10.0; 
                 playSound('powerup'); 
+                gameState.runStats.lootCollected++;
+                gameState.runStats.ammoCollected++;
                 needsHudUpdate = true;
             } else if (playerStats.hp < playerStats.maxHp) { 
                 playerStats.hp++; 
                 playSound('powerup'); 
+                gameState.runStats.lootCollected++;
+                gameState.runStats.whiskeyCollected++;
                 needsHudUpdate = true;
             }
             scene.remove(l); 

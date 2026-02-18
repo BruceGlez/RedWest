@@ -28,6 +28,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             if(shotCount > 1) dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), (i - 1) * 0.15);
             spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(70));
         }
+        gameState.runStats.shotsFired += shotCount;
 
         playerGroup.userData.muzzle.intensity = 5;
         setTimeout(() => playerGroup.userData.muzzle.intensity = 0, 50);
@@ -67,8 +68,10 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             if(!checkCollision(playerGroup.position.x, nextZ, 1.5)) playerGroup.position.z = nextZ;
         }
 
-        animateCharacter(playerGroup, timeInSeconds, move.length() > 0);
-        playerGroup.position.y = Math.abs(Math.sin(timeInSeconds * 12)) * 0.1;
+        const isMoving = move.length() > 0;
+        animateCharacter(playerGroup, timeInSeconds, isMoving);
+        if(isMoving) playerGroup.position.y = Math.abs(Math.sin(timeInSeconds * 12)) * 0.1;
+        else playerGroup.position.y = THREE.MathUtils.lerp(playerGroup.position.y, 0, dt * 14);
 
         raycaster.setFromCamera(mouse, camera);
         const intersect = new THREE.Vector3();

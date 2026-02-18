@@ -100,3 +100,11 @@ export function rebuildEnemyGrid(enemies) {
 export function getNearbyEnemies(x, z, radius) {
     return queryGrid(enemyGrid, x, z, radius);
 }
+
+export function getGridStats() {
+    return {
+        obstacleCells: obstacleGrid.size,
+        enemyCells: enemyGrid.size,
+        obstacleGridDirty
+    };
+}

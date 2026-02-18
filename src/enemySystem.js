@@ -162,6 +162,7 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         // --- COLLISION WITH PLAYER (DAMAGE) ---
         if(e.position.distanceTo(playerGroup.position) < 2.5 && !playerStats.isDashing) {
             playerStats.hp--; 
+            gameState.runStats.damageTaken++;
             
             // Trigger UI update callback
             if (callbacks.onUpdateHUD) callbacks.onUpdateHUD(); 

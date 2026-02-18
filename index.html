@@ -18,6 +18,7 @@
             <div id="health-container" class="hud-row">&#10084;&#10084;&#10084;&#10084;&#10084;</div>
             <div id="status-msg"></div> </div>
     </div>
+    <div id="debug-panel" class="debug-panel"></div>
 
     <div id="dash-bar-container">
         <div id="dash-bar-label">STAMINA</div>
@@ -46,6 +47,10 @@
         <div class="modal-content">
             <h1 class="western-title wasted-text">WASTED</h1>
             <p class="score-text">FINAL SCORE: <span id="finalScore">0</span></p>
+            <div class="run-summary-box">
+                <h3>RUN REPORT</h3>
+                <table id="run-stats-table"></table>
+            </div>
             
             <div id="input-section">
                 <input type="text" id="playerName" placeholder="ENTER NAME" maxlength="8">

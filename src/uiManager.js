@@ -11,7 +11,9 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         restartMsg: document.getElementById('restart-msg'),
         playerName: document.getElementById('playerName'),
         saveButton: document.getElementById('saveScoreBtn'),
-        leaderboard: document.getElementById('highscore-list')
+        leaderboard: document.getElementById('highscore-list'),
+        debugPanel: document.getElementById('debug-panel'),
+        runStatsTable: document.getElementById('run-stats-table')
     };
 
     if(els.saveButton) {
@@ -46,9 +48,39 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.dashBar.className = percent >= 1 ? 'dash-ready' : 'dash-cooldown';
     }
 
+    function renderRunStats() {
+        if(!els.runStatsTable) return;
+        const s = gameState.runStats;
+        const rows = [
+            ['Enemies destroyed', s.enemiesKilled],
+            ['Bandits destroyed', s.banditsKilled],
+            ['Gunslingers destroyed', s.gunslingersKilled],
+            ['Wolves destroyed', s.wolvesKilled],
+            ['Bosses destroyed', s.bossesKilled],
+            ['Shots fired', s.shotsFired],
+            ['Damage taken', s.damageTaken],
+            ['Obstacles destroyed', s.obstaclesDestroyed],
+            ['Loot collected', s.lootCollected],
+            ['Whiskey picked up', s.whiskeyCollected],
+            ['Ammo picked up', s.ammoCollected]
+        ];
+        els.runStatsTable.innerHTML = '';
+        for(const [label, value] of rows) {
+            const tr = document.createElement('tr');
+            const tdLabel = document.createElement('td');
+            const tdValue = document.createElement('td');
+            tdLabel.textContent = label;
+            tdValue.textContent = value;
+            tr.appendChild(tdLabel);
+            tr.appendChild(tdValue);
+            els.runStatsTable.appendChild(tr);
+        }
+    }
+
     function showGameOver() {
         els.gameOver.style.display = 'flex';
         els.finalScore.innerText = gameState.score;
+        renderRunStats();
         els.inputSection.style.display = 'flex';
         els.restartMsg.style.display = 'none';
         els.playerName.value = '';
@@ -93,6 +125,20 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         });
     }
 
+    function updateDebug(debugData) {
+        if(!els.debugPanel) return;
+        els.debugPanel.textContent =
+`FPS: ${debugData.fps}
+Enemies: ${debugData.enemies}
+Obstacles: ${debugData.obstacles}
+Loot: ${debugData.loot}
+Bullets: ${debugData.bulletsActive} / pool ${debugData.bulletsPooled}
+Particles: ${debugData.particlesActive} / pool ${debugData.particlesPooled}
+Respawns queued: ${debugData.pendingRespawns}
+Grid cells: O=${debugData.obstacleCells} E=${debugData.enemyCells}
+Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
+    }
+
     return {
         updateHUD,
         updateDashBar,
@@ -101,6 +147,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         showStartScreen,
         hideStartScreen,
         updateLeaderboard,
-        canRestart
+        canRestart,
+        updateDebug
     };
 }

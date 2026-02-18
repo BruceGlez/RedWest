@@ -3,7 +3,20 @@ export const gameState = {
     isGameOver: false,
     isGameStarted: false,
     enemySpawnTimer: 0,
-    MAP_SIZE: 140
+    MAP_SIZE: 140,
+    runStats: {
+        shotsFired: 0,
+        damageTaken: 0,
+        enemiesKilled: 0,
+        banditsKilled: 0,
+        gunslingersKilled: 0,
+        wolvesKilled: 0,
+        bossesKilled: 0,
+        obstaclesDestroyed: 0,
+        lootCollected: 0,
+        whiskeyCollected: 0,
+        ammoCollected: 0
+    }
 };
 
 export const playerStats = {
@@ -31,6 +44,18 @@ export function resetGameState() {
     gameState.isGameOver = false;
     gameState.isGameStarted = false;
     gameState.enemySpawnTimer = 0;
+    const s = gameState.runStats;
+    s.shotsFired = 0;
+    s.damageTaken = 0;
+    s.enemiesKilled = 0;
+    s.banditsKilled = 0;
+    s.gunslingersKilled = 0;
+    s.wolvesKilled = 0;
+    s.bossesKilled = 0;
+    s.obstaclesDestroyed = 0;
+    s.lootCollected = 0;
+    s.whiskeyCollected = 0;
+    s.ammoCollected = 0;
 }
 
 export function resetPlayerStats() {

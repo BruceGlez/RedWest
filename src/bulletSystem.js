@@ -38,6 +38,14 @@ export function clearPendingRespawns() {
     respawnTimeouts.clear();
 }
 
+export function getBulletPoolStats() {
+    return {
+        active: bullets.length,
+        pooled: bulletPool.length,
+        pendingRespawns: respawnTimeouts.size
+    };
+}
+
 export function spawnBullet(scene, owner, position, velocity) {
     const bullet = acquireBullet();
     bullet.visible = true;
@@ -70,6 +78,7 @@ function respawnObstacle(scene, type) {
 }
 
 export function updateBullets(dt, scene, playerGroup, callbacks) {
+    const runStats = gameState.runStats;
     rebuildEnemyGrid(enemies);
     for(let i=bullets.length-1; i>=0; i--) {
         const b = bullets[i]; 
@@ -83,11 +92,12 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
         
         // 2. Check Obstacle Collision (Destruction)
         const hitObs = getObstacleAt(b.position.x, b.position.z, 0.5);
-        if(hitObs) { 
+            if(hitObs) { 
             createExplosion(scene, b.position, 0x8B4513); 
             releaseBullet(scene, b, i);
             
             if(hitObs.destructible) {
+                runStats.obstaclesDestroyed++;
                 playSound('thud'); 
                 scene.remove(hitObs.mesh);
                 
@@ -112,6 +122,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
             const dist = new THREE.Vector3(b.position.x - playerGroup.position.x, 0, b.position.z - playerGroup.position.z).length();
             if(dist < 1.0 && !playerStats.isDashing) { 
                 playerStats.hp--; 
+                runStats.damageTaken++;
                 callbacks.onUpdateHUD(); 
                 createExplosion(scene, playerGroup.position, 0xff0000); 
                 releaseBullet(scene, b, i);
@@ -145,6 +156,11 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     spawnLoot(scene, e.position.x, e.position.z); 
                     scene.remove(e); 
                     enemies.splice(j,1); 
+                    runStats.enemiesKilled++;
+                    if(e.userData.type === 'bandit') runStats.banditsKilled++;
+                    else if(e.userData.type === 'gunslinger') runStats.gunslingersKilled++;
+                    else if(e.userData.type === 'wolf') runStats.wolvesKilled++;
+                    else if(e.userData.type === 'boss') runStats.bossesKilled++;
                     gameState.score += (e.userData.type === 'boss') ? 10 : 1;
                     callbacks.onUpdateHUD();
                 } else { 

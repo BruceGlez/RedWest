@@ -5,12 +5,14 @@ import { gameState, playerStats, obstacles, enemies, loots, resetGameState, rese
 import { generateMap } from './world.js';
 import { spawnEnemy, updateEnemies } from './enemySystem.js';
 import { updateLoots } from './lootSystem.js';
-import { updateBullets, clearBullets, clearPendingRespawns } from './bulletSystem.js';
-import { updateParticles, clearParticles } from './particleSystem.js';
-import { markObstacleGridDirty } from './physics.js';
+import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats } from './bulletSystem.js';
+import { updateParticles, clearParticles, getParticlePoolStats } from './particleSystem.js';
+import { markObstacleGridDirty, getGridStats } from './physics.js';
 
 export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
     let lastTime = 0;
+    let debugElapsed = 0;
+    let fpsSmoothed = 60;
 
     const callbacks = {
         onUpdateHUD: () => ui.updateHUD(),
@@ -21,6 +23,32 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             ui.showGameOver();
         }
     };
+
+    function emitDebug(dt) {
+        const instantFps = dt > 0 ? (1 / dt) : fpsSmoothed;
+        fpsSmoothed = THREE.MathUtils.lerp(fpsSmoothed, instantFps, 0.08);
+        debugElapsed += dt;
+        if(debugElapsed < 0.1) return;
+        debugElapsed = 0;
+
+        const bulletStats = getBulletPoolStats();
+        const particleStats = getParticlePoolStats();
+        const gridStats = getGridStats();
+        ui.updateDebug({
+            fps: Math.round(fpsSmoothed),
+            enemies: enemies.length,
+            obstacles: obstacles.length,
+            loot: loots.length,
+            bulletsActive: bulletStats.active,
+            bulletsPooled: bulletStats.pooled,
+            particlesActive: particleStats.active,
+            particlesPooled: particleStats.pooled,
+            pendingRespawns: bulletStats.pendingRespawns,
+            obstacleCells: gridStats.obstacleCells,
+            enemyCells: gridStats.enemyCells,
+            obstacleGridDirty: gridStats.obstacleGridDirty
+        });
+    }
 
     function clearSceneCollections() {
         for(const e of enemies) scene.remove(e);
@@ -56,6 +84,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 20, Math.cos(timeInSeconds * 0.5) * 30);
             camera.lookAt(playerSystem.playerGroup.position);
             renderer.render(scene, camera);
+            emitDebug(dt);
             if(keys.space) {
                 gameState.isGameStarted = true;
                 ui.hideStartScreen();
@@ -68,6 +97,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         if(gameState.isGameOver) {
             renderer.render(scene, camera);
             if(keys.restartRequested && ui.canRestart()) resetGame();
+            emitDebug(dt);
             return;
         }
 
@@ -89,6 +119,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             spawnEnemy(scene, playerSystem.playerGroup.position);
             gameState.enemySpawnTimer = Math.max(0.5, 2.0 - (gameState.score * 0.02));
         }
+
+        emitDebug(dt);
 
         renderer.render(scene, camera);
     }

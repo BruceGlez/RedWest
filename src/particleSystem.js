@@ -26,6 +26,13 @@ export function clearParticles(scene) {
     }
 }
 
+export function getParticlePoolStats() {
+    return {
+        active: particles.length,
+        pooled: particlePool.length
+    };
+}
+
 export function createExplosion(scene, pos, color) {
     playSound('boom');
     for(let i=0; i<8; i++) {
