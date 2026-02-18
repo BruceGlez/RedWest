@@ -14,6 +14,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         playerName: document.getElementById('playerName'),
         playerNameList: document.getElementById('player-name-list'),
         saveButton: document.getElementById('saveScoreBtn'),
+        toggleMusicBtn: document.getElementById('toggle-music-btn'),
+        toggleSfxBtn: document.getElementById('toggle-sfx-btn'),
         leaderboard: document.getElementById('highscore-list'),
         debugPanel: document.getElementById('debug-panel'),
         runStatsTable: document.getElementById('run-stats-table')
@@ -168,6 +170,22 @@ Grid cells: O=${debugData.obstacleCells} E=${debugData.enemyCells}
 Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
     }
 
+    function bindAudioControls(onToggleMusic, onToggleSfx) {
+        if(els.toggleMusicBtn) els.toggleMusicBtn.addEventListener('click', onToggleMusic);
+        if(els.toggleSfxBtn) els.toggleSfxBtn.addEventListener('click', onToggleSfx);
+    }
+
+    function updateAudioControls(settings) {
+        if(els.toggleMusicBtn) {
+            els.toggleMusicBtn.textContent = `Music: ${settings.musicEnabled ? 'ON' : 'OFF'}`;
+            els.toggleMusicBtn.className = settings.musicEnabled ? '' : 'off';
+        }
+        if(els.toggleSfxBtn) {
+            els.toggleSfxBtn.textContent = `SFX: ${settings.sfxEnabled ? 'ON' : 'OFF'}`;
+            els.toggleSfxBtn.className = settings.sfxEnabled ? '' : 'off';
+        }
+    }
+
     return {
         updateHUD,
         updateDashBar,
@@ -178,6 +196,8 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         updateLeaderboard,
         canRestart,
         updateDebug,
+        bindAudioControls,
+        updateAudioControls,
         setPreferredName,
         showPauseOverlay,
         hidePauseOverlay

@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { setupInputs } from './input.js';
 import { gameState, playerStats } from './state.js';
 import { setupScene, generateMap } from './world.js';
-import { resumeAudio } from './audio.js';
+import { resumeAudio, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { loadHighScores, saveHighScore, getPreferredPlayerName } from './scoreSystem.js';
 import { createUIManager } from './uiManager.js';
 import { createPlayerSystem } from './playerSystem.js';
@@ -29,6 +29,14 @@ ui.updateLeaderboard(loadHighScores());
 ui.setPreferredName(getPreferredPlayerName());
 ui.updateHUD();
 ui.updateDashBar(1);
+ui.bindAudioControls(() => {
+    toggleMusicEnabled();
+    ui.updateAudioControls(getAudioSettings());
+}, () => {
+    toggleSfxEnabled();
+    ui.updateAudioControls(getAudioSettings());
+});
+ui.updateAudioControls(getAudioSettings());
 
 const playerSystem = createPlayerSystem(scene, camera, gameState, playerStats);
 const gameLoop = createGameLoop(scene, camera, renderer, playerSystem, ui);

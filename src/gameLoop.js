@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { keys } from './input.js';
-import { resumeAudio } from './audio.js';
+import { resumeAudio, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { gameState, playerStats, obstacles, enemies, loots, resetGameState, resetPlayerStats, clearDynamicState } from './state.js';
 import { generateMap } from './world.js';
 import { spawnEnemy, updateEnemies } from './enemySystem.js';
@@ -31,6 +31,21 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         gameState.isPaused = !gameState.isPaused;
         if(gameState.isPaused) ui.showPauseOverlay();
         else ui.hidePauseOverlay();
+    }
+
+    function handleAudioToggles() {
+        let changed = false;
+        if(keys.musicToggleRequested) {
+            keys.musicToggleRequested = false;
+            toggleMusicEnabled();
+            changed = true;
+        }
+        if(keys.sfxToggleRequested) {
+            keys.sfxToggleRequested = false;
+            toggleSfxEnabled();
+            changed = true;
+        }
+        if(changed) ui.updateAudioControls(getAudioSettings());
     }
 
     function emitDebug(dt) {
@@ -91,6 +106,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         lastTime = time;
         const timeInSeconds = time / 1000;
         handlePauseToggle();
+        handleAudioToggles();
 
         if(!gameState.isGameStarted) {
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 20, Math.cos(timeInSeconds * 0.5) * 30);

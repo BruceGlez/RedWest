@@ -2,10 +2,13 @@ const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const masterGain = audioCtx.createGain();
 const musicGain = audioCtx.createGain();
 const sfxGain = audioCtx.createGain();
+const AUDIO_SETTINGS_KEY = 'redWestAudioSettings';
+const BASE_MUSIC_GAIN = 0.18;
+const BASE_SFX_GAIN = 1.0;
 
 masterGain.gain.value = 0.55;
-musicGain.gain.value = 0.18;
-sfxGain.gain.value = 1.0;
+musicGain.gain.value = BASE_MUSIC_GAIN;
+sfxGain.gain.value = BASE_SFX_GAIN;
 
 musicGain.connect(masterGain);
 sfxGain.connect(masterGain);
@@ -13,6 +16,29 @@ masterGain.connect(audioCtx.destination);
 
 let musicIntervalId = null;
 let musicStep = 0;
+let musicEnabled = true;
+let sfxEnabled = true;
+
+function loadAudioSettings() {
+    try {
+        const raw = localStorage.getItem(AUDIO_SETTINGS_KEY);
+        if(!raw) return;
+        const parsed = JSON.parse(raw);
+        if(typeof parsed.musicEnabled === 'boolean') musicEnabled = parsed.musicEnabled;
+        if(typeof parsed.sfxEnabled === 'boolean') sfxEnabled = parsed.sfxEnabled;
+    } catch {
+        // Use defaults if settings are missing or malformed.
+    }
+}
+
+function persistAudioSettings() {
+    localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify({ musicEnabled, sfxEnabled }));
+}
+
+function applyAudioSettings() {
+    musicGain.gain.value = musicEnabled ? BASE_MUSIC_GAIN : 0;
+    sfxGain.gain.value = sfxEnabled ? BASE_SFX_GAIN : 0;
+}
 
 function scheduleTone(freq, duration, when, volume, type = 'triangle') {
     const osc = audioCtx.createOscillator();
@@ -57,13 +83,23 @@ function startBackgroundTrack() {
     }, stepDuration * 1000);
 }
 
+function stopBackgroundTrack() {
+    if(musicIntervalId === null) return;
+    clearInterval(musicIntervalId);
+    musicIntervalId = null;
+}
+
+loadAudioSettings();
+applyAudioSettings();
+
 export function resumeAudio() {
     if(audioCtx.state === 'suspended') audioCtx.resume();
-    startBackgroundTrack();
+    if(musicEnabled) startBackgroundTrack();
 }
 
 export function playSound(type) {
     resumeAudio();
+    if(!sfxEnabled) return;
     const now = audioCtx.currentTime;
 
     if(type === 'shoot') {
@@ -142,4 +178,32 @@ export function playSound(type) {
         bodyOsc.stop(now + 0.1);
         clickOsc.stop(now + 0.04);
     }
+}
+
+export function getAudioSettings() {
+    return { musicEnabled, sfxEnabled };
+}
+
+export function setMusicEnabled(enabled) {
+    musicEnabled = !!enabled;
+    if(musicEnabled) startBackgroundTrack();
+    else stopBackgroundTrack();
+    applyAudioSettings();
+    persistAudioSettings();
+}
+
+export function setSfxEnabled(enabled) {
+    sfxEnabled = !!enabled;
+    applyAudioSettings();
+    persistAudioSettings();
+}
+
+export function toggleMusicEnabled() {
+    setMusicEnabled(!musicEnabled);
+    return musicEnabled;
+}
+
+export function toggleSfxEnabled() {
+    setSfxEnabled(!sfxEnabled);
+    return sfxEnabled;
 }
