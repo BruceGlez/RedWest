@@ -70,6 +70,23 @@ canvas {
     transform: translate(-50%, -50%); border-radius: 50%; 
 }
 
+.pause-overlay {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 18;
+    padding: 10px 18px;
+    border: 2px solid #ffd700;
+    background: rgba(0, 0, 0, 0.55);
+    color: #ffd700;
+    font-family: 'Roboto Mono', monospace;
+    font-size: 28px;
+    letter-spacing: 2px;
+    text-shadow: 2px 2px 0 #000;
+    pointer-events: none;
+}
+
 .debug-panel {
     position: absolute;
     top: 20px;

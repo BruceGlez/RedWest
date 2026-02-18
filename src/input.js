@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { gameState } from './state.js';
 
-export const keys = { w:false, a:false, s:false, d:false, shift:false, space: false, mouse: false, restartRequested: false };
+export const keys = { w:false, a:false, s:false, d:false, shift:false, space: false, mouse: false, restartRequested: false, pauseToggleRequested: false };
 export const mouse = new THREE.Vector2();
 
 export function setupInputs() {
@@ -15,6 +15,7 @@ export function setupInputs() {
         if(e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = true;
         if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = true;
         if(e.code === 'Space') keys.space = true;
+        if(e.code === 'KeyP' || e.code === 'Escape') keys.pauseToggleRequested = true;
         
         // Only allow restart if the input section is hidden (meaning score is saved)
         if(e.code === 'KeyR' && gameState.isGameOver && document.getElementById('input-section').style.display === 'none') {
@@ -36,6 +37,7 @@ export function setupInputs() {
     window.addEventListener('blur', () => {
         Object.keys(keys).forEach(k => keys[k] = false);
         keys.restartRequested = false;
+        keys.pauseToggleRequested = false;
     });
 
     window.addEventListener('mousemove', e => {

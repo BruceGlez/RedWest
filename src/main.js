@@ -3,7 +3,7 @@ import { setupInputs } from './input.js';
 import { gameState, playerStats } from './state.js';
 import { setupScene, generateMap } from './world.js';
 import { resumeAudio } from './audio.js';
-import { loadHighScores, saveHighScore } from './scoreSystem.js';
+import { loadHighScores, saveHighScore, getPreferredPlayerName } from './scoreSystem.js';
 import { createUIManager } from './uiManager.js';
 import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
@@ -26,6 +26,7 @@ ui = createUIManager(gameState, playerStats, (name, score) => {
     ui.updateLeaderboard(scores);
 });
 ui.updateLeaderboard(loadHighScores());
+ui.setPreferredName(getPreferredPlayerName());
 ui.updateHUD();
 ui.updateDashBar(1);
 

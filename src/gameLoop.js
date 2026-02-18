@@ -24,6 +24,15 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         }
     };
 
+    function handlePauseToggle() {
+        if(!keys.pauseToggleRequested) return;
+        keys.pauseToggleRequested = false;
+        if(!gameState.isGameStarted || gameState.isGameOver) return;
+        gameState.isPaused = !gameState.isPaused;
+        if(gameState.isPaused) ui.showPauseOverlay();
+        else ui.hidePauseOverlay();
+    }
+
     function emitDebug(dt) {
         const instantFps = dt > 0 ? (1 / dt) : fpsSmoothed;
         fpsSmoothed = THREE.MathUtils.lerp(fpsSmoothed, instantFps, 0.08);
@@ -66,9 +75,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         resetGameState();
         resetPlayerStats();
         keys.restartRequested = false;
+        keys.pauseToggleRequested = false;
         playerSystem.reset();
         generateMap(scene);
         ui.hideGameOverScreen();
+        ui.hidePauseOverlay();
         ui.showStartScreen();
         ui.updateHUD();
         ui.updateDashBar(1);
@@ -79,6 +90,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         const dt = Math.min((time - lastTime) / 1000, 0.1);
         lastTime = time;
         const timeInSeconds = time / 1000;
+        handlePauseToggle();
 
         if(!gameState.isGameStarted) {
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 20, Math.cos(timeInSeconds * 0.5) * 30);
@@ -97,6 +109,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         if(gameState.isGameOver) {
             renderer.render(scene, camera);
             if(keys.restartRequested && ui.canRestart()) resetGame();
+            emitDebug(dt);
+            return;
+        }
+
+        if(gameState.isPaused) {
+            renderer.render(scene, camera);
             emitDebug(dt);
             return;
         }

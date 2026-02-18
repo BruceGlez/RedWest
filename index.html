@@ -18,6 +18,7 @@
             <div id="health-container" class="hud-row">&#10084;&#10084;&#10084;&#10084;&#10084;</div>
             <div id="status-msg"></div> </div>
     </div>
+    <div id="pause-overlay" class="pause-overlay" style="display:none;">PAUSED</div>
     <div id="debug-panel" class="debug-panel"></div>
 
     <div id="dash-bar-container">
@@ -38,6 +39,7 @@
                 <p><span>WASD</span> MOVE</p>
                 <p><span>MOUSE</span> AIM / SHOOT</p>
                 <p><span>SHIFT</span> DASH</p>
+                <p><span>P / ESC</span> PAUSE</p>
             </div>
             <p class="blink-text">PRESS <span class="key-highlight">SPACE</span> TO DRAW</p>
         </div>
@@ -53,7 +55,8 @@
             </div>
             
             <div id="input-section">
-                <input type="text" id="playerName" placeholder="ENTER NAME" maxlength="8">
+                <input type="text" id="playerName" list="player-name-list" placeholder="ENTER NAME" maxlength="8">
+                <datalist id="player-name-list"></datalist>
                 <button id="saveScoreBtn">SAVE RECORD</button>
             </div>
 

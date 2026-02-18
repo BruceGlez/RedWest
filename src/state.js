@@ -2,6 +2,7 @@ export const gameState = {
     score: 0,
     isGameOver: false,
     isGameStarted: false,
+    isPaused: false,
     enemySpawnTimer: 0,
     MAP_SIZE: 140,
     runStats: {
@@ -43,6 +44,7 @@ export function resetGameState() {
     gameState.score = 0;
     gameState.isGameOver = false;
     gameState.isGameStarted = false;
+    gameState.isPaused = false;
     gameState.enemySpawnTimer = 0;
     const s = gameState.runStats;
     s.shotsFired = 0;
