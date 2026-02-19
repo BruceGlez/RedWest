@@ -15,6 +15,12 @@ const ENEMY_COST = {
     gunslinger: 2.0,
     boss: 8.0
 };
+const WAVE_MODIFIERS = [
+    { id: 'FAST_WOLVES', label: 'FAST WOLVES', minWave: 3 },
+    { id: 'SHARPSHOOTERS', label: 'SHARPSHOOTERS', minWave: 4 },
+    { id: 'SWARM', label: 'SWARM', minWave: 2 },
+    { id: 'HEAVY_HITTERS', label: 'HEAVY HITTERS', minWave: 5 }
+];
 
 function getWaveDuration(wave) {
     return Math.max(18, 34 - (wave * 1.25));
@@ -44,6 +50,13 @@ function getWaveWeights(wave) {
         gunslinger: Math.min(2.4, 0.3 + (wave * 0.2)),
         boss: wave >= 5 ? 0.1 : 0
     };
+}
+
+function pickWaveModifier(wave) {
+    if(wave < 2) return null;
+    const candidates = WAVE_MODIFIERS.filter(m => wave >= m.minWave);
+    if(!candidates.length) return null;
+    return candidates[Math.floor(Math.random() * candidates.length)];
 }
 
 function getActiveEnemyCounts() {
@@ -84,16 +97,21 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
     };
 
     function beginWave(waveNumber) {
+        const modifier = pickWaveModifier(waveNumber);
         gameState.waveNumber = waveNumber;
         gameState.waveDuration = getWaveDuration(waveNumber);
         gameState.waveTimer = gameState.waveDuration;
         gameState.isIntermission = false;
         gameState.intermissionTimer = 0;
         gameState.waveBossSpawned = false;
-        gameState.waveBudgetRemaining = getWaveBudget(waveNumber);
+        gameState.waveModifier = modifier ? modifier.id : null;
+        let budget = getWaveBudget(waveNumber);
+        if(gameState.waveModifier === 'SWARM') budget *= 1.35;
+        if(gameState.waveModifier === 'HEAVY_HITTERS') budget *= 1.15;
+        gameState.waveBudgetRemaining = budget;
         gameState.enemySpawnTimer = 0.55;
         gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, waveNumber);
-        ui.showWaveBanner(`WAVE ${waveNumber}`);
+        ui.showWaveBanner(modifier ? `WAVE ${waveNumber} - ${modifier.label}` : `WAVE ${waveNumber}`);
     }
 
     function beginIntermission() {
@@ -110,6 +128,22 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
 
         const caps = getWaveCaps(wave);
         const weights = getWaveWeights(wave);
+        const mod = gameState.waveModifier;
+        if(mod === 'SWARM') {
+            weights.bandit *= 1.8;
+            weights.wolf *= 1.4;
+            weights.gunslinger *= 0.65;
+        } else if(mod === 'SHARPSHOOTERS') {
+            weights.gunslinger *= 1.9;
+            weights.wolf *= 0.8;
+        } else if(mod === 'FAST_WOLVES') {
+            weights.wolf *= 2.2;
+            caps.wolf += 3;
+        } else if(mod === 'HEAVY_HITTERS') {
+            weights.bandit *= 0.75;
+            weights.gunslinger *= 1.35;
+            if(wave >= 5) weights.boss *= 1.5;
+        }
         const active = getActiveEnemyCounts();
         const candidates = [];
         const timeElapsed = gameState.waveDuration - gameState.waveTimer;
@@ -126,7 +160,10 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         if(!chosenType) return;
 
         spawnEnemy(scene, playerSystem.playerGroup.position, chosenType);
-        gameState.waveBudgetRemaining = Math.max(0, gameState.waveBudgetRemaining - ENEMY_COST[chosenType]);
+        let spawnCost = ENEMY_COST[chosenType];
+        if(mod === 'SWARM' && chosenType !== 'boss') spawnCost *= 0.8;
+        if(mod === 'HEAVY_HITTERS' && chosenType === 'boss') spawnCost *= 1.35;
+        gameState.waveBudgetRemaining = Math.max(0, gameState.waveBudgetRemaining - spawnCost);
         if(chosenType === 'boss') gameState.waveBossSpawned = true;
     }
 
@@ -287,7 +324,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         else phaseMultiplier = 1.0; // stabilize ending
 
         trySpawnDirectorEnemy();
-        gameState.enemySpawnTimer = getBaseSpawnInterval(gameState.waveNumber) * phaseMultiplier;
+        let interval = getBaseSpawnInterval(gameState.waveNumber) * phaseMultiplier;
+        if(gameState.waveModifier === 'SWARM') interval *= 0.78;
+        if(gameState.waveModifier === 'FAST_WOLVES') interval *= 0.86;
+        if(gameState.waveModifier === 'HEAVY_HITTERS') interval *= 1.06;
+        gameState.enemySpawnTimer = interval;
     }
 
     function tick(time) {

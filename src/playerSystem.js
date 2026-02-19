@@ -12,6 +12,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
 
     const raycaster = new THREE.Raycaster();
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
+    playerGroup.userData.blockedFrames = 0;
 
     const WEAPONS = {
         revolver: { pellets: 1, spread: 0, speed: 70, fireRate: 0.2 },
@@ -82,12 +83,31 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if(keys.s) move.z += 1;
         if(keys.a) move.x -= 1;
         if(keys.d) move.x += 1;
+        const beforePos = playerGroup.position.clone();
         if(move.length() > 0) {
             move.normalize().multiplyScalar(speed * dt);
             const nextX = Math.max(-gameState.MAP_SIZE, Math.min(gameState.MAP_SIZE, playerGroup.position.x + move.x));
             const nextZ = Math.max(-gameState.MAP_SIZE, Math.min(gameState.MAP_SIZE, playerGroup.position.z + move.z));
             if(!checkCollision(nextX, playerGroup.position.z, 1.5)) playerGroup.position.x = nextX;
             if(!checkCollision(playerGroup.position.x, nextZ, 1.5)) playerGroup.position.z = nextZ;
+        }
+        const movedDistance = playerGroup.position.distanceTo(beforePos);
+        if(move.length() > 0 && movedDistance < 0.001) {
+            playerGroup.userData.blockedFrames++;
+            if(playerGroup.userData.blockedFrames > 8) {
+                const dir = move.clone().setY(0).normalize();
+                const side = new THREE.Vector3(-dir.z, 0, dir.x);
+                const nudge = side.multiplyScalar(0.8);
+                const nudgedX = Math.max(-gameState.MAP_SIZE, Math.min(gameState.MAP_SIZE, playerGroup.position.x + nudge.x));
+                const nudgedZ = Math.max(-gameState.MAP_SIZE, Math.min(gameState.MAP_SIZE, playerGroup.position.z + nudge.z));
+                if(!checkCollision(nudgedX, nudgedZ, 1.5)) {
+                    playerGroup.position.x = nudgedX;
+                    playerGroup.position.z = nudgedZ;
+                    playerGroup.userData.blockedFrames = 0;
+                }
+            }
+        } else {
+            playerGroup.userData.blockedFrames = 0;
         }
 
         const isMoving = move.length() > 0;

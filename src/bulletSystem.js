@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { bullets, obstacles, enemies, playerStats, gameState } from './state.js';
-import { getObstacleAt, getNearbyEnemies, markObstacleGridDirty, rebuildEnemyGrid } from './physics.js';
+import { checkCollision, getObstacleAt, getNearbyEnemies, markObstacleGridDirty, rebuildEnemyGrid } from './physics.js';
 import { createExplosion } from './particleSystem.js';
 import { spawnLoot } from './lootSystem.js';
 import { playSound } from './audio.js';
@@ -11,6 +11,7 @@ const ENEMY_BULLET_COLOR = new THREE.Color(0xff0000);
 const BULLET_GEOMETRY = new THREE.SphereGeometry(0.35);
 const bulletPool = [];
 const respawnTimeouts = new Set();
+const RESPAWN_RADIUS = { crate: 2.6, cactus: 1.5, tree: 1.0, fence: 1.5, rock: 1.2 };
 
 function createBulletMesh() {
     return new THREE.Mesh(BULLET_GEOMETRY, new THREE.MeshBasicMaterial({ color: PLAYER_BULLET_COLOR }));
@@ -57,14 +58,36 @@ export function spawnBullet(scene, owner, position, velocity) {
     bullets.push(bullet);
 }
 
-// Helper to respawn destructibles
-function respawnObstacle(scene, type) {
-    const timeoutId = setTimeout(() => {
-        // Simple random position for now
+function findSafeRespawnPosition(type, playerPos) {
+    const mapLimit = gameState.MAP_SIZE - 10;
+    const radius = RESPAWN_RADIUS[type] || 1.5;
+    const minPlayerDist = 16;
+
+    for(let attempt = 0; attempt < 28; attempt++) {
         const angle = Math.random() * Math.PI * 2;
-        const dist = 20 + Math.random() * 80;
+        const dist = 35 + Math.random() * (mapLimit - 35);
         const x = Math.cos(angle) * dist;
         const z = Math.sin(angle) * dist;
+
+        if(Math.abs(x) > mapLimit || Math.abs(z) > mapLimit) continue;
+        if(playerPos && new THREE.Vector2(x - playerPos.x, z - playerPos.z).length() < minPlayerDist) continue;
+        if(checkCollision(x, z, radius + 0.8)) continue;
+        return { x, z };
+    }
+    return null;
+}
+
+// Helper to respawn destructibles
+function respawnObstacle(scene, type, playerGroup) {
+    const timeoutId = setTimeout(() => {
+        const playerPos = playerGroup ? playerGroup.position : null;
+        const safePos = findSafeRespawnPosition(type, playerPos);
+        if(!safePos) {
+            respawnTimeouts.delete(timeoutId);
+            return;
+        }
+        const x = safePos.x;
+        const z = safePos.z;
         
         if(type === 'crate') createCrate(scene, x, z);
         else if(type === 'cactus') createCactus(scene, x, z);
@@ -112,7 +135,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                 
                 // Drop Loot & Respawn
                 if(Math.random() < 0.3) spawnLoot(scene, hitObs.x, hitObs.z);
-                respawnObstacle(scene, hitObs.type);
+                respawnObstacle(scene, hitObs.type, playerGroup);
             }
             continue; 
         }

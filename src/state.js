@@ -12,6 +12,7 @@ export const gameState = {
     isIntermission: false,
     waveBossSpawned: false,
     waveBudgetRemaining: 0,
+    waveModifier: null,
     MAP_SIZE: 140,
     runStats: {
         shotsFired: 0,
@@ -65,6 +66,7 @@ export function resetGameState() {
     gameState.isIntermission = false;
     gameState.waveBossSpawned = false;
     gameState.waveBudgetRemaining = 0;
+    gameState.waveModifier = null;
     const s = gameState.runStats;
     s.shotsFired = 0;
     s.shotsHit = 0;

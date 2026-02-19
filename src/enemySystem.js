@@ -16,6 +16,8 @@ export function enemyShoot(enemy, playerPos, scene) {
     playSound('shoot');
     const isBoss = (enemy.userData.type === 'boss');
     const shotCount = isBoss ? 3 : 1;
+    const aimSpread = enemy.userData.aimSpread ?? 2.0;
+    const projectileSpeed = enemy.userData.projectileSpeed ?? 40;
 
     for(let i = 0; i < shotCount; i++) {
         const gunPos = new THREE.Vector3(); 
@@ -23,8 +25,8 @@ export function enemyShoot(enemy, playerPos, scene) {
         
         // Add slight inaccuracy/spread
         const target = playerPos.clone(); 
-        target.x += (Math.random() - 0.5) * 2; 
-        target.z += (Math.random() - 0.5) * 2; 
+        target.x += (Math.random() - 0.5) * aimSpread; 
+        target.z += (Math.random() - 0.5) * aimSpread; 
         target.y = 2.5; 
         
         const dir = new THREE.Vector3().subVectors(target, gunPos).normalize();
@@ -34,7 +36,7 @@ export function enemyShoot(enemy, playerPos, scene) {
             dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), (i - 1) * 0.15);
         }
         
-        spawnBullet(scene, 'enemy', gunPos, dir.multiplyScalar(40));
+        spawnBullet(scene, 'enemy', gunPos, dir.multiplyScalar(projectileSpeed));
     }
 
     // Muzzle flash visual
@@ -50,6 +52,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
     let enemy, speed, type, hp;
     const randomScale = 0.85 + Math.random() * 0.3;
     const wave = gameState.waveNumber;
+    const modifier = gameState.waveModifier;
 
     let spawnType = requestedType;
     if(!spawnType) {
@@ -102,12 +105,29 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
     enemy.position.set(ex, 0, ez);
     
     // Initialize enemy state
+    let shootCooldown = 2.0 + Math.random();
+    let projectileSpeed = 40;
+    let aimSpread = 2.0;
+    if(modifier === 'SHARPSHOOTERS' && (type === 'gunslinger' || type === 'boss')) {
+        shootCooldown *= 0.72;
+        projectileSpeed = 52;
+        aimSpread = 0.8;
+    }
+    if(modifier === 'FAST_WOLVES' && type === 'wolf') speed *= 1.35;
+    if(modifier === 'HEAVY_HITTERS' && (type === 'gunslinger' || type === 'boss')) {
+        hp += 1;
+        projectileSpeed *= 1.1;
+    }
+
     Object.assign(enemy.userData, { 
         speed: speed, 
         type: type, 
         hp: hp, 
         maxHp: hp, 
-        shootTimer: Math.random() * 2, 
+        shootTimer: Math.random() * 2,
+        shootCooldown: shootCooldown,
+        projectileSpeed: projectileSpeed,
+        aimSpread: aimSpread,
         isMoving: true, 
         armAngle: 2.8 
     });
@@ -143,7 +163,7 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
             // Fire
             if(e.userData.shootTimer <= 0 && dist < 40) { 
                 enemyShoot(e, playerGroup.position, scene); 
-                e.userData.shootTimer = 2.0 + Math.random(); 
+                e.userData.shootTimer = e.userData.shootCooldown || (2.0 + Math.random()); 
             }
         }
         

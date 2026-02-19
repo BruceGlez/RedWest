@@ -1,6 +1,12 @@
 export function createUIManager(gameState, playerStats, onSaveScore) {
     let preferredName = '';
     let waveBannerTimeoutId = null;
+    const modifierLabels = {
+        FAST_WOLVES: 'FAST WOLVES',
+        SHARPSHOOTERS: 'SHARPSHOOTERS',
+        SWARM: 'SWARM',
+        HEAVY_HITTERS: 'HEAVY HITTERS'
+    };
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
@@ -64,6 +70,9 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         if(playerStats.tripleShotTimer > 0) {
             els.status.className = 'status-power';
             els.status.innerText = `TRIPLE SHOT: ${Math.ceil(playerStats.tripleShotTimer)}s`;
+        } else if(gameState.waveModifier) {
+            els.status.className = '';
+            els.status.innerText = `MODIFIER: ${modifierLabels[gameState.waveModifier] || gameState.waveModifier}`;
         } else {
             els.status.className = '';
             els.status.innerText = '';
