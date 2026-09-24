@@ -13,12 +13,15 @@ npm run dev
 
 Open the local URL printed by Vite. Use WASD to move, mouse to aim and shoot, Shift to dash, Q to change weapons, and P or Escape to pause. Chain kills to raise Heat: points and enemy pressure both rise. Defeat the outlaw in pursuit 3 to finish the prototype run.
 
+The source page also works from a plain local HTTP server such as VS Code Live Server, using the Three.js CDN import map. Opening `index.html` as a `file://` URL may be blocked by browser module security; use an HTTP server.
+
 ## Verify
 
 ```powershell
 npm test
 npm run build
 npm run test:smoke
+npm run test:static
 ```
 
 The browser smoke test uses an installed Chrome executable. Set `CHROME_PATH` to another Chromium executable when needed. Player feel, balance, and frame pacing still require hands-on playtesting.

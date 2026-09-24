@@ -17,6 +17,8 @@ try {
     page.setDefaultTimeout(15000);
     const pageErrors = [];
     page.on('pageerror', error => pageErrors.push(error.message));
+    page.on('console', message => { if(message.type() === 'error') pageErrors.push(message.text()); });
+    page.on('requestfailed', request => pageErrors.push(`${request.url()}: ${request.failure()?.errorText}`));
     await page.route('https://fonts.googleapis.com/**', route => route.abort());
     await page.route('https://fonts.gstatic.com/**', route => route.abort());
     const url = server.resolvedUrls.local[0];
@@ -24,8 +26,13 @@ try {
     assert.equal(response.status, 200, 'Vite serves the game');
     await page.goto(url, { waitUntil: 'commit', timeout: 30000 });
     await page.waitForTimeout(1000);
-    if(pageErrors.length) throw new Error(`Page initialization: ${pageErrors.join(', ')}`);
-    await page.locator('canvas').waitFor();
+    const relevantErrors = () => pageErrors.filter(error => !error.includes('fonts.googleapis.com') && !error.includes('fonts.gstatic.com') && !error.includes('Failed to load resource'));
+    if(relevantErrors().length) throw new Error(`Page initialization: ${relevantErrors().join(', ')}`);
+    try {
+        await page.locator('canvas').waitFor();
+    } catch {
+        throw new Error(`Vite page did not create a canvas: ${pageErrors.join('; ')}`);
+    }
     await page.evaluate(async () => { window.__rwTestState = await import('/src/state.js'); });
     await page.keyboard.down('Space');
     await page.waitForFunction(() => window.__rwTestState.gameState.isGameStarted);
@@ -101,9 +108,13 @@ try {
     await page.locator('#skipScoreBtn').click();
     await page.keyboard.press('KeyR');
     await page.locator('#start-screen').waitFor({ state: 'visible' });
+    await page.keyboard.down('Space');
+    await page.waitForFunction(() => window.__rwTestState.gameState.isGameStarted);
+    await page.keyboard.up('Space');
+    await page.locator('#start-screen').waitFor({ state: 'hidden' });
 
-    assert.deepEqual(pageErrors, [], `browser errors: ${pageErrors.join(', ')}`);
-    console.log('Browser smoke passed: start, pause, boss, win, restart.');
+    assert.deepEqual(relevantErrors(), [], `browser errors: ${pageErrors.join(', ')}`);
+    console.log('Browser smoke passed: start, pause, Heat, boss, win, restart, second run.');
 } finally {
     await browser?.close();
     await server.close();
