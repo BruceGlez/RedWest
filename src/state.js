@@ -1,3 +1,5 @@
+import { createHeatState } from './heat.js';
+
 export const gameState = {
     score: 0,
     isGameOver: false,
@@ -12,7 +14,8 @@ export const gameState = {
     isIntermission: false,
     waveBossSpawned: false,
     waveBudgetRemaining: 0,
-    waveModifier: null,
+    heat: createHeatState(),
+    runWon: false,
     MAP_SIZE: 140,
     runStats: {
         shotsFired: 0,
@@ -40,6 +43,7 @@ export const playerStats = {
     dashCooldown: 0, 
     dashDuration: 0,
     shootCooldown: 0,
+    invulnerabilityTimer: 0,
     fireRate: 0.2,
     tripleShotTimer: 0,
     weapon: 'revolver'
@@ -66,7 +70,8 @@ export function resetGameState() {
     gameState.isIntermission = false;
     gameState.waveBossSpawned = false;
     gameState.waveBudgetRemaining = 0;
-    gameState.waveModifier = null;
+    gameState.heat = createHeatState();
+    gameState.runWon = false;
     const s = gameState.runStats;
     s.shotsFired = 0;
     s.shotsHit = 0;
@@ -89,6 +94,7 @@ export function resetPlayerStats() {
     playerStats.dashCooldown = 0;
     playerStats.dashDuration = 0;
     playerStats.shootCooldown = 0;
+    playerStats.invulnerabilityTimer = 0;
     playerStats.tripleShotTimer = 0;
     playerStats.weapon = 'revolver';
 }

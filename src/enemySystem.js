@@ -52,7 +52,6 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
     let enemy, speed, type, hp;
     const randomScale = 0.85 + Math.random() * 0.3;
     const wave = gameState.waveNumber;
-    const modifier = gameState.waveModifier;
 
     let spawnType = requestedType;
     if(!spawnType) {
@@ -108,16 +107,6 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
     let shootCooldown = 2.0 + Math.random();
     let projectileSpeed = 40;
     let aimSpread = 2.0;
-    if(modifier === 'SHARPSHOOTERS' && (type === 'gunslinger' || type === 'boss')) {
-        shootCooldown *= 0.72;
-        projectileSpeed = 52;
-        aimSpread = 0.8;
-    }
-    if(modifier === 'FAST_WOLVES' && type === 'wolf') speed *= 1.35;
-    if(modifier === 'HEAVY_HITTERS' && (type === 'gunslinger' || type === 'boss')) {
-        hp += 1;
-        projectileSpeed *= 1.1;
-    }
 
     Object.assign(enemy.userData, { 
         speed: speed, 
@@ -192,9 +181,11 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         }
         
         // --- COLLISION WITH PLAYER (DAMAGE) ---
-        if(e.position.distanceTo(playerGroup.position) < 2.5 && !playerStats.isDashing) {
+        if(e.position.distanceTo(playerGroup.position) < 2.5 && !playerStats.isDashing && playerStats.invulnerabilityTimer <= 0) {
             playerStats.hp--; 
+            playerStats.invulnerabilityTimer = 0.6;
             gameState.runStats.damageTaken++;
+            callbacks.onPlayerDamaged?.();
             playSound('hit');
             
             // Trigger UI update callback

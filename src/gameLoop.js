@@ -8,22 +8,18 @@ import { updateLoots } from './lootSystem.js';
 import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats } from './bulletSystem.js';
 import { updateParticles, clearParticles, getParticlePoolStats } from './particleSystem.js';
 import { markObstacleGridDirty, getGridStats } from './physics.js';
+import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill } from './heat.js';
+
+const FINAL_WAVE = 3;
 
 const ENEMY_COST = {
     bandit: 1.0,
     wolf: 1.2,
-    gunslinger: 2.0,
-    boss: 8.0
+    gunslinger: 2.0
 };
-const WAVE_MODIFIERS = [
-    { id: 'FAST_WOLVES', label: 'FAST WOLVES', minWave: 3 },
-    { id: 'SHARPSHOOTERS', label: 'SHARPSHOOTERS', minWave: 4 },
-    { id: 'SWARM', label: 'SWARM', minWave: 2 },
-    { id: 'HEAVY_HITTERS', label: 'HEAVY HITTERS', minWave: 5 }
-];
 
 function getWaveDuration(wave) {
-    return Math.max(18, 34 - (wave * 1.25));
+    return wave === FINAL_WAVE ? 35 : 28;
 }
 
 function getBaseSpawnInterval(wave) {
@@ -38,8 +34,7 @@ function getWaveCaps(wave) {
     return {
         bandit: 10 + Math.floor(wave * 0.8),
         wolf: 4 + Math.floor(wave * 0.45),
-        gunslinger: Math.max(1, Math.floor(wave / 2)),
-        boss: wave >= 5 ? 1 : 0
+        gunslinger: Math.max(1, Math.floor(wave / 2))
     };
 }
 
@@ -47,20 +42,12 @@ function getWaveWeights(wave) {
     return {
         bandit: Math.max(0.8, 2.4 - (wave * 0.12)),
         wolf: Math.min(2.2, 0.8 + (wave * 0.16)),
-        gunslinger: Math.min(2.4, 0.3 + (wave * 0.2)),
-        boss: wave >= 5 ? 0.1 : 0
+        gunslinger: Math.min(2.4, 0.3 + (wave * 0.2))
     };
 }
 
-function pickWaveModifier(wave) {
-    if(wave < 2) return null;
-    const candidates = WAVE_MODIFIERS.filter(m => wave >= m.minWave);
-    if(!candidates.length) return null;
-    return candidates[Math.floor(Math.random() * candidates.length)];
-}
-
 function getActiveEnemyCounts() {
-    const counts = { bandit: 0, wolf: 0, gunslinger: 0, boss: 0 };
+    const counts = { bandit: 0, wolf: 0, gunslinger: 0 };
     for(const e of enemies) {
         const t = e.userData.type;
         if(counts[t] !== undefined) counts[t]++;
@@ -86,32 +73,49 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
     let fpsSmoothed = 60;
     let pausedBeforeSettings = false;
 
+    function finishRun(won) {
+        if(gameState.isGameOver) return;
+        gameState.runWon = won;
+        gameState.isGameOver = true;
+        playerSystem.playerGroup.visible = false;
+        ui.showGameOver(won);
+    }
+
     const callbacks = {
         onUpdateHUD: () => ui.updateHUD(),
-        onGameOver: () => {
-            if(gameState.isGameOver) return;
-            gameState.isGameOver = true;
-            playerSystem.playerGroup.visible = false;
-            ui.showGameOver();
+        onGameOver: () => finishRun(false),
+        onBossDefeated: () => finishRun(true),
+        onPlayerDamaged: () => recordDamage(gameState.heat),
+        onEnemyKilled: (type) => {
+            const multiplier = recordKill(gameState.heat);
+            gameState.score += Math.round((type === 'boss' ? 50 : 10) * multiplier);
+            if(type !== 'boss') gameState.waveBudgetRemaining += Math.min(1.2, gameState.heat.level * 0.3);
+            ui.updateHUD();
         }
     };
 
     function beginWave(waveNumber) {
-        const modifier = pickWaveModifier(waveNumber);
         gameState.waveNumber = waveNumber;
         gameState.waveDuration = getWaveDuration(waveNumber);
         gameState.waveTimer = gameState.waveDuration;
         gameState.isIntermission = false;
         gameState.intermissionTimer = 0;
         gameState.waveBossSpawned = false;
-        gameState.waveModifier = modifier ? modifier.id : null;
-        let budget = getWaveBudget(waveNumber);
-        if(gameState.waveModifier === 'SWARM') budget *= 1.35;
-        if(gameState.waveModifier === 'HEAVY_HITTERS') budget *= 1.15;
-        gameState.waveBudgetRemaining = budget;
+        gameState.waveBudgetRemaining = getWaveBudget(waveNumber);
         gameState.enemySpawnTimer = 0.55;
         gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, waveNumber);
-        ui.showWaveBanner(modifier ? `WAVE ${waveNumber} - ${modifier.label}` : `WAVE ${waveNumber}`);
+        if(waveNumber === FINAL_WAVE) {
+            spawnEnemy(scene, playerSystem.playerGroup.position, 'boss');
+            gameState.waveBossSpawned = true;
+            ui.showWaveBanner('OUTLAW ARRIVES — TAKE THE BOUNTY', 2500);
+        } else {
+            const introductions = waveNumber === 1 ? ['bandit'] : ['wolf', 'gunslinger'];
+            for(const type of introductions) {
+                spawnEnemy(scene, playerSystem.playerGroup.position, type);
+                gameState.waveBudgetRemaining -= ENEMY_COST[type];
+            }
+            ui.showWaveBanner(`PURSUIT ${waveNumber} / ${FINAL_WAVE}`);
+        }
     }
 
     function beginIntermission() {
@@ -128,30 +132,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
 
         const caps = getWaveCaps(wave);
         const weights = getWaveWeights(wave);
-        const mod = gameState.waveModifier;
-        if(mod === 'SWARM') {
-            weights.bandit *= 1.8;
-            weights.wolf *= 1.4;
-            weights.gunslinger *= 0.65;
-        } else if(mod === 'SHARPSHOOTERS') {
-            weights.gunslinger *= 1.9;
-            weights.wolf *= 0.8;
-        } else if(mod === 'FAST_WOLVES') {
-            weights.wolf *= 2.2;
-            caps.wolf += 3;
-        } else if(mod === 'HEAVY_HITTERS') {
-            weights.bandit *= 0.75;
-            weights.gunslinger *= 1.35;
-            if(wave >= 5) weights.boss *= 1.5;
-        }
         const active = getActiveEnemyCounts();
         const candidates = [];
-        const timeElapsed = gameState.waveDuration - gameState.waveTimer;
-        const canSpawnBoss = !gameState.waveBossSpawned && wave >= 5 && (timeElapsed >= Math.max(6, gameState.waveDuration * 0.4));
 
-        for(const type of ['bandit', 'wolf', 'gunslinger', 'boss']) {
-            if(type === 'boss' && !canSpawnBoss) continue;
-            if(active[type] >= (caps[type] || 0)) continue;
+        for(const type of ['bandit', 'wolf', 'gunslinger']) {
+            const heatCapBonus = type === 'bandit' ? gameState.heat.level * 2 : Math.floor(gameState.heat.level / 2);
+            if(active[type] >= (caps[type] || 0) + heatCapBonus) continue;
             if(ENEMY_COST[type] > remaining) continue;
             candidates.push({ type, weight: weights[type] || 0 });
         }
@@ -160,11 +146,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         if(!chosenType) return;
 
         spawnEnemy(scene, playerSystem.playerGroup.position, chosenType);
-        let spawnCost = ENEMY_COST[chosenType];
-        if(mod === 'SWARM' && chosenType !== 'boss') spawnCost *= 0.8;
-        if(mod === 'HEAVY_HITTERS' && chosenType === 'boss') spawnCost *= 1.35;
-        gameState.waveBudgetRemaining = Math.max(0, gameState.waveBudgetRemaining - spawnCost);
-        if(chosenType === 'boss') gameState.waveBossSpawned = true;
+        gameState.waveBudgetRemaining = Math.max(0, gameState.waveBudgetRemaining - ENEMY_COST[chosenType]);
     }
 
     function pauseGame() {
@@ -309,6 +291,10 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         }
 
         gameState.waveTimer -= dt;
+        if(gameState.waveTimer <= 0 && gameState.waveNumber === FINAL_WAVE) {
+            gameState.waveTimer = 0;
+            return;
+        }
         if(gameState.waveTimer <= 0) {
             beginIntermission();
             return;
@@ -325,10 +311,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
 
         trySpawnDirectorEnemy();
         let interval = getBaseSpawnInterval(gameState.waveNumber) * phaseMultiplier;
-        if(gameState.waveModifier === 'SWARM') interval *= 0.78;
-        if(gameState.waveModifier === 'FAST_WOLVES') interval *= 0.86;
-        if(gameState.waveModifier === 'HEAVY_HITTERS') interval *= 1.06;
-        gameState.enemySpawnTimer = interval;
+        gameState.enemySpawnTimer = interval / heatSpawnMultiplier(gameState.heat.level);
     }
 
     function tick(time) {
@@ -370,12 +353,13 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             return;
         }
 
+        advanceHeat(gameState.heat, dt);
         updateParticles(dt, scene);
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();
         updateBullets(dt, scene, playerSystem.playerGroup, callbacks);
-        updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
-        playerSystem.update(dt, timeInSeconds);
-        updateWaveFlow(dt);
+        if(!gameState.isGameOver) updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
+        if(!gameState.isGameOver) playerSystem.update(dt, timeInSeconds);
+        if(!gameState.isGameOver) updateWaveFlow(dt);
         ui.updateHUD();
 
         const dashPct = Math.max(0, 1 - (playerStats.dashCooldown / 2.0));

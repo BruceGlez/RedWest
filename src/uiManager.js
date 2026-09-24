@@ -1,17 +1,13 @@
 export function createUIManager(gameState, playerStats, onSaveScore) {
     let preferredName = '';
     let waveBannerTimeoutId = null;
-    const modifierLabels = {
-        FAST_WOLVES: 'FAST WOLVES',
-        SHARPSHOOTERS: 'SHARPSHOOTERS',
-        SWARM: 'SWARM',
-        HEAVY_HITTERS: 'HEAVY HITTERS'
-    };
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
         waveTimer: document.getElementById('wave-timer'),
         weaponLabel: document.getElementById('weapon-label'),
+        heatLevel: document.getElementById('heat-level'),
+        heatMultiplier: document.getElementById('heat-multiplier'),
         health: document.getElementById('health-container'),
         status: document.getElementById('status-msg'),
         waveBanner: document.getElementById('wave-banner'),
@@ -28,11 +24,13 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         startScreen: document.getElementById('start-screen'),
         gameOver: document.getElementById('gameover'),
         finalScore: document.getElementById('finalScore'),
+        resultTitle: document.getElementById('result-title'),
         inputSection: document.getElementById('input-section'),
         restartMsg: document.getElementById('restart-msg'),
         playerName: document.getElementById('playerName'),
         playerNameList: document.getElementById('player-name-list'),
         saveButton: document.getElementById('saveScoreBtn'),
+        skipButton: document.getElementById('skipScoreBtn'),
         leaderboard: document.getElementById('highscore-list'),
         debugPanel: document.getElementById('debug-panel'),
         runStatsTable: document.getElementById('run-stats-table')
@@ -47,6 +45,10 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
             els.restartMsg.style.display = 'block';
         });
     }
+    els.skipButton?.addEventListener('click', () => {
+        els.inputSection.style.display = 'none';
+        els.restartMsg.style.display = 'block';
+    });
 
     function updateHUD() {
         const hearts = [];
@@ -58,6 +60,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.score.innerText = gameState.score;
         els.wave.innerText = gameState.waveNumber;
         els.weaponLabel.innerText = playerStats.weapon.toUpperCase();
+        els.heatLevel.innerText = gameState.heat.level;
+        els.heatMultiplier.innerText = `x${(1 + gameState.heat.level * 0.5).toFixed(1)}`;
 
         if(gameState.isIntermission) {
             els.waveTimer.innerText = `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
@@ -70,9 +74,6 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         if(playerStats.tripleShotTimer > 0) {
             els.status.className = 'status-power';
             els.status.innerText = `TRIPLE SHOT: ${Math.ceil(playerStats.tripleShotTimer)}s`;
-        } else if(gameState.waveModifier) {
-            els.status.className = '';
-            els.status.innerText = `MODIFIER: ${modifierLabels[gameState.waveModifier] || gameState.waveModifier}`;
         } else {
             els.status.className = '';
             els.status.innerText = '';
@@ -101,6 +102,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         const accuracy = s.shotsFired > 0 ? `${Math.round((s.shotsHit / s.shotsFired) * 100)}%` : '0%';
         const rows = [
             ['Wave reached', s.waveReached],
+            ['Peak Heat', gameState.heat.peak],
             ['Enemies destroyed', s.enemiesKilled],
             ['Bandits destroyed', s.banditsKilled],
             ['Gunslingers destroyed', s.gunslingersKilled],
@@ -127,9 +129,11 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         }
     }
 
-    function showGameOver() {
+    function showGameOver(won = false) {
         hidePauseOverlay();
         hideSettingsModal();
+        els.resultTitle.textContent = won ? 'BOUNTY CLAIMED' : 'WASTED';
+        els.resultTitle.classList.toggle('wasted-text', !won);
         els.gameOver.style.display = 'flex';
         els.finalScore.innerText = gameState.score;
         renderRunStats();

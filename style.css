@@ -31,6 +31,8 @@ canvas {
 }
 
 #score { color: #ffd700; font-family: 'Roboto Mono', monospace; }
+#heat-level, #heat-multiplier { color: #ff774d; font-family: 'Roboto Mono', monospace; }
+.heat-row { font-size: 23px; }
 #wave, #wave-timer, #weapon-label { color: #ffcc80; font-family: 'Roboto Mono', monospace; }
 #health-container { color: #ff0044; font-size: 32px; letter-spacing: 2px; }
 #status-msg { color: #00ffcc; font-size: 20px; font-weight: bold; margin-top: 5px; text-shadow: 1px 1px 4px black; }
@@ -189,6 +191,9 @@ canvas {
     text-align: center; color: #f5f5f5;
     box-shadow: 0 0 30px rgba(0,0,0,0.9), inset 0 0 20px rgba(0,0,0,0.5);
     max-width: 500px; width: 80%;
+    max-height: calc(100vh - 24px);
+    overflow-y: auto;
+    box-sizing: border-box;
 }
 
 .western-title { font-size: 64px; margin: 0 0 20px 0; color: #e64a19; text-shadow: 4px 4px 0 #000; letter-spacing: 4px; }
@@ -211,6 +216,7 @@ canvas {
 #playerName::placeholder { color: rgba(255, 215, 0, 0.3); }
 #saveScoreBtn { background: #5d4037; color: white; border: 2px solid #ffd700; padding: 8px 20px; font-family: 'Roboto Mono', monospace; font-weight: bold; cursor: pointer; font-size: 18px; transition: 0.2s; }
 #saveScoreBtn:hover { background: #8d6e63; transform: scale(1.05); }
+#skipScoreBtn { background: transparent; color: #ddd; border: 1px solid #8d6e63; padding: 7px 16px; font-family: 'Roboto Mono', monospace; cursor: pointer; }
 
 .run-summary-box {
     margin: 8px 0 20px;

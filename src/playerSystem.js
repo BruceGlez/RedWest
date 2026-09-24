@@ -51,6 +51,9 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     }
 
     function update(dt, timeInSeconds) {
+        if(playerStats.invulnerabilityTimer > 0) {
+            playerStats.invulnerabilityTimer = Math.max(0, playerStats.invulnerabilityTimer - dt);
+        }
         if(keys.weaponSwitchRequested) {
             keys.weaponSwitchRequested = false;
             playerStats.weapon = playerStats.weapon === 'revolver' ? 'shotgun' : 'revolver';

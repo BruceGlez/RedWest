@@ -143,9 +143,11 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
         // 3. Check Player Collision (Enemy Bullets)
         if(b.userData.owner === 'enemy') {
             const dist = new THREE.Vector3(b.position.x - playerGroup.position.x, 0, b.position.z - playerGroup.position.z).length();
-            if(dist < 1.0 && !playerStats.isDashing) { 
+            if(dist < 1.0 && !playerStats.isDashing && playerStats.invulnerabilityTimer <= 0) {
                 playerStats.hp--; 
+                playerStats.invulnerabilityTimer = 0.6;
                 runStats.damageTaken++;
+                callbacks.onPlayerDamaged?.();
                 playSound('hit');
                 callbacks.onUpdateHUD(); 
                 createExplosion(scene, playerGroup.position, 0xff0000); 
@@ -186,8 +188,8 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     else if(e.userData.type === 'gunslinger') runStats.gunslingersKilled++;
                     else if(e.userData.type === 'wolf') runStats.wolvesKilled++;
                     else if(e.userData.type === 'boss') runStats.bossesKilled++;
-                    gameState.score += (e.userData.type === 'boss') ? 10 : 1;
-                    callbacks.onUpdateHUD();
+                    callbacks.onEnemyKilled?.(e.userData.type);
+                    if(e.userData.type === 'boss') callbacks.onBossDefeated?.();
                 } else { 
                     // Enemy Hit
                     playSound('hit'); 
