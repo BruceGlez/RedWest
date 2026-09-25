@@ -177,10 +177,15 @@ try {
     await page.locator('#skipScoreBtn').click();
     await page.keyboard.press('KeyR');
     await page.locator('#start-screen').waitFor({ state: 'visible' });
+    // The playtest log recorded one row per finished run, in order, with the bounty decision.
+    const runLog = await page.evaluate(async () => (await import('/src/runLog.js')).loadRunLog());
+    assert.deepEqual(runLog.map(run => [run.sessionRun, run.result, run.bountyChoice]),
+        [[1, 'escaped', 'ride on'], [2, 'banked', 'bank'], [3, 'died', 'ride on']]);
+    assert.equal(await page.locator('#run-log-count').textContent(), '3 runs');
     await startRun();
 
     assert.deepEqual(relevantErrors(), [], `browser errors: ${pageErrors.join(', ')}`);
-    console.log('Browser smoke passed: start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, restarts.');
+    console.log('Browser smoke passed: start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, run log, restarts.');
 } finally {
     await browser?.close();
     await server.close();

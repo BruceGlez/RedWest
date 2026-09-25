@@ -19,6 +19,8 @@
 - Players may save or skip saving a score before restarting. Prototype scores are stored under `redWestScores.v2` because their scale differs from the original build; the original `redWestScores` records are left untouched.
 - Focused Heat and bounty rules tests, and a Chrome browser smoke path covering start, pause/resume, pursuit transitions, Heat, both bounty choices (escape and forfeit), and restarts. CI runs the unit tests, build, and both browser smoke tests.
 
+- Playtest support: the game is published to GitHub Pages from `main`, and each finished run is appended to an in-browser run log (copyable as spreadsheet rows) that records the result, peak Heat, bank / ride-on choice, bounty, time, and run order within the session. Whether a second run was *voluntary* still needs the observer's note.
+
 ## Prototype balance values to watch in playtests
 
 These are first guesses, not tuned numbers: 4-second chain window, 2 kills per Heat level (max 4, x1.5 score per level), 5-second decay per level, 50-point base bounty, 30-second bonus pursuit, and the rule that dying in the bonus forfeits the bounty and bonus score. Record how often testers ride on and at what Heat.

@@ -57,6 +57,12 @@
                 <p><span>M / N</span> TOGGLE MUSIC / SFX</p>
             </div>
             <p class="blink-text">PRESS <span class="key-highlight">SPACE</span> TO DRAW</p>
+            <div class="run-log-box">
+                PLAYTEST LOG: <span id="run-log-count">0 runs</span>
+                <button id="copyRunLogBtn" type="button">COPY</button>
+                <button id="clearRunLogBtn" type="button">CLEAR</button>
+                <span id="run-log-status"></span>
+            </div>
         </div>
     </div>
 
@@ -80,6 +86,7 @@
             <p id="restart-msg" class="restart-text" style="display: none;">
                 PRESS <span class="key-highlight">R</span> TO RESTART
             </p>
+            <button id="resultCopyLogBtn" type="button">COPY RUN LOG</button>
         </div>
     </div>
 

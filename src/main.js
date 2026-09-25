@@ -7,6 +7,7 @@ import { loadHighScores, saveHighScore, getPreferredPlayerName } from './scoreSy
 import { createUIManager } from './uiManager.js';
 import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
+import { loadRunLog, clearRunLog } from './runLog.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -26,6 +27,7 @@ ui = createUIManager(gameState, playerStats, (name, score) => {
     ui.updateLeaderboard(scores);
 });
 ui.updateLeaderboard(loadHighScores());
+ui.setRunLog(loadRunLog());
 ui.setPreferredName(getPreferredPlayerName());
 ui.updateHUD();
 ui.updateDashBar(1);
@@ -39,6 +41,10 @@ ui.bindControlHandlers({
     onRestartRun: () => gameLoop.resetGame(),
     onBankBounty: () => gameLoop.bankAndLeave(),
     onRideOn: () => gameLoop.rideOnToBonus(),
+    onClearRunLog: () => {
+        clearRunLog();
+        ui.setRunLog([]);
+    },
     onToggleMusic: () => {
         toggleMusicEnabled();
         ui.updateAudioControls(getAudioSettings());

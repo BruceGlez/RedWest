@@ -9,6 +9,7 @@ import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats }
 import { updateParticles, clearParticles, getParticlePoolStats } from './particleSystem.js';
 import { markObstacleGridDirty, getGridStats } from './physics.js';
 import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
+import { buildRunRecord, appendRunRecord } from './runLog.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 
 const FINAL_WAVE = FINAL_PURSUIT;
@@ -75,6 +76,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
     let debugElapsed = 0;
     let fpsSmoothed = 60;
     let pausedBeforeSettings = false;
+    let sessionRun = 0;
 
     // result: 'died' | 'banked' | 'escaped'
     function finishRun(result) {
@@ -85,6 +87,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         gameState.isChoosingBounty = false;
         playerSystem.playerGroup.visible = false;
         ui.hideBountyChoice();
+        ui.setRunLog(appendRunRecord(buildRunRecord(gameState, result, sessionRun)));
         ui.showGameOver(result);
     }
 
@@ -401,6 +404,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             emitDebug(dt);
             if(keys.space) {
                 gameState.isGameStarted = true;
+                sessionRun++;
                 ui.hideStartScreen();
                 camera.position.set(0, 35, 25);
                 resumeAudio();
@@ -433,6 +437,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             return;
         }
 
+        gameState.runTime += dt;
         advanceHeat(gameState.heat, dt);
         updateParticles(dt, scene);
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();

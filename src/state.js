@@ -19,6 +19,7 @@ export const gameState = {
     bounty: createBountyState(),
     isChoosingBounty: false,
     runWon: false,
+    runTime: 0,
     MAP_SIZE: 140,
     runStats: {
         shotsFired: 0,
@@ -77,6 +78,7 @@ export function resetGameState() {
     gameState.bounty = createBountyState();
     gameState.isChoosingBounty = false;
     gameState.runWon = false;
+    gameState.runTime = 0;
     const s = gameState.runStats;
     s.shotsFired = 0;
     s.shotsHit = 0;

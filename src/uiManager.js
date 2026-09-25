@@ -1,11 +1,13 @@
 import { heatMultiplier, CHAIN_WINDOW, MAX_HEAT } from './heat.js';
 import { FINAL_PURSUIT } from './bounty.js';
+import { formatRunLog } from './runLog.js';
 
 export function createUIManager(gameState, playerStats, onSaveScore) {
     let preferredName = '';
     let waveBannerTimeoutId = null;
     let heatEventTimeoutId = null;
     let lastHeatLevel = 0;
+    let runLog = [];
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
@@ -41,6 +43,11 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         bonusSeconds: document.getElementById('bonus-seconds'),
         bankBountyBtn: document.getElementById('bankBountyBtn'),
         rideOnBtn: document.getElementById('rideOnBtn'),
+        runLogCount: document.getElementById('run-log-count'),
+        runLogStatus: document.getElementById('run-log-status'),
+        copyRunLogBtn: document.getElementById('copyRunLogBtn'),
+        clearRunLogBtn: document.getElementById('clearRunLogBtn'),
+        resultCopyLogBtn: document.getElementById('resultCopyLogBtn'),
         inputSection: document.getElementById('input-section'),
         restartMsg: document.getElementById('restart-msg'),
         playerName: document.getElementById('playerName'),
@@ -222,6 +229,39 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         if(els.bountyChoice) els.bountyChoice.style.display = 'none';
     }
 
+    function setRunLog(records) {
+        runLog = records;
+        if(els.runLogCount) els.runLogCount.textContent = `${records.length} run${records.length === 1 ? '' : 's'}`;
+    }
+
+    async function copyText(text) {
+        try {
+            await navigator.clipboard.writeText(text);
+            return true;
+        } catch {
+            // Clipboard API unavailable (e.g. plain http): fall back to a temporary selection.
+            const area = document.createElement('textarea');
+            area.value = text;
+            area.style.position = 'fixed';
+            area.style.opacity = '0';
+            document.body.appendChild(area);
+            area.select();
+            const copied = document.execCommand('copy');
+            area.remove();
+            return copied;
+        }
+    }
+
+    async function copyRunLog(button) {
+        button.blur(); // Space starts/restarts the game; keep it from re-pressing this button.
+        const copied = runLog.length ? await copyText(formatRunLog(runLog)) : false;
+        const message = !runLog.length ? 'NO RUNS LOGGED YET' : copied ? `COPIED ${runLog.length} RUNS` : 'COPY FAILED';
+        if(els.runLogStatus) els.runLogStatus.textContent = message;
+        button.dataset.label = button.dataset.label || button.textContent;
+        button.textContent = message;
+        setTimeout(() => { button.textContent = button.dataset.label; }, 1500);
+    }
+
     function showStartScreen() {
         els.startScreen.style.display = 'flex';
     }
@@ -303,6 +343,14 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         if(els.settingsSfxBtn) els.settingsSfxBtn.addEventListener('click', handlers.onToggleSfx);
         if(els.bankBountyBtn) els.bankBountyBtn.addEventListener('click', handlers.onBankBounty);
         if(els.rideOnBtn) els.rideOnBtn.addEventListener('click', handlers.onRideOn);
+        els.copyRunLogBtn?.addEventListener('click', () => copyRunLog(els.copyRunLogBtn));
+        els.resultCopyLogBtn?.addEventListener('click', () => copyRunLog(els.resultCopyLogBtn));
+        els.clearRunLogBtn?.addEventListener('click', () => {
+            els.clearRunLogBtn.blur();
+            if(!runLog.length || !window.confirm(`Delete all ${runLog.length} logged runs from this browser?`)) return;
+            handlers.onClearRunLog();
+            if(els.runLogStatus) els.runLogStatus.textContent = 'LOG CLEARED';
+        });
     }
 
     function updateAudioControls(settings) {
@@ -337,6 +385,7 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         showGameOver,
         showBountyChoice,
         showHeatEvent,
+        setRunLog,
         hideBountyChoice,
         hideGameOverScreen,
         showStartScreen,

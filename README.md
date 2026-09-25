@@ -15,6 +15,13 @@ Open the local URL printed by Vite. Use WASD to move, mouse to aim and shoot, Sh
 
 The source page also works from a plain local HTTP server such as VS Code Live Server, using the Three.js CDN import map. Opening `index.html` as a `file://` URL may be blocked by browser module security; use an HTTP server.
 
+## Playtest build
+
+Every push to `main` is built and published by `.github/workflows/pages.yml` to
+https://bruceglez.github.io/RedWest/ (the repository's Pages source must be set to **GitHub Actions**).
+
+Each finished run is recorded in that browser's playtest log: result, pursuit reached, peak Heat, bank or ride-on choice and the Heat at that moment, bounty, score, time, shots, accuracy, kills, damage taken, and its order in the session. Use **COPY** on the start screen or **COPY RUN LOG** on the result screen to copy the rows as tab-separated text for a spreadsheet, and **CLEAR** on the start screen before the next tester.
+
 ## Verify
 
 ```powershell
