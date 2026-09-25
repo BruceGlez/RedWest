@@ -1,4 +1,5 @@
 import { heatMultiplier } from './heat.js';
+import { FINAL_PURSUIT } from './bounty.js';
 
 export function createUIManager(gameState, playerStats, onSaveScore) {
     let preferredName = '';
@@ -27,6 +28,13 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         gameOver: document.getElementById('gameover'),
         finalScore: document.getElementById('finalScore'),
         resultTitle: document.getElementById('result-title'),
+        resultDetail: document.getElementById('result-detail'),
+        bountyChoice: document.getElementById('bounty-choice'),
+        bountyAmount: document.getElementById('bounty-amount'),
+        bountyHeat: document.getElementById('bounty-heat'),
+        bonusSeconds: document.getElementById('bonus-seconds'),
+        bankBountyBtn: document.getElementById('bankBountyBtn'),
+        rideOnBtn: document.getElementById('rideOnBtn'),
         inputSection: document.getElementById('input-section'),
         restartMsg: document.getElementById('restart-msg'),
         playerName: document.getElementById('playerName'),
@@ -60,7 +68,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         }
         els.health.innerHTML = hearts.join('');
         els.score.innerText = gameState.score;
-        els.wave.innerText = gameState.waveNumber;
+        els.wave.innerText = gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
         els.weaponLabel.innerText = playerStats.weapon.toUpperCase();
         els.heatLevel.innerText = gameState.heat.level;
         els.heatMultiplier.innerText = `x${heatMultiplier(gameState.heat.level).toFixed(1)}`;
@@ -105,7 +113,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         const s = gameState.runStats;
         const accuracy = s.shotsFired > 0 ? `${Math.round((s.shotsHit / s.shotsFired) * 100)}%` : '0%';
         const rows = [
-            ['Wave reached', s.waveReached],
+            ['Pursuit reached', s.waveReached > FINAL_PURSUIT ? 'BONUS' : s.waveReached],
+            ['Outlaw bounty', describeBounty(gameState.bounty)],
             ['Peak Heat', gameState.heat.peak],
             ['Enemies destroyed', s.enemiesKilled],
             ['Bandits destroyed', s.banditsKilled],
@@ -133,11 +142,29 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         }
     }
 
-    function showGameOver(won = false) {
+    function describeBounty(bounty) {
+        if(bounty.status === 'banked') return `+${bounty.amount} (banked)`;
+        if(bounty.status === 'escaped') return `+${bounty.amount} (escaped)`;
+        if(bounty.status === 'forfeited') return `${bounty.amount} lost`;
+        return 'not claimed';
+    }
+
+    const RESULT_TEXT = {
+        banked: ['BOUNTY CLAIMED', 'You took the bounty and rode out.'],
+        escaped: ['ESCAPED', 'You outran the posse with the bounty.'],
+        died: ['WASTED', '']
+    };
+
+    // result: 'died' | 'banked' | 'escaped'
+    function showGameOver(result = 'died') {
         hidePauseOverlay();
         hideSettingsModal();
-        els.resultTitle.textContent = won ? 'BOUNTY CLAIMED' : 'WASTED';
-        els.resultTitle.classList.toggle('wasted-text', !won);
+        const [title, detail] = RESULT_TEXT[result] || RESULT_TEXT.died;
+        els.resultTitle.textContent = title;
+        els.resultTitle.classList.toggle('wasted-text', result === 'died');
+        els.resultDetail.textContent = gameState.bounty.status === 'forfeited'
+            ? `You rode on and lost the ${gameState.bounty.amount} bounty and your bonus earnings.`
+            : detail;
         els.gameOver.style.display = 'flex';
         els.finalScore.innerText = gameState.score;
         renderRunStats();
@@ -145,6 +172,19 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.restartMsg.style.display = 'none';
         els.playerName.value = preferredName;
         els.playerName.focus();
+    }
+
+    function showBountyChoice(bounty, bonusSeconds) {
+        hidePauseOverlay();
+        hideSettingsModal();
+        els.bountyAmount.textContent = bounty.amount;
+        els.bountyHeat.textContent = `${bounty.heatAtOffer} (x${heatMultiplier(bounty.heatAtOffer).toFixed(1)})`;
+        els.bonusSeconds.textContent = bonusSeconds;
+        els.bountyChoice.style.display = 'flex';
+    }
+
+    function hideBountyChoice() {
+        if(els.bountyChoice) els.bountyChoice.style.display = 'none';
     }
 
     function showStartScreen() {
@@ -226,6 +266,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         if(els.settingsRestartBtn) els.settingsRestartBtn.addEventListener('click', handlers.onRestartRun);
         if(els.settingsMusicBtn) els.settingsMusicBtn.addEventListener('click', handlers.onToggleMusic);
         if(els.settingsSfxBtn) els.settingsSfxBtn.addEventListener('click', handlers.onToggleSfx);
+        if(els.bankBountyBtn) els.bankBountyBtn.addEventListener('click', handlers.onBankBounty);
+        if(els.rideOnBtn) els.rideOnBtn.addEventListener('click', handlers.onRideOn);
     }
 
     function updateAudioControls(settings) {
@@ -258,6 +300,8 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         updateDashBar,
         showWaveBanner,
         showGameOver,
+        showBountyChoice,
+        hideBountyChoice,
         hideGameOverScreen,
         showStartScreen,
         hideStartScreen,

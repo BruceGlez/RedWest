@@ -8,9 +8,11 @@ import { updateLoots } from './lootSystem.js';
 import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats } from './bulletSystem.js';
 import { updateParticles, clearParticles, getParticlePoolStats } from './particleSystem.js';
 import { markObstacleGridDirty, getGridStats } from './physics.js';
-import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill } from './heat.js';
+import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
+import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 
-const FINAL_WAVE = 3;
+const FINAL_WAVE = FINAL_PURSUIT;
+const BONUS_WAVE = FINAL_PURSUIT + 1;
 
 const ENEMY_COST = {
     bandit: 1.0,
@@ -19,6 +21,7 @@ const ENEMY_COST = {
 };
 
 function getWaveDuration(wave) {
+    if(wave === BONUS_WAVE) return BONUS_PURSUIT_SECONDS;
     return wave === FINAL_WAVE ? 35 : 28;
 }
 
@@ -73,23 +76,53 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
     let fpsSmoothed = 60;
     let pausedBeforeSettings = false;
 
-    function finishRun(won) {
+    // result: 'died' | 'banked' | 'escaped'
+    function finishRun(result) {
         if(gameState.isGameOver) return;
-        gameState.runWon = won;
+        if(result === 'died') gameState.score = forfeitBounty(gameState.bounty, gameState.score);
+        gameState.runWon = result !== 'died';
         gameState.isGameOver = true;
+        gameState.isChoosingBounty = false;
         playerSystem.playerGroup.visible = false;
-        ui.showGameOver(won);
+        ui.hideBountyChoice();
+        ui.showGameOver(result);
+    }
+
+    function openBountyChoice() {
+        if(gameState.isGameOver || gameState.isChoosingBounty) return;
+        offerBounty(gameState.bounty, gameState.heat.level);
+        gameState.isChoosingBounty = true;
+        clearBullets(scene);
+        ui.showBountyChoice(gameState.bounty, BONUS_PURSUIT_SECONDS);
+    }
+
+    function bankAndLeave() {
+        if(!gameState.isChoosingBounty) return;
+        gameState.score = bankBounty(gameState.bounty, gameState.score);
+        finishRun('banked');
+    }
+
+    function rideOnToBonus() {
+        if(!gameState.isChoosingBounty) return;
+        rideOn(gameState.bounty, gameState.score);
+        gameState.isChoosingBounty = false;
+        ui.hideBountyChoice();
+        beginWave(BONUS_WAVE);
     }
 
     const callbacks = {
         onUpdateHUD: () => ui.updateHUD(),
-        onGameOver: () => finishRun(false),
-        onBossDefeated: () => finishRun(true),
+        onGameOver: () => finishRun('died'),
+        onBossDefeated: () => openBountyChoice(),
         onPlayerDamaged: () => recordDamage(gameState.heat),
+        onPlayerMiss: () => recordMiss(gameState.heat),
         onEnemyKilled: (type) => {
             const multiplier = recordKill(gameState.heat);
-            gameState.score += Math.round((type === 'boss' ? 50 : 10) * multiplier);
-            if(type !== 'boss') gameState.waveBudgetRemaining += Math.min(1.2, gameState.heat.level * 0.3);
+            // The outlaw pays out through the bounty choice instead of as a kill score.
+            if(type !== 'boss') {
+                gameState.score += Math.round(10 * multiplier);
+                gameState.waveBudgetRemaining += Math.min(1.2, gameState.heat.level * 0.3);
+            }
             ui.updateHUD();
         }
     };
@@ -108,6 +141,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             spawnEnemy(scene, playerSystem.playerGroup.position, 'boss');
             gameState.waveBossSpawned = true;
             ui.showWaveBanner('OUTLAW ARRIVES — TAKE THE BOUNTY', 2500);
+        } else if(waveNumber === BONUS_WAVE) {
+            for(const type of ['gunslinger', 'wolf', 'wolf']) {
+                spawnEnemy(scene, playerSystem.playerGroup.position, type);
+                gameState.waveBudgetRemaining -= ENEMY_COST[type];
+            }
+            ui.showWaveBanner(`BONUS PURSUIT — SURVIVE ${BONUS_PURSUIT_SECONDS}s TO ESCAPE`, 2500);
         } else {
             const introductions = waveNumber === 1 ? ['bandit'] : ['wolf', 'gunslinger'];
             for(const type of introductions) {
@@ -132,6 +171,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
 
         const caps = getWaveCaps(wave);
         const weights = getWaveWeights(wave);
+        // Higher Heat sends more dangerous pursuers, not only more of them.
+        weights.gunslinger *= 1 + (gameState.heat.level * 0.25);
+        weights.wolf *= 1 + (gameState.heat.level * 0.15);
         const active = getActiveEnemyCounts();
         const candidates = [];
 
@@ -150,7 +192,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
     }
 
     function pauseGame() {
-        if(!gameState.isGameStarted || gameState.isGameOver) return;
+        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty) return;
         gameState.isPaused = true;
         ui.showPauseOverlay();
     }
@@ -164,7 +206,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
     }
 
     function openSettings() {
-        if(!gameState.isGameStarted || gameState.isGameOver) return;
+        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty) return;
         if(gameState.isSettingsOpen) return;
         pausedBeforeSettings = gameState.isPaused;
         gameState.isPaused = true;
@@ -273,9 +315,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         keys.weaponSwitchRequested = false;
         keys.musicToggleRequested = false;
         keys.sfxToggleRequested = false;
+        keys.bankRequested = false;
+        keys.rideOnRequested = false;
         playerSystem.reset();
         generateMap(scene);
         ui.hideGameOverScreen();
+        ui.hideBountyChoice();
         ui.hidePauseOverlay();
         ui.hideSettingsModal();
         ui.showStartScreen();
@@ -295,6 +340,10 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         if(gameState.waveTimer <= 0 && gameState.waveNumber === FINAL_WAVE) {
             gameState.waveTimer = 0;
             if(gameState.waveBudgetRemaining < ENEMY_COST.bandit) gameState.waveBudgetRemaining = ENEMY_COST.bandit;
+        } else if(gameState.waveTimer <= 0 && gameState.waveNumber === BONUS_WAVE) {
+            gameState.score = escapeWithBounty(gameState.bounty, gameState.score);
+            finishRun('escaped');
+            return;
         } else if(gameState.waveTimer <= 0) {
             beginIntermission();
             return;
@@ -323,6 +372,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         handlePauseToggle();
         handleSettingsToggle();
         handleAudioToggles();
+        // B / C only answer the bounty choice; ignore presses made before it opens.
+        if(!gameState.isChoosingBounty) {
+            keys.bankRequested = false;
+            keys.rideOnRequested = false;
+        }
 
         if(!gameState.isGameStarted) {
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 20, Math.cos(timeInSeconds * 0.5) * 30);
@@ -346,6 +400,16 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             return;
         }
 
+        if(gameState.isChoosingBounty) {
+            if(keys.bankRequested) bankAndLeave();
+            else if(keys.rideOnRequested) rideOnToBonus();
+            keys.bankRequested = false;
+            keys.rideOnRequested = false;
+            renderer.render(scene, camera);
+            emitDebug(dt);
+            return;
+        }
+
         if(gameState.isPaused || gameState.isSettingsOpen) {
             renderer.render(scene, camera);
             ui.updateHUD();
@@ -357,9 +421,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         updateParticles(dt, scene);
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();
         updateBullets(dt, scene, playerSystem.playerGroup, callbacks);
-        if(!gameState.isGameOver) updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
-        if(!gameState.isGameOver) playerSystem.update(dt, timeInSeconds);
-        if(!gameState.isGameOver) updateWaveFlow(dt);
+        // A bullet can end the run or open the bounty choice; freeze the rest of this frame if so.
+        const stillFighting = () => !gameState.isGameOver && !gameState.isChoosingBounty;
+        if(stillFighting()) updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
+        if(stillFighting()) playerSystem.update(dt, timeInSeconds);
+        if(stillFighting()) updateWaveFlow(dt);
         ui.updateHUD();
 
         const dashPct = Math.max(0, 1 - (playerStats.dashCooldown / 2.0));
@@ -378,6 +444,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         pauseGame,
         resumeGame,
         openSettings,
-        closeSettings
+        closeSettings,
+        bankAndLeave,
+        rideOnToBonus
     };
 }

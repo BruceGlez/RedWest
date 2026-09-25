@@ -40,7 +40,7 @@
         <div class="modal-content">
             <h1 class="western-title">RED WEST</h1>
             <div class="leaderboard-box">
-                <h3>WANTED LIST (TOP 3)</h3>
+                <h3>WANTED LIST (TOP 5)</h3>
                 <ul id="highscore-list">
                     <li>LOADING...</li>
                 </ul>
@@ -50,7 +50,7 @@
                 <p><span>MOUSE</span> AIM / SHOOT</p>
                 <p><span>SHIFT</span> DASH</p>
                 <p><span>Q</span> SWITCH WEAPON</p>
-                <p><span>HEAT</span> CHAIN KILLS FOR MORE POINTS AND MORE PURSUERS</p>
+                <p><span>HEAT</span> CHAIN ACCURATE KILLS FOR MORE POINTS AND DEADLIER PURSUERS. MISSES AND HITS TAKEN COOL IT</p>
                 <p><span>P / ESC</span> PAUSE</p>
                 <p><span>O</span> SETTINGS</p>
                 <p><span>M / N</span> TOGGLE MUSIC / SFX</p>
@@ -62,6 +62,7 @@
     <div id="gameover" class="modal-overlay" style="display: none;">
         <div class="modal-content">
             <h1 id="result-title" class="western-title wasted-text">WASTED</h1>
+            <p id="result-detail" class="result-detail"></p>
             <p class="score-text">FINAL SCORE: <span id="finalScore">0</span></p>
             <div class="run-summary-box">
                 <h3>RUN REPORT</h3>
@@ -78,6 +79,24 @@
             <p id="restart-msg" class="restart-text" style="display: none;">
                 PRESS <span class="key-highlight">R</span> TO RESTART
             </p>
+        </div>
+    </div>
+
+    <div id="bounty-choice" class="modal-overlay" style="display:none;">
+        <div class="modal-content bounty-content">
+            <h1 class="western-title">OUTLAW DOWN</h1>
+            <p class="score-text">BOUNTY: <span id="bounty-amount">0</span></p>
+            <p class="result-detail">Heat <span id="bounty-heat">0</span> set the bounty. It is only paid when you leave.</p>
+            <div class="bounty-options">
+                <button id="bankBountyBtn" type="button">
+                    <strong>BANK IT <span class="key-highlight">B</span></strong>
+                    <small>Collect the bounty now and end the run.</small>
+                </button>
+                <button id="rideOnBtn" type="button">
+                    <strong>RIDE ON <span class="key-highlight">C</span></strong>
+                    <small>Keep your Heat through a <span id="bonus-seconds">30</span>s bonus pursuit. Escape: bounty plus everything you earn. Die: lose both.</small>
+                </button>
+            </div>
         </div>
     </div>
 

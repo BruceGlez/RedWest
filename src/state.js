@@ -1,4 +1,5 @@
 import { createHeatState } from './heat.js';
+import { createBountyState } from './bounty.js';
 
 export const gameState = {
     score: 0,
@@ -15,6 +16,8 @@ export const gameState = {
     waveBossSpawned: false,
     waveBudgetRemaining: 0,
     heat: createHeatState(),
+    bounty: createBountyState(),
+    isChoosingBounty: false,
     runWon: false,
     MAP_SIZE: 140,
     runStats: {
@@ -71,6 +74,8 @@ export function resetGameState() {
     gameState.waveBossSpawned = false;
     gameState.waveBudgetRemaining = 0;
     gameState.heat = createHeatState();
+    gameState.bounty = createBountyState();
+    gameState.isChoosingBounty = false;
     gameState.runWon = false;
     const s = gameState.runStats;
     s.shotsFired = 0;

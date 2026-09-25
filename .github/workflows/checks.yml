@@ -14,3 +14,9 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+      - run: npm run test:smoke
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
+      - run: npm run test:static
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

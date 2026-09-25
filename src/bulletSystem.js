@@ -47,13 +47,25 @@ export function getBulletPoolStats() {
     };
 }
 
-export function spawnBullet(scene, owner, position, velocity) {
+// A volley is every pellet from one trigger pull. It counts as a miss once all of its
+// pellets are gone without touching an enemy.
+function resolveVolley(bullet, hit, callbacks) {
+    const volley = bullet.userData.volley;
+    if(!volley) return;
+    bullet.userData.volley = null;
+    if(hit) volley.hit = true;
+    volley.pending--;
+    if(volley.pending === 0 && !volley.hit) callbacks.onPlayerMiss?.();
+}
+
+export function spawnBullet(scene, owner, position, velocity, volley = null) {
     const bullet = acquireBullet();
     bullet.visible = true;
     bullet.position.copy(position);
     bullet.material.color.copy(owner === 'enemy' ? ENEMY_BULLET_COLOR : PLAYER_BULLET_COLOR);
     bullet.userData.owner = owner;
     bullet.userData.velocity = velocity.clone();
+    bullet.userData.volley = volley;
     scene.add(bullet);
     bullets.push(bullet);
 }
@@ -104,13 +116,15 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
     const runStats = gameState.runStats;
     rebuildEnemyGrid(enemies);
     for(let i=bullets.length-1; i>=0; i--) {
-        // Stop resolving hits once the run has ended so the result screen's score is final.
-        if(gameState.isGameOver) break;
+        // Stop resolving hits once the run has ended or the bounty choice is open,
+        // so the score shown on either screen is final.
+        if(gameState.isGameOver || gameState.isChoosingBounty) break;
         const b = bullets[i]; 
         b.position.addScaledVector(b.userData.velocity, dt);
 
         // 1. Remove if too far
         if(b.position.distanceTo(playerGroup.position) > 100) { 
+            resolveVolley(b, false, callbacks);
             releaseBullet(scene, b, i);
             continue; 
         }
@@ -119,6 +133,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
         const hitObs = getObstacleAt(b.position.x, b.position.z, 0.5);
             if(hitObs) { 
             createExplosion(scene, b.position, 0x8B4513); 
+            resolveVolley(b, false, callbacks);
             releaseBullet(scene, b, i);
             
             if(hitObs.destructible) {
@@ -174,6 +189,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
             const hitRad = (e.userData.type === 'boss') ? 2.5 : 2.0;
             
             if(dist < hitRad) {
+                resolveVolley(b, true, callbacks);
                 releaseBullet(scene, b, i);
                 bulletHit = true;
                 e.userData.hp--;

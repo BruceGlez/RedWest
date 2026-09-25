@@ -1,8 +1,9 @@
 import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
+import { findChrome } from './chrome-path.mjs';
 import { createServer } from 'vite';
 
-const chromePath = process.env.CHROME_PATH || 'C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe';
+const chromePath = findChrome();
 const server = await createServer({ server: { host: '127.0.0.1', port: 0 } });
 let browser;
 
@@ -44,24 +45,48 @@ try {
     await page.locator('#pause-overlay').waitFor({ state: 'hidden' });
 
     // Skip elapsed time to exercise the real phase transitions without a minute-long test.
-    for(const targetWave of [2, 3]) {
-        await page.evaluate(async () => {
-            const { gameState } = await import('/src/state.js');
-            gameState.waveTimer = 0.01;
+    async function advanceToOutlaw() {
+        for(const targetWave of [2, 3]) {
+            await page.evaluate(async () => {
+                const { gameState } = await import('/src/state.js');
+                gameState.waveTimer = 0.01;
+            });
+            await page.waitForFunction(() => window.__rwTestState.gameState.isIntermission);
+            await page.evaluate(async () => {
+                const { gameState } = await import('/src/state.js');
+                gameState.intermissionTimer = 0.01;
+            });
+            await page.waitForFunction(wave => window.__rwTestState.gameState.waveNumber === wave, targetWave);
+        }
+        const bossState = await page.evaluate(async () => {
+            const { enemies, gameState } = await import('/src/state.js');
+            return { types: enemies.map(enemy => enemy.userData.type), wave: gameState.waveNumber, bossSpawned: gameState.waveBossSpawned, over: gameState.isGameOver };
         });
-        await page.waitForFunction(() => window.__rwTestState.gameState.isIntermission);
-        await page.evaluate(async () => {
-            const { gameState } = await import('/src/state.js');
-            gameState.intermissionTimer = 0.01;
-        });
-        await page.waitForFunction(wave => window.__rwTestState.gameState.waveNumber === wave, targetWave);
+        assert.equal(bossState.types.includes('boss'), true, `final pursuit spawns the outlaw: ${JSON.stringify(bossState)}`);
     }
 
-    const bossState = await page.evaluate(async () => {
-        const { enemies, gameState } = await import('/src/state.js');
-        return { types: enemies.map(enemy => enemy.userData.type), wave: gameState.waveNumber, bossSpawned: gameState.waveBossSpawned, over: gameState.isGameOver };
-    });
-    assert.equal(bossState.types.includes('boss'), true, `final pursuit spawns the outlaw: ${JSON.stringify(bossState)}`);
+    // Give the boss one HP and place a player bullet on it to exercise the normal hit path.
+    async function shootOutlaw() {
+        await page.evaluate(async () => {
+            const [{ enemies }, { spawnBullet }] = await Promise.all([
+                import('/src/state.js'), import('/src/bulletSystem.js')
+            ]);
+            const boss = enemies.find(enemy => enemy.userData.type === 'boss');
+            boss.userData.hp = 1;
+            const bulletPosition = boss.position.clone().setY(2);
+            spawnBullet(boss.parent, 'player', bulletPosition, bulletPosition.clone().set(0, 0, 0));
+        });
+        await page.locator('#bounty-choice').waitFor({ state: 'visible' });
+    }
+
+    async function startRun() {
+        await page.keyboard.down('Space');
+        await page.waitForFunction(() => window.__rwTestState.gameState.isGameStarted);
+        await page.keyboard.up('Space');
+        await page.locator('#start-screen').waitFor({ state: 'hidden' });
+    }
+
+    await advanceToOutlaw();
 
     await page.evaluate(async () => {
         const [{ enemies }, { spawnEnemy }, { spawnBullet }, { checkCollision }] = await Promise.all([
@@ -92,29 +117,69 @@ try {
     await page.waitForFunction(() => window.__rwTestState.gameState.heat.level >= 1);
     assert.equal(await page.locator('#heat-multiplier').textContent(), 'x1.5');
 
-    // Give the boss one HP and place a player bullet on it to exercise the normal hit path.
+    // Run 1: ride on into the bonus pursuit and escape with the bounty.
+    const scoreBeforeOutlaw = await page.evaluate(() => window.__rwTestState.gameState.score);
+    await shootOutlaw();
+    const offered = await page.evaluate(() => ({ ...window.__rwTestState.gameState.bounty, score: window.__rwTestState.gameState.score }));
+    assert.equal(offered.status, 'offered');
+    assert.equal(offered.score, scoreBeforeOutlaw, 'the bounty is not paid until the player leaves');
+    assert.equal(Number(await page.locator('#bounty-amount').textContent()), offered.amount);
+    await page.locator('#rideOnBtn').click();
+    await page.locator('#bounty-choice').waitFor({ state: 'hidden' });
+    await page.waitForFunction(() => document.getElementById('wave').textContent === 'BONUS');
+    assert.equal(await page.evaluate(() => window.__rwTestState.gameState.heat.level >= 1), true, 'Heat carries into the bonus pursuit');
     await page.evaluate(async () => {
-        const [{ enemies }, { spawnBullet }] = await Promise.all([
-            import('/src/state.js'), import('/src/bulletSystem.js')
-        ]);
-        const boss = enemies.find(enemy => enemy.userData.type === 'boss');
-        boss.userData.hp = 1;
-        const bulletPosition = boss.position.clone().setY(2);
-        spawnBullet(boss.parent, 'player', bulletPosition, bulletPosition.clone().set(0, 0, 0));
+        const { gameState, playerStats } = await import('/src/state.js');
+        playerStats.hp = 99;
+        gameState.waveTimer = 0.01;
     });
-    await page.locator('#result-title').getByText('BOUNTY CLAIMED').waitFor();
-    const finalScore = Number(await page.locator('#finalScore').textContent());
-    assert.ok(finalScore >= 50, 'the outlaw kill awards Heat-based score');
+    await page.locator('#result-title').getByText('ESCAPED').waitFor();
+    const escapedScore = Number(await page.locator('#finalScore').textContent());
+    assert.ok(escapedScore >= scoreBeforeOutlaw + offered.amount, 'escaping pays the Heat-scaled bounty');
     await page.locator('#skipScoreBtn').click();
     await page.keyboard.press('KeyR');
     await page.locator('#start-screen').waitFor({ state: 'visible' });
-    await page.keyboard.down('Space');
-    await page.waitForFunction(() => window.__rwTestState.gameState.isGameStarted);
-    await page.keyboard.up('Space');
-    await page.locator('#start-screen').waitFor({ state: 'hidden' });
+
+    // Run 2: bank the bounty with the keyboard as soon as the outlaw falls.
+    await startRun();
+    await advanceToOutlaw();
+    const scoreBeforeBank = await page.evaluate(() => window.__rwTestState.gameState.score);
+    await shootOutlaw();
+    await page.keyboard.press('KeyB');
+    await page.locator('#result-title').getByText('BOUNTY CLAIMED').waitFor();
+    const bankedBounty = await page.evaluate(() => window.__rwTestState.gameState.bounty);
+    assert.equal(bankedBounty.status, 'banked');
+    assert.equal(Number(await page.locator('#finalScore').textContent()), scoreBeforeBank + bankedBounty.amount);
+    await page.locator('#skipScoreBtn').click();
+    await page.keyboard.press('KeyR');
+    await page.locator('#start-screen').waitFor({ state: 'visible' });
+    await startRun();
+
+    // Run 3: ride on and die in the bonus pursuit; the bounty and bonus earnings are forfeited.
+    await advanceToOutlaw();
+    const scoreBeforeForfeit = await page.evaluate(() => window.__rwTestState.gameState.score);
+    await shootOutlaw();
+    await page.keyboard.press('KeyC');
+    await page.waitForFunction(() => window.__rwTestState.gameState.bounty.status === 'riding');
+    await page.evaluate(async () => {
+        const { gameState, playerStats, enemies } = await import('/src/state.js');
+        gameState.score += 500;
+        playerStats.hp = 1;
+        playerStats.invulnerabilityTimer = 0;
+        playerStats.isDashing = false;
+        const player = enemies[0].parent.children.find(object => object.userData.type === 'player');
+        enemies[0].position.copy(player.position);
+    });
+    await page.locator('#result-title').getByText('WASTED').waitFor();
+    assert.equal(Number(await page.locator('#finalScore').textContent()), scoreBeforeForfeit);
+    assert.equal(await page.evaluate(() => window.__rwTestState.gameState.bounty.status), 'forfeited');
+    await page.locator('#skipScoreBtn').click();
+    await page.keyboard.press('KeyR');
+    await page.locator('#start-screen').waitFor({ state: 'visible' });
+    await startRun();
 
     assert.deepEqual(relevantErrors(), [], `browser errors: ${pageErrors.join(', ')}`);
-    console.log('Browser smoke passed: start, pause, Heat, boss, win, restart, second run.');
+    console.log('Browser smoke passed: start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, restarts.');
 } finally {
     await browser?.close();
     await server.close();

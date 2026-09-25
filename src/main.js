@@ -37,6 +37,8 @@ ui.bindControlHandlers({
     onOpenSettings: () => gameLoop.openSettings(),
     onCloseSettings: () => gameLoop.closeSettings(),
     onRestartRun: () => gameLoop.resetGame(),
+    onBankBounty: () => gameLoop.bankAndLeave(),
+    onRideOn: () => gameLoop.rideOnToBonus(),
     onToggleMusic: () => {
         toggleMusicEnabled();
         ui.updateAudioControls(getAudioSettings());

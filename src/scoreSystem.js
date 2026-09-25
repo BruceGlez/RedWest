@@ -1,4 +1,6 @@
-const STORAGE_KEY = 'redWestScores';
+// Heat-prototype scores use a different scale from the original endless mode, so they are kept
+// under a versioned key. The original 'redWestScores' records are left untouched, not deleted.
+const STORAGE_KEY = 'redWestScores.v2';
 const PLAYER_NAME_KEY = 'redWestPlayerName';
 const MAX_SCORES = 5;
 

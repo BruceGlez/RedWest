@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createHeatState, recordKill, recordDamage, advanceHeat, heatMultiplier, heatSpawnMultiplier } from '../src/heat.js';
+import { createHeatState, recordKill, recordMiss, recordDamage, advanceHeat, heatMultiplier, heatSpawnMultiplier } from '../src/heat.js';
 
 test('kill chains raise reward and danger but are capped', () => {
     const heat = createHeatState();
@@ -46,4 +46,16 @@ test('decayed Heat rebuilds from its current level with a new chain', () => {
     assert.equal(heat.level, 2);
     for(let i = 0; i < 5; i++) recordKill(heat);
     assert.equal(heat.level, 3);
+});
+
+test('a missed shot breaks the chain but lets Heat decay rather than reset', () => {
+    const heat = createHeatState();
+    for(let i = 0; i < 6; i++) recordKill(heat);
+    recordMiss(heat);
+    assert.equal(heat.streak, 0);
+    assert.equal(heat.level, 3);
+    advanceHeat(heat, 5);
+    assert.equal(heat.level, 2);
+    recordKill(heat);
+    assert.equal(heat.streak, 1);
 });

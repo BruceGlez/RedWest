@@ -45,25 +45,15 @@ export function enemyShoot(enemy, playerPos, scene) {
 }
 
 /**
- * Spawns a random enemy at a safe distance from the player
+ * Spawns an enemy of the requested type at a safe distance from the player
  */
 export function spawnEnemy(scene, playerPos, requestedType = null) {
-    const r = Math.random();
     let enemy, speed, type, hp;
     const randomScale = 0.85 + Math.random() * 0.3;
     const wave = gameState.waveNumber;
 
-    let spawnType = requestedType;
-    if(!spawnType) {
-        // Wave-driven enemy distribution
-        const bossChance = Math.min(0.05 + (wave * 0.01), 0.22);
-        const gunslingerChance = Math.min(0.15 + (wave * 0.03), 0.45);
-        const wolfChance = (wave < 4) ? 0.45 : 0.30;
-        if(r < bossChance && wave >= 3) spawnType = 'boss';
-        else if(r < bossChance + gunslingerChance) spawnType = 'gunslinger';
-        else if(r < bossChance + gunslingerChance + wolfChance) spawnType = 'wolf';
-        else spawnType = 'bandit';
-    }
+    // The wave director in gameLoop.js always chooses the type.
+    const spawnType = requestedType || 'bandit';
 
     if (spawnType === 'boss') { 
         enemy = createBossMesh(); 

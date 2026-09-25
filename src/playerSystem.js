@@ -28,6 +28,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         const weaponCfg = WEAPONS[playerStats.weapon] || WEAPONS.revolver;
         const volleyOffsets = playerStats.tripleShotTimer > 0 ? [-0.15, 0, 0.15] : [0];
         const pelletsPerVolley = weaponCfg.pellets;
+        const volley = { pending: volleyOffsets.length * pelletsPerVolley, hit: false };
         const gunPos = new THREE.Vector3();
         playerGroup.userData.muzzle.getWorldPosition(gunPos);
 
@@ -40,7 +41,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
                     pelletOffset = (-weaponCfg.spread * 0.5) + (spreadStep * i);
                 }
                 dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), volleyOffset + pelletOffset);
-                spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(weaponCfg.speed));
+                spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(weaponCfg.speed), volley);
             }
         }
         gameState.runStats.shotsFired += volleyOffsets.length * pelletsPerVolley;

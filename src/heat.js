@@ -24,6 +24,12 @@ export function recordKill(heat) {
     return heatMultiplier(heat.level);
 }
 
+// A shot that hits nothing breaks the chain; the level then decays instead of resetting.
+export function recordMiss(heat) {
+    heat.streak = 0;
+    heat.chainTimer = 0;
+}
+
 export function recordDamage(heat) {
     heat.level = 0;
     heat.streak = 0;
