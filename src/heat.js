@@ -1,5 +1,5 @@
 export const MAX_HEAT = 4;
-const CHAIN_WINDOW = 4;
+export const CHAIN_WINDOW = 4;
 const DECAY_INTERVAL = 5;
 
 export function createHeatState() {

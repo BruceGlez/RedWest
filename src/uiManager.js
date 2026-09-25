@@ -1,9 +1,11 @@
-import { heatMultiplier } from './heat.js';
+import { heatMultiplier, CHAIN_WINDOW, MAX_HEAT } from './heat.js';
 import { FINAL_PURSUIT } from './bounty.js';
 
 export function createUIManager(gameState, playerStats, onSaveScore) {
     let preferredName = '';
     let waveBannerTimeoutId = null;
+    let heatEventTimeoutId = null;
+    let lastHeatLevel = 0;
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
@@ -11,6 +13,10 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         weaponLabel: document.getElementById('weapon-label'),
         heatLevel: document.getElementById('heat-level'),
         heatMultiplier: document.getElementById('heat-multiplier'),
+        heatRow: document.getElementById('heat-row'),
+        heatEvent: document.getElementById('heat-event'),
+        heatChain: document.getElementById('heat-chain'),
+        heatChainFill: document.getElementById('heat-chain-fill'),
         health: document.getElementById('health-container'),
         status: document.getElementById('status-msg'),
         waveBanner: document.getElementById('wave-banner'),
@@ -70,8 +76,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.score.innerText = gameState.score;
         els.wave.innerText = gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
         els.weaponLabel.innerText = playerStats.weapon.toUpperCase();
-        els.heatLevel.innerText = gameState.heat.level;
-        els.heatMultiplier.innerText = `x${heatMultiplier(gameState.heat.level).toFixed(1)}`;
+        updateHeat(gameState.heat);
 
         if(gameState.isIntermission) {
             els.waveTimer.innerText = `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
@@ -90,6 +95,36 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
             els.status.className = '';
             els.status.innerText = '';
         }
+    }
+
+    function updateHeat(heat) {
+        els.heatLevel.innerText = heat.level;
+        els.heatMultiplier.innerText = `x${heatMultiplier(heat.level).toFixed(1)}`;
+        // Row glows hotter with each level; the bar shows time left to extend the chain.
+        for(let level = 0; level <= MAX_HEAT; level++) els.heatRow.classList.toggle(`heat-${level}`, level === heat.level);
+        els.heatChain.classList.toggle('active', heat.chainTimer > 0);
+        els.heatChainFill.style.width = `${Math.max(0, Math.min(1, heat.chainTimer / CHAIN_WINDOW)) * 100}%`;
+        if(heat.level < lastHeatLevel && heat.level > 0 && !heatEventTimeoutId) showHeatEvent('cooling');
+        lastHeatLevel = heat.level;
+    }
+
+    const HEAT_EVENTS = {
+        up: 'HEAT UP',
+        broken: 'CHAIN BROKEN',
+        cooling: 'COOLING',
+        lost: 'HEAT LOST'
+    };
+
+    function showHeatEvent(kind) {
+        els.heatEvent.textContent = HEAT_EVENTS[kind] || '';
+        els.heatRow.classList.remove('pulse-up', 'pulse-down');
+        void els.heatRow.offsetWidth; // restart the CSS animation
+        els.heatRow.classList.add(kind === 'up' ? 'pulse-up' : 'pulse-down');
+        if(heatEventTimeoutId) clearTimeout(heatEventTimeoutId);
+        heatEventTimeoutId = setTimeout(() => {
+            els.heatEvent.textContent = '';
+            heatEventTimeoutId = null;
+        }, 1200);
     }
 
     function updateDashBar(percent) {
@@ -301,6 +336,7 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         showWaveBanner,
         showGameOver,
         showBountyChoice,
+        showHeatEvent,
         hideBountyChoice,
         hideGameOverScreen,
         showStartScreen,

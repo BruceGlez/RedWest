@@ -262,3 +262,18 @@ canvas {
 .bounty-options button small { font-size: 13px; color: #ccc; line-height: 1.4; }
 .bounty-options button:hover { border-color: #ffd700; }
 .bounty-content .western-title { font-size: 48px; }
+
+/* Heat feedback */
+.heat-row { transition: color 0.2s; }
+.heat-row.heat-2 #heat-level, .heat-row.heat-2 #heat-multiplier { color: #ff5a2e; }
+.heat-row.heat-3 #heat-level, .heat-row.heat-3 #heat-multiplier { color: #ff3b1f; text-shadow: 0 0 8px rgba(255, 80, 30, 0.7); }
+.heat-row.heat-4 #heat-level, .heat-row.heat-4 #heat-multiplier { color: #ff1e1e; text-shadow: 0 0 12px rgba(255, 40, 20, 0.9); }
+.heat-event { font-family: 'Roboto Mono', monospace; font-size: 15px; color: #ffd180; }
+.heat-row.pulse-down .heat-event { color: #b0bec5; }
+.heat-chain { width: 180px; height: 6px; margin: -2px 0 8px 0; background: rgba(0, 0, 0, 0.45); border: 1px solid rgba(255, 119, 77, 0.35); visibility: hidden; }
+.heat-chain.active { visibility: visible; }
+#heat-chain-fill { height: 100%; width: 0; background: #ff774d; }
+.pulse-up { animation: heat-pulse-up 0.45s ease-out; }
+.pulse-down { animation: heat-pulse-down 0.45s ease-out; }
+@keyframes heat-pulse-up { 0% { transform: scale(1.25); transform-origin: left center; } 100% { transform: scale(1); transform-origin: left center; } }
+@keyframes heat-pulse-down { 0%, 50% { opacity: 0.35; } 100% { opacity: 1; } }

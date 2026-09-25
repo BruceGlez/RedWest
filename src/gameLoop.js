@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { keys } from './input.js';
-import { resumeAudio, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
+import { resumeAudio, playSound, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { gameState, playerStats, obstacles, enemies, loots, resetGameState, resetPlayerStats, clearDynamicState } from './state.js';
 import { generateMap } from './world.js';
 import { spawnEnemy, updateEnemies } from './enemySystem.js';
@@ -114,10 +114,26 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         onUpdateHUD: () => ui.updateHUD(),
         onGameOver: () => finishRun('died'),
         onBossDefeated: () => openBountyChoice(),
-        onPlayerDamaged: () => recordDamage(gameState.heat),
-        onPlayerMiss: () => recordMiss(gameState.heat),
+        onPlayerDamaged: () => {
+            const hadHeat = gameState.heat.level > 0;
+            recordDamage(gameState.heat);
+            if(hadHeat) {
+                playSound('heatLost');
+                ui.showHeatEvent('lost');
+            }
+        },
+        onPlayerMiss: () => {
+            const hadChain = gameState.heat.streak > 0;
+            recordMiss(gameState.heat);
+            if(hadChain) ui.showHeatEvent('broken');
+        },
         onEnemyKilled: (type) => {
+            const levelBefore = gameState.heat.level;
             const multiplier = recordKill(gameState.heat);
+            if(gameState.heat.level > levelBefore) {
+                playSound('heatUp');
+                ui.showHeatEvent('up');
+            }
             // The outlaw pays out through the bounty choice instead of as a kill score.
             if(type !== 'boss') {
                 gameState.score += Math.round(10 * multiplier);

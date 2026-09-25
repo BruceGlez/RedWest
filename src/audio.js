@@ -150,6 +150,34 @@ export function playSound(type) {
         gain.connect(sfxGain);
         osc.start(now);
         osc.stop(now + 0.15);
+    } else if(type === 'heatUp') {
+        // Two quick rising notes: the chain paid off.
+        [520, 780].forEach((freq, i) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            const start = now + (i * 0.07);
+            osc.type = 'square';
+            osc.frequency.setValueAtTime(freq, start);
+            gain.gain.setValueAtTime(0.04, start);
+            gain.gain.exponentialRampToValueAtTime(0.0001, start + 0.09);
+            osc.connect(gain);
+            gain.connect(sfxGain);
+            osc.start(start);
+            osc.stop(start + 0.1);
+        });
+    } else if(type === 'heatLost') {
+        // A falling tone: Heat was wiped by damage.
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(420, now);
+        osc.frequency.exponentialRampToValueAtTime(90, now + 0.35);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.35);
+        osc.connect(gain);
+        gain.connect(sfxGain);
+        osc.start(now);
+        osc.stop(now + 0.36);
     } else if(type === 'hit' || type === 'thud') {
         const bodyOsc = audioCtx.createOscillator();
         const clickOsc = audioCtx.createOscillator();

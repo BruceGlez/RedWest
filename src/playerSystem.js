@@ -55,6 +55,8 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if(playerStats.invulnerabilityTimer > 0) {
             playerStats.invulnerabilityTimer = Math.max(0, playerStats.invulnerabilityTimer - dt);
         }
+        // Blink while hits can't land so the grace window after damage is readable.
+        playerGroup.visible = playerStats.invulnerabilityTimer <= 0 || Math.floor(timeInSeconds * 16) % 2 === 0;
         if(keys.weaponSwitchRequested) {
             keys.weaponSwitchRequested = false;
             playerStats.weapon = playerStats.weapon === 'revolver' ? 'shotgun' : 'revolver';
