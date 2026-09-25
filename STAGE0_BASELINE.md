@@ -1,7 +1,7 @@
 # Stage 0 baseline and Stage 1 status
 
-**Baseline commit:** `a0a68e5` on `main` (the original browser build).
-**Prototype branch:** `feat/heat-prototype`.
+**Baseline commit:** `a0a68e5` (the original browser build, still in `main`'s history).
+**Prototype:** developed on `feat/heat-prototype` and merged into `main` on 2026-09-25.
 
 ## Baseline inventory
 

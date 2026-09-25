@@ -69,7 +69,7 @@ Replace the global-state and monolithic-loop coupling in stages:
 5. Add a versioned persistence layer with migration from the current `localStorage` keys where practical. Do not silently delete player scores/settings.
 6. Add focused tests for reward application, run-phase transitions, scoring, and save migration; add a browser smoke test for start → combat → result → restart. Add GitHub Actions build/test checks once the workflow exists.
 
-Existing visuals and systems can be reused when they help the new game. The rewrite should proceed as playable increments on a branch, with the existing `main` build available for comparison until the new loop passes its gates.
+Existing visuals and systems can be reused when they help the new game. The rewrite proceeds as playable increments merged into `main`; the original build stays available for comparison at commit `a0a68e5`.
 
 ## Delivery sequence and review gates
 
