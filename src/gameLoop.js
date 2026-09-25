@@ -291,11 +291,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         }
 
         gameState.waveTimer -= dt;
+        // The final pursuit only ends with the outlaw; keep reinforcements coming after the timer.
         if(gameState.waveTimer <= 0 && gameState.waveNumber === FINAL_WAVE) {
             gameState.waveTimer = 0;
-            return;
-        }
-        if(gameState.waveTimer <= 0) {
+            if(gameState.waveBudgetRemaining < ENEMY_COST.bandit) gameState.waveBudgetRemaining = ENEMY_COST.bandit;
+        } else if(gameState.waveTimer <= 0) {
             beginIntermission();
             return;
         }

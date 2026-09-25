@@ -18,7 +18,8 @@ export function recordKill(heat) {
     heat.streak = heat.chainTimer > 0 ? heat.streak + 1 : 1;
     heat.chainTimer = CHAIN_WINDOW;
     heat.decayTimer = DECAY_INTERVAL;
-    heat.level = Math.min(MAX_HEAT, Math.floor(heat.streak / 2));
+    // A fresh chain builds from the current (decaying) level instead of resetting it.
+    heat.level = Math.min(MAX_HEAT, Math.max(heat.level, Math.floor(heat.streak / 2)));
     heat.peak = Math.max(heat.peak, heat.level);
     return heatMultiplier(heat.level);
 }

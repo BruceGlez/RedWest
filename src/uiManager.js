@@ -1,3 +1,5 @@
+import { heatMultiplier } from './heat.js';
+
 export function createUIManager(gameState, playerStats, onSaveScore) {
     let preferredName = '';
     let waveBannerTimeoutId = null;
@@ -61,7 +63,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.wave.innerText = gameState.waveNumber;
         els.weaponLabel.innerText = playerStats.weapon.toUpperCase();
         els.heatLevel.innerText = gameState.heat.level;
-        els.heatMultiplier.innerText = `x${(1 + gameState.heat.level * 0.5).toFixed(1)}`;
+        els.heatMultiplier.innerText = `x${heatMultiplier(gameState.heat.level).toFixed(1)}`;
 
         if(gameState.isIntermission) {
             els.waveTimer.innerText = `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
@@ -70,7 +72,9 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
             return;
         }
 
-        els.waveTimer.innerText = `${Math.ceil(Math.max(0, gameState.waveTimer))}s`;
+        els.waveTimer.innerText = (gameState.waveBossSpawned && gameState.waveTimer <= 0)
+            ? 'OUTLAW'
+            : `${Math.ceil(Math.max(0, gameState.waveTimer))}s`;
         if(playerStats.tripleShotTimer > 0) {
             els.status.className = 'status-power';
             els.status.innerText = `TRIPLE SHOT: ${Math.ceil(playerStats.tripleShotTimer)}s`;

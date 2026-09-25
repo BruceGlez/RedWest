@@ -104,6 +104,8 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
     const runStats = gameState.runStats;
     rebuildEnemyGrid(enemies);
     for(let i=bullets.length-1; i>=0; i--) {
+        // Stop resolving hits once the run has ended so the result screen's score is final.
+        if(gameState.isGameOver) break;
         const b = bullets[i]; 
         b.position.addScaledVector(b.userData.velocity, dt);
 
