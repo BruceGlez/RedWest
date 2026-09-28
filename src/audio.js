@@ -145,8 +145,9 @@ function playBuffer(buffer, destination, volume = 1) {
     return source;
 }
 
-// Effects are small, so they all load up front.
+// Effects are small, so they all load up front, with the menu music so it is ready for the first tap.
 for(const key of Object.keys(SFX)) loadBuffer('sfx', key);
+loadBuffer('music', 'home');
 
 // Old sound names from before the recorded effects.
 const SFX_ALIASES = { shoot: 'shot-revolver', thud: 'hit' };

@@ -213,7 +213,9 @@ window.addEventListener('resize', () => {
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
+// Browsers only allow sound after the player interacts, so the first input starts the menu music.
 window.addEventListener('mousedown', resumeAudio);
+window.addEventListener('keydown', resumeAudio);
 window.addEventListener('touchend', resumeAudio); // iOS only unlocks audio from a touch gesture
 // Every menu button clicks.
 document.addEventListener('click', event => {
