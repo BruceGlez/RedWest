@@ -111,16 +111,16 @@ export function createPlayerMesh() {
     const group = new THREE.Group();
     const mesh = new THREE.Group(); mesh.rotation.y = Math.PI; group.add(mesh);
 
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.5), mat.coat); body.position.y = 2.5; body.castShadow = true; mesh.add(body);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.5), mat.coat); body.position.y = 2.5; body.castShadow = true; body.userData.slot = 'coat'; mesh.add(body);
     const belt = new THREE.Mesh(new THREE.BoxGeometry(2.1, 0.4, 1.6), mat.belt); belt.position.y = 1.6; mesh.add(belt);
     const buckle = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.1), mat.gold); buckle.position.set(0, 0, -0.85); belt.add(buckle);
 
-    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants); leftLeg.position.set(-0.5, 0.75, 0); leftLeg.castShadow = true; leftLeg.name = 'leftLeg'; mesh.add(leftLeg);
-    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants); rightLeg.position.set(0.5, 0.75, 0); rightLeg.castShadow = true; rightLeg.name = 'rightLeg'; mesh.add(rightLeg);
+    const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants); leftLeg.position.set(-0.5, 0.75, 0); leftLeg.castShadow = true; leftLeg.name = 'leftLeg'; leftLeg.userData.slot = 'pants'; mesh.add(leftLeg);
+    const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants); rightLeg.position.set(0.5, 0.75, 0); rightLeg.castShadow = true; rightLeg.name = 'rightLeg'; rightLeg.userData.slot = 'pants'; mesh.add(rightLeg);
 
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), mat.coat); leftArm.position.set(-1.2, 2.5, 0); leftArm.castShadow = true; leftArm.name = 'leftArm'; mesh.add(leftArm);
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), mat.coat); leftArm.position.set(-1.2, 2.5, 0); leftArm.castShadow = true; leftArm.name = 'leftArm'; leftArm.userData.slot = 'coat'; mesh.add(leftArm);
     const rightArmPivot = new THREE.Group(); rightArmPivot.position.set(1.2, 3.25, 0); rightArmPivot.name = 'rightArm'; mesh.add(rightArmPivot);
-    const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), mat.coat); rightArmMesh.position.set(0, -0.75, 0); rightArmPivot.add(rightArmMesh);
+    const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), mat.coat); rightArmMesh.position.set(0, -0.75, 0); rightArmMesh.userData.slot = 'coat'; rightArmPivot.add(rightArmMesh);
     const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), mat.skin); rightHand.position.set(0, -1.5, 0); rightArmPivot.add(rightHand);
 
     const gunGroup = createRevolverMesh(); gunGroup.position.set(0, -0.2, 0.2); gunGroup.rotation.set(-Math.PI / 2, 0, 0); rightHand.add(gunGroup); 
@@ -138,8 +138,8 @@ export function createPlayerMesh() {
     const stacheDrop = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.3, 0.1), mat.hat); stacheDrop.position.set(-0.4, -0.1, 0); stache.add(stacheDrop);
     const stacheDropR = stacheDrop.clone(); stacheDropR.position.set(0.4, -0.1, 0); stache.add(stacheDropR); headGroup.add(stache);
 
-    const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 2.2), mat.hat); hatBrim.position.y = 0.5; headGroup.add(hatBrim);
-    const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 1.3), mat.hat); hatTop.position.y = 0.9; headGroup.add(hatTop);
+    const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 2.2), mat.hat); hatBrim.position.y = 0.5; hatBrim.userData.slot = 'hat'; headGroup.add(hatBrim);
+    const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 1.3), mat.hat); hatTop.position.y = 0.9; hatTop.userData.slot = 'hat'; headGroup.add(hatTop);
 
     group.userData = { muzzle: gunGroup.userData.muzzle, gunMesh: gunGroup, type: 'player' };
     addOutline(group);
@@ -346,6 +346,14 @@ export function createFence(scene, x, z, angle) {
     const r2 = new THREE.Mesh(railGeo, mat.wood); r2.position.set(0, 1.0, 0); r2.rotation.z = (Math.random()-0.5)*0.1; group.add(r2);
     group.position.set(x, 0, z); group.rotation.y = angle; scene.add(group);
     addObstacle({ mesh: group, x: x, z: z, radius: 1.5, destructible: true, type: 'fence' });
+}
+
+// Recolour the player's outfit. colors: { hat, coat, pants } hex values (see cosmetics.js).
+export function applyPlayerLoadout(playerGroup, colors) {
+    playerGroup.traverse(part => {
+        const slot = part.userData.slot;
+        if(slot && colors[slot] !== undefined && !part.userData.isOutline) part.material = colorMat(colors[slot]);
+    });
 }
 
 // ---------- New enemy models (one per Wanted Road stage) ----------

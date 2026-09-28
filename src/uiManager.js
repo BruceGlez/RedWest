@@ -3,6 +3,10 @@ import { FINAL_PURSUIT } from './bounty.js';
 import { formatRunLog } from './runLog.js';
 import { OUTLAWS, MODIFIERS, STAR_GOALS, getOutlaw } from './outlaws.js';
 import { ENEMY_TYPES, ENEMY_ORDER } from './enemyTypes.js';
+import { COSMETICS, SLOTS, SLOT_LABELS, getCosmetic, loadoutColors } from './cosmetics.js';
+import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
+import { PRODUCTS } from './products.js';
+import { purchaseSupport } from './purchases.js';
 import { isUnlocked, totalStars } from './progress.js';
 
 export function createUIManager(gameState, playerStats, onSaveScore) {
@@ -15,6 +19,13 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
     let portraits = {};
     let enemyPortraits = {};
     let newEnemyTimeoutId = null;
+    let profile = null;
+    let renderPreview = null;
+    let shopTab = 'hat';
+    let tryOn = null; // item previewed but not equipped
+    let confirmId = null;
+    let confirmTimeoutId = null;
+    let shopHandlers = {};
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
@@ -58,7 +69,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         howtoBtn: document.getElementById('howto-btn'),
         homeSettingsBtn: document.getElementById('home-settings-btn'),
         starGoals: document.getElementById('star-goals'),
-        panels: ['road-screen', 'records-screen', 'howto-screen', 'book-screen'].map(id => document.getElementById(id)),
+        panels: ['road-screen', 'records-screen', 'howto-screen', 'book-screen', 'shop-screen', 'jobs-screen'].map(id => document.getElementById(id)),
         bookBtn: document.getElementById('book-btn'),
         bookProgress: document.getElementById('book-progress'),
         bookEnemies: document.getElementById('book-enemies'),
@@ -66,6 +77,22 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         bookCount: document.getElementById('book-count'),
         bookTotal: document.getElementById('book-total'),
         newEnemyCard: document.getElementById('new-enemy-card'),
+        shopBtn: document.getElementById('shop-btn'),
+        jobsBtn: document.getElementById('jobs-btn'),
+        jobsProgress: document.getElementById('jobs-progress'),
+        homeDollars: document.getElementById('home-dollars'),
+        homeNuggets: document.getElementById('home-nuggets'),
+        shopDollars: document.getElementById('shop-dollars'),
+        shopNuggets: document.getElementById('shop-nuggets'),
+        shopTabs: document.getElementById('shop-tabs'),
+        shopGrid: document.getElementById('shop-grid'),
+        shopMessage: document.getElementById('shop-message'),
+        shopPreviewImg: document.getElementById('shop-preview-img'),
+        shopPreviewLabel: document.getElementById('shop-preview-label'),
+        jobsList: document.getElementById('jobs-list'),
+        jobsBonus: document.getElementById('jobs-bonus'),
+        jobsReset: document.getElementById('jobs-reset'),
+        resultEarnings: document.getElementById('result-earnings'),
         bountyChoice: document.getElementById('bounty-choice'),
         bountyAmount: document.getElementById('bounty-amount'),
         bountyHeat: document.getElementById('bounty-heat'),
@@ -244,6 +271,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
             ? `You rode on and lost the ${gameState.bounty.amount} bounty and your bonus earnings.`
             : detail;
         renderRoadResult(roadResult);
+        els.resultEarnings.innerHTML = '<p class="earn-title">Counting your earnings...</p>';
         els.gameOver.style.display = 'flex';
         els.finalScore.innerText = gameState.score;
         renderRunStats();
@@ -309,6 +337,159 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
                 + `<span class="road-name">${outlaw.name}</span><span class="road-stars">${starsHtml(progress.stars[i])}</span>`
                 + `<span class="road-reward">$${outlaw.bounty}</span>${unlocked ? '' : '<span class="road-lock">LOCKED</span>'}</button>`;
         }).join('<span class="road-link" aria-hidden="true"></span>');
+    }
+
+    // ---------- Economy: balances, shop, daily jobs, earnings ----------
+    const hexColor = color => `#${color.toString(16).padStart(6, '0')}`;
+    const priceLabel = item => (item.currency === 'nuggets' ? `&#9670;${item.price}` : `$${item.price}`);
+    const owns = id => { const item = getCosmetic(id); return !!item && (item.price === 0 || profile.owned.includes(id)); };
+
+    function setProfile(nextProfile) {
+        profile = nextProfile;
+        const { dollars, nuggets } = profile.balances;
+        for(const el of [els.homeDollars, els.shopDollars]) el.textContent = dollars.toLocaleString();
+        for(const el of [els.homeNuggets, els.shopNuggets]) el.textContent = nuggets.toLocaleString();
+        const done = profile.jobs.list.filter(j => j.done).length;
+        els.jobsProgress.textContent = `${done} / ${profile.jobs.list.length} DONE`;
+        els.jobsBtn.classList.toggle('attention', done < profile.jobs.list.length);
+        if(els.panels[4].style.display !== 'none') renderShop();
+        if(els.panels[5].style.display !== 'none') renderJobs();
+    }
+
+    function updatePreview() {
+        if(!renderPreview || !profile) return;
+        const loadout = { ...profile.loadout };
+        if(tryOn) loadout[tryOn.slot] = tryOn.id;
+        els.shopPreviewImg.src = renderPreview(loadoutColors(loadout));
+        els.shopPreviewLabel.textContent = tryOn && !owns(tryOn.id) ? `TRYING ON: ${tryOn.name.toUpperCase()}` : 'YOUR OUTFIT';
+    }
+
+    function shopMessage(text, isError = false) {
+        els.shopMessage.textContent = text;
+        els.shopMessage.classList.toggle('error', isError);
+    }
+
+    function renderShop() {
+        const tabs = [...SLOTS.map(slot => [slot, SLOT_LABELS[slot]]), ['nuggets', '&#9670; NUGGETS']];
+        els.shopTabs.innerHTML = tabs.map(([id, label]) => `<button type="button" class="shop-tab${shopTab === id ? ' active' : ''}" data-tab="${id}">${label}</button>`).join('');
+        if(shopTab === 'nuggets') {
+            els.shopGrid.innerHTML = PRODUCTS.map(product => {
+                const support = purchaseSupport(product.id);
+                const pending = confirmId === product.id;
+                return `<div class="shop-card nugget-card">${product.badge ? `<span class="shop-badge">${product.badge}</span>` : ''}`
+                    + `<div class="nugget-icon">&#9670;</div><div class="shop-name">${product.nuggets.toLocaleString()} NUGGETS</div>`
+                    + `<div class="shop-sub">${product.label}</div>`
+                    + `<button type="button" class="shop-action${pending ? ' confirm' : ''}" data-product="${product.id}"${support.available ? '' : ' disabled'}>`
+                    + `${pending ? `CONFIRM ${product.price}` : support.available ? product.price : 'SOON'}</button></div>`;
+            }).join('') + `<p class="shop-fineprint">${purchaseSupport(PRODUCTS[0].id).available
+                ? 'Real money. You will confirm in the App Store / checkout before being charged. Under 18? Ask a parent first.'
+                : purchaseSupport(PRODUCTS[0].id).reason} Gold Nuggets are also earned by finishing all daily jobs.</p>`;
+            return;
+        }
+        els.shopGrid.innerHTML = COSMETICS.filter(item => item.slot === shopTab).map(item => {
+            const owned = owns(item.id);
+            const equipped = profile.loadout[item.slot] === item.id;
+            const pending = confirmId === item.id;
+            const action = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : pending ? `CONFIRM ${priceLabel(item)}` : priceLabel(item);
+            return `<div class="shop-card${tryOn?.id === item.id ? ' trying' : ''}" data-try="${item.id}">`
+                + `<div class="shop-swatch${item.slot === 'bullets' ? ' bullet' : ''}" style="--swatch:${hexColor(item.color)}"></div>`
+                + `<div class="shop-name">${item.name}</div>`
+                + `<button type="button" class="shop-action${equipped ? ' equipped' : ''}${pending ? ' confirm' : ''}${item.currency === 'nuggets' && !owned ? ' nugget' : ''}" data-item="${item.id}"${equipped ? ' disabled' : ''}>${action}</button></div>`;
+        }).join('');
+    }
+
+    function openShop() {
+        tryOn = null;
+        confirmId = null;
+        shopMessage('');
+        showPanel(els.panels[4]);
+        renderShop();
+        updatePreview();
+    }
+
+    // Two taps to spend anything: the first arms a CONFIRM button (no one-tap purchases).
+    function armConfirm(id) {
+        confirmId = id;
+        if(confirmTimeoutId) clearTimeout(confirmTimeoutId);
+        confirmTimeoutId = setTimeout(() => { confirmId = null; renderShop(); }, 4000);
+        renderShop();
+    }
+
+    async function onShopClick(event) {
+        const tab = event.target.closest('[data-tab]');
+        if(tab) {
+            shopTab = tab.dataset.tab;
+            confirmId = null;
+            renderShop();
+            return;
+        }
+        const productButton = event.target.closest('[data-product]');
+        if(productButton) {
+            const id = productButton.dataset.product;
+            if(confirmId !== id) return armConfirm(id);
+            confirmId = null;
+            renderShop();
+            shopMessage('Opening checkout...');
+            await shopHandlers.onBuyProduct?.(id);
+            return;
+        }
+        const itemButton = event.target.closest('[data-item]');
+        if(itemButton) {
+            const item = getCosmetic(itemButton.dataset.item);
+            if(owns(item.id)) {
+                await shopHandlers.onEquipItem?.(item.id);
+                tryOn = null;
+            } else if(confirmId !== item.id) {
+                // Show it on the player first, then start the confirm window.
+                tryOn = item;
+                updatePreview();
+                armConfirm(item.id);
+                return;
+            } else {
+                confirmId = null;
+                await shopHandlers.onBuyItem?.(item.id);
+            }
+            renderShop();
+            updatePreview();
+            return;
+        }
+        const card = event.target.closest('[data-try]');
+        if(card) {
+            tryOn = getCosmetic(card.dataset.try);
+            renderShop();
+            updatePreview();
+        }
+    }
+
+    function msUntilMidnight() {
+        const now = new Date();
+        const midnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+        return midnight - now;
+    }
+
+    function renderJobs() {
+        els.jobsList.innerHTML = profile.jobs.list.map(entry => {
+            const job = getJob(entry.id);
+            const pct = Math.min(100, Math.round((entry.progress / job.goal) * 100));
+            return `<div class="job-card${entry.done ? ' done' : ''}"><div class="job-text">${job.text}</div>`
+                + `<div class="job-bar"><div class="job-fill" style="width:${pct}%"></div></div>`
+                + `<div class="job-meta"><span>${Math.min(entry.progress, job.goal)} / ${job.goal}</span><span class="job-reward">${entry.done ? 'PAID' : `+$${job.reward}`}</span></div></div>`;
+        }).join('');
+        els.jobsBonus.innerHTML = profile.jobs.bonusPaid
+            ? `All jobs done today: <b>+&#9670;${ALL_JOBS_BONUS_NUGGETS} paid</b>. Come back tomorrow.`
+            : `Finish all three for a bonus of <b>&#9670;${ALL_JOBS_BONUS_NUGGETS} Gold Nuggets</b>.`;
+        const hours = Math.floor(msUntilMidnight() / 3600000);
+        const minutes = Math.floor((msUntilMidnight() % 3600000) / 60000);
+        els.jobsReset.textContent = `NEW JOBS IN ${hours}h ${minutes}m`;
+    }
+
+    function showEarnings(result, error = null) {
+        if(error) {
+            els.resultEarnings.innerHTML = `<p class="earn-error">Earnings not saved: ${error}</p>`;
+            return;
+        }
+        const lines = result.lines.map(line => `<li><span>${line.label}</span><b>${line.nuggets ? `+&#9670;${line.nuggets}` : `+$${line.dollars}`}</b></li>`).join('');
+        els.resultEarnings.innerHTML = `<p class="earn-title">EARNED <b>$${result.dollars}</b>${result.nuggets ? ` <b>&#9670;${result.nuggets}</b>` : ''}</p><ul class="earn-lines">${lines}</ul>`;
     }
 
     // ---------- Bounty Book ----------
@@ -556,6 +737,11 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.recordsBtn.addEventListener('click', () => showPanel(els.panels[1]));
         els.howtoBtn.addEventListener('click', () => showPanel(els.panels[2]));
         els.bookBtn.addEventListener('click', () => showPanel(els.panels[3]));
+        els.shopBtn.addEventListener('click', openShop);
+        els.jobsBtn.addEventListener('click', () => { showPanel(els.panels[5]); renderJobs(); });
+        els.shopTabs.addEventListener('click', onShopClick);
+        els.shopGrid.addEventListener('click', onShopClick);
+        shopHandlers = handlers;
         document.querySelectorAll('.panel-back').forEach(btn => btn.addEventListener('click', hidePanels));
         els.roadTrack.addEventListener('click', event => {
             const node = event.target.closest('.road-node');
@@ -610,6 +796,11 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         setRunLog,
         setProgress,
         setPortraits,
+        setProfile,
+        shopMessage,
+        showEarnings,
+        openShop,
+        setPreviewRenderer: fn => { renderPreview = fn; },
         showNewEnemy,
         hideBountyChoice,
         hideGameOverScreen,

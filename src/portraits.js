@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createBossMesh, createEnemyMesh, createWolfMesh, createGunslingerMesh, createRattlerMesh, createRiflemanMesh,
+import { createBossMesh, createPlayerMesh, applyPlayerLoadout, createEnemyMesh, createWolfMesh, createGunslingerMesh, createRattlerMesh, createRiflemanMesh,
     createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh } from './assets.js';
 import { OUTLAWS } from './outlaws.js';
 
@@ -64,9 +64,8 @@ const ENEMY_MESHES = {
     duelist: createDuelistMesh, ghost: createGhostMesh
 };
 
-// Bounty Book pictures: each regular enemy, framed automatically from its bounding box.
-export function renderEnemyPortraits(renderer) {
-    const portraits = {};
+// A small off-screen photo studio: frames any model from its bounding box and returns a PNG URL.
+function createStudio(renderer) {
     const target = new THREE.WebGLRenderTarget(SIZE, SIZE, { samples: 4 });
     target.texture.colorSpace = THREE.SRGBColorSpace;
     const pixels = new Uint8Array(SIZE * SIZE * 4);
@@ -85,36 +84,65 @@ export function renderEnemyPortraits(renderer) {
     const center = new THREE.Vector3();
     const size = new THREE.Vector3();
     const viewDir = new THREE.Vector3(0.55, 0.45, 1).normalize();
-    const previousTarget = renderer.getRenderTarget();
-    try {
-        for(const [id, create] of Object.entries(ENEMY_MESHES)) {
-            const model = create();
-            model.rotation.y = -0.5;
+    return {
+        capture(model, zoom = 1.25) {
             scene.add(model);
             model.updateMatrixWorld(true);
             bounds.setFromObject(model);
             bounds.getCenter(center);
             bounds.getSize(size);
             const radius = Math.max(size.x, size.y, size.z) * 0.5;
-            const distance = (radius / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * 1.25;
-            camera.position.copy(center).addScaledVector(viewDir, distance);
+            camera.position.copy(center).addScaledVector(viewDir, (radius / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * zoom);
             camera.lookAt(center);
+            const previous = renderer.getRenderTarget();
             renderer.setRenderTarget(target);
             renderer.render(scene, camera);
             renderer.readRenderTargetPixels(target, 0, 0, SIZE, SIZE, pixels);
+            renderer.setRenderTarget(previous);
             scene.remove(model);
             for(let y = 0; y < SIZE; y++) {
                 const from = (SIZE - 1 - y) * SIZE * 4;
                 image.data.set(pixels.subarray(from, from + (SIZE * 4)), y * SIZE * 4);
             }
             ctx.putImageData(image, 0, 0);
-            portraits[id] = canvas.toDataURL('image/png');
+            return canvas.toDataURL('image/png');
+        },
+        dispose() { target.dispose(); }
+    };
+}
+
+// Bounty Book pictures: each regular enemy, framed automatically from its bounding box.
+export function renderEnemyPortraits(renderer) {
+    const portraits = {};
+    let studio = null;
+    try {
+        studio = createStudio(renderer);
+        for(const [id, create] of Object.entries(ENEMY_MESHES)) {
+            const model = create();
+            model.rotation.y = -0.5;
+            portraits[id] = studio.capture(model);
         }
     } catch {
         return {};
     } finally {
-        renderer.setRenderTarget(previousTarget);
-        target.dispose();
+        studio?.dispose();
     }
     return portraits;
+}
+
+// Shop preview: the player in a given outfit. The studio and model are reused between calls.
+let previewStudio = null;
+let previewModel = null;
+export function renderPlayerPreview(renderer, colors) {
+    try {
+        previewStudio ??= createStudio(renderer);
+        if(!previewModel) {
+            previewModel = createPlayerMesh();
+            previewModel.rotation.y = -0.5;
+        }
+        applyPlayerLoadout(previewModel, colors);
+        return previewStudio.capture(previewModel, 1.15);
+    } catch {
+        return '';
+    }
 }

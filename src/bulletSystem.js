@@ -7,6 +7,11 @@ import { playSound } from './audio.js';
 import { createCrate, createCactus, createDeadTree, createFence, createRock } from './assets.js';
 
 const PLAYER_BULLET_COLOR = new THREE.Color(0xffff00);
+
+// Cosmetic bullet colour from the player's loadout.
+export function setPlayerBulletColor(hex) {
+    PLAYER_BULLET_COLOR.setHex(hex);
+}
 const ENEMY_BULLET_COLOR = new THREE.Color(0xff0000);
 const BULLET_GEOMETRY = new THREE.SphereGeometry(0.35);
 const bulletPool = [];

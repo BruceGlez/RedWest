@@ -628,3 +628,86 @@ body.in-lobby .new-enemy-card { display: none !important; }
     .new-enemy-name { font-size: 17px; }
     .new-enemy-tip { font-size: 10px; }
 }
+
+/* ---------- Economy: currency chips, store, jobs, earnings ---------- */
+.money-chip { display: flex; gap: 4px; align-items: center; }
+.cur-dollar { color: #7cff6b; font-weight: 700; }
+.cur-nugget { color: #ffd54f; }
+.shop-btn {
+    font-family: 'Rye', serif; font-size: 18px; color: #3b1d00; cursor: pointer; padding: 6px 14px;
+    background: linear-gradient(#9cff8a, #3fbf4a); border: 3px solid #14240f; border-radius: 12px; box-shadow: 0 4px 0 #14240f;
+}
+.shop-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #14240f; }
+.side-btn.attention::after { content: '!'; position: absolute; margin-left: 150px; margin-top: -6px; background: #e53935; color: #fff; border-radius: 50%; width: 18px; height: 18px; font-size: 12px; display: flex; align-items: center; justify-content: center; border: 2px solid #14142b; }
+.side-btn { position: relative; }
+#jobs-btn { background: linear-gradient(#ffb74d, #f57c00); }
+
+.shop-body { flex: 1; min-height: 0; display: flex; gap: 16px; padding-top: 12px; }
+.shop-preview { flex: 0 0 220px; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.shop-preview img { width: 220px; height: 220px; border: 4px solid #6b4a2b; border-radius: 12px; background: #e7cf9c; box-shadow: 0 6px 0 #2a1a0c; }
+.shop-preview p { margin: 0; font-weight: 700; font-size: 12px; color: #ffcc80; text-align: center; }
+.shop-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 10px; }
+.shop-tabs { display: flex; gap: 6px; flex-wrap: wrap; }
+.shop-tab { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 13px; padding: 6px 12px; border-radius: 10px; cursor: pointer; background: rgba(0,0,0,0.35); color: #ddd; border: 2px solid #5d4037; }
+.shop-tab.active { background: #ffcc33; color: #3b1d00; border-color: #3b1d00; }
+.shop-grid { flex: 1; overflow-y: auto; display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; align-content: start; }
+.shop-card {
+    position: relative; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 10px 8px; cursor: pointer;
+    background: radial-gradient(ellipse at center, #f7e6be 55%, #e2c68d 100%); color: #3b2412; border: 3px solid #6b4a2b; border-radius: 10px; box-shadow: 0 4px 0 #2a1a0c;
+}
+.shop-card.trying { border-color: #ffcc33; box-shadow: 0 0 0 3px #ffcc33, 0 4px 0 #2a1a0c; }
+.shop-swatch { width: 54px; height: 54px; border-radius: 12px; background: var(--swatch); border: 3px solid #3b2412; }
+.shop-swatch.bullet { border-radius: 50%; width: 30px; height: 30px; margin: 12px; box-shadow: 0 0 14px 4px var(--swatch); }
+.shop-name { font-family: 'Rye', serif; font-size: 13px; text-align: center; }
+.shop-sub { font-size: 11px; opacity: 0.8; }
+.shop-action {
+    font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 13px; width: 100%; padding: 6px; border-radius: 8px; cursor: pointer;
+    background: linear-gradient(#9cff8a, #3fbf4a); color: #0f2410; border: 2px solid #14240f; box-shadow: 0 3px 0 #14240f;
+}
+.shop-action.nugget { background: linear-gradient(#fff07a, #ffc21a); color: #3b1d00; border-color: #3b1d00; box-shadow: 0 3px 0 #3b1d00; }
+.shop-action.confirm { background: linear-gradient(#ff8a80, #e53935); color: #fff; animation: confirm-pulse 0.8s ease-in-out infinite; }
+.shop-action.equipped, .shop-action:disabled { background: #bca68a; color: #5d4037; box-shadow: none; cursor: default; animation: none; }
+@keyframes confirm-pulse { 50% { transform: scale(1.05); } }
+.nugget-icon { font-size: 40px; color: #ffc107; text-shadow: 0 2px 0 #6b3a00; }
+.shop-badge { position: absolute; top: -8px; right: -8px; background: #e53935; color: #fff; font-weight: 700; font-size: 11px; padding: 2px 6px; border-radius: 8px; border: 2px solid #fff; }
+.shop-fineprint { grid-column: 1 / -1; font-size: 11px; color: #bbb; margin: 4px 0 0; }
+.shop-message { margin: 0; min-height: 18px; font-weight: 700; font-size: 13px; color: #7cff6b; }
+.shop-message.error { color: #ff8a80; }
+
+.jobs-body { flex-direction: column; align-items: center; justify-content: flex-start; flex-wrap: nowrap; }
+.jobs-list { display: flex; flex-direction: column; gap: 10px; width: min(560px, 100%); }
+.job-card { background: radial-gradient(ellipse at center, #f7e6be 55%, #e2c68d 100%); color: #3b2412; border: 3px solid #6b4a2b; border-radius: 10px; padding: 10px 14px; box-shadow: 0 4px 0 #2a1a0c; }
+.job-card.done { filter: saturate(0.6); }
+.job-text { font-family: 'Rye', serif; font-size: 17px; }
+.job-bar { height: 12px; margin: 6px 0; border-radius: 6px; background: rgba(59, 36, 18, 0.2); overflow: hidden; border: 2px solid #3b2412; }
+.job-fill { height: 100%; background: linear-gradient(90deg, #ffb74d, #f57c00); }
+.job-card.done .job-fill { background: linear-gradient(90deg, #9cff8a, #3fbf4a); }
+.job-meta { display: flex; justify-content: space-between; font-weight: 700; font-size: 13px; }
+.job-reward { color: #2e7d32; }
+.jobs-bonus { font-size: 14px; color: #ffcc80; text-align: center; }
+
+.result-earnings { margin: 0 0 6px; font-family: 'Roboto Mono', monospace; }
+.earn-title { margin: 4px 0; font-size: 16px; color: #eee; }
+.earn-title b { color: #7cff6b; font-size: 20px; }
+.earn-lines { list-style: none; margin: 0 auto; padding: 0; max-width: 360px; font-size: 12px; color: #ccc; }
+.earn-lines li { display: flex; justify-content: space-between; gap: 10px; }
+.earn-lines b { color: #7cff6b; }
+.earn-error { color: #ff8a80; font-size: 13px; }
+
+@media (max-height: 560px), (max-width: 760px) {
+    .shop-btn { font-size: 14px; padding: 4px 10px; }
+    .home-top-right { gap: 6px; }
+    .home-chip.money-chip { padding: 3px 8px; font-size: 12px; }
+    .shop-preview { flex-basis: 130px; }
+    .shop-preview img { width: 130px; height: 130px; }
+    .shop-grid { grid-template-columns: repeat(auto-fill, minmax(104px, 1fr)); gap: 8px; }
+    .shop-swatch { width: 40px; height: 40px; }
+    .shop-name { font-size: 11px; }
+    .shop-action { font-size: 11px; padding: 4px; }
+    .shop-tab { font-size: 11px; padding: 4px 8px; }
+    .job-text { font-size: 14px; }
+    .home-side { gap: 6px; }
+    .side-btn { padding: 5px 10px; }
+    .side-btn small { font-size: 8px; }
+    .side-btn.attention::after { margin-left: 120px; }
+}

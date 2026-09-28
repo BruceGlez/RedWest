@@ -87,9 +87,11 @@ The tester thresholds are **decision rules for the project**, not industry bench
 
 ## Explicit exclusions for this rewrite
 
-Multiplayer, online accounts or leaderboard, live service features, in-app purchases, open world, full narrative campaign, procedural generation of all levels, and a custom engine. These can be reconsidered only after the paid core game is validated.
+Multiplayer, online leaderboards, live service features, open world, full narrative campaign, procedural generation of all levels, and a custom engine. These can be reconsidered only after the paid core game is validated.
 
 ## Distribution and commercial gate
+
+> **Owner decision (2026-09-28):** add a cosmetics-only store with earned and paid currency (see MONETIZATION.md) in place of a single up-front price. No paid loot boxes and nothing pay-to-win.
 
 Use a free demo to test the pitch before charging. Publish a Steam Coming Soon page when the visual identity and gameplay clip match the expected product. Steam currently states a [$100 Steam Direct fee, a 30-day wait after payment, and at least two weeks for a public Coming Soon page](https://partner.steamgames.com/steamdirect). The first store trailer should show [actual gameplay](https://partner.steamgames.com/doc/store/trailer). Do not commit to a release date or Early Access sale until the vertical slice and playtest evidence justify it.
 

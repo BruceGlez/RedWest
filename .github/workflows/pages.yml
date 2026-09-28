@@ -22,6 +22,14 @@ jobs:
       - run: npm ci
       - run: npm test
       - run: npm run build
+        env:
+          # Public store settings, from Settings > Secrets and variables > Actions > Variables.
+          VITE_API_BASE: ${{ vars.VITE_API_BASE }}
+          VITE_REVENUECAT_APPLE_KEY: ${{ vars.VITE_REVENUECAT_APPLE_KEY }}
+          VITE_REVENUECAT_GOOGLE_KEY: ${{ vars.VITE_REVENUECAT_GOOGLE_KEY }}
+          VITE_STRIPE_LINK_NUGGETS_100: ${{ vars.VITE_STRIPE_LINK_NUGGETS_100 }}
+          VITE_STRIPE_LINK_NUGGETS_550: ${{ vars.VITE_STRIPE_LINK_NUGGETS_550 }}
+          VITE_STRIPE_LINK_NUGGETS_1200: ${{ vars.VITE_STRIPE_LINK_NUGGETS_1200 }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

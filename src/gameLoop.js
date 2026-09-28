@@ -66,7 +66,7 @@ function chooseWeightedType(candidates) {
     return candidates[candidates.length - 1]?.type || null;
 }
 
-export function createGameLoop(scene, camera, renderer, playerSystem, ui, progress) {
+export function createGameLoop(scene, camera, renderer, playerSystem, ui, progress, economy = null) {
     let lastTime = 0;
     let debugElapsed = 0;
     let fpsSmoothed = 60;
@@ -96,9 +96,29 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         ui.setRunLog(appendRunRecord(buildRunRecord(gameState, result, sessionRun)));
         const roadResult = recordRun(progress, gameState.outlawIndex, gameState.bounty, gameState.score);
         recordKills(progress, gameState.runStats.kills);
+        reportEarnings(roadResult);
         saveProgress(progress);
         ui.setProgress(progress);
         ui.showGameOver(result, roadResult);
+    }
+
+    // Bounty Dollars and daily jobs (wallet may be a server, so this is async).
+    function reportEarnings(roadResult) {
+        if(!economy) return;
+        const s = gameState.runStats;
+        const bits = roadResult?.newStars ?? 0;
+        const summary = {
+            score: gameState.score,
+            bounty: gameState.bounty.status === 'none' ? 'none' : gameState.bounty.status,
+            newStars: (bits & 1) + ((bits >> 1) & 1) + ((bits >> 2) & 1),
+            peakHeat: gameState.heat.peak,
+            kills: { ...s.kills },
+            shotsHit: s.shotsHit,
+            loot: s.lootCollected
+        };
+        economy.reportRun(summary)
+            .then(result => ui.showEarnings(result))
+            .catch(error => ui.showEarnings(null, error.message));
     }
 
     function openBountyChoice() {

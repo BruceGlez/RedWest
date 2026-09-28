@@ -19,6 +19,10 @@ The source page also works from a plain local HTTP server such as VS Code Live S
 
 The same build plays on phones. Open the Pages link, hold the phone sideways, and press PLAY. The left thumb moves. On the right, **tap** to quick-fire at the nearest enemy, or **drag** to aim (an aim line shows the shot and snaps onto enemies near it) and push past about a third of the way to fire. Settings has an optional **auto-fire when still** mode for one-thumb play. DASH (with a cooldown ring), SWAP and pause sit on the right; arrows at the screen edge point to off-screen enemies, with a gold arrow for the outlaw. Hits shake the screen, kills pop score numbers, and the phone vibrates (Android browsers and the iOS app). For a full-screen app with its own icon, use **Add to Home Screen** (Safari share menu on iPhone; browser menu or the install prompt on Android). After the first visit it also works offline.
 
+## Store
+
+Runs pay **Bounty Dollars** (score, collected bounties, new stars, daily jobs). Spend them in the **General Store** on cosmetic hats, coats, pants and bullet colours, with a live try-on preview. **Daily Jobs** give three goals a day plus a Gold Nugget bonus. Real-money Gold Nugget packs (App Store / Google Play via RevenueCat, web via Stripe) are built but switched off until the server and store accounts are set up: see [MONETIZATION.md](MONETIZATION.md).
+
 ## iPhone / iPad app
 
 A native iOS app (for TestFlight and the App Store) is built from the same code with Capacitor. See [IOS.md](IOS.md) for building it on a Mac and submitting it.
@@ -39,6 +43,7 @@ npm run test:smoke
 npm run test:static
 npm run test:mobile
 npm run test:enemies
+npm run test:store
 ```
 
 The browser smoke tests look for an installed Chrome or Chromium in the usual location for Windows, macOS, or Linux. Set `CHROME_PATH` to use a different Chromium executable. Player feel, balance, and frame pacing still require hands-on playtesting.
