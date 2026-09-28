@@ -46,17 +46,25 @@ ui.setProgress(progress);
 const outlawPortraits = renderOutlawPortraits(renderer);
 const enemyPortraits = renderEnemyPortraits(renderer);
 ui.setPortraits(outlawPortraits, enemyPortraits);
-// Outlaws with an imported 3D model: load it for the fight and redraw their WANTED poster from it.
-for(const outlaw of OUTLAWS) {
-    if(!outlaw.model) continue;
-    loadCharacterModel(outlaw.model).then(gltf => {
-        const instance = createCharacterInstance(gltf, 6);
-        instance.mixer.update(0.4);
-        const picture = renderCharacterPortrait(renderer, instance.object);
-        if(picture) outlawPortraits[outlaw.id] = picture;
-        ui.setPortraits(outlawPortraits, enemyPortraits);
-    }).catch(() => {}); // missing file: the box outlaw is used
+// Outlaws' 3D models load one at a time (about 1 MB each): the selected outlaw now, others when
+// picked. Once loaded, the outlaw fights as the model and their WANTED poster is redrawn from it.
+const outlawModelRequests = new Map();
+function loadOutlawModel(index) {
+    const outlaw = OUTLAWS[index];
+    if(!outlaw?.model) return Promise.resolve();
+    if(!outlawModelRequests.has(index)) {
+        outlawModelRequests.set(index, loadCharacterModel(outlaw.model).then(gltf => {
+            const instance = createCharacterInstance(gltf, 6);
+            instance.mixer.update(0.4);
+            const picture = renderCharacterPortrait(renderer, instance.object);
+            if(picture) outlawPortraits[outlaw.id] = picture;
+            ui.setPortraits(outlawPortraits, enemyPortraits);
+        }).catch(() => {})); // missing file: the box outlaw is used
+    }
+    return outlawModelRequests.get(index);
 }
+if(arena.enabled) OUTLAWS.forEach((_, i) => loadOutlawModel(i)); // the arena shows them all
+else loadOutlawModel(progress.selected);
 ui.updateHUD();
 ui.updateDashBar(1);
 if(arena.enabled) ui.showStartScreen(); // the Boss Arena list replaces the home screen
@@ -140,7 +148,11 @@ ui.bindControlHandlers({
     onRestartRun: () => gameLoop.resetGame(),
     onBankBounty: () => gameLoop.bankAndLeave(),
     onRideOn: () => gameLoop.rideOnToBonus(),
-    onPlay: () => { keys.startRequested = true; },
+    // The arena starts a fight at once, so it waits for that outlaw's model first.
+    onPlay: async () => {
+        if(arena.enabled) await loadOutlawModel(arena.outlaw);
+        keys.startRequested = true;
+    },
     onBuyItem: async id => {
         try {
             applyProfile(await wallet.buy(id));
@@ -171,6 +183,7 @@ ui.bindControlHandlers({
     onSelectOutlaw: index => {
         if(!isUnlocked(progress, index)) return;
         progress.selected = index;
+        loadOutlawModel(index);
         saveProgress(progress);
         ui.setProgress(progress);
     },

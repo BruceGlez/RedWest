@@ -32,6 +32,8 @@
 
 - Outlaw signature attacks (2026-09-28, owner request after all eight bosses turned out to share one three-shot fan): each outlaw now has its own telegraphed attack (`signature` in `src/outlaws.js`, `updateBoss` in `src/enemySystem.js`), a tip on the ride-in banner, and a description on the poster and in the Bounty Book. Timings are first guesses; a boss smoke test checks each attack lands.
 
+- AI-made characters (2026-09-28, owner approved the pictures): the player and all eight outlaws are animated GLB models made through the OpenAI Images and Meshy APIs (about 8k triangles, 0.8-1 MB each). Outlaws stand about 1.5x the player's height. Only the selected outlaw's model is downloaded; check load time and frame rate on an older phone.
+
 ## Prototype balance values to watch in playtests
 
 These are first guesses, not tuned numbers: 4-second chain window, 2 kills per Heat level (max 4, x1.5 score per level), 5-second decay per level, 50-point base bounty, 30-second bonus pursuit, and the rule that dying in the bonus forfeits the bounty and bonus score. Record how often testers ride on and at what Heat.

@@ -272,7 +272,7 @@ const BROTHER_HP_SHARE = 0.45;
 
 // Imported 3D outlaw (OUTLAWS[].model): shown instead of the box figure once loaded. The box
 // figure stays for its gun muzzle and health bar; everything else about the fight is unchanged.
-const OUTLAW_MODEL_HEIGHT = 6.5; // before the boss's own 1.2x scale
+const OUTLAW_MODEL_HEIGHT = 7.5; // before the boss's own 1.2x scale: about 1.5x the player
 function attachOutlawModel(enemy, outlaw) {
     const gltf = outlaw.model ? loadedCharacterModel(outlaw.model) : null;
     if(!gltf) return;
@@ -280,6 +280,7 @@ function attachOutlawModel(enemy, outlaw) {
     const box = enemy.children[0];
     const hpBar = enemy.userData.hpBar?.parent;
     for(const part of box.children) if(part !== hpBar) part.visible = false;
+    if(hpBar) hpBar.position.y = (OUTLAW_MODEL_HEIGHT + 0.9) / box.scale.y; // just above the model's head
     enemy.add(instance.object);
     enemy.userData.model = instance;
 }

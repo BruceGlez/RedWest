@@ -94,7 +94,9 @@ function createStudio(renderer) {
         capture(model, zoom = 1.25, view = viewDir, top = 1) {
             scene.add(model);
             model.updateMatrixWorld(true);
-            bounds.setFromObject(model);
+            // Precise bounds follow the posed (skinned) vertices of imported characters; their stored
+            // bounds describe the unposed mesh and can be far off.
+            bounds.setFromObject(model, !!model.getObjectByProperty('isSkinnedMesh', true));
             if(top < 1) bounds.min.y = bounds.max.y - (bounds.max.y - bounds.min.y) * top;
             bounds.getCenter(center);
             bounds.getSize(size);

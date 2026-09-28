@@ -58,7 +58,8 @@ export function createCharacterInstance(gltf, height) {
     });
     for(const [parent, outline] of outlines) parent.add(outline);
 
-    const box = new THREE.Box3().setFromObject(root);
+    root.updateMatrixWorld(true);
+    const box = new THREE.Box3().setFromObject(root, true); // posed vertices: stored skinned bounds can be far off
     const scale = height / Math.max(0.01, box.max.y - box.min.y);
     const holder = new THREE.Group();
     root.scale.setScalar(scale);

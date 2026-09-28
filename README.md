@@ -25,7 +25,7 @@ Runs pay **Bounty Dollars** (score, collected bounties, new stars, daily jobs). 
 
 ## Characters
 
-The player is **Marshal Flint Reed**, an animated 3D character made with Meshy (image to 3D, auto-rig, animations) and saved as `public/models/marshal.glb`. The original box-built cowboy is still available as **The Drifter** in the shop's CHARACTERS tab, and is the one the hat, coat and pants colours apply to. To add another character:
+The player (**Marshal Flint Reed**) and all eight outlaws are animated 3D characters: front-view pictures made with the OpenAI Images API (`tools/character-picture.mjs`, prompts in `tools/character-prompts.mjs`, pictures in `art/characters/`), turned into rigged, animated models through the Meshy API (`tools/meshy.mjs`) and saved in `public/models/`. The game loads the selected outlaw's model (about 1 MB) and draws their WANTED poster from it. The original box-built cowboy is still available as **The Drifter** in the shop's CHARACTERS tab, and is the one the hat, coat and pants colours apply to. To add another character:
 
 - **With the Meshy API** (needs `MESHY_API_KEY` in the environment and network access to `api.meshy.ai`): `node tools/meshy.mjs front-view.png dusty-pete` runs image to 3D, auto-rig and the four animations (Idle, Running, Run and Shoot, Dead), then shrinks the result into `public/models/dusty-pete.glb`. It needs the model tools once: `npm i --no-save @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions sharp`.
 - **From the Meshy website**: export a rigged GLB (Mixamo skeleton, those animations, single file) and shrink it with `node tools/optimize-model.mjs input.glb public/models/name.glb`.

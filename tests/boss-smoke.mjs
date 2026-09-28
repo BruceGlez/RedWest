@@ -90,6 +90,7 @@ try {
     // and still fights the same way.
     const modelled = await page.evaluate(async () => {
         const { loadCharacterModel } = await import('/src/characterModels.js');
+        const original = O.OUTLAWS[0].model;
         O.OUTLAWS[0].model = 'models/marshal.glb';
         await loadCharacterModel(O.OUTLAWS[0].model);
         window.clearField();
@@ -101,7 +102,7 @@ try {
         const deadline = Date.now() + 90000;
         while(S.gameState.runTime - start < 8 && S.playerStats.hp === 50 && Date.now() < deadline) await new Promise(r => setTimeout(r, 100));
         const result = { model: !!skinned && skinned.visible, animating: pete.userData.model?.mixer.time > 0, hurt: S.playerStats.hp < 50 };
-        O.OUTLAWS[0].model = undefined;
+        O.OUTLAWS[0].model = original;
         return result;
     });
     assert.deepEqual(modelled, { model: true, animating: true, hurt: true }, 'an imported outlaw model is shown, animated, and still charges');
