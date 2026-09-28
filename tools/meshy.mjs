@@ -4,7 +4,7 @@
 //
 //   export MESHY_API_KEY=...   (set it in the environment's settings; never commit it)
 //   npm i --no-save @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions sharp
-//   node tools/meshy.mjs <front-view.png> <name> [--height 1.8] [--polycount 8000] [--actions id,id,id,id]
+//   node tools/meshy.mjs <front-view.png> <name> [--height 1.8] [--polycount 8000] [--actions id,id,id,id] [--lookup-actions]
 //
 // Needs network access to api.meshy.ai. Raw downloads are kept in tools/.meshy-cache/.
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
@@ -15,7 +15,11 @@ const API = (process.env.MESHY_API_BASE || 'https://api.meshy.ai').replace(/\/$/
 const POLL_MS = Number(process.env.MESHY_POLL_MS || 5000);
 const CACHE = resolve('tools/.meshy-cache');
 
-// Library names to look for, per game role, in order of preference.
+// Meshy library actions used for every character, matching the Marshal: Idle 1, Run 2, Run and
+// Shoot, Dead (ids from GET /openapi/v1/animations/library, checked 2026-09-28). Order = ROLES.
+const DEFAULT_ACTIONS = [11, 14, 98, 8];
+
+// Fallback: library names to look for, per game role, in order of preference.
 const ACTION_SEARCH = {
     idle: ['Idle'],
     run: ['Running', 'Run'],
@@ -26,12 +30,16 @@ const ACTION_SEARCH = {
 function parseArgs(argv) {
     const [image, name, ...rest] = argv;
     const options = { image, name, height: 1.8, polycount: 8000, actions: null };
+    if(rest.includes('--lookup-actions')) {
+        rest.splice(rest.indexOf('--lookup-actions'), 1);
+        options.lookup = true;
+    }
     for(let i = 0; i < rest.length; i += 2) {
         const key = rest[i].replace(/^--/, '');
         const value = rest[i + 1];
         if(key === 'height') options.height = Number(value);
         else if(key === 'polycount') options.polycount = Number(value);
-        else if(key === 'actions') options.actions = value.split(',').map(v => v.trim());
+        else if(key === 'actions') options.actions = value.split(',').map(v => Number(v.trim()));
         else throw new Error(`Unknown option --${key}`);
     }
     if(!image || !name || !/^[a-z0-9-]+$/.test(name)) {
@@ -124,7 +132,7 @@ async function main() {
     console.log('2/4 Auto-rig');
     const rig = await runTask('rig', '/openapi/v1/rigging', { input_task_id: model.id, height_meters: options.height });
     console.log('3/4 Animations');
-    const actionIds = options.actions ?? await resolveActions();
+    const actionIds = options.actions ?? (options.lookup ? await resolveActions() : DEFAULT_ACTIONS);
     const animation = await runTask('animations', '/openapi/v1/animations', { rig_task_id: rig.id, action_ids: actionIds });
     const url = animation.result?.animation_glb_url ?? animation.result?.glb_url;
     if(!url) throw new Error(`No GLB in the animation result: ${JSON.stringify(animation.result)}`);
