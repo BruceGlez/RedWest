@@ -2,7 +2,17 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
     <title>Red West — Heat Prototype</title>
+    <meta name="description" content="Hunt a notorious outlaw through short, escalating Western shootouts.">
+    <meta name="theme-color" content="#3e2723">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Red West">
+    <link rel="manifest" href="manifest.webmanifest">
+    <link rel="icon" type="image/png" href="icons/icon-192.png">
+    <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Roboto+Mono:wght@700&family=Rye&display=swap" rel="stylesheet">
@@ -32,6 +42,19 @@
     </div>
     <div id="debug-panel" class="debug-panel"></div>
 
+    <div id="touch-controls" aria-hidden="true">
+        <div id="stick-move" class="stick-zone"><div class="stick-base"><div class="stick-knob"></div></div><span class="stick-hint">MOVE</span></div>
+        <div id="stick-aim" class="stick-zone"><div class="stick-base"><div class="stick-knob"></div></div><span class="stick-hint">AIM + FIRE</span></div>
+        <button id="btn-dash" class="touch-btn" type="button">DASH</button>
+        <button id="btn-swap" class="touch-btn" type="button">SWAP</button>
+        <button id="btn-pause" class="touch-btn touch-btn-small" type="button">II</button>
+    </div>
+
+    <div id="rotate-hint" class="rotate-hint">
+        <div class="rotate-icon">&#8635;</div>
+        <p>TURN YOUR PHONE SIDEWAYS</p>
+    </div>
+
     <div id="dash-bar-container">
         <div id="dash-bar-label">STAMINA</div>
         <div id="dash-bar"></div>
@@ -46,7 +69,13 @@
                     <li>LOADING...</li>
                 </ul>
             </div>
-            <div class="controls-box">
+            <div class="controls-box touch-only">
+                <p><span>LEFT THUMB</span> MOVE</p>
+                <p><span>RIGHT THUMB</span> AIM &mdash; PUSH FURTHER TO FIRE</p>
+                <p><span>DASH / SWAP</span> DASH, SWITCH WEAPON</p>
+                <p><span>HEAT</span> CHAIN ACCURATE KILLS FOR MORE POINTS AND DEADLIER PURSUERS. MISSES AND HITS TAKEN COOL IT</p>
+            </div>
+            <div class="controls-box desktop-only">
                 <p><span>WASD</span> MOVE</p>
                 <p><span>MOUSE</span> AIM / SHOOT</p>
                 <p><span>SHIFT</span> DASH</p>
@@ -56,7 +85,8 @@
                 <p><span>O</span> SETTINGS</p>
                 <p><span>M / N</span> TOGGLE MUSIC / SFX</p>
             </div>
-            <p class="blink-text">PRESS <span class="key-highlight">SPACE</span> TO DRAW</p>
+            <p class="blink-text desktop-only">PRESS <span class="key-highlight">SPACE</span> TO DRAW</p>
+            <p class="blink-text touch-only">TAP TO DRAW</p>
             <div class="run-log-box">
                 PLAYTEST LOG: <span id="run-log-count">0 runs</span>
                 <button id="copyRunLogBtn" type="button">COPY</button>
@@ -84,7 +114,8 @@
             </div>
 
             <p id="restart-msg" class="restart-text" style="display: none;">
-                PRESS <span class="key-highlight">R</span> TO RESTART
+                <span class="desktop-only">PRESS <span class="key-highlight">R</span> TO RESTART</span>
+                <span class="touch-only restart-tap">TAP HERE TO RIDE AGAIN</span>
             </p>
             <button id="resultCopyLogBtn" type="button">COPY RUN LOG</button>
         </div>
@@ -97,11 +128,11 @@
             <p class="result-detail">Heat <span id="bounty-heat">0</span> set the bounty. It is only paid when you leave.</p>
             <div class="bounty-options">
                 <button id="bankBountyBtn" type="button">
-                    <strong>BANK IT <span class="key-highlight">B</span></strong>
+                    <strong>BANK IT <span class="key-highlight desktop-only-inline">B</span></strong>
                     <small>Collect the bounty now and end the run.</small>
                 </button>
                 <button id="rideOnBtn" type="button">
-                    <strong>RIDE ON <span class="key-highlight">C</span></strong>
+                    <strong>RIDE ON <span class="key-highlight desktop-only-inline">C</span></strong>
                     <small>Keep your Heat through a <span id="bonus-seconds">30</span>s bonus pursuit. Escape: bounty plus everything you earn. Die: lose both.</small>
                 </button>
             </div>

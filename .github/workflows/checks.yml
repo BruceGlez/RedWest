@@ -20,3 +20,6 @@ jobs:
       - run: npm run test:static
         env:
           CHROME_PATH: /usr/bin/google-chrome
+      - run: npm run test:mobile
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

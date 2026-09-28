@@ -52,7 +52,7 @@ These Steam page observations show that these games found an audience; they do n
 ### 3. Presentation and usability
 
 - One coherent Western palette, recognizable enemy silhouettes, cleaner HUD, readable pickup and objective markers, impact and reload sounds, and music that supports combat intensity.
-- First-time tutorial delivered during play, with no long instruction wall. Keyboard and mouse remain the initial input target. Controller support is a release candidate gate for a desktop storefront, not a vertical-slice blocker.
+- First-time tutorial delivered during play, with no long instruction wall. Keyboard and mouse remain the primary input target; the browser build also supports phones as an installable web app with twin-stick touch controls (added 2026-09-28 at the owner's request). Controller support is a release candidate gate for a desktop storefront, not a vertical-slice blocker.
 - Settings for volume levels, fullscreen, screen shake, and readable text. Preserve local scores and settings through a versioned save format.
 - English UI first; prepare strings for localization and prioritize Spanish after the English copy and layout stabilize.
 
@@ -85,7 +85,7 @@ The tester thresholds are **decision rules for the project**, not industry bench
 
 ## Explicit exclusions for this rewrite
 
-Multiplayer, online accounts or leaderboard, live service features, in-app purchases, open world, full narrative campaign, mobile controls, procedural generation of all levels, and a custom engine. These can be reconsidered only after the paid core game is validated.
+Multiplayer, online accounts or leaderboard, live service features, in-app purchases, open world, full narrative campaign, native mobile store releases, procedural generation of all levels, and a custom engine. These can be reconsidered only after the paid core game is validated.
 
 ## Distribution and commercial gate
 

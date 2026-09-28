@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { setupInputs } from './input.js';
+import { setupTouchControls } from './touchControls.js';
 import { gameState, playerStats } from './state.js';
 import { setupScene, generateMap } from './world.js';
 import { resumeAudio, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
@@ -13,6 +14,9 @@ const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
+const isTouch = setupTouchControls();
+// Sharper on phones without paying for full 3x device-pixel rendering.
+if(isTouch) renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 document.body.appendChild(renderer.domElement);
@@ -63,3 +67,9 @@ window.addEventListener('resize', () => {
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 window.addEventListener('mousedown', resumeAudio);
+window.addEventListener('touchend', resumeAudio); // iOS only unlocks audio from a touch gesture
+
+// Installable app: cache the game for offline play. Only on https (GitHub Pages), never in local dev.
+if('serviceWorker' in navigator && location.protocol === 'https:') {
+    navigator.serviceWorker.register('sw.js').catch(() => { /* Offline support is optional. */ });
+}

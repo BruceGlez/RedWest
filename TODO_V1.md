@@ -28,7 +28,7 @@ Deliver a polished, replayable arcade survival shooter that feels complete enoug
 - Live services / accounts
 - In-app purchases
 - Story campaign
-- Mobile-first controls
+- Mobile-first design (phones are supported as a web app with touch controls, but desktop stays the primary target)
 - Advanced mod support
 
 ## Quality Bar

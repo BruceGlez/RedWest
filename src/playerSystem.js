@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { keys, mouse } from './input.js';
+import { keys, mouse, touch } from './input.js';
 import { createPlayerMesh } from './assets.js';
 import { checkCollision } from './physics.js';
 import { playSound } from './audio.js';
@@ -76,7 +76,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if(playerStats.dashCooldown > 0) playerStats.dashCooldown -= dt;
         if(playerStats.tripleShotTimer > 0) playerStats.tripleShotTimer -= dt;
 
-        if(keys.mouse || keys.space || playerStats.shootCooldown > 0 || playerGroup.userData.aimTimer > 0) {
+        if(keys.mouse || keys.space || touch.firing || playerStats.shootCooldown > 0 || playerGroup.userData.aimTimer > 0) {
             playerGroup.userData.isAiming = true;
         } else {
             playerGroup.userData.isAiming = false;
@@ -89,9 +89,14 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if(keys.s) move.z += 1;
         if(keys.a) move.x -= 1;
         if(keys.d) move.x += 1;
+        if(touch.enabled) {
+            move.x += touch.moveX;
+            move.z += touch.moveY;
+        }
         const beforePos = playerGroup.position.clone();
         if(move.length() > 0) {
-            move.normalize().multiplyScalar(speed * dt);
+            // Keys give full speed; a partly tilted stick gives proportionally less.
+            move.clampLength(0, 1).multiplyScalar(speed * dt);
             const nextX = Math.max(-gameState.MAP_SIZE, Math.min(gameState.MAP_SIZE, playerGroup.position.x + move.x));
             const nextZ = Math.max(-gameState.MAP_SIZE, Math.min(gameState.MAP_SIZE, playerGroup.position.z + move.z));
             if(!checkCollision(nextX, playerGroup.position.z, 1.5)) playerGroup.position.x = nextX;
@@ -121,16 +126,25 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if(isMoving) playerGroup.position.y = Math.abs(Math.sin(timeInSeconds * 12)) * 0.1;
         else playerGroup.position.y = THREE.MathUtils.lerp(playerGroup.position.y, 0, dt * 14);
 
-        raycaster.setFromCamera(mouse, camera);
-        const intersect = new THREE.Vector3();
-        raycaster.ray.intersectPlane(groundPlane, intersect);
-        if(intersect) playerGroup.lookAt(intersect.x, playerGroup.position.y, intersect.z);
+        if(touch.enabled) {
+            // Aim stick wins; otherwise face the direction of travel.
+            const faceX = touch.aiming ? touch.aimX : move.x;
+            const faceZ = touch.aiming ? touch.aimY : move.z;
+            if(faceX !== 0 || faceZ !== 0) {
+                playerGroup.lookAt(playerGroup.position.x + faceX, playerGroup.position.y, playerGroup.position.z + faceZ);
+            }
+        } else {
+            raycaster.setFromCamera(mouse, camera);
+            const intersect = new THREE.Vector3();
+            raycaster.ray.intersectPlane(groundPlane, intersect);
+            if(intersect) playerGroup.lookAt(intersect.x, playerGroup.position.y, intersect.z);
+        }
 
         const gunGroup = playerGroup.userData.gunMesh;
         if(gunGroup) gunGroup.position.z = THREE.MathUtils.lerp(gunGroup.position.z, 0.2, dt * 10);
 
         if(playerStats.shootCooldown > 0) playerStats.shootCooldown -= dt;
-        if((keys.space || keys.mouse) && playerStats.shootCooldown <= 0) {
+        if((keys.space || keys.mouse || touch.firing) && playerStats.shootCooldown <= 0) {
             shoot();
             playerStats.shootCooldown = playerStats.fireRate;
         }

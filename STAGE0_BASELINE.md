@@ -21,6 +21,8 @@
 
 - Playtest support: the game is published to GitHub Pages from `main`, and each finished run is appended to an in-browser run log (copyable as spreadsheet rows) that records the result, peak Heat, bank / ride-on choice, bounty, time, and run order within the session. Whether a second run was *voluntary* still needs the observer's note.
 
+- Phone support: touch mode (floating twin sticks, DASH / SWAP / pause buttons, tap to start and restart), compact layout, a landscape prompt, and an installable web app (manifest, icons, network-first offline cache). A phone-emulation smoke test runs in CI. Balance was set for mouse aim; record touch testers separately.
+
 ## Prototype balance values to watch in playtests
 
 These are first guesses, not tuned numbers: 4-second chain window, 2 kills per Heat level (max 4, x1.5 score per level), 5-second decay per level, 50-point base bounty, 30-second bonus pursuit, and the rule that dying in the bonus forfeits the bounty and bonus score. Record how often testers ride on and at what Heat.

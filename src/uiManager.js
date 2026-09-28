@@ -213,7 +213,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.inputSection.style.display = 'flex';
         els.restartMsg.style.display = 'none';
         els.playerName.value = preferredName;
-        els.playerName.focus();
+        // On phones, focusing would pop the keyboard over the run report.
+        if(!document.body.classList.contains('touch')) els.playerName.focus();
     }
 
     function showBountyChoice(bounty, bonusSeconds) {

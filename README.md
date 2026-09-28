@@ -15,6 +15,10 @@ Open the local URL printed by Vite. Use WASD to move, mouse to aim and shoot, Sh
 
 The source page also works from a plain local HTTP server such as VS Code Live Server, using the Three.js CDN import map. Opening `index.html` as a `file://` URL may be blocked by browser module security; use an HTTP server.
 
+## Phones and tablets
+
+The same build plays on phones. Open the Pages link, hold the phone sideways, and tap to draw: the left thumb moves, the right thumb aims and fires once pushed past about a third of the way, and the DASH, SWAP and pause buttons sit on the right. For a full-screen app with its own icon, use **Add to Home Screen** (Safari share menu on iPhone; browser menu or the install prompt on Android). After the first visit it also works offline.
+
 ## Playtest build
 
 Every push to `main` is built and published by `.github/workflows/pages.yml` to
@@ -29,6 +33,7 @@ npm test
 npm run build
 npm run test:smoke
 npm run test:static
+npm run test:mobile
 ```
 
 The browser smoke tests look for an installed Chrome or Chromium in the usual location for Windows, macOS, or Linux. Set `CHROME_PATH` to use a different Chromium executable. Player feel, balance, and frame pacing still require hands-on playtesting.

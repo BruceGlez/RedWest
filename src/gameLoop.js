@@ -402,7 +402,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             camera.lookAt(playerSystem.playerGroup.position);
             renderer.render(scene, camera);
             emitDebug(dt);
-            if(keys.space) {
+            if(keys.space || keys.startRequested) {
+                keys.startRequested = false;
                 gameState.isGameStarted = true;
                 sessionRun++;
                 ui.hideStartScreen();

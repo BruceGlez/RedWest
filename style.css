@@ -282,3 +282,94 @@ canvas {
 .run-log-box { margin-top: 18px; font-family: 'Roboto Mono', monospace; font-size: 12px; color: #aaa; display: flex; gap: 8px; justify-content: center; align-items: center; flex-wrap: wrap; }
 .run-log-box button, #resultCopyLogBtn { background: transparent; color: #ddd; border: 1px solid #8d6e63; padding: 4px 10px; font-family: 'Roboto Mono', monospace; font-size: 12px; cursor: pointer; }
 #run-log-status { color: #ffd180; }
+
+/* ---------- Mobile / app mode ---------- */
+html, body { height: 100%; overscroll-behavior: none; }
+body { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; touch-action: none; }
+.touch-only { display: none; }
+#touch-controls { display: none; }
+.rotate-hint { display: none; }
+
+body.touch .touch-only { display: block; }
+body.touch .desktop-only, body.touch .desktop-only-inline { display: none; }
+body.touch #crosshair, body.touch .debug-panel { display: none; }
+body.touch #input-section, body.touch .modal-content { touch-action: auto; }
+
+body.touch #touch-controls { display: block; position: fixed; inset: 0; z-index: 5; }
+.stick-zone { position: absolute; bottom: 0; width: 50%; height: 75%; touch-action: none; }
+#stick-move { left: 0; }
+#stick-aim { right: 0; }
+.stick-hint {
+    position: absolute; bottom: calc(18px + env(safe-area-inset-bottom)); font-family: 'Roboto Mono', monospace;
+    font-size: 11px; color: rgba(255, 255, 255, 0.45); text-shadow: 1px 1px 0 #000; pointer-events: none;
+}
+#stick-move .stick-hint { left: calc(24px + env(safe-area-inset-left)); }
+#stick-aim .stick-hint { right: calc(24px + env(safe-area-inset-right)); }
+.stick-base {
+    position: absolute; width: 112px; height: 112px; margin: -56px 0 0 -56px; border-radius: 50%;
+    border: 2px solid rgba(255, 215, 0, 0.45); background: rgba(0, 0, 0, 0.25); opacity: 0; pointer-events: none;
+}
+.stick-base.active { opacity: 1; }
+.stick-knob {
+    position: absolute; top: 50%; left: 50%; width: 48px; height: 48px; border-radius: 50%;
+    transform: translate(-50%, -50%); background: rgba(255, 215, 0, 0.55); border: 2px solid rgba(0, 0, 0, 0.4);
+}
+#stick-aim .stick-base { border-color: rgba(255, 119, 77, 0.6); }
+#stick-aim .stick-knob { background: rgba(255, 119, 77, 0.6); }
+
+.touch-btn {
+    position: absolute; width: 64px; height: 64px; border-radius: 50%; touch-action: none;
+    background: rgba(20, 12, 8, 0.6); color: #ffd700; border: 2px solid rgba(255, 215, 0, 0.55);
+    font-family: 'Roboto Mono', monospace; font-size: 12px; font-weight: bold;
+}
+.touch-btn.pressed { background: rgba(255, 215, 0, 0.35); }
+#btn-dash { right: calc(24px + env(safe-area-inset-right)); bottom: calc(150px + env(safe-area-inset-bottom)); }
+#btn-swap { right: calc(100px + env(safe-area-inset-right)); bottom: calc(175px + env(safe-area-inset-bottom)); }
+.touch-btn-small { width: 44px; height: 44px; font-size: 14px; }
+#btn-pause { right: calc(16px + env(safe-area-inset-right)); top: calc(12px + env(safe-area-inset-top)); }
+
+body.touch #ui-layer { top: calc(8px + env(safe-area-inset-top)); left: calc(12px + env(safe-area-inset-left)); }
+body.touch .hud-row { font-size: 16px; margin-bottom: 2px; gap: 6px; }
+body.touch .heat-row { font-size: 14px; }
+body.touch .heat-event { font-size: 11px; }
+body.touch .heat-chain { width: 120px; height: 4px; margin-bottom: 4px; }
+body.touch #health-container { font-size: 20px; }
+body.touch #status-msg { font-size: 13px; }
+body.touch #dash-bar-container { width: 150px; height: 8px; bottom: calc(10px + env(safe-area-inset-bottom)); }
+body.touch #dash-bar-label { font-size: 10px; top: -14px; }
+body.touch .wave-banner { top: calc(10px + env(safe-area-inset-top)); font-size: 14px; }
+body.touch .pause-overlay { z-index: 20; }
+body.touch .pause-actions button { font-size: 16px; padding: 12px 18px; }
+.restart-tap { display: inline-block; padding: 10px 16px; border: 1px solid #ffd700; color: #ffd700; border-radius: 6px; }
+
+/* Small or short screens (phones in landscape): compact menus. */
+@media (max-height: 560px), (max-width: 640px) {
+    .modal-content { padding: 16px 20px; width: 92%; border-width: 3px; }
+    .western-title { font-size: 36px; margin-bottom: 8px; }
+    .bounty-content .western-title { font-size: 30px; }
+    .score-text { font-size: 20px; margin: 8px 0; }
+    .leaderboard-box { padding: 8px; margin-bottom: 8px; }
+    #highscore-list { font-size: 14px; }
+    .controls-box { font-size: 11px; margin-bottom: 8px; }
+    .controls-box p { margin: 3px 0; }
+    .blink-text { font-size: 18px; margin-top: 8px; }
+    .run-summary-box { margin: 4px 0 8px; }
+    #run-stats-table { font-size: 11px; }
+    #input-section { margin: 8px 0; }
+    #playerName { font-size: 18px; padding: 6px; }
+    .bounty-options { margin-top: 8px; gap: 8px; }
+    .bounty-options button { padding: 10px; flex-basis: 180px; }
+    .bounty-options button strong { font-size: 16px; }
+    .bounty-options button small { font-size: 11px; }
+    .settings-title { font-size: 24px; margin-bottom: 10px; }
+}
+
+/* Phones held upright: ask for landscape (the arena and twin sticks need the width). */
+@media (orientation: portrait) {
+    body.touch .rotate-hint {
+        display: flex; position: fixed; inset: 0; z-index: 200; flex-direction: column; align-items: center;
+        justify-content: center; background: #1a0f0a; color: #ffd700; font-family: 'Roboto Mono', monospace; text-align: center;
+    }
+}
+.rotate-icon { font-size: 64px; animation: rotate-hint 2s ease-in-out infinite; }
+@keyframes rotate-hint { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(90deg); } }
