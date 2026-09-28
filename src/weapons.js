@@ -4,7 +4,7 @@
 //
 // Stats: pellets per shot, spread (radians across all pellets, or random jitter for one pellet),
 // speed (units/s), fireRate (seconds between shots), damage per pellet, pierce (extra enemies a
-// bullet passes through), range (units before the bullet drops).
+// bullet passes through), range (units before the bullet drops), size (how big the bullet looks).
 
 export const WEAPON_SLOTS = ['primary', 'secondary'];
 
@@ -12,32 +12,32 @@ export const WEAPONS = [
     {
         id: 'gun-revolver', slot: 'primary', name: 'Peacemaker', short: 'REVOLVER', price: 0, currency: 'dollars',
         blurb: 'Reliable all-rounder. Every shot goes where you aim.',
-        stats: { pellets: 1, spread: 0, speed: 70, fireRate: 0.2, damage: 1, pierce: 0, range: 100 }
+        stats: { pellets: 1, spread: 0, speed: 70, fireRate: 0.2, damage: 1, pierce: 0, range: 100, size: 1 }
     },
     {
         id: 'gun-twins', slot: 'primary', name: 'Twin Pistols', short: 'TWINS', price: 500, currency: 'dollars',
         blurb: 'Fires almost twice as fast, but shots wander. Misses cool your Heat.',
-        stats: { pellets: 1, spread: 0.14, speed: 66, fireRate: 0.12, damage: 1, pierce: 0, range: 60 }
+        stats: { pellets: 1, spread: 0.14, speed: 66, fireRate: 0.12, damage: 1, pierce: 0, range: 60, size: 0.85 }
     },
     {
         id: 'gun-rifle', slot: 'primary', name: 'Repeater Rifle', short: 'RIFLE', price: 650, currency: 'dollars',
         blurb: 'Slower, but fast bullets go through two enemies and fly far.',
-        stats: { pellets: 1, spread: 0, speed: 110, fireRate: 0.38, damage: 1, pierce: 1, range: 130 }
+        stats: { pellets: 1, spread: 0, speed: 110, fireRate: 0.38, damage: 1, pierce: 1, range: 130, size: 1.2 }
     },
     {
         id: 'gun-shotgun', slot: 'secondary', name: 'Scattergun', short: 'SHOTGUN', price: 0, currency: 'dollars',
         blurb: 'Seven-pellet spread for crowds up close.',
-        stats: { pellets: 7, spread: 0.38, speed: 62, fireRate: 0.75, damage: 1, pierce: 0, range: 100 }
+        stats: { pellets: 7, spread: 0.38, speed: 62, fireRate: 0.75, damage: 1, pierce: 0, range: 100, size: 0.7 }
     },
     {
         id: 'gun-sawedoff', slot: 'secondary', name: 'Sawed-Off', short: 'SAWED-OFF', price: 450, currency: 'dollars',
         blurb: 'Ten pellets in a wide blast, but only at close range.',
-        stats: { pellets: 10, spread: 0.75, speed: 58, fireRate: 0.9, damage: 1, pierce: 0, range: 22 }
+        stats: { pellets: 10, spread: 0.75, speed: 58, fireRate: 0.9, damage: 1, pierce: 0, range: 22, size: 0.65 }
     },
     {
         id: 'gun-buffalo', slot: 'secondary', name: 'Buffalo Gun', short: 'BUFFALO', price: 900, currency: 'dollars',
         blurb: 'One huge slug: 4 damage, goes through three enemies. Very slow to reload.',
-        stats: { pellets: 1, spread: 0, speed: 130, fireRate: 1.2, damage: 4, pierce: 2, range: 140 }
+        stats: { pellets: 1, spread: 0, speed: 130, fireRate: 1.2, damage: 4, pierce: 2, range: 140, size: 1.9 }
     }
 ];
 

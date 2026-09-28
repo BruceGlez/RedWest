@@ -59,7 +59,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
                 }
                 dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), volleyOffset + pelletOffset);
                 spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(weaponCfg.speed), volley,
-                    { damage: weaponCfg.damage, pierce: weaponCfg.pierce, range: weaponCfg.range });
+                    { damage: weaponCfg.damage, pierce: weaponCfg.pierce, range: weaponCfg.range, size: weaponCfg.size });
             }
         }
         gameState.runStats.shotsFired += volleyOffsets.length * pelletsPerVolley;

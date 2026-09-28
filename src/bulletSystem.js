@@ -12,14 +12,37 @@ const PLAYER_BULLET_COLOR = new THREE.Color(0xffff00);
 export function setPlayerBulletColor(hex) {
     PLAYER_BULLET_COLOR.setHex(hex);
 }
-const ENEMY_BULLET_COLOR = new THREE.Color(0xff0000);
-const BULLET_GEOMETRY = new THREE.SphereGeometry(0.35);
+const ENEMY_BULLET_COLOR = new THREE.Color(0xff3b1f);
+const WHITE = new THREE.Color(0xffffff);
+const RESPAWN_RADIUS = { crate: 2.6, cactus: 1.5, tree: 1.0, fence: 1.5, rock: 1.2 };
 const bulletPool = [];
 const respawnTimeouts = new Set();
-const RESPAWN_RADIUS = { crate: 2.6, cactus: 1.5, tree: 1.0, fence: 1.5, rock: 1.2 };
+
+// A bullet is a bright slug with a dark cartoon outline (like the characters) and a tracer streak
+// behind it, pointed along its flight so it reads on bright sand. Geometry is shared; each pooled
+// bullet owns its materials so it can take the shooter's colour. Not tone mapped: full-strength colour.
+const SLUG_GEOMETRY = new THREE.CapsuleGeometry(0.22, 0.7, 3, 8).rotateX(Math.PI / 2);
+const OUTLINE_MATERIAL = new THREE.MeshBasicMaterial({ color: 0x2a1405, side: THREE.BackSide });
+const TRAIL_LENGTH = 2.8;
+const TRAIL_GEOMETRY = new THREE.ConeGeometry(0.28, TRAIL_LENGTH, 8, 1, true)
+    .rotateX(-Math.PI / 2) // tip points backwards (-Z), base sits at the slug
+    .translate(0, 0, -TRAIL_LENGTH / 2 - 0.25);
 
 function createBulletMesh() {
-    return new THREE.Mesh(BULLET_GEOMETRY, new THREE.MeshBasicMaterial({ color: PLAYER_BULLET_COLOR }));
+    const bullet = new THREE.Group();
+    const slug = new THREE.Mesh(SLUG_GEOMETRY, new THREE.MeshBasicMaterial({ color: 0xffffff, toneMapped: false }));
+    const outline = new THREE.Mesh(SLUG_GEOMETRY, OUTLINE_MATERIAL);
+    outline.scale.setScalar(1.35);
+    const trail = new THREE.Mesh(TRAIL_GEOMETRY, new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.75, depthWrite: false, toneMapped: false }));
+    bullet.add(trail, outline, slug);
+    bullet.userData.slug = slug;
+    bullet.userData.trail = trail;
+    return bullet;
+}
+
+function paintBullet(bullet, color) {
+    bullet.userData.slug.material.color.copy(color).lerp(WHITE, 0.12);
+    bullet.userData.trail.material.color.copy(color);
 }
 
 function acquireBullet() {
@@ -63,12 +86,16 @@ function resolveVolley(bullet, hit, callbacks) {
     if(volley.pending === 0 && !volley.hit) callbacks.onPlayerMiss?.();
 }
 
-// opts (player guns): damage per hit, pierce = extra enemies it passes through, range in units.
+// opts (player guns): damage per hit, pierce = extra enemies it passes through, range in units,
+// size = visual scale (small pellets, a big slug).
+const aimPoint = new THREE.Vector3();
 export function spawnBullet(scene, owner, position, velocity, volley = null, opts = {}) {
     const bullet = acquireBullet();
     bullet.visible = true;
     bullet.position.copy(position);
-    bullet.material.color.copy(owner === 'enemy' ? ENEMY_BULLET_COLOR : PLAYER_BULLET_COLOR);
+    paintBullet(bullet, owner === 'enemy' ? ENEMY_BULLET_COLOR : PLAYER_BULLET_COLOR);
+    bullet.scale.setScalar(opts.size ?? 1);
+    if(velocity.lengthSq() > 0) bullet.lookAt(aimPoint.copy(position).add(velocity));
     bullet.userData.owner = owner;
     bullet.userData.velocity = velocity.clone();
     bullet.userData.volley = volley;
