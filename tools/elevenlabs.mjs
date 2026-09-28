@@ -45,12 +45,15 @@ async function pickVoice(wanted) {
         if(!response.ok) throw new Error(`ElevenLabs voices failed (${response.status})`);
         voiceList = (await response.json()).voices || [];
     }
-    const words = wanted.toLowerCase().split(/\s+/);
+    // Whole words only ("male" must not match "female"); "man"/"woman" mean the gender label.
+    const alias = { man: 'male', woman: 'female' };
+    const words = wanted.toLowerCase().split(/\s+/).map(w => alias[w] || w);
     const score = v => {
-        const text = [v.name, v.description, ...Object.values(v.labels || {})].join(' ').toLowerCase();
-        return words.filter(w => text.includes(w)).length;
+        const text = new Set([v.name, v.description, ...Object.values(v.labels || {})].join(' ').toLowerCase().split(/[^a-z]+/));
+        return words.filter(w => text.has(w)).length;
     };
-    const best = [...voiceList].sort((a, b) => score(b) - score(a))[0];
+    // Cloned voices are personal; use only the stock ones.
+    const best = voiceList.filter(v => v.category !== 'cloned').sort((a, b) => score(b) - score(a))[0];
     if(!best) throw new Error('No voices on this ElevenLabs account.');
     return best;
 }

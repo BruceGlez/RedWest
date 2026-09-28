@@ -43,11 +43,11 @@ export const VOICE = {
     'announce-escaped': { text: 'You got away clean!', voice: 'deep male narrator american' },
     'marshal-start': { text: "Time to bring 'em in.", voice: 'confident male american' },
     'dusty-pete': { text: "You lookin' for a fight? You found one!", voice: OUTLAW_VOICE },
-    'rattlesnake-rosa': { text: 'The pack is hungry tonight.', voice: 'confident female american' },
-    'deacon-graves': { text: 'Judgment comes at high noon.', voice: 'deep male old raspy' },
+    'rattlesnake-rosa': { text: 'The pack is hungry tonight.', voice: 'gritty female american' },
+    'deacon-graves': { text: 'Judgment comes at high noon.', voice: 'gravelly male american' },
     'calloways': { text: 'There are a whole lot more of us, Marshal!', voice: 'young male american' },
-    'iron-jack': { text: "Go on. Shoot me. See what happens.", voice: 'deep male gruff' },
-    'mesa-morgan': { text: 'Hope you like fireworks!', voice: 'energetic female' },
-    'silas-vane': { text: 'Six shots. That is all I need.', voice: 'calm male deep' },
-    'el-espectro': { text: 'You cannot kill what is already dead.', voice: 'whisper male mysterious' }
+    'iron-jack': { text: "Go on. Shoot me. See what happens.", voice: 'dominant firm male american' },
+    'mesa-morgan': { text: 'Hope you like fireworks!', voice: 'sassy female american' },
+    'silas-vane': { text: 'Six shots. That is all I need.', voice: 'smooth male american' },
+    'el-espectro': { text: 'You cannot kill what is already dead.', voice: 'dark male latin' }
 };
