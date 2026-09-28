@@ -11,6 +11,7 @@ import { loadRunLog, clearRunLog } from './runLog.js';
 import { loadProgress, saveProgress, isUnlocked } from './progress.js';
 import { renderOutlawPortraits, renderEnemyPortraits, renderPlayerPreview, renderCharacterPortrait } from './portraits.js';
 import { OUTLAWS } from './outlaws.js';
+import { arena } from './arena.js';
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit } from './purchases.js';
@@ -58,6 +59,7 @@ for(const outlaw of OUTLAWS) {
 }
 ui.updateHUD();
 ui.updateDashBar(1);
+if(arena.enabled) ui.showStartScreen(); // the Boss Arena list replaces the home screen
 
 const playerSystem = createPlayerSystem(scene, camera, gameState, playerStats);
 // ---------- Economy: wallet, outfit, purchases ----------

@@ -151,8 +151,48 @@ try {
     });
     await page.locator('#bounty-choice').waitFor({ state: 'visible', timeout: 60000 });
 
+    // Boss Arena (?arena): pick an outlaw, fight at once with no gang, and nothing is saved.
+    const arenaPage = await context.newPage();
+    arenaPage.setDefaultTimeout(30000);
+    arenaPage.on('pageerror', error => errors.push(error.message));
+    await arenaPage.route('https://fonts.googleapis.com/**', route => route.abort());
+    await arenaPage.route('https://fonts.gstatic.com/**', route => route.abort());
+    await arenaPage.goto(`${server.resolvedUrls.local[0]}?arena`, { waitUntil: 'commit', timeout: 60000 });
+    await arenaPage.locator('#arena-screen').waitFor({ state: 'visible', timeout: 90000 });
+    await arenaPage.evaluate(async () => {
+        window.S = await import('/src/state.js');
+        localStorage.clear();
+    });
+    assert.equal(await arenaPage.locator('.arena-fight').count(), 8, 'all eight outlaws can be picked');
+    assert.equal(await arenaPage.locator('#start-screen').isVisible(), false, 'the arena replaces the home screen');
+    await arenaPage.locator('#arena-invincible').click();
+    await arenaPage.locator('[data-arena="4"]').click(); // Iron Jack
+    await arenaPage.waitForFunction(() => S.gameState.isGameStarted);
+    const fight = await arenaPage.evaluate(async () => {
+        const t = S.gameState.runTime;
+        while(S.gameState.runTime - t < 3) await new Promise(r => setTimeout(r, 50));
+        return { outlaw: S.gameState.outlawIndex, wave: S.gameState.waveNumber, types: S.enemies.map(e => e.userData.type), hp: S.playerStats.hp };
+    });
+    assert.equal(fight.outlaw, 4);
+    assert.deepEqual(fight.types, ['boss'], `only the outlaw, no gang: ${JSON.stringify(fight)}`);
+    assert.equal(fight.hp, 5, "can't die keeps the hearts full");
+    await arenaPage.evaluate(async () => {
+        const { spawnBullet } = await import('/src/bulletSystem.js');
+        const jack = S.enemies[0];
+        jack.userData.hp = 1;
+        const back = jack.getWorldDirection(jack.position.clone()).setY(0).normalize().negate();
+        const from = jack.position.clone().addScaledVector(back, 2).setY(2);
+        spawnBullet(jack.parent, 'player', from, back.clone().multiplyScalar(-60));
+    });
+    await arenaPage.locator('#result-title').getByText('OUTLAW DOWN').waitFor({ timeout: 60000 });
+    const saved = await arenaPage.evaluate(() => ({ progress: localStorage.getItem('redWestProgress.v1'), log: localStorage.getItem('redWestRunLog.v1') }));
+    assert.deepEqual(saved, { progress: null, log: null }, 'practice fights save nothing');
+    await arenaPage.locator('#restart-msg').waitFor({ state: 'visible' });
+    await arenaPage.keyboard.press('KeyR');
+    await arenaPage.locator('#arena-screen').waitFor({ state: 'visible' });
+
     assert.deepEqual(errors, [], `page errors: ${errors.join(' | ')}`);
-    console.log(`Boss smoke passed: every outlaw's signature attack lands (${landed.join(', ')}), an imported outlaw model, Iron Jack's armour, and the Calloways' last-brother bounty.`);
+    console.log(`Boss smoke passed: every outlaw's signature attack lands (${landed.join(', ')}), an imported outlaw model, Iron Jack's armour, the Calloways' last-brother bounty, and the Boss Arena.`);
 } finally {
     await browser?.close();
     await server.close();

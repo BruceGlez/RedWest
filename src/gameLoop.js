@@ -15,6 +15,7 @@ import { ENEMY_TYPES, rosterWave, featuredFor, enemyCost } from './enemyTypes.js
 import { markSeen, recordKills } from './progress.js';
 import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
 import { recordRun, saveProgress } from './progress.js';
+import { arena } from './arena.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 
 const FINAL_WAVE = FINAL_PURSUIT;
@@ -87,6 +88,17 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     // result: 'died' | 'banked' | 'escaped'
     function finishRun(result) {
         if(gameState.isGameOver) return;
+        if(arena.enabled) {
+            // Practice: show the result, record nothing.
+            gameState.runWon = result !== 'died';
+            gameState.isGameOver = true;
+            gameState.isChoosingBounty = false;
+            if(result === 'died') playerSystem.die();
+            ui.hideBountyChoice();
+            ui.showGameOver(result, null);
+            ui.showPracticeResult();
+            return;
+        }
         if(result === 'died') gameState.score = forfeitBounty(gameState.bounty, gameState.score);
         gameState.runWon = result !== 'died';
         gameState.isGameOver = true;
@@ -436,6 +448,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             return;
         }
 
+        if(arena.enabled && !arena.gang) return; // arena: just the outlaw (and anyone they call in)
         gameState.enemySpawnTimer -= dt;
         if(gameState.enemySpawnTimer > 0) return;
 
@@ -475,12 +488,13 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             if(keys.space || keys.startRequested) {
                 keys.startRequested = false;
                 gameState.isGameStarted = true;
-                gameState.outlawIndex = progress.selected;
+                gameState.outlawIndex = arena.enabled ? arena.outlaw : progress.selected;
                 sessionRun++;
                 ui.hideStartScreen();
                 camera.position.copy(cameraOffset());
                 resumeAudio();
-                beginWave(1);
+                // The arena goes straight to the outlaw.
+                beginWave(arena.enabled ? FINAL_WAVE : 1);
             }
             return;
         }
@@ -512,11 +526,13 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
         if(bountyChoiceAt && performance.now() >= bountyChoiceAt) {
             bountyChoiceAt = 0;
-            openBountyChoice();
+            if(arena.enabled) finishRun('arena-win');
+            else openBountyChoice();
             renderer.render(scene, camera);
             return;
         }
 
+        if(arena.enabled && arena.invincible) playerStats.hp = playerStats.maxHp;
         gameState.runTime += dt;
         advanceHeat(gameState.heat, dt);
         updateParticles(dt, scene);

@@ -8,6 +8,7 @@ import { getWeapon, defaultWeapon, weaponBars } from './weapons.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { PRODUCTS } from './products.js';
 import { purchaseSupport } from './purchases.js';
+import { arena } from './arena.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 
 export function createUIManager(gameState, playerStats) {
@@ -255,7 +256,8 @@ export function createUIManager(gameState, playerStats) {
     const RESULT_TEXT = {
         banked: ['BOUNTY CLAIMED', 'You took the bounty and rode out.'],
         escaped: ['ESCAPED', 'You outran the posse with the bounty.'],
-        died: ['WASTED', '']
+        died: ['WASTED', ''],
+        'arena-win': ['OUTLAW DOWN', 'Practice fight won.']
     };
 
     // result: 'died' | 'banked' | 'escaped'; roadResult: what the run changed on the Wanted Road
@@ -576,6 +578,7 @@ export function createUIManager(gameState, playerStats) {
         portraits = images || {};
         enemyPortraits = enemyImages || {};
         if(progress) setProgress(progress);
+        if(arena.enabled && arenaEls.screen.style.display !== 'none') renderArena();
     }
 
     function setProgress(nextProgress) {
@@ -653,7 +656,39 @@ export function createUIManager(gameState, playerStats) {
         setTimeout(() => { button.textContent = button.dataset.label; }, 1500);
     }
 
+    // ---------- Boss Arena (?arena): pick an outlaw, fight at once, nothing saved ----------
+    const arenaEls = {
+        screen: document.getElementById('arena-screen'),
+        list: document.getElementById('arena-list'),
+        invincible: document.getElementById('arena-invincible'),
+        gang: document.getElementById('arena-gang')
+    };
+
+    function renderArena() {
+        arenaEls.invincible.textContent = `CAN'T DIE: ${arena.invincible ? 'ON' : 'OFF'}`;
+        arenaEls.invincible.classList.toggle('active', arena.invincible);
+        arenaEls.gang.textContent = `GANG: ${arena.gang ? 'ON' : 'OFF'}`;
+        arenaEls.gang.classList.toggle('active', arena.gang);
+        arenaEls.list.innerHTML = OUTLAWS.map((outlaw, i) => `<div class="book-card outlaw arena-card">${portraitHtml(outlaw)}<div class="book-info">`
+            + `<h4>${outlaw.name}</h4><p class="book-from">Stage ${i + 1} &middot; ${outlaw.title}</p>`
+            + `<p class="book-tip"><b>${outlaw.signature.move}:</b> ${outlaw.signature.detail}</p>`
+            + `<button class="arena-fight" type="button" data-arena="${i}">FIGHT</button></div></div>`).join('');
+    }
+
+    function showPracticeResult() {
+        els.resultRoad.innerHTML = '';
+        els.resultEarnings.innerHTML = '<p class="earn-title">Boss Arena: practice only, nothing is saved.</p>';
+    }
+
     function showStartScreen() {
+        if(arena.enabled) {
+            els.startScreen.style.display = 'none';
+            arenaEls.screen.style.display = 'flex';
+            renderArena();
+            hideNewEnemy();
+            document.body.classList.add('in-lobby');
+            return;
+        }
         els.startScreen.style.display = 'flex';
         hideNewEnemy();
         document.body.classList.add('in-lobby');
@@ -665,6 +700,7 @@ export function createUIManager(gameState, playerStats) {
 
     function hideStartScreen() {
         els.startScreen.style.display = 'none';
+        arenaEls.screen.style.display = 'none';
         document.body.classList.remove('in-lobby');
         hidePanels();
         closeHomeSettings();
@@ -720,6 +756,14 @@ export function createUIManager(gameState, playerStats) {
             els.playBtn.blur();
             handlers.onPlay();
         });
+        arenaEls.list.addEventListener('click', event => {
+            const button = event.target.closest('[data-arena]');
+            if(!button) return;
+            arena.outlaw = Number(button.dataset.arena);
+            handlers.onPlay();
+        });
+        arenaEls.invincible.addEventListener('click', () => { arena.invincible = !arena.invincible; renderArena(); });
+        arenaEls.gang.addEventListener('click', () => { arena.gang = !arena.gang; renderArena(); });
         els.roadBtn.addEventListener('click', () => showPanel(els.panels[0]));
         els.recordsBtn.addEventListener('click', () => showPanel(els.panels[1]));
         els.howtoBtn.addEventListener('click', () => showPanel(els.panels[2]));
@@ -795,6 +839,7 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         hideGameOverScreen,
         showStartScreen,
         hideStartScreen,
+        showPracticeResult,
         canRestart,
         updateDebug,
         bindControlHandlers,
