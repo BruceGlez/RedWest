@@ -74,7 +74,7 @@
         <div class="home-main">
             <div class="home-side">
                 <button id="road-btn" class="side-btn" type="button">WANTED ROAD<small id="road-progress">STAGE 1 / 8</small></button>
-                <button id="records-btn" class="side-btn" type="button">RECORDS<small>TOP 5 BOUNTIES</small></button>
+                <button id="records-btn" class="side-btn" type="button">RECORDS<small>BESTS &amp; LEADERBOARDS</small></button>
                 <button id="jobs-btn" class="side-btn" type="button">DAILY JOBS<small id="jobs-progress">0 / 3 DONE</small></button>
                 <button id="book-btn" class="side-btn" type="button">BOUNTY BOOK<small id="book-progress">0 / 10 FOUND</small></button>
                 <button id="howto-btn" class="side-btn" type="button">HOW TO PLAY<small>CONTROLS &amp; STARS</small></button>
@@ -153,12 +153,34 @@
             <h2>RECORDS</h2>
             <div></div>
         </div>
-        <div class="panel-body">
-            <div class="leaderboard-box">
-                <h3>WANTED LIST (TOP 5)</h3>
-                <ul id="highscore-list">
-                    <li>LOADING...</li>
-                </ul>
+        <div class="panel-body records-body">
+            <div class="records-name" id="records-name">
+                <div class="records-name-show">
+                    <span class="records-label">OUTLAW NAME</span>
+                    <strong id="records-name-value">NO NAME YET</strong>
+                    <button id="records-name-edit" class="shop-tab" type="button">EDIT</button>
+                </div>
+                <form class="records-name-form" id="records-name-form" style="display:none;">
+                    <input type="text" id="records-name-input" maxlength="14" autocomplete="off" autocapitalize="characters" spellcheck="false" placeholder="YOUR OUTLAW NAME" aria-label="Outlaw name">
+                    <button id="records-name-save" class="shop-tab active" type="submit">SAVE</button>
+                    <button id="records-name-cancel" class="shop-tab" type="button">CANCEL</button>
+                </form>
+                <p id="records-name-msg" class="records-msg" role="status"></p>
+            </div>
+            <div class="shop-tabs records-tabs" id="records-tabs">
+                <button class="shop-tab active" type="button" data-tab="mine">MY RECORDS</button>
+                <button class="shop-tab" type="button" data-tab="boards">LEADERBOARDS</button>
+            </div>
+            <div id="records-mine" class="records-pane">
+                <div id="records-totals" class="records-totals"></div>
+                <ul id="records-stages" class="records-list"></ul>
+            </div>
+            <div id="records-boards" class="records-pane" style="display:none;">
+                <div class="records-board-pick">
+                    <select id="records-board" aria-label="Leaderboard"></select>
+                </div>
+                <p id="records-board-detail" class="records-msg"></p>
+                <ol id="records-board-list" class="records-list"></ol>
             </div>
         </div>
     </div>
@@ -208,13 +230,6 @@
                 <table id="run-stats-table"></table>
             </div>
             
-            <div id="input-section">
-                <input type="text" id="playerName" list="player-name-list" placeholder="ENTER NAME" maxlength="8">
-                <datalist id="player-name-list"></datalist>
-                <button id="saveScoreBtn">SAVE RECORD</button>
-                <button id="skipScoreBtn" type="button">SKIP SAVE</button>
-            </div>
-
             <p id="restart-msg" class="restart-text" style="display: none;">
                 <span class="desktop-only">PRESS <span class="key-highlight">R</span> TO RETURN TO TOWN</span>
                 <span class="touch-only restart-tap">TAP HERE TO RETURN TO TOWN</span>

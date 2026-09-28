@@ -14,7 +14,8 @@ async function playOneRunAndDie(page) {
     await page.keyboard.down('Space');
     await page.waitForFunction(() => S.gameState.isGameStarted);
     await page.keyboard.up('Space');
-    await page.evaluate(() => { S.gameState.score = 480; S.gameState.runStats.kills = { bandit: 3 }; });
+    // A two-minute run, so the score is plausible enough to be ranked.
+    await page.evaluate(() => { S.gameState.score = 480; S.gameState.runTime = 120; S.gameState.runStats.kills = { bandit: 3 }; });
     await page.evaluate(async () => {
         const { spawnEnemy } = await import('/src/enemySystem.js');
         const p = S.enemies[0].parent.children.find(o => o.userData.type === 'player');
@@ -25,7 +26,7 @@ async function playOneRunAndDie(page) {
     await page.locator('#gameover').waitFor({ state: 'visible' });
     await page.locator('#result-earnings .earn-title b').first().waitFor();
     const earned = Number((await page.locator('#result-earnings .earn-title b').first().textContent()).replace(/\D/g, ''));
-    await page.locator('#skipScoreBtn').click();
+    await page.locator('#restart-msg').waitFor({ state: 'visible' });
     await page.keyboard.press('KeyR');
     await page.locator('#start-screen').waitFor({ state: 'visible' });
     return earned;
@@ -90,6 +91,22 @@ try {
         await page.locator('#shop-screen .panel-back').click();
         await page.locator('#jobs-btn').click();
         assert.equal(await page.locator('.job-card').count(), 3);
+
+        // Records belong to the account: offline they are personal records, with a name set once.
+        await page.locator('#jobs-screen .panel-back').click();
+        await page.locator('#records-btn').click();
+        await page.locator('#records-screen').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#records-totals').textContent(), /480BEST RUN/);
+        assert.match(await page.locator('#records-stages li').first().textContent(), /DUSTY PETE.*480/);
+        await page.locator('#records-name-edit').click();
+        await page.locator('#records-name-input').fill('x');
+        await page.locator('#records-name-save').click();
+        await page.locator('#records-name-msg').getByText('At least 3').waitFor();
+        await page.locator('#records-name-input').fill('trail boss');
+        await page.locator('#records-name-save').click();
+        await page.locator('#records-name-value').getByText('TRAIL BOSS').waitFor();
+        await page.locator('[data-tab="boards"]').click();
+        await page.locator('#records-board-detail').getByText('Leaderboards go live').waitFor();
         assert.deepEqual(errors, [], errors.join(' | '));
     }
     // Two dev servers share the dependency cache; stop the first before starting the second.
@@ -106,12 +123,37 @@ try {
     viteServers.push(remoteVite);
     await remoteVite.listen();
     {
+        // A rival already on the boards.
+        const post = async (path, token, body) => (await fetch(apiBase + path, { method: 'POST', headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' }, body: body && JSON.stringify(body) })).json();
+        const rival = await post('/api/account');
+        await post('/api/name', rival.token, { name: 'Rival Rosa' });
+        await post('/api/run', rival.token, { score: 2000, seconds: 200, outlawIndex: 0, bounty: 'banked', heatAtOutlaw: 2 });
+
         const { page, errors } = await openPage(browser, remoteVite.resolvedUrls.local[0]);
         await page.waitForFunction(() => !!JSON.parse(localStorage.getItem('redWestAccount.v1') || 'null')?.token);
         const userId = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestAccount.v1')).userId);
         const earned = await playOneRunAndDie(page);
         const serverDollars = store.getUser(userId).profile.balances.dollars;
         assert.equal(serverDollars, earned, 'the server, not the browser, holds the balance');
+
+        // Online leaderboards rank accounts; my row is highlighted once I have a name.
+        await page.locator('#records-btn').click();
+        await page.locator('#records-name-edit').click();
+        await page.locator('#records-name-input').fill('rival rosa');
+        await page.locator('#records-name-save').click();
+        await page.locator('#records-name-msg').getByText('taken').waitFor();
+        await page.locator('#records-name-input').fill('smoke kid');
+        await page.locator('#records-name-save').click();
+        await page.locator('#records-name-value').getByText('SMOKE KID').waitFor();
+        assert.equal(store.getUser(userId).profile.name, 'SMOKE KID');
+        await page.locator('[data-tab="boards"]').click();
+        await page.locator('#records-board-list li.me').waitFor();
+        const rows = await page.locator('#records-board-list li').allTextContents();
+        assert.deepEqual(rows, ['#1RIVAL ROSA2,000', '#2SMOKE KID480']);
+        await page.locator('#records-board').selectOption('stars');
+        await page.locator('#records-board-list li').getByText('RIVAL ROSA').waitFor();
+        assert.equal(await page.locator('#records-board-list li.me').count(), 0, 'no stars yet, so not on the stars board');
+        await page.locator('#records-screen .panel-back').click();
 
         // A paid purchase: RevenueCat calls the server, and the game shows it after a refresh.
         const response = await fetch(`${apiBase}/webhooks/revenuecat`, {
@@ -125,7 +167,7 @@ try {
         await page.waitForFunction(() => document.getElementById('home-nuggets').textContent === '100');
         assert.deepEqual(errors, [], errors.join(' | '));
     }
-    console.log('Store smoke passed: run earnings, daily jobs, confirm-to-buy, equip, gated paid packs, server wallet and webhook credit.');
+    console.log('Store smoke passed: run earnings, daily jobs, confirm-to-buy, equip, gated paid packs, account records and name, server wallet, online leaderboards and webhook credit.');
 } finally {
     await browser?.close();
     for(const server of viteServers) await server.close();

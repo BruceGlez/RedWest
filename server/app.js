@@ -1,6 +1,7 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, creditNuggets, refreshJobs, EconomyError } from '../src/profile.js';
+import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, creditNuggets, refreshJobs, setName, rankBoard, EconomyError } from '../src/profile.js';
 import { getProduct } from '../src/products.js';
+import { validateName } from '../src/names.js';
 
 // Red West economy server. The game talks to /api/*; the stores talk to /webhooks/*.
 // Paid Gold Nuggets are only ever credited from a verified store webhook, never by the client.
@@ -128,6 +129,12 @@ export function createApp({ store, env = {}, now = () => new Date() }) {
                 const { id, user } = auth;
                 const save = () => { store.putUser(id, user); store.save(); };
 
+                if(url.pathname === '/api/leaderboard' && req.method === 'GET') {
+                    // Account boards: every named player's best, ranked server-side from reported runs.
+                    const accounts = store.listUsers().map(entry => ({ id: entry.id, profile: normalizeProfile(entry.user.profile, now()) }));
+                    const board = rankBoard(accounts, url.searchParams.get('board') || 'weekly', id, 50, now());
+                    return send(res, 200, board);
+                }
                 if(url.pathname === '/api/profile' && req.method === 'GET') {
                     refreshJobs(user.profile, now());
                     save();
@@ -141,6 +148,17 @@ export function createApp({ store, env = {}, now = () => new Date() }) {
                     const result = applyRun(user.profile, body, now());
                     save();
                     return send(res, 200, { ...result, profile: user.profile });
+                }
+                if(url.pathname === '/api/name' && req.method === 'POST') {
+                    const wanted = validateName(body.name);
+                    if(!wanted.ok) throw new EconomyError('bad_name', wanted.error);
+                    // Names are unique so a leaderboard row always means one player.
+                    if(store.listUsers().some(entry => entry.id !== id && entry.user.profile?.name === wanted.name)) {
+                        return send(res, 409, { code: 'name_taken', message: 'That name is taken. Try another.' });
+                    }
+                    setName(user.profile, wanted.name);
+                    save();
+                    return send(res, 200, { profile: user.profile });
                 }
                 if(url.pathname === '/api/buy' && req.method === 'POST') {
                     buyItem(user.profile, body.itemId);

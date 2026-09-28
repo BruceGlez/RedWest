@@ -90,3 +90,64 @@ test('catalog and job pool are well formed', () => {
     for(const job of JOB_POOL) assert.ok(getJob(job.id) && job.goal > 0 && job.reward > 0);
     assert.equal(new Set(PRODUCTS.map(p => p.id)).size, PRODUCTS.length);
 });
+
+test('names: one per account, cleaned up, with a basic blocklist', async () => {
+    const { validateName } = await import('../src/names.js');
+    const { setName } = await import('../src/profile.js');
+    assert.deepEqual(validateName('  el  paso kid!! '), { ok: true, name: 'EL PASO KID' });
+    assert.equal(validateName('ab').ok, false);
+    assert.equal(validateName('a'.repeat(20)).ok, false);
+    assert.equal(validateName('sh1t head').ok, false, 'leetspeak does not dodge the list');
+    const p = createProfile(day);
+    assert.equal(setName(p, 'dusty'), 'DUSTY');
+    assert.throws(() => setName(p, '??'), e => e.code === 'bad_name');
+});
+
+test('runs update account records; implausible scores never reach the boards', async () => {
+    const { plausibleScore } = await import('../src/profile.js');
+    const p = createProfile(day);
+    applyRun(p, run({ score: 700, seconds: 150, outlawIndex: 2, bounty: 'banked' }), day);
+    assert.equal(p.stats.stageBest[2], 0, 'a locked stage gives no record');
+    p.stats.stageStars[1] = 1;
+    applyRun(p, run({ score: 900, seconds: 150, outlawIndex: 2, bounty: 'banked', heatAtOutlaw: 3, kills: { bandit: 12 } }), day);
+    assert.equal(p.stats.runs, 2);
+    assert.equal(p.stats.kills, 12);
+    assert.equal(p.stats.stageBest[2], 900);
+    assert.equal(p.stats.stageStars[2], 3, 'defeat + hot bounty');
+    assert.equal(p.stats.weekly.score, 900);
+    const cheat = applyRun(p, run({ score: 999999, seconds: 30, outlawIndex: 2 }), day);
+    assert.equal(cheat.ranked, false);
+    assert.equal(p.stats.stageBest[2], 900);
+    assert.equal(plausibleScore(500, 10), false, 'too short to count');
+
+    const { importProgress } = await import('../src/profile.js');
+    const q = createProfile(day);
+    importProgress(q, { stars: [1, 3, 0, 0, 0, 0, 0, 0], best: [400, 650, 0, 0, 0, 0, 0, 0] });
+    assert.deepEqual(q.stats.stageStars.slice(0, 3), [1, 3, 0]);
+    assert.equal(q.stats.stageBest[1], 650);
+    assert.equal(q.stats.bestScore, 650);
+});
+
+test('leaderboards rank named accounts, show my rank, and reset weekly', async () => {
+    const { rankBoard, weekKey } = await import('../src/profile.js');
+    const make = (name, weekly, stars) => {
+        const p = createProfile(day);
+        p.name = name;
+        p.stats.weekly = { week: weekKey(day), score: weekly };
+        p.stats.stageStars = stars;
+        return p;
+    };
+    const accounts = [
+        { id: 'a', profile: make('ANNIE', 800, [7, 1, 0, 0, 0, 0, 0, 0]) },
+        { id: 'b', profile: make('BART', 1200, [1, 0, 0, 0, 0, 0, 0, 0]) },
+        { id: 'c', profile: make('', 5000, [7, 7, 7, 0, 0, 0, 0, 0]) },
+        { id: 'd', profile: make('DOC', 300, [7, 7, 0, 0, 0, 0, 0, 0]) }
+    ];
+    const weekly = rankBoard(accounts, 'weekly', 'd', 2, day);
+    assert.deepEqual(weekly.entries.map(e => e.name), ['BART', 'ANNIE'], 'unnamed accounts are hidden');
+    assert.deepEqual(weekly.me, { rank: 3, name: 'DOC', value: 300, me: true });
+    assert.equal(rankBoard(accounts, 'stars', null, 50, day).entries[0].name, 'DOC');
+    const nextWeek = new Date(day.getTime() + 8 * 86400000);
+    assert.equal(rankBoard(accounts, 'weekly', null, 50, nextWeek).entries.length, 0);
+    assert.throws(() => rankBoard(accounts, 'nope'), e => e.code === 'bad_board');
+});

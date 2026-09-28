@@ -104,3 +104,35 @@ test('Stripe signature check accepts any listed v1 signature and rejects tamperi
     assert.equal(verifyStripeSignature('{"a":2}', `t=${t},v1=${good}`, secret, now), false);
     assert.equal(verifyStripeSignature(body, '', secret, now), false);
 });
+
+test('account names are unique and leaderboards rank named accounts', async () => {
+    const s = await startServer();
+    try {
+        const { data: a } = await s.call('/api/account');
+        const { data: b } = await s.call('/api/account');
+        assert.equal((await s.call('/api/name', { token: a.token, body: { name: 'dusty rhodes' } })).data.profile.name, 'DUSTY RHODES');
+        const taken = await s.call('/api/name', { token: b.token, body: { name: 'Dusty  Rhodes' } });
+        assert.equal(taken.status, 409);
+        assert.equal(taken.data.code, 'name_taken');
+        assert.equal((await s.call('/api/name', { token: b.token, body: { name: 'x' } })).status, 400);
+        assert.equal((await s.call('/api/name', { token: b.token, body: { name: 'Kid Cole' } })).status, 200);
+
+        await s.call('/api/run', { token: a.token, body: { score: 900, seconds: 200, outlawIndex: 0, bounty: 'banked', heatAtOutlaw: 2 } });
+        await s.call('/api/run', { token: b.token, body: { score: 1500, seconds: 240, outlawIndex: 0, bounty: 'escaped', heatAtOutlaw: 3 } });
+        s.advance(30);
+        await s.call('/api/run', { token: a.token, body: { score: 99999, seconds: 25, outlawIndex: 0 } });
+
+        const weekly = await s.call('/api/leaderboard?board=weekly', { token: a.token });
+        assert.equal(weekly.status, 200);
+        assert.deepEqual(weekly.data.entries.map(e => [e.name, e.value]), [['KID COLE', 1500], ['DUSTY RHODES', 900]], 'the implausible run is not ranked');
+        assert.equal(weekly.data.me.rank, 2);
+        const stars = await s.call('/api/leaderboard?board=stars', { token: b.token });
+        assert.equal(stars.data.entries[0].name, 'KID COLE');
+        assert.equal(stars.data.entries[0].value, 3);
+        assert.equal((await s.call('/api/leaderboard?board=stage-0', { token: a.token })).data.entries.length, 2);
+        assert.equal((await s.call('/api/leaderboard?board=nope', { token: a.token })).status, 400);
+        assert.equal((await s.call('/api/leaderboard')).status, 401);
+    } finally {
+        await s.close();
+    }
+});

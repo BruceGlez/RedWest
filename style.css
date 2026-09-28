@@ -204,8 +204,6 @@ canvas {
 .wasted-text { color: #b71c1c; transform: rotate(-2deg); }
 .leaderboard-box { background: rgba(0,0,0,0.3); padding: 15px; border-radius: 8px; margin-bottom: 20px; border: 1px solid #5d4037; }
 .leaderboard-box h3 { margin: 0 0 10px 0; color: #ffd700; text-decoration: underline; }
-#highscore-list { list-style: none; padding: 0; margin: 0; font-family: 'Roboto Mono', monospace; font-size: 18px; }
-#highscore-list li { padding: 4px 0; border-bottom: 1px solid rgba(255,255,255,0.1); display: flex; justify-content: space-between;}
 .score-value { color: #ffd700; }
 .controls-box { font-size: 14px; color: #bbb; margin-bottom: 25px; font-family: 'Roboto Mono', monospace; }
 .controls-box span { color: #ffcc80; font-weight: bold; }
@@ -215,9 +213,6 @@ canvas {
 .score-text { font-size: 32px; font-family: 'Roboto Mono', monospace; margin: 20px 0; }
 .restart-text { font-size: 18px; color: #aaa; }
 
-#input-section { margin: 20px 0; display: flex; flex-direction: column; align-items: center; gap: 10px; }
-#playerName { background: rgba(0, 0, 0, 0.5); border: 2px solid #b71c1c; color: #ffd700; padding: 10px; font-family: 'Rye', serif; font-size: 24px; text-align: center; width: 200px; outline: none; text-transform: uppercase; }
-#playerName::placeholder { color: rgba(255, 215, 0, 0.3); }
 #saveScoreBtn { background: #5d4037; color: white; border: 2px solid #ffd700; padding: 8px 20px; font-family: 'Roboto Mono', monospace; font-weight: bold; cursor: pointer; font-size: 18px; transition: 0.2s; }
 #saveScoreBtn:hover { background: #8d6e63; transform: scale(1.05); }
 #skipScoreBtn { background: transparent; color: #ddd; border: 1px solid #8d6e63; padding: 7px 16px; font-family: 'Roboto Mono', monospace; cursor: pointer; }
@@ -297,7 +292,7 @@ body { -webkit-touch-callout: none; -webkit-tap-highlight-color: transparent; to
 body.touch .touch-only { display: block; }
 body.touch .desktop-only, body.touch .desktop-only-inline { display: none; }
 body.touch #crosshair, body.touch .debug-panel { display: none; }
-body.touch #input-section, body.touch .modal-content { touch-action: auto; }
+body.touch .modal-content { touch-action: auto; }
 
 body.touch #touch-controls { display: block; position: fixed; inset: 0; z-index: 5; }
 .stick-zone { position: absolute; bottom: 0; width: 50%; height: 75%; touch-action: none; }
@@ -353,14 +348,11 @@ body.touch .pause-actions button { font-size: 16px; padding: 12px 18px; }
     .bounty-content .western-title { font-size: 30px; }
     .score-text { font-size: 20px; margin: 8px 0; }
     .leaderboard-box { padding: 8px; margin-bottom: 8px; }
-    #highscore-list { font-size: 14px; }
     .controls-box { font-size: 11px; margin-bottom: 8px; }
     .controls-box p { margin: 3px 0; }
     .blink-text { font-size: 18px; margin-top: 8px; }
     .run-summary-box { margin: 4px 0 8px; }
     #run-stats-table { font-size: 11px; }
-    #input-section { margin: 8px 0; }
-    #playerName { font-size: 18px; padding: 6px; }
     .bounty-options { margin-top: 8px; gap: 8px; }
     .bounty-options button { padding: 10px; flex-basis: 180px; }
     .bounty-options button strong { font-size: 16px; }
@@ -710,4 +702,38 @@ body.in-lobby .new-enemy-card { display: none !important; }
     .side-btn { padding: 5px 10px; }
     .side-btn small { font-size: 8px; }
     .side-btn.attention::after { margin-left: 120px; }
+}
+
+/* Records: account name, personal records, online leaderboards */
+.records-body { flex-direction: column; align-items: center; flex-wrap: nowrap; justify-content: flex-start; }
+.records-name, .records-pane { width: min(520px, 100%); box-sizing: border-box; }
+.records-name { background: rgba(0,0,0,0.35); border: 2px solid #5d4037; border-radius: 12px; padding: 10px 14px; }
+.records-name-show, .records-name-form { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+.records-label { font-size: 12px; color: #ffcc80; font-weight: 700; }
+.records-name-show strong { flex: 1; font-family: 'Rye', serif; font-size: 20px; color: #ffd700; }
+#records-name-input { flex: 1; min-width: 140px; background: rgba(0,0,0,0.5); border: 2px solid #b71c1c; color: #ffd700; padding: 6px 10px; font-family: 'Rye', serif; font-size: 18px; text-transform: uppercase; outline: none; border-radius: 8px; }
+.records-msg { margin: 6px 0 0; font-size: 12px; color: #ffcc80; }
+.records-msg:empty { display: none; }
+.records-tabs { justify-content: center; }
+.records-totals { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-bottom: 10px; }
+.records-stat { background: rgba(0,0,0,0.35); border: 2px solid #5d4037; border-radius: 10px; padding: 8px 4px; text-align: center; display: flex; flex-direction: column; gap: 2px; }
+.records-stat strong { font-family: 'Roboto Mono', monospace; font-size: 18px; color: #ffd700; }
+.records-stat span { font-size: 10px; color: #ffcc80; font-weight: 700; }
+.records-list { list-style: none; padding: 0; margin: 0; font-family: 'Roboto Mono', monospace; font-size: 15px; background: rgba(0,0,0,0.3); border: 1px solid #5d4037; border-radius: 8px; }
+.records-list li { display: flex; gap: 10px; align-items: center; padding: 6px 10px; border-bottom: 1px solid rgba(255,255,255,0.08); }
+.records-list li:last-child { border-bottom: 0; }
+.records-list li.me { background: rgba(255, 204, 51, 0.25); color: #ffd700; font-weight: 700; }
+.records-who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.records-rank { width: 3.5em; color: #ffcc80; }
+.records-stars { color: #ffcc33; letter-spacing: 1px; }
+.records-value { min-width: 4.5em; text-align: right; }
+.records-empty, .records-gap { justify-content: center; color: #bbb; }
+.records-board-pick select { width: 100%; font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 14px; padding: 6px 8px; border-radius: 10px; background: rgba(0,0,0,0.5); color: #ffd700; border: 2px solid #5d4037; }
+body.touch .records-name, body.touch .records-pane { touch-action: auto; }
+@media (max-height: 500px) {
+    .records-totals { grid-template-columns: repeat(4, 1fr); gap: 4px; margin-bottom: 6px; }
+    .records-stat strong { font-size: 14px; }
+    .records-list { font-size: 13px; }
+    .records-list li { padding: 3px 8px; }
+    .records-name-show strong { font-size: 16px; }
 }

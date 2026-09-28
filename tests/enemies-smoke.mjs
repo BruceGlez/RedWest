@@ -110,7 +110,7 @@ try {
         S.enemies.at(-1).position.copy(player.position);
     });
     await page.locator('#gameover').waitFor({ state: 'visible' });
-    await page.locator('#skipScoreBtn').click();
+    await page.locator('#restart-msg').waitFor({ state: 'visible' });
     await page.keyboard.press('KeyR');
     await page.locator('#book-btn').click();
     await page.locator('#book-screen').waitFor({ state: 'visible' });

@@ -4,14 +4,14 @@ import { setupTouchControls } from './touchControls.js';
 import { gameState, playerStats } from './state.js';
 import { setupScene, generateMap } from './world.js';
 import { resumeAudio, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
-import { loadHighScores, saveHighScore, getPreferredPlayerName } from './scoreSystem.js';
 import { createUIManager } from './uiManager.js';
 import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
 import { loadRunLog, clearRunLog } from './runLog.js';
 import { loadProgress, saveProgress, isUnlocked } from './progress.js';
 import { renderOutlawPortraits, renderEnemyPortraits, renderPlayerPreview } from './portraits.js';
-import { createWallet, cachedProfile } from './wallet.js';
+import { createWallet, cachedProfile, legacyName } from './wallet.js';
+import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit } from './purchases.js';
 import { loadoutColors } from './cosmetics.js';
 import { applyPlayerLoadout } from './assets.js';
@@ -36,16 +36,11 @@ generateMap(scene);
 setupInputs();
 
 let ui;
-ui = createUIManager(gameState, playerStats, (name, score) => {
-    const scores = saveHighScore(name, score);
-    ui.updateLeaderboard(scores);
-});
-ui.updateLeaderboard(loadHighScores());
+ui = createUIManager(gameState, playerStats);
 ui.setRunLog(loadRunLog());
 const progress = loadProgress();
 ui.setProgress(progress);
 ui.setPortraits(renderOutlawPortraits(renderer), renderEnemyPortraits(renderer));
-ui.setPreferredName(getPreferredPlayerName());
 ui.updateHUD();
 ui.updateDashBar(1);
 
@@ -53,8 +48,11 @@ const playerSystem = createPlayerSystem(scene, camera, gameState, playerStats);
 // ---------- Economy: wallet, outfit, purchases ----------
 const wallet = createWallet();
 let profile = cachedProfile();
+const records = createRecordsPanel({ wallet, onProfile: next => applyProfile(next), suggestedName: legacyName() });
+document.getElementById('records-btn').addEventListener('click', () => records.open());
 function applyProfile(next) {
     profile = next;
+    records.setProfile(profile);
     const colors = loadoutColors(profile.loadout);
     applyPlayerLoadout(playerSystem.playerGroup, colors);
     setPlayerBulletColor(colors.bullets);

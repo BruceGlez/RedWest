@@ -114,7 +114,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             peakHeat: gameState.heat.peak,
             kills: { ...s.kills },
             shotsHit: s.shotsHit,
-            loot: s.lootCollected
+            loot: s.lootCollected,
+            // Leaderboard records: the server checks the score is plausible for the run's length.
+            seconds: Math.round(gameState.runTime),
+            outlawIndex: gameState.outlawIndex,
+            heatAtOutlaw: gameState.bounty.heatAtOffer
         };
         economy.reportRun(summary)
             .then(result => ui.showEarnings(result))

@@ -9,6 +9,7 @@ export function createMemoryStore(initial = {}) {
         getUser: id => data.users[id] ?? null,
         putUser: (id, user) => { data.users[id] = user; },
         findUserByTokenHash: hash => Object.entries(data.users).find(([, user]) => user.tokenHash === hash)?.[0] ?? null,
+        listUsers: () => Object.entries(data.users).map(([id, user]) => ({ id, user })),
         save: () => {}
     };
 }

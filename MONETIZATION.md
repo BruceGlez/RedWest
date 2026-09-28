@@ -25,7 +25,8 @@ Status:
 
 ```
 Game (browser / iOS / Android)
-  ├─ /api/account, /api/profile, /api/run, /api/buy, /api/equip ──► Red West server (server/)
+  ├─ /api/account, /api/profile, /api/run, /api/buy, /api/equip,
+  │  /api/name, /api/leaderboard ──────────────────────────────► Red West server (server/)
   ├─ iOS/Android: RevenueCat SDK ──► App Store / Google Play
   │                        RevenueCat ──webhook──► /webhooks/revenuecat ──► credits ◆
   └─ Web: Stripe Payment Link (?client_reference_id=<player id>)
@@ -35,6 +36,12 @@ Game (browser / iOS / Android)
 Without `VITE_API_BASE`, the game uses a **local playtest wallet** in the browser. It only holds earned
 currency, and real-money packs show "SOON". Local balances are not moved to the server when you switch
 over, so reset testers' balances at launch.
+
+The same server runs the **leaderboards**. They rank accounts, not typed-in names: each account picks
+one unique outlaw name, and every reported run updates that account's records. The boards are This Week
+(best single run, resetting Monday UTC), Wanted Stars (all-time) and one per outlaw. A run only counts
+if its score is plausible for its length and the outlaw was unlocked on that account. Without the
+server, the Records screen shows the player's own records and says the boards need the server.
 
 ## 1. Host the server
 

@@ -114,8 +114,6 @@ try {
         S.enemies.at(-1).position.copy(p.position);
     });
     await page.locator('#gameover').waitFor({ state: 'visible' });
-    assert.notEqual(await page.evaluate(() => document.activeElement?.id), 'playerName', 'the name field does not pop the keyboard');
-    await page.locator('#skipScoreBtn').tap();
     await page.locator('.restart-tap').tap();
     await page.locator('#start-screen').waitFor({ state: 'visible' });
 

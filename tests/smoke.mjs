@@ -68,11 +68,19 @@ try {
     // Give the boss one HP and place a player bullet on it to exercise the normal hit path.
     async function shootOutlaw() {
         await page.evaluate(async () => {
-            const [{ enemies }, { spawnBullet }] = await Promise.all([
-                import('/src/state.js'), import('/src/bulletSystem.js')
+            const [{ enemies }, { spawnBullet }, { checkCollision }] = await Promise.all([
+                import('/src/state.js'), import('/src/bulletSystem.js'), import('/src/physics.js')
             ]);
             const boss = enemies.find(enemy => enemy.userData.type === 'boss');
             boss.userData.hp = 1;
+            // The map is random: move the outlaw somewhere clear so the shot cannot hit a rock instead.
+            const player = boss.parent.children.find(object => object.userData.type === 'player');
+            for(let step = 0; step < 24; step++) {
+                const angle = step * Math.PI / 12;
+                const x = player.position.x + Math.cos(angle) * 10;
+                const z = player.position.z + Math.sin(angle) * 10;
+                if(!checkCollision(x, z, 3)) { boss.position.set(x, 0, z); break; }
+            }
             const bulletPosition = boss.position.clone().setY(2);
             spawnBullet(boss.parent, 'player', bulletPosition, bulletPosition.clone().set(0, 0, 0));
         });
@@ -140,7 +148,7 @@ try {
     assert.match(await page.locator('#result-road').textContent(), /NEW OUTLAW ON THE ROAD: RATTLESNAKE ROSA/);
     const escapedScore = Number(await page.locator('#finalScore').textContent());
     assert.ok(escapedScore >= scoreBeforeOutlaw + offered.amount, 'escaping pays the Heat-scaled bounty');
-    await page.locator('#skipScoreBtn').click();
+    await page.locator('#restart-msg').waitFor({ state: 'visible' });
     await page.keyboard.press('KeyR');
     await page.locator('#start-screen').waitFor({ state: 'visible' });
 
@@ -154,7 +162,7 @@ try {
     const bankedBounty = await page.evaluate(() => window.__rwTestState.gameState.bounty);
     assert.equal(bankedBounty.status, 'banked');
     assert.equal(Number(await page.locator('#finalScore').textContent()), scoreBeforeBank + bankedBounty.amount);
-    await page.locator('#skipScoreBtn').click();
+    await page.locator('#restart-msg').waitFor({ state: 'visible' });
     await page.keyboard.press('KeyR');
     await page.locator('#start-screen').waitFor({ state: 'visible' });
     await startRun();
@@ -177,7 +185,7 @@ try {
     await page.locator('#result-title').getByText('WASTED').waitFor();
     assert.equal(Number(await page.locator('#finalScore').textContent()), scoreBeforeForfeit);
     assert.equal(await page.evaluate(() => window.__rwTestState.gameState.bounty.status), 'forfeited');
-    await page.locator('#skipScoreBtn').click();
+    await page.locator('#restart-msg').waitFor({ state: 'visible' });
     await page.keyboard.press('KeyR');
     await page.locator('#start-screen').waitFor({ state: 'visible' });
     // The playtest log recorded one row per finished run, in order, with the bounty decision.

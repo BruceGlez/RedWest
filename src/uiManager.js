@@ -9,8 +9,7 @@ import { PRODUCTS } from './products.js';
 import { purchaseSupport } from './purchases.js';
 import { isUnlocked, totalStars } from './progress.js';
 
-export function createUIManager(gameState, playerStats, onSaveScore) {
-    let preferredName = '';
+export function createUIManager(gameState, playerStats) {
     let waveBannerTimeoutId = null;
     let heatEventTimeoutId = null;
     let lastHeatLevel = 0;
@@ -104,30 +103,12 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         copyRunLogBtn: document.getElementById('copyRunLogBtn'),
         clearRunLogBtn: document.getElementById('clearRunLogBtn'),
         resultCopyLogBtn: document.getElementById('resultCopyLogBtn'),
-        inputSection: document.getElementById('input-section'),
         restartMsg: document.getElementById('restart-msg'),
-        playerName: document.getElementById('playerName'),
-        playerNameList: document.getElementById('player-name-list'),
-        saveButton: document.getElementById('saveScoreBtn'),
-        skipButton: document.getElementById('skipScoreBtn'),
-        leaderboard: document.getElementById('highscore-list'),
         debugPanel: document.getElementById('debug-panel'),
         runStatsTable: document.getElementById('run-stats-table')
     };
 
-    if(els.saveButton) {
-        els.saveButton.addEventListener('click', () => {
-            const name = (els.playerName.value.trim() || preferredName || 'UNKNOWN').toUpperCase();
-            preferredName = name;
-            onSaveScore(name, gameState.score);
-            els.inputSection.style.display = 'none';
-            els.restartMsg.style.display = 'block';
-        });
-    }
-    els.skipButton?.addEventListener('click', () => {
-        els.inputSection.style.display = 'none';
-        els.restartMsg.style.display = 'block';
-    });
+    let restartTimer = 0;
 
     if(els.starGoals) els.starGoals.innerHTML = STAR_GOALS.map(goal => `<li>${goal}</li>`).join('');
 
@@ -275,11 +256,10 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.gameOver.style.display = 'flex';
         els.finalScore.innerText = gameState.score;
         renderRunStats();
-        els.inputSection.style.display = 'flex';
+        // A short beat before RETURN TO TOWN, so a held key or stray tap cannot skip the result.
         els.restartMsg.style.display = 'none';
-        els.playerName.value = preferredName;
-        // On phones, focusing would pop the keyboard over the run report.
-        if(!document.body.classList.contains('touch')) els.playerName.focus({ preventScroll: true });
+        clearTimeout(restartTimer);
+        restartTimer = setTimeout(() => { els.restartMsg.style.display = 'block'; }, 800);
         // Start at the top so the stars and result are seen before the long run report.
         const panel = els.gameOver.querySelector('.modal-content');
         if(panel) panel.scrollTop = 0;
@@ -649,46 +629,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
     }
 
     function canRestart() {
-        return els.inputSection.style.display === 'none';
-    }
-
-    function updateLeaderboard(scores) {
-        if(!els.leaderboard) return;
-        els.leaderboard.innerHTML = '';
-        if(els.playerNameList) els.playerNameList.innerHTML = '';
-        if(!scores.length) {
-            const li = document.createElement('li');
-            li.textContent = 'NO RECORDS YET';
-            els.leaderboard.appendChild(li);
-            return;
-        }
-
-        const uniqueNames = new Set();
-        scores.forEach((s, i) => {
-            const li = document.createElement('li');
-            const rank = document.createElement('span');
-            rank.textContent = `#${i + 1} ${s.name}`;
-            const value = document.createElement('span');
-            value.className = 'score-value';
-            value.textContent = s.score;
-            li.appendChild(rank);
-            li.appendChild(value);
-            els.leaderboard.appendChild(li);
-            uniqueNames.add(s.name);
-        });
-
-        if(els.playerNameList) {
-            for(const name of uniqueNames) {
-                const option = document.createElement('option');
-                option.value = name;
-                els.playerNameList.appendChild(option);
-            }
-        }
-    }
-
-    function setPreferredName(name) {
-        preferredName = (name || '').toUpperCase();
-        if(els.playerName) els.playerName.value = preferredName;
+        return els.restartMsg.style.display !== 'none';
     }
 
     function showPauseOverlay() {
@@ -806,12 +747,10 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         hideGameOverScreen,
         showStartScreen,
         hideStartScreen,
-        updateLeaderboard,
         canRestart,
         updateDebug,
         bindControlHandlers,
         updateAudioControls,
-        setPreferredName,
         showPauseOverlay,
         hidePauseOverlay,
         showSettingsModal,

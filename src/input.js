@@ -26,7 +26,7 @@ export function setupInputs() {
         if(e.code === 'KeyC') keys.rideOnRequested = true;
         
         // Only allow restart if the input section is hidden (meaning score is saved)
-        if(e.code === 'KeyR' && gameState.isGameOver && document.getElementById('input-section').style.display === 'none') {
+        if(e.code === 'KeyR' && gameState.isGameOver && document.getElementById('restart-msg').style.display !== 'none') {
             keys.restartRequested = true;
         }
     });

@@ -151,7 +151,7 @@ export function setupTouchControls() {
     // PLAY also takes the browser fullscreen in landscape where that is allowed.
     document.getElementById('play-btn').addEventListener('click', enterAppMode);
     document.getElementById('restart-msg').addEventListener('click', () => {
-        if(document.getElementById('input-section').style.display === 'none') keys.restartRequested = true;
+        if(document.getElementById('restart-msg').style.display !== 'none') keys.restartRequested = true;
     });
 
     // Lifting every finger (e.g. a notification or app switch) must not leave a stick held.
