@@ -538,3 +538,30 @@ body.touch .howto-card.touch-only { display: block; }
 body.in-lobby #ui-layer, body.in-lobby #dash-bar-container, body.in-lobby .debug-panel,
 body.in-lobby #touch-controls, body.in-lobby #crosshair, body.in-lobby .wave-banner { display: none !important; }
 .panel-screen { background: linear-gradient(180deg, #2a1409, #120703); }
+
+/* ---------- Mobile game feel ---------- */
+#fx-layer { position: fixed; inset: 0; z-index: 11; pointer-events: none; overflow: hidden; }
+body.in-lobby #fx-layer { display: none; }
+.float-text {
+    position: absolute; left: 0; top: 0; font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 20px;
+    color: #ffe082; text-shadow: 0 2px 0 #3b1d00, 0 0 6px rgba(0, 0, 0, 0.6); white-space: nowrap; will-change: transform;
+}
+.float-text.hot { color: #ff7a45; font-size: 24px; }
+.float-text.hurt { color: #ff1744; font-size: 26px; }
+.edge-arrow {
+    position: absolute; left: 0; top: 0; width: 0; height: 0; will-change: transform;
+    border-top: 9px solid transparent; border-bottom: 9px solid transparent; border-left: 16px solid rgba(255, 90, 60, 0.9);
+    filter: drop-shadow(0 0 2px #000);
+}
+.edge-arrow.boss { border-top-width: 14px; border-bottom-width: 14px; border-left: 26px solid #ffcc33; filter: drop-shadow(0 0 6px #ff6f00); }
+body.touch #dash-bar-container { display: none; }
+body.touch #btn-dash {
+    width: 72px; height: 72px; font-size: 13px;
+    background: radial-gradient(circle, rgba(20, 12, 8, 0.85) 58%, transparent 60%),
+        conic-gradient(#00e5b0 calc(var(--cooldown, 1) * 360deg), rgba(255, 255, 255, 0.12) 0);
+}
+body.touch #btn-dash.ready { border-color: #00e5b0; color: #00e5b0; box-shadow: 0 0 10px rgba(0, 229, 176, 0.5); }
+.touch-btn small { display: block; font-size: 8px; font-weight: 400; margin-top: 2px; opacity: 0.85; }
+#btn-swap { width: 66px; height: 66px; }
+.touch-only-inline { display: none; }
+body.touch .touch-only-inline { display: inline-block; }

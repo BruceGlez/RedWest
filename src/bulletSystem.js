@@ -206,7 +206,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     else if(e.userData.type === 'gunslinger') runStats.gunslingersKilled++;
                     else if(e.userData.type === 'wolf') runStats.wolvesKilled++;
                     else if(e.userData.type === 'boss') runStats.bossesKilled++;
-                    callbacks.onEnemyKilled?.(e.userData.type);
+                    callbacks.onEnemyKilled?.(e.userData.type, e.position);
                     if(e.userData.type === 'boss') callbacks.onBossDefeated?.();
                 } else { 
                     // Enemy Hit

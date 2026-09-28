@@ -17,7 +17,7 @@ The source page also works from a plain local HTTP server such as VS Code Live S
 
 ## Phones and tablets
 
-The same build plays on phones. Open the Pages link, hold the phone sideways, and tap to draw: the left thumb moves, the right thumb aims and fires once pushed past about a third of the way, and the DASH, SWAP and pause buttons sit on the right. For a full-screen app with its own icon, use **Add to Home Screen** (Safari share menu on iPhone; browser menu or the install prompt on Android). After the first visit it also works offline.
+The same build plays on phones. Open the Pages link, hold the phone sideways, and press PLAY. The left thumb moves. On the right, **tap** to quick-fire at the nearest enemy, or **drag** to aim (an aim line shows the shot and snaps onto enemies near it) and push past about a third of the way to fire. Settings has an optional **auto-fire when still** mode for one-thumb play. DASH (with a cooldown ring), SWAP and pause sit on the right; arrows at the screen edge point to off-screen enemies, with a gold arrow for the outlaw. Hits shake the screen, kills pop score numbers, and the phone vibrates (Android browsers and the iOS app). For a full-screen app with its own icon, use **Add to Home Screen** (Safari share menu on iPhone; browser menu or the install prompt on Android). After the first visit it also works offline.
 
 ## iPhone / iPad app
 

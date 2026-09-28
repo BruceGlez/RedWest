@@ -3,7 +3,7 @@ import { gameState } from './state.js';
 
 export const keys = { w:false, a:false, s:false, d:false, shift:false, space: false, mouse: false, restartRequested: false, pauseToggleRequested: false, settingsToggleRequested: false, musicToggleRequested: false, sfxToggleRequested: false, weaponSwitchRequested: false, bankRequested: false, rideOnRequested: false, startRequested: false };
 // Analog state from the on-screen sticks (touchControls.js). Unused on desktop.
-export const touch = { enabled: false, moveX: 0, moveY: 0, aiming: false, aimX: 0, aimY: 1, firing: false };
+export const touch = { enabled: false, moveX: 0, moveY: 0, aiming: false, aimX: 0, aimY: 1, firing: false, quickFireAt: 0, autoFire: false };
 export const mouse = new THREE.Vector2();
 
 export function setupInputs() {
@@ -55,6 +55,7 @@ export function setupInputs() {
         touch.moveY = 0;
         touch.aiming = false;
         touch.firing = false;
+        touch.quickFireAt = 0;
     });
 
     window.addEventListener('mousemove', e => {

@@ -57,6 +57,48 @@ try {
     const shotsAfter = await page.evaluate(() => S.gameState.runStats.shotsFired);
     assert.ok(shotsAfter > shotsBefore, 'right stick pushed past the threshold fires');
 
+    // Off-screen enemies get edge arrows (the phone camera is closer than desktop).
+    await page.waitForFunction(() => [...document.querySelectorAll('.edge-arrow')].some(a => a.style.display === 'block'));
+
+    // Tap the aim side: Brawl Stars-style quick fire turns toward the nearest enemy and shoots.
+    await page.evaluate(async () => {
+        const { spawnEnemy } = await import('/src/enemySystem.js');
+        const p = S.enemies[0].parent.children.find(o => o.userData.type === 'player');
+        for(const e of S.enemies) e.position.set(p.position.x + 60, 0, p.position.z + 60);
+        spawnEnemy(p.parent, p.position, 'bandit');
+        window.__target = S.enemies.at(-1);
+        Object.assign(window.__target.userData, { speed: 0, hp: 50, maxHp: 50 });
+        window.__target.position.set(p.position.x - 10, 0, p.position.z + 6);
+        window.__player = p;
+    });
+    const shotsBeforeTap = await page.evaluate(() => S.gameState.runStats.shotsFired);
+    await page.locator('#stick-aim').evaluate(zone => {
+        const fire = type => zone.dispatchEvent(new PointerEvent(type, { pointerId: 9, pointerType: 'touch', clientX: 650, clientY: 250, bubbles: true, cancelable: true, isPrimary: true }));
+        fire('pointerdown');
+        fire('pointerup');
+    });
+    await page.waitForFunction(before => S.gameState.runStats.shotsFired > before, shotsBeforeTap);
+    const facing = await page.evaluate(() => {
+        const p = window.__player;
+        const forward = p.getWorldDirection(p.position.clone());
+        const to = window.__target.position.clone().sub(p.position).setY(0).normalize();
+        return forward.setY(0).normalize().dot(to);
+    });
+    assert.ok(facing > 0.95, `quick fire faces the nearest enemy (dot ${facing.toFixed(3)})`);
+
+    // Archero-style auto-fire: turn it on in settings, stand still, and it shoots by itself.
+    await page.locator('#btn-pause').dispatchEvent('pointerdown');
+    await page.locator('#pause-settings-btn').tap();
+    await page.locator('#settings-autofire-btn').tap();
+    assert.equal(await page.locator('#settings-autofire-btn').textContent(), 'Auto-fire when still: ON');
+    await page.locator('#settings-resume-btn').tap();
+    const shotsBeforeAuto = await page.evaluate(() => S.gameState.runStats.shotsFired);
+    await page.waitForFunction(before => S.gameState.runStats.shotsFired > before + 2, shotsBeforeAuto);
+    await page.locator('#btn-pause').dispatchEvent('pointerdown');
+    await page.locator('#pause-settings-btn').tap();
+    await page.locator('#settings-autofire-btn').tap();
+    await page.locator('#settings-resume-btn').tap();
+
     await page.locator('#btn-swap').dispatchEvent('pointerdown');
     await page.waitForFunction(() => S.playerStats.weapon === 'shotgun');
     await page.locator('#btn-pause').dispatchEvent('pointerdown');
@@ -78,7 +120,7 @@ try {
     await page.locator('#start-screen').waitFor({ state: 'visible' });
 
     assert.deepEqual(errors, []);
-    console.log('Mobile smoke passed: touch mode, tap start, move + aim/fire sticks, swap, pause, tap restart.');
+    console.log('Mobile smoke passed: touch mode, tap start, move + aim/fire sticks, edge arrows, tap quick-fire auto-aim, auto-fire setting, swap, pause, tap restart.');
 } finally {
     await browser?.close();
     await server.close();

@@ -5,6 +5,10 @@ import { checkCollision } from './physics.js';
 import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
+import { enemies } from './state.js';
+import { pickTarget } from './aimAssist.js';
+
+const QUICK_FIRE_WINDOW_MS = 400;
 
 export function createPlayerSystem(scene, camera, gameState, playerStats) {
     const playerGroup = createPlayerMesh();
@@ -13,6 +17,16 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     const raycaster = new THREE.Raycaster();
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
     playerGroup.userData.blockedFrames = 0;
+
+    // Ground line showing where the aim stick points; it turns orange when aim assist has a target.
+    const aimLine = new THREE.Mesh(
+        new THREE.PlaneGeometry(0.45, 16),
+        new THREE.MeshBasicMaterial({ color: 0xffd54f, transparent: true, opacity: 0.4, depthWrite: false })
+    );
+    aimLine.geometry.rotateX(-Math.PI / 2);
+    aimLine.geometry.translate(0, 0.08, 8);
+    aimLine.visible = false;
+    scene.add(aimLine);
 
     const WEAPONS = {
         revolver: { pellets: 1, spread: 0, speed: 70, fireRate: 0.2 },
@@ -126,12 +140,39 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if(isMoving) playerGroup.position.y = Math.abs(Math.sin(timeInSeconds * 12)) * 0.1;
         else playerGroup.position.y = THREE.MathUtils.lerp(playerGroup.position.y, 0, dt * 14);
 
+        let touchWantsFire = false;
         if(touch.enabled) {
-            // Aim stick wins; otherwise face the direction of travel.
-            const faceX = touch.aiming ? touch.aimX : move.x;
-            const faceZ = touch.aiming ? touch.aimY : move.z;
+            // Drag: aim with a gentle snap. Tap: quick-fire at the nearest enemy. Optional auto-fire
+            // while standing still. Otherwise face the direction of travel.
+            const pos = playerGroup.position;
+            let faceX = move.x;
+            let faceZ = move.z;
+            let target = null;
+            const quickFire = touch.quickFireAt > 0 && performance.now() - touch.quickFireAt < QUICK_FIRE_WINDOW_MS;
+            if(touch.aiming) {
+                faceX = touch.aimX;
+                faceZ = touch.aimY;
+                target = pickTarget(pos, enemies, { dirX: faceX, dirZ: faceZ });
+                touchWantsFire = touch.firing;
+            } else if(quickFire) {
+                target = pickTarget(pos, enemies);
+                touchWantsFire = true;
+            } else if(touch.autoFire && move.lengthSq() === 0) {
+                target = pickTarget(pos, enemies);
+                touchWantsFire = target !== null;
+            }
+            if(target) {
+                faceX = target.position.x - pos.x;
+                faceZ = target.position.z - pos.z;
+            }
             if(faceX !== 0 || faceZ !== 0) {
-                playerGroup.lookAt(playerGroup.position.x + faceX, playerGroup.position.y, playerGroup.position.z + faceZ);
+                playerGroup.lookAt(pos.x + faceX, pos.y, pos.z + faceZ);
+            }
+            aimLine.visible = touch.aiming;
+            if(touch.aiming) {
+                aimLine.position.set(pos.x, 0, pos.z);
+                aimLine.rotation.y = Math.atan2(faceX, faceZ);
+                aimLine.material.color.setHex(target ? 0xff7043 : 0xffd54f);
             }
         } else {
             raycaster.setFromCamera(mouse, camera);
@@ -144,14 +185,16 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if(gunGroup) gunGroup.position.z = THREE.MathUtils.lerp(gunGroup.position.z, 0.2, dt * 10);
 
         if(playerStats.shootCooldown > 0) playerStats.shootCooldown -= dt;
-        if((keys.space || keys.mouse || touch.firing) && playerStats.shootCooldown <= 0) {
+        if((keys.space || keys.mouse || touchWantsFire) && playerStats.shootCooldown <= 0) {
             shoot();
             playerStats.shootCooldown = playerStats.fireRate;
+            touch.quickFireAt = 0;
         }
     }
 
     function reset() {
         playerGroup.visible = true;
+        aimLine.visible = false;
         playerGroup.position.set(0, 0, 0);
         playerGroup.rotation.set(0, 0, 0);
         playerGroup.userData.isAiming = false;

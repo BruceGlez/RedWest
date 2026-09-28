@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { keys } from './input.js';
+import { keys, touch } from './input.js';
 import { resumeAudio, playSound, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { gameState, playerStats, obstacles, enemies, loots, resetGameState, resetPlayerStats, clearDynamicState } from './state.js';
 import { generateMap } from './world.js';
@@ -11,10 +11,15 @@ import { markObstacleGridDirty, getGridStats } from './physics.js';
 import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
 import { buildRunRecord, appendRunRecord } from './runLog.js';
 import { getOutlaw, applyOutlawToWave } from './outlaws.js';
+import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
 import { recordRun, saveProgress } from './progress.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 
 const FINAL_WAVE = FINAL_PURSUIT;
+// Phones get a closer camera so characters read at small sizes; off-screen arrows cover the rest.
+const CAMERA_OFFSET_DESKTOP = new THREE.Vector3(0, 35, 25);
+const CAMERA_OFFSET_PHONE = new THREE.Vector3(0, 26, 18.5);
+const OUTLAW_DOWN_SLOWMO_MS = 650;
 const BONUS_WAVE = FINAL_PURSUIT + 1;
 
 const ENEMY_COST = {
@@ -89,6 +94,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     let fpsSmoothed = 60;
     let pausedBeforeSettings = false;
     let sessionRun = 0;
+    let bountyChoiceAt = 0; // slow-motion beat after the outlaw falls, then the choice opens
+    const cameraOffset = () => (touch.enabled ? CAMERA_OFFSET_PHONE : CAMERA_OFFSET_DESKTOP);
 
     // result: 'died' | 'banked' | 'escaped'
     function finishRun(result) {
@@ -131,8 +138,18 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     const callbacks = {
         onUpdateHUD: () => ui.updateHUD(),
         onGameOver: () => finishRun('died'),
-        onBossDefeated: () => openBountyChoice(),
+        onBossDefeated: () => {
+            if(bountyChoiceAt) return;
+            addShake(0.9);
+            haptic('heavy');
+            hitStop(OUTLAW_DOWN_SLOWMO_MS);
+            playerStats.invulnerabilityTimer = 2;
+            bountyChoiceAt = performance.now() + OUTLAW_DOWN_SLOWMO_MS;
+        },
         onPlayerDamaged: () => {
+            addShake(0.45);
+            haptic('heavy');
+            floatText('-1', playerSystem.playerGroup.position, 'hurt');
             const hadHeat = gameState.heat.level > 0;
             recordDamage(gameState.heat);
             if(hadHeat) {
@@ -145,16 +162,21 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             recordMiss(gameState.heat);
             if(hadChain) ui.showHeatEvent('broken');
         },
-        onEnemyKilled: (type) => {
+        onEnemyKilled: (type, position) => {
             const levelBefore = gameState.heat.level;
             const multiplier = recordKill(gameState.heat);
             if(gameState.heat.level > levelBefore) {
                 playSound('heatUp');
                 ui.showHeatEvent('up');
+                haptic('medium');
             }
             // The outlaw pays out through the bounty choice instead of as a kill score.
             if(type !== 'boss') {
-                gameState.score += Math.round(10 * multiplier);
+                const points = Math.round(10 * multiplier);
+                gameState.score += points;
+                addShake(0.12);
+                haptic('light');
+                if(position) floatText(`+${points}`, position, gameState.heat.level >= 2 ? 'hot' : '');
                 gameState.waveBudgetRemaining += Math.min(1.2, gameState.heat.level * 0.3);
             }
             ui.updateHUD();
@@ -340,6 +362,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     }
 
     function resetGame() {
+        bountyChoiceAt = 0;
+        resetFeedback();
         clearSceneCollections();
         resetGameState();
         resetPlayerStats();
@@ -399,8 +423,10 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
     function tick(time) {
         requestAnimationFrame(tick);
-        const dt = Math.min((time - lastTime) / 1000, 0.1);
+        const realDt = Math.min((time - lastTime) / 1000, 0.1);
         lastTime = time;
+        // Hit-stop slows gameplay for a beat; the camera and UI keep real time.
+        const dt = realDt * timeScale(performance.now());
         const timeInSeconds = time / 1000;
 
         handlePauseToggle();
@@ -416,14 +442,14 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 20, Math.cos(timeInSeconds * 0.5) * 30);
             camera.lookAt(playerSystem.playerGroup.position);
             renderer.render(scene, camera);
-            emitDebug(dt);
+            emitDebug(realDt);
             if(keys.space || keys.startRequested) {
                 keys.startRequested = false;
                 gameState.isGameStarted = true;
                 gameState.outlawIndex = progress.selected;
                 sessionRun++;
                 ui.hideStartScreen();
-                camera.position.set(0, 35, 25);
+                camera.position.copy(cameraOffset());
                 resumeAudio();
                 beginWave(1);
             }
@@ -433,7 +459,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         if(gameState.isGameOver) {
             renderer.render(scene, camera);
             if(keys.restartRequested && ui.canRestart()) resetGame();
-            emitDebug(dt);
+            emitDebug(realDt);
             return;
         }
 
@@ -443,14 +469,21 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             keys.bankRequested = false;
             keys.rideOnRequested = false;
             renderer.render(scene, camera);
-            emitDebug(dt);
+            emitDebug(realDt);
             return;
         }
 
         if(gameState.isPaused || gameState.isSettingsOpen) {
             renderer.render(scene, camera);
             ui.updateHUD();
-            emitDebug(dt);
+            emitDebug(realDt);
+            return;
+        }
+
+        if(bountyChoiceAt && performance.now() >= bountyChoiceAt) {
+            bountyChoiceAt = 0;
+            openBountyChoice();
+            renderer.render(scene, camera);
             return;
         }
 
@@ -469,10 +502,15 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         const dashPct = Math.max(0, 1 - (playerStats.dashCooldown / 2.0));
         ui.updateDashBar(dashPct);
 
-        camera.position.lerp(playerSystem.playerGroup.position.clone().add(new THREE.Vector3(0, 35, 25)), 5 * dt);
-        camera.lookAt(playerSystem.playerGroup.position);
+        const playerPos = playerSystem.playerGroup.position;
+        camera.position.lerp(playerPos.clone().add(cameraOffset()), 5 * realDt);
+        const shake = shakeOffset(realDt, time);
+        camera.position.x += shake.x;
+        camera.position.z += shake.z;
+        camera.lookAt(playerPos.x + shake.x * 0.5, playerPos.y, playerPos.z + shake.z * 0.5);
+        updateFeedback(realDt, camera, enemies, playerPos);
 
-        emitDebug(dt);
+        emitDebug(realDt);
         renderer.render(scene, camera);
     }
 

@@ -9,7 +9,8 @@ What the app does natively:
   `capacitor.config.json`) and edge swipes need a second swipe so thumbs on the sticks don't leave the game
   (`GameViewController` in `ios/App/App/SceneDelegate.swift`).
 - Sheriff-star app icon and a dark launch screen (`ios/App/App/Assets.xcassets`).
-- Twin-stick touch controls, the same as the phone web build.
+- Twin-stick touch controls with tap quick-fire, aim assist and optional auto-fire, the same as the phone web build.
+- Haptic feedback through the Capacitor Haptics plugin (hits, kills, Heat, the outlaw falling).
 
 CI (`.github/workflows/ios.yml`) compiles the app for the iOS Simulator on every push to `main`, without signing.
 Signing, device testing and App Store submission need a Mac.

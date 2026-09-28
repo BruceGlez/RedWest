@@ -42,6 +42,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         resultDetail: document.getElementById('result-detail'),
         resultRoad: document.getElementById('result-road'),
         homePoster: document.getElementById('home-poster'),
+        dashBtn: document.getElementById('btn-dash'),
+        swapBtn: document.getElementById('btn-swap'),
         homeStars: document.getElementById('home-stars'),
         roadStars: document.getElementById('road-stars'),
         roadProgress: document.getElementById('road-progress'),
@@ -101,6 +103,10 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.score.innerText = gameState.score;
         els.wave.innerText = gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
         els.weaponLabel.innerText = playerStats.weapon.toUpperCase();
+        if(els.swapBtn && els.swapBtn.dataset.weapon !== playerStats.weapon) {
+            els.swapBtn.dataset.weapon = playerStats.weapon;
+            els.swapBtn.innerHTML = `SWAP<small>${playerStats.weapon === 'revolver' ? 'REVOLVER' : 'SHOTGUN'}</small>`;
+        }
         updateHeat(gameState.heat);
 
         if(gameState.isIntermission) {
@@ -153,6 +159,9 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
     }
 
     function updateDashBar(percent) {
+        // Phones show the cooldown as a ring filling around the DASH button.
+        els.dashBtn?.style.setProperty('--cooldown', String(Math.max(0, Math.min(1, percent))));
+        els.dashBtn?.classList.toggle('ready', percent >= 1);
         els.dashBar.style.width = `${Math.max(0, Math.min(1, percent)) * 100}%`;
         els.dashBar.className = percent >= 1 ? 'dash-ready' : 'dash-cooldown';
     }

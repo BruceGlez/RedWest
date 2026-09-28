@@ -116,6 +116,7 @@ try {
     });
     await page.waitForFunction(() => window.__rwTestState.gameState.heat.level >= 1);
     assert.equal(await page.locator('#heat-multiplier').textContent(), 'x1.5');
+    assert.ok(await page.locator('.float-text').count() > 0, 'kills pop floating score text');
     assert.equal(await page.locator('#heat-chain').evaluate(el => el.classList.contains('active')), true, 'the chain timer shows while a chain is live');
 
     // Run 1: ride on into the bonus pursuit and escape with the bounty.
