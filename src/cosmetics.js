@@ -4,8 +4,17 @@ import { WEAPONS, WEAPON_SLOTS } from './weapons.js';
 // so they are sold for earned Bounty Dollars only (no pay-to-win). Price 0 = owned by default.
 
 export const LOOK_SLOTS = ['hat', 'coat', 'pants', 'bullets'];
-export const SLOTS = [...WEAPON_SLOTS, ...LOOK_SLOTS];
-export const SLOT_LABELS = { primary: 'SIDEARMS', secondary: 'LONG GUNS', hat: 'HATS', coat: 'COATS', pants: 'PANTS', bullets: 'BULLETS' };
+export const SLOTS = ['character', ...WEAPON_SLOTS, ...LOOK_SLOTS];
+export const SLOT_LABELS = { character: 'CHARACTERS', primary: 'SIDEARMS', secondary: 'LONG GUNS', hat: 'HATS', coat: 'COATS', pants: 'PANTS', bullets: 'BULLETS' };
+
+// Who you play as. `model` is an animated GLB (src/characterModels.js); the Drifter is the original
+// box-built cowboy, the only one the hat / coat / pants colours apply to. First free one = default.
+export const CHARACTERS = [
+    { id: 'char-marshal', slot: 'character', name: 'Marshal Flint Reed', model: 'models/marshal.glb', price: 0, currency: 'dollars',
+        blurb: 'Fully animated lawman.' },
+    { id: 'char-drifter', slot: 'character', name: 'The Drifter', model: null, price: 0, currency: 'dollars',
+        blurb: 'The classic cowboy. Wears your shop hat, coat and pants colours.' }
+];
 
 export const COSMETICS = [
     { id: 'hat-trail', slot: 'hat', name: 'Trail Hat', color: 0x7a4520, price: 0, currency: 'dollars' },
@@ -28,7 +37,7 @@ export const COSMETICS = [
     { id: 'bullets-ember', slot: 'bullets', name: 'Ember', color: 0xff6d00, price: 40, currency: 'nuggets' }
 ];
 
-export const SHOP_ITEMS = [...WEAPONS, ...COSMETICS];
+export const SHOP_ITEMS = [...CHARACTERS, ...WEAPONS, ...COSMETICS];
 const BY_ID = new Map(SHOP_ITEMS.map(item => [item.id, item]));
 
 export function getShopItem(id) {

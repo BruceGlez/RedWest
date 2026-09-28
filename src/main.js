@@ -13,7 +13,8 @@ import { renderOutlawPortraits, renderEnemyPortraits, renderPlayerPreview } from
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit } from './purchases.js';
-import { loadoutColors } from './cosmetics.js';
+import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
+import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { applyPlayerLoadout } from './assets.js';
 import { setPlayerBulletColor } from './bulletSystem.js';
 
@@ -55,6 +56,7 @@ function applyProfile(next) {
     records.setProfile(profile);
     const colors = loadoutColors(profile.loadout);
     applyPlayerLoadout(playerSystem.playerGroup, colors);
+    playerSystem.setCharacter(getShopItem(profile.loadout.character)).then(() => ui.refreshShop());
     // Guns apply from the next shot (the shop is only open between runs).
     playerStats.guns = { primary: profile.loadout.primary, secondary: profile.loadout.secondary };
     ui.updateHUD();
@@ -63,7 +65,29 @@ function applyProfile(next) {
 }
 applyProfile(profile);
 wallet.load().then(applyProfile).catch(error => ui.shopMessage(error.message, true));
-ui.setPreviewRenderer(colors => renderPlayerPreview(renderer, colors));
+// Shop preview and character cards: imported characters get their own posed copy once loaded.
+const previewCharacters = new Map();
+function previewCharacter(id) {
+    const item = getShopItem(id);
+    if(!item?.model) return null;
+    if(!previewCharacters.has(id)) {
+        previewCharacters.set(id, null);
+        loadCharacterModel(item.model).then(gltf => {
+            const instance = createCharacterInstance(gltf, 6);
+            instance.mixer.update(0.4); // a moment into the idle pose
+            instance.object.rotation.y = 0.5;
+            previewCharacters.set(id, instance.object);
+            ui.setCharacterThumb(id, renderPlayerPreview(renderer, null, instance.object));
+            ui.refreshShop();
+        }).catch(() => {});
+    }
+    return previewCharacters.get(id);
+}
+ui.setPreviewRenderer(loadout => renderPlayerPreview(renderer, loadoutColors(loadout), previewCharacter(loadout.character)));
+for(const item of CHARACTERS) {
+    if(item.model) previewCharacter(item.id);
+    else ui.setCharacterThumb(item.id, renderPlayerPreview(renderer, loadoutColors(profile.loadout)));
+}
 
 async function afterPayment(before) {
     ui.shopMessage('Payment received. Your nuggets are on the way...');

@@ -16,12 +16,17 @@ const server = createServer(async (request, response) => {
         response.writeHead(403).end();
         return;
     }
-    try {
-        const content = await readFile(filePath);
-        response.writeHead(200, { 'content-type': mime[extname(filePath)] || 'application/octet-stream' }).end(content);
-    } catch {
-        response.writeHead(404).end();
+    // Like Vite and the Pages build, files in public/ are served from the site root.
+    for(const candidate of [filePath, resolve(root, 'public', `.${pathname}`)]) {
+        try {
+            const content = await readFile(candidate);
+            response.writeHead(200, { 'content-type': mime[extname(candidate)] || 'application/octet-stream' }).end(content);
+            return;
+        } catch {
+            // try the next location
+        }
     }
+    response.writeHead(404).end();
 });
 let browser;
 
@@ -36,8 +41,10 @@ try {
     page.on('requestfailed', request => errors.push(`${request.url()}: ${request.failure()?.errorText}`));
     await page.route('https://fonts.googleapis.com/**', route => route.abort());
     await page.route('https://fonts.gstatic.com/**', route => route.abort());
-    await page.route('https://unpkg.com/three@0.160.0/build/three.module.js', async route => {
-        const body = await readFile(resolve(root, 'node_modules/three/build/three.module.js'));
+    // Serve the import map's CDN Three.js files (core and add-ons) from the local package.
+    await page.route('https://unpkg.com/three@0.160.0/**', async route => {
+        const path = new URL(route.request().url()).pathname.replace('/three@0.160.0/', '');
+        const body = await readFile(resolve(root, 'node_modules/three', path));
         await route.fulfill({ status: 200, contentType: 'text/javascript', headers: { 'access-control-allow-origin': '*' }, body });
     });
     await page.goto(`http://127.0.0.1:${server.address().port}/`, { waitUntil: 'commit', timeout: 30000 });

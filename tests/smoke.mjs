@@ -39,6 +39,12 @@ try {
     await page.waitForFunction(() => window.__rwTestState.gameState.isGameStarted);
     await page.keyboard.up('Space');
     await page.locator('#start-screen').waitFor({ state: 'hidden' });
+    // The default character is the imported, animated Marshal (a skinned GLB model).
+    await page.waitForFunction(() => {
+        const scene = window.__rwTestState.obstacles[0]?.mesh.parent;
+        const player = scene?.children.find(object => object.userData.type === 'player');
+        return !!player?.getObjectByProperty('isSkinnedMesh', true);
+    }, null, { timeout: 60000 });
     await page.keyboard.press('KeyP');
     await page.locator('#pause-overlay').waitFor({ state: 'visible' });
     await page.locator('#pause-resume-btn').click();

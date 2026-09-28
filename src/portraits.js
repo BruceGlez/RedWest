@@ -133,9 +133,11 @@ export function renderEnemyPortraits(renderer) {
 // Shop preview: the player in a given outfit. The studio and model are reused between calls.
 let previewStudio = null;
 let previewModel = null;
-export function renderPlayerPreview(renderer, colors) {
+// characterModel: an imported character (src/characterModels.js) to show instead of the Drifter.
+export function renderPlayerPreview(renderer, colors, characterModel = null) {
     try {
         previewStudio ??= createStudio(renderer);
+        if(characterModel) return previewStudio.capture(characterModel, 1.15);
         if(!previewModel) {
             previewModel = createPlayerMesh();
             previewModel.rotation.y = -0.5;

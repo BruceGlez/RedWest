@@ -23,6 +23,10 @@ The same build plays on phones. Open the Pages link, hold the phone sideways, an
 
 Runs pay **Bounty Dollars** (score, collected bounties, new stars, daily jobs). Spend them in the **General Store** on guns and on cosmetic hats, coats, pants and bullet colours (with a live try-on preview). You carry two guns, a sidearm and a long gun, and SWAP between them; shop guns (Twin Pistols, Repeater Rifle, Sawed-Off, Buffalo Gun) each trade one strength for another and are sold only for earned Bounty Dollars. **Daily Jobs** give three goals a day plus a Gold Nugget bonus. Real-money Gold Nugget packs (App Store / Google Play via RevenueCat, web via Stripe) are built but switched off until the server and store accounts are set up: see [MONETIZATION.md](MONETIZATION.md).
 
+## Characters
+
+The player is **Marshal Flint Reed**, an animated 3D character made with Meshy (image to 3D, auto-rig, animations) and saved as `public/models/marshal.glb`. The original box-built cowboy is still available as **The Drifter** in the shop's CHARACTERS tab, and is the one the hat, coat and pants colours apply to. To add another character: export a rigged GLB from Meshy (Mixamo skeleton, animations Idle, Running, Run and Shoot, Dead, single file), shrink it with `tools/optimize-model.mjs`, put it in `public/models/`, and add it to `CHARACTERS` in `src/cosmetics.js`.
+
 ## iPhone / iPad app
 
 A native iOS app (for TestFlight and the App Store) is built from the same code with Capacitor. See [IOS.md](IOS.md) for building it on a Mac and submitting it.

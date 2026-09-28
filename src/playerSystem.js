@@ -8,12 +8,20 @@ import { spawnBullet } from './bulletSystem.js';
 import { enemies } from './state.js';
 import { pickTarget } from './aimAssist.js';
 import { getWeapon, defaultWeapon } from './weapons.js';
+import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 
 const QUICK_FIRE_WINDOW_MS = 400;
 
 export function createPlayerSystem(scene, camera, gameState, playerStats) {
     const playerGroup = createPlayerMesh();
     scene.add(playerGroup);
+    // The box-built Drifter is always there (and is the fallback); an imported character hides it.
+    const drifter = playerGroup.children[0];
+    const muzzle = playerGroup.userData.muzzle;
+    const drifterMuzzleParent = muzzle.parent;
+    const drifterMuzzlePosition = muzzle.position.clone();
+    let character = null; // { id, instance } while an imported model is shown
+    let characterRequest = 0;
 
     const raycaster = new THREE.Raycaster();
     const groundPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0);
@@ -67,6 +75,54 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         playerGroup.userData.muzzle.intensity = 5;
         setTimeout(() => playerGroup.userData.muzzle.intensity = 0, 50);
         playerGroup.userData.gunMesh.position.z = 0.2;
+    }
+
+    // Imported characters are slimmer than the box-built ones, so they stand a little taller to read as well.
+    const CHARACTER_HEIGHT = 6;
+    function setCharacter(item) {
+        const request = ++characterRequest;
+        if(!item?.model) return Promise.resolve(showDrifter());
+        if(character?.id === item.id) return Promise.resolve(true);
+        return loadCharacterModel(item.model).then(gltf => {
+            if(request !== characterRequest) return false;
+            showDrifter();
+            const instance = createCharacterInstance(gltf, CHARACTER_HEIGHT);
+            playerGroup.add(instance.object);
+            drifter.visible = false;
+            // Shots leave from the character's gun hand instead of the hidden box revolver.
+            playerGroup.add(muzzle);
+            muzzle.position.set(1, 3.1, 1.8);
+            character = { id: item.id, instance };
+            return true;
+        }).catch(() => {
+            if(request === characterRequest) showDrifter();
+            return false;
+        });
+    }
+
+    function showDrifter() {
+        if(character) playerGroup.remove(character.instance.object);
+        character = null;
+        drifter.visible = true;
+        drifterMuzzleParent.add(muzzle);
+        muzzle.position.copy(drifterMuzzlePosition);
+        return true;
+    }
+
+    // Animation for an imported character; runs every frame, also after the run ends.
+    function animateModel(dt, { moving = false, shooting = false } = {}) {
+        if(!character) return;
+        if(!gameState.isGameOver) character.instance.play(moving ? (shooting && character.instance.has('runShoot') ? 'runShoot' : 'run') : 'idle');
+        character.instance.mixer.update(dt);
+    }
+
+    function die() {
+        if(character?.instance.has('dead')) {
+            character.instance.play('dead', 0.1);
+            playerGroup.visible = true;
+        } else {
+            playerGroup.visible = false;
+        }
     }
 
     function update(dt, timeInSeconds) {
@@ -140,7 +196,8 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
 
         const isMoving = move.length() > 0;
         animateCharacter(playerGroup, timeInSeconds, isMoving);
-        if(isMoving) playerGroup.position.y = Math.abs(Math.sin(timeInSeconds * 12)) * 0.1;
+        animateModel(dt, { moving: isMoving, shooting: playerGroup.userData.isAiming });
+        if(isMoving && !character) playerGroup.position.y = Math.abs(Math.sin(timeInSeconds * 12)) * 0.1;
         else playerGroup.position.y = THREE.MathUtils.lerp(playerGroup.position.y, 0, dt * 14);
 
         let touchWantsFire = false;
@@ -203,7 +260,8 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         playerGroup.userData.isAiming = false;
         playerGroup.userData.aimTimer = 0;
         playerStats.weapon = 'primary';
+        character?.instance.play('idle', 0);
     }
 
-    return { playerGroup, update, reset };
+    return { playerGroup, update, reset, setCharacter, animateModel, die };
 }

@@ -679,6 +679,8 @@ body.in-lobby .new-enemy-card { display: none !important; }
 .shop-swatch.bullet { border-radius: 50%; width: 30px; height: 30px; margin: 12px; box-shadow: 0 0 14px 4px var(--swatch); }
 .shop-name { font-family: 'Rye', serif; font-size: 13px; text-align: center; }
 .shop-grid .gun-card { grid-column: span 2; }
+.char-thumb { width: 96px; height: 96px; border-radius: 10px; overflow: hidden; border: 3px solid #3b2412; background: #e7cf9c; display: flex; align-items: center; justify-content: center; font-size: 10px; font-weight: 700; color: #6b4a2b; }
+.char-thumb img { width: 100%; height: 100%; object-fit: cover; }
 .gun-bars { width: 100%; display: flex; flex-direction: column; gap: 3px; }
 .gun-bar { display: flex; align-items: center; gap: 6px; font-family: 'Roboto Mono', monospace; font-size: 10px; font-weight: 700; color: #5d3a1a; }
 .gun-bar span { width: 44px; }

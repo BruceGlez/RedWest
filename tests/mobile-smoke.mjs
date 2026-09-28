@@ -39,7 +39,12 @@ try {
             fire('pointermove', toX, toY);
             window.__release = () => fire('pointerup', toX, toY);
         }, [fromX, fromY, toX, toY]);
-        await page.waitForTimeout(holdMs);
+        // Hold for game time, not wall time: software rendering in CI can run at a few FPS.
+        await page.evaluate(async seconds => {
+            const start = S.gameState.runTime;
+            const deadline = Date.now() + 30000;
+            while(S.gameState.runTime - start < seconds && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
+        }, holdMs / 1000);
         await page.evaluate(() => window.__release());
     }
 

@@ -26,6 +26,11 @@ function toonMat({ color = 0xffffff, transparent = false, opacity = 1, metalness
     return material;
 }
 
+// Cel shading for imported, textured characters (colour comes from the model's own texture).
+export function toonTexturedMaterial(map) {
+    return new THREE.MeshToonMaterial({ color: 0xffffff, map: map ?? null, gradientMap: TOON_GRADIENT });
+}
+
 const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x1a0d05, side: THREE.BackSide });
 const OUTLINE_WIDTH = 0.05;
 

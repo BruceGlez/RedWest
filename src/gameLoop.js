@@ -91,7 +91,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         gameState.runWon = result !== 'died';
         gameState.isGameOver = true;
         gameState.isChoosingBounty = false;
-        playerSystem.playerGroup.visible = false;
+        if(result === 'died') playerSystem.die();
         ui.hideBountyChoice();
         ui.setRunLog(appendRunRecord(buildRunRecord(gameState, result, sessionRun)));
         const roadResult = recordRun(progress, gameState.outlawIndex, gameState.bounty, gameState.score);
@@ -475,6 +475,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         }
 
         if(gameState.isGameOver) {
+            playerSystem.animateModel(realDt);
             renderer.render(scene, camera);
             if(keys.restartRequested && ui.canRestart()) resetGame();
             emitDebug(realDt);

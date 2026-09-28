@@ -21,7 +21,8 @@ export function createUIManager(gameState, playerStats) {
     let newEnemyTimeoutId = null;
     let profile = null;
     let renderPreview = null;
-    let shopTab = 'hat';
+    let shopTab = 'character';
+    const characterThumbs = {};
     let tryOn = null; // item previewed but not equipped
     let confirmId = null;
     let confirmTimeoutId = null;
@@ -370,8 +371,11 @@ export function createUIManager(gameState, playerStats) {
         if(!renderPreview || !profile) return;
         const loadout = { ...profile.loadout };
         if(tryOn) loadout[tryOn.slot] = tryOn.id;
-        els.shopPreviewImg.src = renderPreview(loadoutColors(loadout));
-        els.shopPreviewLabel.textContent = tryOn && !owns(tryOn.id) ? `TRYING ON: ${tryOn.name.toUpperCase()}` : 'YOUR OUTFIT';
+        // Outfit colours only show on the Drifter, so try them on the Drifter.
+        if(tryOn && ['hat', 'coat', 'pants'].includes(tryOn.slot)) loadout.character = 'char-drifter';
+        els.shopPreviewImg.src = renderPreview(loadout);
+        els.shopPreviewLabel.textContent = tryOn && !owns(tryOn.id) ? `TRYING ON: ${tryOn.name.toUpperCase()}`
+            : tryOn ? tryOn.name.toUpperCase() : 'YOUR OUTFIT';
     }
 
     function shopMessage(text, isError = false) {
@@ -396,13 +400,17 @@ export function createUIManager(gameState, playerStats) {
                 : purchaseSupport(PRODUCTS[0].id).reason} Gold Nuggets are also earned by finishing all daily jobs.</p>`;
             return;
         }
+        const outfitNote = ['hat', 'coat', 'pants'].includes(shopTab) && getShopItem(profile.loadout.character)?.model
+            ? '<p class="shop-fineprint">Hats, coats and pants show on The Drifter (CHARACTERS tab).</p>' : '';
         els.shopGrid.innerHTML = SHOP_ITEMS.filter(item => item.slot === shopTab).map(item => {
             const owned = owns(item.id);
             const equipped = profile.loadout[item.slot] === item.id;
             const pending = confirmId === item.id;
             const action = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : pending ? `CONFIRM ${priceLabel(item)}` : priceLabel(item);
-            // Guns show what they do (bars + trade-off); looks show a colour swatch.
-            const top = item.stats
+            // Characters show their picture, guns what they do (bars + trade-off), looks a colour swatch.
+            const top = item.slot === 'character'
+                ? `<div class="char-thumb">${characterThumbs[item.id] ? `<img src="${characterThumbs[item.id]}" alt="">` : '<span>LOADING</span>'}</div>`
+                : item.stats
                 ? `<div class="gun-bars">${Object.entries(weaponBars(item)).map(([label, value]) => `<div class="gun-bar"><span>${label}</span><i style="--fill:${value * 20}%"></i></div>`).join('')}</div>`
                 : `<div class="shop-swatch${item.slot === 'bullets' ? ' bullet' : ''}" style="--swatch:${hexColor(item.color)}"></div>`;
             return `<div class="shop-card${item.stats ? ' gun-card' : ''}${tryOn?.id === item.id ? ' trying' : ''}" data-try="${item.id}">`
@@ -410,7 +418,7 @@ export function createUIManager(gameState, playerStats) {
                 + `<div class="shop-name">${item.name}</div>`
                 + (item.blurb ? `<div class="shop-sub gun-blurb">${item.blurb}</div>` : '')
                 + `<button type="button" class="shop-action${equipped ? ' equipped' : ''}${pending ? ' confirm' : ''}${item.currency === 'nuggets' && !owned ? ' nugget' : ''}" data-item="${item.id}"${equipped ? ' disabled' : ''}>${action}</button></div>`;
-        }).join('');
+        }).join('') + outfitNote;
     }
 
     function openShop() {
@@ -779,6 +787,8 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         showEarnings,
         openShop,
         setPreviewRenderer: fn => { renderPreview = fn; },
+        setCharacterThumb: (id, src) => { if(src) characterThumbs[id] = src; },
+        refreshShop: () => { if(profile && els.panels[4].style.display !== 'none') { renderShop(); updatePreview(); } },
         showNewEnemy,
         hideBountyChoice,
         hideGameOverScreen,
