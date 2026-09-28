@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { toonTexturedMaterial } from './assets.js';
+import { inPlace, LOCOMOTION } from './animationClips.js';
 
 // Animated 3D characters made outside the game (Meshy / Mixamo GLB, see tools/optimize-model.mjs).
 // Each file carries a skinned mesh plus animations named idle, run, runShoot and dead.
@@ -56,7 +57,7 @@ export function createCharacterInstance(gltf, height) {
 
     const mixer = new THREE.AnimationMixer(root);
     const actions = {};
-    for(const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip);
+    for(const clip of gltf.animations) actions[clip.name] = mixer.clipAction(clip.name === 'dead' ? clip : inPlace(clip));
     if(actions.dead) {
         actions.dead.setLoop(THREE.LoopOnce, 1);
         actions.dead.clampWhenFinished = true;
@@ -65,7 +66,11 @@ export function createCharacterInstance(gltf, height) {
     function play(name, fade = 0.15) {
         const next = actions[name] || actions.idle;
         if(!next || next === current) return;
+        const phase = current && LOCOMOTION.has(current.getClip().name) && LOCOMOTION.has(next.getClip().name)
+            ? current.time / current.getClip().duration : 0;
         next.reset().play();
+        // Run <-> run-and-shoot keeps the stride where it was, so the legs never restart mid-step.
+        next.time = phase * next.getClip().duration;
         if(current) current.crossFadeTo(next, fade, false);
         current = next;
     }
