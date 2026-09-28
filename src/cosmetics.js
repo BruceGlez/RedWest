@@ -1,8 +1,11 @@
-// Cosmetic catalog. Cosmetics never change gameplay (no pay-to-win), which also keeps them in
-// the lowest store fee tier on Google Play. Price 0 = owned by default.
+import { WEAPONS, WEAPON_SLOTS } from './weapons.js';
 
-export const SLOTS = ['hat', 'coat', 'pants', 'bullets'];
-export const SLOT_LABELS = { hat: 'HATS', coat: 'COATS', pants: 'PANTS', bullets: 'BULLETS' };
+// Shop catalog: guns (src/weapons.js) plus cosmetics. Cosmetics never change gameplay; guns do,
+// so they are sold for earned Bounty Dollars only (no pay-to-win). Price 0 = owned by default.
+
+export const LOOK_SLOTS = ['hat', 'coat', 'pants', 'bullets'];
+export const SLOTS = [...WEAPON_SLOTS, ...LOOK_SLOTS];
+export const SLOT_LABELS = { primary: 'SIDEARMS', secondary: 'LONG GUNS', hat: 'HATS', coat: 'COATS', pants: 'PANTS', bullets: 'BULLETS' };
 
 export const COSMETICS = [
     { id: 'hat-trail', slot: 'hat', name: 'Trail Hat', color: 0x7a4520, price: 0, currency: 'dollars' },
@@ -25,15 +28,16 @@ export const COSMETICS = [
     { id: 'bullets-ember', slot: 'bullets', name: 'Ember', color: 0xff6d00, price: 40, currency: 'nuggets' }
 ];
 
-const BY_ID = new Map(COSMETICS.map(item => [item.id, item]));
+export const SHOP_ITEMS = [...WEAPONS, ...COSMETICS];
+const BY_ID = new Map(SHOP_ITEMS.map(item => [item.id, item]));
 
-export function getCosmetic(id) {
+export function getShopItem(id) {
     return BY_ID.get(id) ?? null;
 }
 
 export function defaultLoadout() {
     const loadout = {};
-    for(const slot of SLOTS) loadout[slot] = COSMETICS.find(item => item.slot === slot && item.price === 0).id;
+    for(const slot of SLOTS) loadout[slot] = SHOP_ITEMS.find(item => item.slot === slot && item.price === 0).id;
     return loadout;
 }
 
@@ -41,9 +45,9 @@ export function defaultLoadout() {
 export function loadoutColors(loadout) {
     const colors = {};
     const defaults = defaultLoadout();
-    for(const slot of SLOTS) {
-        const item = getCosmetic(loadout?.[slot]);
-        colors[slot] = (item && item.slot === slot ? item : getCosmetic(defaults[slot])).color;
+    for(const slot of LOOK_SLOTS) {
+        const item = getShopItem(loadout?.[slot]);
+        colors[slot] = (item && item.slot === slot ? item : getShopItem(defaults[slot])).color;
     }
     return colors;
 }

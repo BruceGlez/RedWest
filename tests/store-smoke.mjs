@@ -66,7 +66,7 @@ try {
         await page.evaluate(async () => {
             // Top up for the purchase test through the same local profile store the game uses.
             const raw = JSON.parse(localStorage.getItem('redWestProfile.v1'));
-            raw.balances.dollars = 500;
+            raw.balances.dollars = 1000;
             localStorage.setItem('redWestProfile.v1', JSON.stringify(raw));
         });
         await page.reload({ waitUntil: 'commit', timeout: 60000 });
@@ -83,11 +83,21 @@ try {
         assert.match(await buy.textContent(), /CONFIRM/, 'first tap only arms the purchase');
         await buy.click({ force: true }); // the CONFIRM button pulses, so it is never "stable"
         await page.waitForFunction(() => document.querySelector('[data-item="hat-black"]').textContent === 'EQUIP');
-        assert.equal(await page.locator('#shop-dollars').textContent(), '350');
+        assert.equal(await page.locator('#shop-dollars').textContent(), '850');
         await page.locator('[data-item="hat-black"]').click();
         await page.waitForFunction(() => document.querySelector('[data-item="hat-black"]').textContent === 'EQUIPPED');
         const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestProfile.v1')).loadout.hat);
         assert.equal(saved, 'hat-black');
+        // Guns: bought with Bounty Dollars, equipped into the run's SWAP slot.
+        await page.locator('[data-tab="secondary"]').click();
+        assert.equal(await page.locator('.gun-card').count(), 3);
+        const gun = page.locator('[data-item="gun-sawedoff"]');
+        await gun.click();
+        await gun.click({ force: true });
+        await page.waitForFunction(() => document.querySelector('[data-item="gun-sawedoff"]').textContent === 'EQUIP');
+        assert.equal(await page.locator('#shop-dollars').textContent(), '400');
+        await gun.click();
+        await page.waitForFunction(() => S.playerStats.guns.secondary === 'gun-sawedoff');
         await page.locator('#shop-screen .panel-back').click();
         await page.locator('#jobs-btn').click();
         assert.equal(await page.locator('.job-card').count(), 3);

@@ -13,8 +13,9 @@ Status:
 
 - **Two currencies.** Bounty Dollars ($) are earned by playing: score, collected bounties, new stars, daily
   jobs. Gold Nuggets (◆) are the paid currency, with a small free trickle from finishing all daily jobs.
-- **Cosmetics only.** Hats, coats, pants, bullet colours (`src/cosmetics.js`). Nothing sold changes
-  gameplay, so there is no pay-to-win, and cosmetics sit in Google Play's lowest fee tier.
+- **No pay-to-win.** Gold Nuggets only buy cosmetics: hats, coats, pants, bullet colours
+  (`src/cosmetics.js`). Guns (`src/weapons.js`) change gameplay, so they cost earned Bounty Dollars only,
+  and each is a side-grade with a trade-off. A unit test fails if a gun is ever priced in nuggets.
 - **No paid loot boxes.** Everything is shown with a fixed price, so no odds disclosure is needed.
 - **No dark patterns** (FTC v. Epic, 2022). Every spend needs two taps (price → CONFIRM). Real-money packs
   also go through the App Store sheet or Stripe checkout. The store shows "Under 18? Ask a parent first."

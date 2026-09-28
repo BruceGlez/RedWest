@@ -63,7 +63,8 @@ function resolveVolley(bullet, hit, callbacks) {
     if(volley.pending === 0 && !volley.hit) callbacks.onPlayerMiss?.();
 }
 
-export function spawnBullet(scene, owner, position, velocity, volley = null) {
+// opts (player guns): damage per hit, pierce = extra enemies it passes through, range in units.
+export function spawnBullet(scene, owner, position, velocity, volley = null, opts = {}) {
     const bullet = acquireBullet();
     bullet.visible = true;
     bullet.position.copy(position);
@@ -71,6 +72,11 @@ export function spawnBullet(scene, owner, position, velocity, volley = null) {
     bullet.userData.owner = owner;
     bullet.userData.velocity = velocity.clone();
     bullet.userData.volley = volley;
+    bullet.userData.damage = opts.damage ?? 1;
+    bullet.userData.pierce = opts.pierce ?? 0;
+    bullet.userData.range = opts.range ?? 100;
+    bullet.userData.origin = (bullet.userData.origin || new THREE.Vector3()).copy(position);
+    bullet.userData.hitEnemies = null;
     scene.add(bullet);
     bullets.push(bullet);
 }
@@ -127,8 +133,8 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
         const b = bullets[i]; 
         b.position.addScaledVector(b.userData.velocity, dt);
 
-        // 1. Remove if too far
-        if(b.position.distanceTo(playerGroup.position) > 100) { 
+        // 1. Remove if too far from the player or past the gun's range
+        if(b.position.distanceTo(playerGroup.position) > 100 || b.position.distanceTo(b.userData.origin) > b.userData.range) { 
             resolveVolley(b, false, callbacks);
             releaseBullet(scene, b, i);
             continue; 
@@ -192,13 +198,19 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
             if(j === -1) continue;
             const dist = new THREE.Vector3(e.position.x - b.position.x, 0, e.position.z - b.position.z).length();
             if(e.userData.untargetable) continue; // faded ghosts
+            if(b.userData.hitEnemies?.includes(e)) continue; // a piercing bullet already went through
             const hitRad = e.userData.hitRadius ?? ((e.userData.type === 'boss') ? 2.5 : 2.0);
             
             if(dist < hitRad) {
                 resolveVolley(b, true, callbacks);
-                releaseBullet(scene, b, i);
-                bulletHit = true;
-                e.userData.hp--;
+                if(b.userData.pierce > 0) {
+                    b.userData.pierce--;
+                    (b.userData.hitEnemies ||= []).push(e);
+                } else {
+                    releaseBullet(scene, b, i);
+                    bulletHit = true;
+                }
+                e.userData.hp -= b.userData.damage;
                 runStats.shotsHit++;
                 
                 if(e.userData.hp <= 0) { 

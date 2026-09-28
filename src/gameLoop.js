@@ -215,7 +215,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 spawn(type);
                 gameState.waveBudgetRemaining -= enemyCost(type);
             }
-            ui.showWaveBanner(`BONUS PURSUIT — SURVIVE ${BONUS_PURSUIT_SECONDS}s TO ESCAPE`, 2500);
+            // The ride-on countdown (bonus HUD) states the goal for the whole pursuit.
         } else {
             // Each stage opens by showing off its new enemy.
             const featured = featuredFor(gameState.outlawIndex);

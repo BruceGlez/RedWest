@@ -100,7 +100,7 @@ try {
     await page.locator('#settings-resume-btn').tap();
 
     await page.locator('#btn-swap').dispatchEvent('pointerdown');
-    await page.waitForFunction(() => S.playerStats.weapon === 'shotgun');
+    await page.waitForFunction(() => S.playerStats.weapon === 'secondary');
     await page.locator('#btn-pause').dispatchEvent('pointerdown');
     await page.locator('#pause-overlay').waitFor({ state: 'visible' });
     await page.locator('#pause-resume-btn').tap();

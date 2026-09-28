@@ -55,6 +55,9 @@ function applyProfile(next) {
     records.setProfile(profile);
     const colors = loadoutColors(profile.loadout);
     applyPlayerLoadout(playerSystem.playerGroup, colors);
+    // Guns apply from the next shot (the shop is only open between runs).
+    playerStats.guns = { primary: profile.loadout.primary, secondary: profile.loadout.secondary };
+    ui.updateHUD();
     setPlayerBulletColor(colors.bullets);
     ui.setProfile(profile);
 }

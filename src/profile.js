@@ -1,4 +1,4 @@
-import { COSMETICS, SLOTS, getCosmetic, defaultLoadout } from './cosmetics.js';
+import { COSMETICS, SLOTS, getShopItem, defaultLoadout } from './cosmetics.js';
 import { jobsForDay, getJob, dayKey, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { validateName } from './names.js';
 import { OUTLAWS } from './outlaws.js';
@@ -37,10 +37,10 @@ export function normalizeProfile(raw, now = new Date()) {
         const value = Math.floor(Number(raw.balances?.[currency]));
         if(value > 0) profile.balances[currency] = value;
     }
-    profile.owned = [...new Set((raw.owned || []).filter(id => getCosmetic(id)))];
+    profile.owned = [...new Set((raw.owned || []).filter(id => getShopItem(id)))];
     for(const slot of SLOTS) {
         const id = raw.loadout?.[slot];
-        const item = getCosmetic(id);
+        const item = getShopItem(id);
         if(item && item.slot === slot && ownsItem(profile, id)) profile.loadout[slot] = id;
     }
     if(raw.jobs?.day === profile.jobs.day && Array.isArray(raw.jobs.list)) {
@@ -89,7 +89,7 @@ export function setName(profile, raw) {
 }
 
 export function ownsItem(profile, id) {
-    const item = getCosmetic(id);
+    const item = getShopItem(id);
     return !!item && (item.price === 0 || profile.owned.includes(id));
 }
 
@@ -107,7 +107,7 @@ export class EconomyError extends Error {
 }
 
 export function buyItem(profile, id) {
-    const item = getCosmetic(id);
+    const item = getShopItem(id);
     if(!item) throw new EconomyError('unknown_item', 'That item does not exist.');
     if(ownsItem(profile, id)) throw new EconomyError('owned', 'You already own this.');
     if(profile.balances[item.currency] < item.price) throw new EconomyError('funds', `Not enough ${CURRENCIES[item.currency].name.toLowerCase()}.`);
@@ -117,7 +117,7 @@ export function buyItem(profile, id) {
 }
 
 export function equipItem(profile, id) {
-    const item = getCosmetic(id);
+    const item = getShopItem(id);
     if(!item) throw new EconomyError('unknown_item', 'That item does not exist.');
     if(!ownsItem(profile, id)) throw new EconomyError('not_owned', 'Buy it first.');
     profile.loadout[item.slot] = id;

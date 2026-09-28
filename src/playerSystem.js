@@ -7,6 +7,7 @@ import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
 import { enemies } from './state.js';
 import { pickTarget } from './aimAssist.js';
+import { getWeapon, defaultWeapon } from './weapons.js';
 
 const QUICK_FIRE_WINDOW_MS = 400;
 
@@ -28,9 +29,9 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     aimLine.visible = false;
     scene.add(aimLine);
 
-    const WEAPONS = {
-        revolver: { pellets: 1, spread: 0, speed: 70, fireRate: 0.2 },
-        shotgun: { pellets: 7, spread: 0.38, speed: 62, fireRate: 0.75 }
+    const heldGun = () => {
+        const gun = getWeapon(playerStats.guns?.[playerStats.weapon]);
+        return (gun && gun.slot === playerStats.weapon ? gun : defaultWeapon(playerStats.weapon) || defaultWeapon('primary')).stats;
     };
 
     function shoot() {
@@ -39,7 +40,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         playerGroup.userData.aimTimer = 0.5;
         playSound('shoot');
 
-        const weaponCfg = WEAPONS[playerStats.weapon] || WEAPONS.revolver;
+        const weaponCfg = heldGun();
         const volleyOffsets = playerStats.tripleShotTimer > 0 ? [-0.15, 0, 0.15] : [0];
         const pelletsPerVolley = weaponCfg.pellets;
         const volley = { pending: volleyOffsets.length * pelletsPerVolley, hit: false };
@@ -53,9 +54,12 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
                 if(pelletsPerVolley > 1) {
                     const spreadStep = weaponCfg.spread / Math.max(1, pelletsPerVolley - 1);
                     pelletOffset = (-weaponCfg.spread * 0.5) + (spreadStep * i);
+                } else if(weaponCfg.spread > 0) {
+                    pelletOffset = (Math.random() - 0.5) * weaponCfg.spread; // a single shot that wanders
                 }
                 dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), volleyOffset + pelletOffset);
-                spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(weaponCfg.speed), volley);
+                spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(weaponCfg.speed), volley,
+                    { damage: weaponCfg.damage, pierce: weaponCfg.pierce, range: weaponCfg.range });
             }
         }
         gameState.runStats.shotsFired += volleyOffsets.length * pelletsPerVolley;
@@ -73,11 +77,10 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         playerGroup.visible = playerStats.invulnerabilityTimer <= 0 || Math.floor(timeInSeconds * 16) % 2 === 0;
         if(keys.weaponSwitchRequested) {
             keys.weaponSwitchRequested = false;
-            playerStats.weapon = playerStats.weapon === 'revolver' ? 'shotgun' : 'revolver';
+            playerStats.weapon = playerStats.weapon === 'primary' ? 'secondary' : 'primary';
         }
 
-        const weaponCfg = WEAPONS[playerStats.weapon] || WEAPONS.revolver;
-        playerStats.fireRate = weaponCfg.fireRate;
+        playerStats.fireRate = heldGun().fireRate;
 
         if(keys.shift && playerStats.dashCooldown <= 0) {
             playerStats.isDashing = true;
@@ -199,7 +202,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         playerGroup.rotation.set(0, 0, 0);
         playerGroup.userData.isAiming = false;
         playerGroup.userData.aimTimer = 0;
-        playerStats.weapon = 'revolver';
+        playerStats.weapon = 'primary';
     }
 
     return { playerGroup, update, reset };

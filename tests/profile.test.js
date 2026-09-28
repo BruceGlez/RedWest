@@ -85,8 +85,9 @@ test('loading a profile drops unknown items and un-owned loadouts', () => {
     assert.equal(p.loadout.coat, 'coat-navy');
 });
 
-test('catalog and job pool are well formed', () => {
-    assert.equal(new Set(COSMETICS.map(c => c.id)).size, COSMETICS.length);
+test('catalog and job pool are well formed', async () => {
+    const { SHOP_ITEMS } = await import('../src/cosmetics.js');
+    assert.equal(new Set(SHOP_ITEMS.map(c => c.id)).size, SHOP_ITEMS.length);
     for(const job of JOB_POOL) assert.ok(getJob(job.id) && job.goal > 0 && job.reward > 0);
     assert.equal(new Set(PRODUCTS.map(p => p.id)).size, PRODUCTS.length);
 });
@@ -150,4 +151,22 @@ test('leaderboards rank named accounts, show my rank, and reset weekly', async (
     const nextWeek = new Date(day.getTime() + 8 * 86400000);
     assert.equal(rankBoard(accounts, 'weekly', null, 50, nextWeek).entries.length, 0);
     assert.throws(() => rankBoard(accounts, 'nope'), e => e.code === 'bad_board');
+});
+
+test('guns: one free per slot, sold only for earned dollars, and equippable', async () => {
+    const { WEAPONS, WEAPON_SLOTS, weaponBars } = await import('../src/weapons.js');
+    for(const slot of WEAPON_SLOTS) assert.equal(WEAPONS.filter(w => w.slot === slot && w.price === 0).length, 1);
+    for(const gun of WEAPONS) {
+        assert.equal(gun.currency, 'dollars', `${gun.id}: paid currency never buys power`);
+        for(const value of Object.values(weaponBars(gun))) assert.ok(value >= 1 && value <= 5);
+    }
+    const p = createProfile(day);
+    assert.equal(p.loadout.primary, 'gun-revolver');
+    assert.equal(p.loadout.secondary, 'gun-shotgun');
+    p.balances.dollars = 700;
+    buyItem(p, 'gun-rifle');
+    equipItem(p, 'gun-rifle');
+    assert.equal(p.loadout.primary, 'gun-rifle');
+    assert.equal(normalizeProfile(p, day).loadout.primary, 'gun-rifle');
+    assert.equal(normalizeProfile({ loadout: { secondary: 'gun-buffalo' } }, day).loadout.secondary, 'gun-shotgun', 'unowned guns are not equipped');
 });

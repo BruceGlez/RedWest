@@ -28,6 +28,8 @@
 - Mobile feel pass (2026-09-28), based on Brawl Stars (tap quick-fire + drag aim), Archero (optional auto-fire when still) and common game-feel practice: aim assist and aim line, closer phone camera with off-screen enemy arrows, screen shake, a slow-motion beat when the outlaw falls, floating score text, haptics, and a DASH cooldown ring. Auto-aim makes Heat chains easier, so note which aim mode each touch tester used.
 - Phone support: touch mode (floating twin sticks, DASH / SWAP / pause buttons, tap to start and restart), compact layout, a landscape prompt, and an installable web app (manifest, icons, network-first offline cache). A phone-emulation smoke test runs in CI. Balance was set for mouse aim; record touch testers separately.
 
+- Clearer bounty choice and guns (2026-09-28, after the owner's first phone playtest found bank / ride on confusing): the choice now shows SAFE and RISKY cards with the exact points, final score, stars gained and what is lost, and a SURVIVE countdown with the bounty at stake stays on screen while riding on. The shop sells guns for Bounty Dollars only (sidearm and long-gun slots, each gun a side-grade). Guns change score potential, so note each tester's loadout in playtest notes.
+
 ## Prototype balance values to watch in playtests
 
 These are first guesses, not tuned numbers: 4-second chain window, 2 kills per Heat level (max 4, x1.5 score per level), 5-second decay per level, 50-point base bounty, 30-second bonus pursuit, and the rule that dying in the bonus forfeits the bounty and bonus score. Record how often testers ride on and at what Heat.

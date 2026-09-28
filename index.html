@@ -30,6 +30,7 @@
             <div id="status-msg"></div> </div>
     </div>
     <div id="wave-banner" class="wave-banner" style="display:none;"></div>
+    <div id="bonus-hud" class="bonus-hud" style="display:none;"></div>
     <div id="pause-overlay" class="pause-overlay" style="display:none;">
         <div class="pause-title">PAUSED</div>
         <div class="pause-actions">
@@ -194,7 +195,9 @@
         <div class="panel-body howto-body">
             <div class="howto-card">
                 <h3>THE HUNT</h3>
-                <p>Survive 3 pursuits against the outlaw's gang, then take down the outlaw. Bank the bounty, or ride on through a 30s bonus pursuit: escape to collect everything, die and lose it.</p>
+                <p>Survive 3 pursuits against the outlaw's gang, then take down the outlaw to earn a bounty.</p>
+                <p><span>BANK IT</span> Safe: take the bounty and go home.</p>
+                <p><span>RIDE ON</span> Risky: survive 30 more seconds for the bounty, extra points and a star. Die and you lose the bounty and the extra points.</p>
                 <p><span>HEAT</span> Chain accurate kills for more points and deadlier pursuers. Misses and hits taken cool it.</p>
             </div>
             <div class="howto-card">
@@ -240,19 +243,30 @@
 
     <div id="bounty-choice" class="modal-overlay" style="display:none;">
         <div class="modal-content bounty-content">
-            <h1 class="western-title">OUTLAW DOWN</h1>
-            <p class="score-text">BOUNTY: <span id="bounty-amount">0</span></p>
-            <p class="result-detail">Heat <span id="bounty-heat">0</span> set the bounty. It is only paid when you leave.</p>
+            <h1 class="western-title">OUTLAW DOWN!</h1>
+            <p class="bounty-lead">You earned a <b id="bounty-amount">0</b> point bounty. Take it home now, or risk it for more.</p>
             <div class="bounty-options">
-                <button id="bankBountyBtn" type="button">
+                <button id="bankBountyBtn" type="button" class="bounty-card safe">
+                    <span class="bounty-tag">SAFE</span>
                     <strong>BANK IT <span class="key-highlight desktop-only-inline">B</span></strong>
-                    <small>Collect the bounty now and end the run.</small>
+                    <small>Take the bounty and end the run.</small>
+                    <ul class="bounty-outcomes">
+                        <li class="win">+<span id="bank-amount">0</span> points &rarr; final score <b id="bank-total">0</b></li>
+                        <li class="win star-line" id="bank-stars"></li>
+                    </ul>
                 </button>
-                <button id="rideOnBtn" type="button">
+                <button id="rideOnBtn" type="button" class="bounty-card risky">
+                    <span class="bounty-tag">RISKY</span>
                     <strong>RIDE ON <span class="key-highlight desktop-only-inline">C</span></strong>
-                    <small>Keep your Heat through a <span id="bonus-seconds">30</span>s bonus pursuit. Escape: bounty plus everything you earn. Die: lose both.</small>
+                    <small>Survive <b id="bonus-seconds">30</b> more seconds against a bigger posse.</small>
+                    <ul class="bounty-outcomes">
+                        <li class="win"><b>Survive:</b> +<span id="ride-amount">0</span> bounty plus every point you score</li>
+                        <li class="win star-line" id="ride-stars"></li>
+                        <li class="lose"><b>Die:</b> lose the bounty and the extra points. You keep <span id="ride-keep">0</span>.</li>
+                    </ul>
                 </button>
             </div>
+            <p class="bounty-note">Your Heat <span id="bounty-heat">0</span> made this bounty bigger.</p>
         </div>
     </div>
 

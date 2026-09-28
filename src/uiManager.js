@@ -3,11 +3,12 @@ import { FINAL_PURSUIT } from './bounty.js';
 import { formatRunLog } from './runLog.js';
 import { OUTLAWS, MODIFIERS, STAR_GOALS, getOutlaw } from './outlaws.js';
 import { ENEMY_TYPES, ENEMY_ORDER } from './enemyTypes.js';
-import { COSMETICS, SLOTS, SLOT_LABELS, getCosmetic, loadoutColors } from './cosmetics.js';
+import { SHOP_ITEMS, SLOTS, SLOT_LABELS, getShopItem, loadoutColors } from './cosmetics.js';
+import { getWeapon, defaultWeapon, weaponBars } from './weapons.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { PRODUCTS } from './products.js';
 import { purchaseSupport } from './purchases.js';
-import { isUnlocked, totalStars } from './progress.js';
+import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 
 export function createUIManager(gameState, playerStats) {
     let waveBannerTimeoutId = null;
@@ -96,6 +97,13 @@ export function createUIManager(gameState, playerStats) {
         bountyAmount: document.getElementById('bounty-amount'),
         bountyHeat: document.getElementById('bounty-heat'),
         bonusSeconds: document.getElementById('bonus-seconds'),
+        bankAmount: document.getElementById('bank-amount'),
+        bankTotal: document.getElementById('bank-total'),
+        bankStars: document.getElementById('bank-stars'),
+        rideAmount: document.getElementById('ride-amount'),
+        rideStars: document.getElementById('ride-stars'),
+        rideKeep: document.getElementById('ride-keep'),
+        bonusHud: document.getElementById('bonus-hud'),
         bankBountyBtn: document.getElementById('bankBountyBtn'),
         rideOnBtn: document.getElementById('rideOnBtn'),
         runLogCount: document.getElementById('run-log-count'),
@@ -121,10 +129,11 @@ export function createUIManager(gameState, playerStats) {
         els.health.innerHTML = hearts.join('');
         els.score.innerText = gameState.score;
         els.wave.innerText = gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
-        els.weaponLabel.innerText = playerStats.weapon.toUpperCase();
-        if(els.swapBtn && els.swapBtn.dataset.weapon !== playerStats.weapon) {
-            els.swapBtn.dataset.weapon = playerStats.weapon;
-            els.swapBtn.innerHTML = `SWAP<small>${playerStats.weapon === 'revolver' ? 'REVOLVER' : 'SHOTGUN'}</small>`;
+        const held = getWeapon(playerStats.guns[playerStats.weapon]) || defaultWeapon(playerStats.weapon);
+        els.weaponLabel.innerText = held.short;
+        if(els.swapBtn && els.swapBtn.dataset.weapon !== held.id) {
+            els.swapBtn.dataset.weapon = held.id;
+            els.swapBtn.innerHTML = `SWAP<small>${held.short}</small>`;
         }
         updateHeat(gameState.heat);
 
@@ -133,6 +142,13 @@ export function createUIManager(gameState, playerStats) {
             els.status.className = '';
             els.status.innerText = 'GET READY FOR NEXT WAVE';
             return;
+        }
+
+        // Riding on: keep the goal and the stake on screen the whole time.
+        const riding = gameState.bounty.status === 'riding';
+        els.bonusHud.style.display = riding ? 'block' : 'none';
+        if(riding) {
+            els.bonusHud.innerHTML = `SURVIVE <b>${Math.ceil(Math.max(0, gameState.waveTimer))}s</b> <span>${gameState.bounty.amount} BOUNTY AT STAKE</span>`;
         }
 
         els.waveTimer.innerText = (gameState.waveBossSpawned && gameState.waveTimer <= 0)
@@ -243,13 +259,14 @@ export function createUIManager(gameState, playerStats) {
 
     // result: 'died' | 'banked' | 'escaped'; roadResult: what the run changed on the Wanted Road
     function showGameOver(result = 'died', roadResult = null) {
+        els.bonusHud.style.display = 'none';
         hidePauseOverlay();
         hideSettingsModal();
         const [title, detail] = RESULT_TEXT[result] || RESULT_TEXT.died;
         els.resultTitle.textContent = title;
         els.resultTitle.classList.toggle('wasted-text', result === 'died');
         els.resultDetail.textContent = gameState.bounty.status === 'forfeited'
-            ? `You rode on and lost the ${gameState.bounty.amount} bounty and your bonus earnings.`
+            ? `You rode on and didn't make it: the ${gameState.bounty.amount} bounty and the extra points are lost. You kept ${gameState.score.toLocaleString()}.`
             : detail;
         renderRoadResult(roadResult);
         els.resultEarnings.innerHTML = '<p class="earn-title">Counting your earnings...</p>';
@@ -265,10 +282,23 @@ export function createUIManager(gameState, playerStats) {
         if(panel) panel.scrollTop = 0;
     }
 
+    // Spell out both outcomes in points and stars, so the choice needs no rules reading.
     function showBountyChoice(bounty, bonusSeconds) {
         hidePauseOverlay();
         hideSettingsModal();
+        const score = gameState.score;
+        const had = progress?.stars[gameState.outlawIndex] ?? 0;
+        const newStars = status => {
+            const count = starCount(starsForRun({ status, heatAtOffer: bounty.heatAtOffer }) & ~had);
+            return count ? `+${count} new star${count > 1 ? 's' : ''} &#9733;` : '';
+        };
         els.bountyAmount.textContent = bounty.amount;
+        els.bankAmount.textContent = bounty.amount;
+        els.bankTotal.textContent = (score + bounty.amount).toLocaleString();
+        els.bankStars.innerHTML = newStars('banked');
+        els.rideAmount.textContent = bounty.amount;
+        els.rideStars.innerHTML = newStars('escaped');
+        els.rideKeep.textContent = score.toLocaleString();
         els.bountyHeat.textContent = `${bounty.heatAtOffer} (x${heatMultiplier(bounty.heatAtOffer).toFixed(1)})`;
         els.bonusSeconds.textContent = bonusSeconds;
         els.bountyChoice.style.display = 'flex';
@@ -322,7 +352,7 @@ export function createUIManager(gameState, playerStats) {
     // ---------- Economy: balances, shop, daily jobs, earnings ----------
     const hexColor = color => `#${color.toString(16).padStart(6, '0')}`;
     const priceLabel = item => (item.currency === 'nuggets' ? `&#9670;${item.price}` : `$${item.price}`);
-    const owns = id => { const item = getCosmetic(id); return !!item && (item.price === 0 || profile.owned.includes(id)); };
+    const owns = id => { const item = getShopItem(id); return !!item && (item.price === 0 || profile.owned.includes(id)); };
 
     function setProfile(nextProfile) {
         profile = nextProfile;
@@ -366,14 +396,19 @@ export function createUIManager(gameState, playerStats) {
                 : purchaseSupport(PRODUCTS[0].id).reason} Gold Nuggets are also earned by finishing all daily jobs.</p>`;
             return;
         }
-        els.shopGrid.innerHTML = COSMETICS.filter(item => item.slot === shopTab).map(item => {
+        els.shopGrid.innerHTML = SHOP_ITEMS.filter(item => item.slot === shopTab).map(item => {
             const owned = owns(item.id);
             const equipped = profile.loadout[item.slot] === item.id;
             const pending = confirmId === item.id;
             const action = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : pending ? `CONFIRM ${priceLabel(item)}` : priceLabel(item);
-            return `<div class="shop-card${tryOn?.id === item.id ? ' trying' : ''}" data-try="${item.id}">`
-                + `<div class="shop-swatch${item.slot === 'bullets' ? ' bullet' : ''}" style="--swatch:${hexColor(item.color)}"></div>`
+            // Guns show what they do (bars + trade-off); looks show a colour swatch.
+            const top = item.stats
+                ? `<div class="gun-bars">${Object.entries(weaponBars(item)).map(([label, value]) => `<div class="gun-bar"><span>${label}</span><i style="--fill:${value * 20}%"></i></div>`).join('')}</div>`
+                : `<div class="shop-swatch${item.slot === 'bullets' ? ' bullet' : ''}" style="--swatch:${hexColor(item.color)}"></div>`;
+            return `<div class="shop-card${item.stats ? ' gun-card' : ''}${tryOn?.id === item.id ? ' trying' : ''}" data-try="${item.id}">`
+                + top
                 + `<div class="shop-name">${item.name}</div>`
+                + (item.blurb ? `<div class="shop-sub gun-blurb">${item.blurb}</div>` : '')
                 + `<button type="button" class="shop-action${equipped ? ' equipped' : ''}${pending ? ' confirm' : ''}${item.currency === 'nuggets' && !owned ? ' nugget' : ''}" data-item="${item.id}"${equipped ? ' disabled' : ''}>${action}</button></div>`;
         }).join('');
     }
@@ -415,13 +450,13 @@ export function createUIManager(gameState, playerStats) {
         }
         const itemButton = event.target.closest('[data-item]');
         if(itemButton) {
-            const item = getCosmetic(itemButton.dataset.item);
+            const item = getShopItem(itemButton.dataset.item);
             if(owns(item.id)) {
                 await shopHandlers.onEquipItem?.(item.id);
                 tryOn = null;
             } else if(confirmId !== item.id) {
-                // Show it on the player first, then start the confirm window.
-                tryOn = item;
+                // Show it on the player first (looks only), then start the confirm window.
+                tryOn = item.stats ? null : item;
                 updatePreview();
                 armConfirm(item.id);
                 return;
@@ -435,7 +470,9 @@ export function createUIManager(gameState, playerStats) {
         }
         const card = event.target.closest('[data-try]');
         if(card) {
-            tryOn = getCosmetic(card.dataset.try);
+            const item = getShopItem(card.dataset.try);
+            if(item?.stats) return;
+            tryOn = item;
             renderShop();
             updatePreview();
         }

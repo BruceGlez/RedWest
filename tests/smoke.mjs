@@ -134,9 +134,14 @@ try {
     assert.equal(offered.status, 'offered');
     assert.equal(offered.score, scoreBeforeOutlaw, 'the bounty is not paid until the player leaves');
     assert.equal(Number(await page.locator('#bounty-amount').textContent()), offered.amount);
+    // The choice spells out both outcomes in points and stars.
+    assert.equal(Number((await page.locator('#bank-total').textContent()).replace(/\D/g, '')), offered.score + offered.amount);
+    assert.equal(Number((await page.locator('#ride-keep').textContent()).replace(/\D/g, '')), offered.score);
+    assert.match(await page.locator('#ride-stars').textContent(), /new stars/, 'first escape from this outlaw earns stars');
     await page.locator('#rideOnBtn').click();
     await page.locator('#bounty-choice').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => document.getElementById('wave').textContent === 'BONUS');
+    await page.locator('#bonus-hud').getByText('BOUNTY AT STAKE').waitFor();
     assert.equal(await page.evaluate(() => window.__rwTestState.gameState.heat.level >= 1), true, 'Heat carries into the bonus pursuit');
     await page.evaluate(async () => {
         const { gameState, playerStats } = await import('/src/state.js');

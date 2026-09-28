@@ -52,7 +52,8 @@ export const playerStats = {
     invulnerabilityTimer: 0,
     fireRate: 0.2,
     tripleShotTimer: 0,
-    weapon: 'revolver'
+    weapon: 'primary', // which of the two carried guns is in hand
+    guns: { primary: 'gun-revolver', secondary: 'gun-shotgun' } // equipped from the shop loadout
 };
 
 // Global Arrays
@@ -106,7 +107,7 @@ export function resetPlayerStats() {
     playerStats.shootCooldown = 0;
     playerStats.invulnerabilityTimer = 0;
     playerStats.tripleShotTimer = 0;
-    playerStats.weapon = 'revolver';
+    playerStats.weapon = 'primary';
 }
 
 export function clearDynamicState() {
