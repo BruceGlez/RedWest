@@ -3,7 +3,7 @@ import { setupInputs, keys } from './input.js';
 import { setupTouchControls } from './touchControls.js';
 import { gameState, playerStats } from './state.js';
 import { setupScene, generateMap } from './world.js';
-import { resumeAudio, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
+import { resumeAudio, playSound, getAudioSettings, setMusicVolume, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { createUIManager } from './uiManager.js';
 import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
@@ -156,6 +156,7 @@ ui.bindControlHandlers({
     onBuyItem: async id => {
         try {
             applyProfile(await wallet.buy(id));
+            playSound('coin');
             ui.shopMessage('Bought! It is yours to keep.');
         } catch(error) {
             ui.shopMessage(error.message, true);
@@ -198,6 +199,10 @@ ui.bindControlHandlers({
     onToggleSfx: () => {
         toggleSfxEnabled();
         ui.updateAudioControls(getAudioSettings());
+    },
+    onMusicVolume: volume => {
+        setMusicVolume(volume);
+        ui.updateAudioControls(getAudioSettings());
     }
 });
 ui.updateAudioControls(getAudioSettings());
@@ -210,6 +215,10 @@ window.addEventListener('resize', () => {
 });
 window.addEventListener('mousedown', resumeAudio);
 window.addEventListener('touchend', resumeAudio); // iOS only unlocks audio from a touch gesture
+// Every menu button clicks.
+document.addEventListener('click', event => {
+    if(event.target.closest?.('button')) playSound('click');
+});
 
 // Installable app: cache the game for offline play. Only on https (GitHub Pages), never in local dev.
 if('serviceWorker' in navigator && location.protocol === 'https:') {

@@ -37,16 +37,18 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     aimLine.visible = false;
     scene.add(aimLine);
 
-    const heldGun = () => {
+    const heldWeapon = () => {
         const gun = getWeapon(playerStats.guns?.[playerStats.weapon]);
-        return (gun && gun.slot === playerStats.weapon ? gun : defaultWeapon(playerStats.weapon) || defaultWeapon('primary')).stats;
+        return gun && gun.slot === playerStats.weapon ? gun : defaultWeapon(playerStats.weapon) || defaultWeapon('primary');
     };
+    const heldGun = () => heldWeapon().stats;
 
     function shoot() {
         if(gameState.isGameOver || !gameState.isGameStarted) return;
         playerGroup.userData.isAiming = true;
         playerGroup.userData.aimTimer = 0.5;
-        playSound('shoot');
+        // Each gun has its own shot: 'gun-rifle' plays 'shot-rifle'.
+        playSound(heldWeapon().id.replace(/^gun-/, 'shot-'));
 
         const weaponCfg = heldGun();
         const volleyOffsets = playerStats.tripleShotTimer > 0 ? [-0.15, 0, 0.15] : [0];
@@ -144,7 +146,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             playerStats.isDashing = true;
             playerStats.dashDuration = 0.15;
             playerStats.dashCooldown = 2.0;
-            playSound('shoot');
+            playSound('dash');
         }
         if(playerStats.dashDuration > 0) playerStats.dashDuration -= dt;
         else playerStats.isDashing = false;

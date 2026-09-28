@@ -49,6 +49,8 @@ export function createUIManager(gameState, playerStats) {
         settingsModal: document.getElementById('settings-modal'),
         settingsMusicBtn: document.getElementById('settings-music-btn'),
         settingsSfxBtn: document.getElementById('settings-sfx-btn'),
+        settingsMusicVolume: document.getElementById('settings-music-volume'),
+        settingsMusicVolumeValue: document.getElementById('settings-music-volume-value'),
         settingsResumeBtn: document.getElementById('settings-resume-btn'),
         settingsRestartBtn: document.getElementById('settings-restart-btn'),
         settingsCloseBtn: document.getElementById('settings-close-btn'),
@@ -750,6 +752,7 @@ export function createUIManager(gameState, playerStats) {
         if(els.settingsRestartBtn) els.settingsRestartBtn.addEventListener('click', handlers.onRestartRun);
         if(els.settingsMusicBtn) els.settingsMusicBtn.addEventListener('click', handlers.onToggleMusic);
         if(els.settingsSfxBtn) els.settingsSfxBtn.addEventListener('click', handlers.onToggleSfx);
+        els.settingsMusicVolume?.addEventListener('input', () => handlers.onMusicVolume(Number(els.settingsMusicVolume.value) / 100));
         els.settingsCloseBtn?.addEventListener('click', closeHomeSettings);
         els.homeSettingsBtn.addEventListener('click', openHomeSettings);
         els.playBtn.addEventListener('click', () => {
@@ -800,6 +803,12 @@ export function createUIManager(gameState, playerStats) {
         if(els.settingsSfxBtn) {
             els.settingsSfxBtn.textContent = `SFX: ${settings.sfxEnabled ? 'ON' : 'OFF'}`;
             els.settingsSfxBtn.className = settings.sfxEnabled ? '' : 'off';
+        }
+        if(els.settingsMusicVolume) {
+            const percent = Math.round(settings.musicVolume * 100);
+            els.settingsMusicVolume.value = percent;
+            els.settingsMusicVolume.disabled = !settings.musicEnabled;
+            if(els.settingsMusicVolumeValue) els.settingsMusicVolumeValue.textContent = `${percent}%`;
         }
     }
 

@@ -1,7 +1,7 @@
 // Every sound Red West uses, made with the ElevenLabs API (tools/elevenlabs.mjs) into public/audio/.
 // Keys are the file names; the game plays them by key and falls back to its built-in beeps.
 
-// Sound effects: text prompt and length in seconds (short sounds keep the download small).
+// Sound effects: text prompt and length in seconds (0.5 to 30; short sounds keep the download small).
 export const SFX = {
     'shot-revolver': { prompt: 'Single old west revolver gunshot, sharp crack with a short desert echo, punchy and clean, video game sound effect', seconds: 0.7 },
     'shot-twins': { prompt: 'Quick light pistol shot, snappy pop, small revolver, dry, video game sound effect', seconds: 0.5 },
@@ -10,7 +10,7 @@ export const SFX = {
     'shot-sawedoff': { prompt: 'Sawed-off shotgun blast at close range, very loud short boom, video game sound effect', seconds: 0.8 },
     'shot-buffalo': { prompt: 'Huge buffalo hunting rifle shot, massive thunderous boom with long rolling echo across a canyon, video game sound effect', seconds: 1.4 },
     'enemy-shot': { prompt: 'Distant old west revolver shot, slightly muffled, video game sound effect', seconds: 0.6 },
-    'hit': { prompt: 'Bullet hitting a cartoon bandit, punchy thwack impact, satisfying, video game sound effect', seconds: 0.4 },
+    'hit': { prompt: 'Bullet hitting a cartoon bandit, punchy thwack impact, satisfying, video game sound effect', seconds: 0.5 },
     'hurt': { prompt: 'Player takes a hit, short grunt of pain from a cowboy with a dull thud, video game sound effect', seconds: 0.6 },
     'clang': { prompt: 'Bullet ricocheting off thick iron armor, loud metallic clang with a whizzing ricochet, video game sound effect', seconds: 0.8 },
     'boom': { prompt: 'Dynamite explosion, big cartoonish boom with dirt and debris, video game sound effect', seconds: 1.5 },
@@ -25,7 +25,7 @@ export const SFX = {
     'reload': { prompt: 'Revolver cylinder spinning and six bullets being loaded, clicks, video game sound effect', seconds: 1.5 },
     'outlaw-down': { prompt: 'Dramatic western victory sting, twangy electric guitar and a whip crack, short, video game sound effect', seconds: 2.0 },
     'bounty': { prompt: 'Cash register cha-ching with coins, reward collected, video game sound effect', seconds: 1.2 },
-    'click': { prompt: 'Soft wooden button click for a game menu, short', seconds: 0.3 }
+    'click': { prompt: 'Soft wooden button click for a game menu, short', seconds: 0.5 }
 };
 
 // Music loops (seconds). Kept short so the game starts fast on phones.
@@ -45,7 +45,7 @@ export const VOICE = {
     'dusty-pete': { text: "You lookin' for a fight? You found one!", voice: OUTLAW_VOICE },
     'rattlesnake-rosa': { text: 'The pack is hungry tonight.', voice: 'gritty female american' },
     'deacon-graves': { text: 'Judgment comes at high noon.', voice: 'gravelly male american' },
-    'calloways': { text: 'There are a whole lot more of us, Marshal!', voice: 'young male american' },
+    'calloway-gang': { text: 'There are a whole lot more of us, Marshal!', voice: 'young male american' },
     'iron-jack': { text: "Go on. Shoot me. See what happens.", voice: 'dominant firm male american' },
     'mesa-morgan': { text: 'Hope you like fireworks!', voice: 'sassy female american' },
     'silas-vane': { text: 'Six shots. That is all I need.', voice: 'smooth male american' },

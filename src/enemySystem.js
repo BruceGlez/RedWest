@@ -19,7 +19,7 @@ export function enemyShoot(enemy, playerPos, scene) {
     const muzzle = enemy.userData.muzzle; 
     if(!muzzle) return; 
 
-    playSound('shoot');
+    playSound('enemy-shot');
     const isBoss = (enemy.userData.type === 'boss');
     const shotCount = isBoss ? 3 : 1;
     const aimSpread = enemy.userData.aimSpread ?? 2.0;
@@ -177,7 +177,7 @@ export function damagePlayer(callbacks) {
     playerStats.invulnerabilityTimer = 0.6;
     gameState.runStats.damageTaken++;
     callbacks.onPlayerDamaged?.();
-    playSound('hit');
+    playSound('hurt');
     callbacks.onUpdateHUD?.();
     document.body.style.backgroundColor = '#550000';
     setTimeout(() => document.body.style.backgroundColor = '#000', 100);
@@ -192,7 +192,7 @@ function fireBullets(enemy, targetPoint, count, spread, speed, scene) {
     (enemy.userData.muzzle || enemy).getWorldPosition(from);
     from.y = Math.max(from.y, 2);
     const direction = new THREE.Vector3(targetPoint.x - from.x, 0, targetPoint.z - from.z);
-    playSound('shoot');
+    playSound('enemy-shot');
     for(let i = 0; i < count; i++) {
         const dir = direction.clone().normalize();
         if(count > 1) dir.applyAxisAngle(UP, (i - (count - 1) / 2) * (spread / (count - 1)));
@@ -217,7 +217,7 @@ function throwDynamite(scene, from, target) {
     stick.position.copy(from).setY(3);
     scene.add(stick, ring, fill);
     hazards.push({ stick, ring, fill, from: from.clone(), to: new THREE.Vector3(target.x, 0, target.z), t: 0, duration: 1.2 });
-    playSound('shoot');
+    playSound('fuse');
 }
 
 export function updateHazards(dt, scene, playerGroup, callbacks) {
@@ -379,7 +379,7 @@ function updateBoss(e, u, ctx) {
         if(u.special <= 0 && enemies.filter(o => o.userData.type === 'wolf').length < 6) {
             u.state = 'howl'; u.stateTimer = 0.9;
             callbacks.onBossSignal?.('AWOOO!', e.position);
-            playSound('heatUp');
+            playSound('howl');
             return { moveDir: null };
         }
         u.isAiming = u.shootTimer < 0.6 && dist < 40;
@@ -452,6 +452,7 @@ function updateBoss(e, u, ctx) {
                 if(u.shotsLeft <= 0) {
                     u.state = 'reload'; u.stateTimer = 2.2;
                     callbacks.onBossSignal?.('RELOADING', e.position);
+                    playSound('reload');
                 }
             }
             return { moveDir: null };
@@ -491,7 +492,7 @@ function updateBoss(e, u, ctx) {
                     const angle = (i / 12) * Math.PI * 2;
                     spawnBullet(scene, 'enemy', from, new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(26));
                 }
-                playSound('shoot');
+                playSound('enemy-shot');
                 u.state = 'solid'; u.stateTimer = 3 + Math.random();
                 u.shootTimer = 1.4;
             }

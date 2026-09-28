@@ -1,15 +1,24 @@
+import { SFX, MUSIC, VOICE } from './audioManifest.js';
+
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const masterGain = audioCtx.createGain();
 const musicGain = audioCtx.createGain();
 const sfxGain = audioCtx.createGain();
+// Music volume scales both the recorded tracks and the synthesized fallback loop.
+const synthMusicGain = audioCtx.createGain();
+const fileMusicGain = audioCtx.createGain();
 const AUDIO_SETTINGS_KEY = 'redWestAudioSettings';
-const BASE_MUSIC_GAIN = 0.18;
+const DEFAULT_MUSIC_VOLUME = 0.6;
 const BASE_SFX_GAIN = 1.0;
 
 masterGain.gain.value = 0.55;
-musicGain.gain.value = BASE_MUSIC_GAIN;
+musicGain.gain.value = DEFAULT_MUSIC_VOLUME;
 sfxGain.gain.value = BASE_SFX_GAIN;
+synthMusicGain.gain.value = 0.18 / DEFAULT_MUSIC_VOLUME; // the synth loop's original level at the default volume
+fileMusicGain.gain.value = 0.6;
 
+synthMusicGain.connect(musicGain);
+fileMusicGain.connect(musicGain);
 musicGain.connect(masterGain);
 sfxGain.connect(masterGain);
 masterGain.connect(audioCtx.destination);
@@ -18,6 +27,7 @@ let musicIntervalId = null;
 let musicStep = 0;
 let musicEnabled = true;
 let sfxEnabled = true;
+let musicVolume = DEFAULT_MUSIC_VOLUME;
 
 function loadAudioSettings() {
     try {
@@ -26,17 +36,22 @@ function loadAudioSettings() {
         const parsed = JSON.parse(raw);
         if(typeof parsed.musicEnabled === 'boolean') musicEnabled = parsed.musicEnabled;
         if(typeof parsed.sfxEnabled === 'boolean') sfxEnabled = parsed.sfxEnabled;
+        if(typeof parsed.musicVolume === 'number' && parsed.musicVolume >= 0 && parsed.musicVolume <= 1) musicVolume = parsed.musicVolume;
     } catch {
         // Use defaults if settings are missing or malformed.
     }
 }
 
 function persistAudioSettings() {
-    localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify({ musicEnabled, sfxEnabled }));
+    try {
+        localStorage.setItem(AUDIO_SETTINGS_KEY, JSON.stringify({ musicEnabled, sfxEnabled, musicVolume }));
+    } catch {
+        // Settings still apply for this session.
+    }
 }
 
 function applyAudioSettings() {
-    musicGain.gain.value = musicEnabled ? BASE_MUSIC_GAIN : 0;
+    musicGain.gain.value = musicEnabled ? musicVolume : 0;
     sfxGain.gain.value = sfxEnabled ? BASE_SFX_GAIN : 0;
 }
 
@@ -48,7 +63,7 @@ function scheduleTone(freq, duration, when, volume, type = 'triangle') {
     gain.gain.setValueAtTime(volume, when);
     gain.gain.exponentialRampToValueAtTime(0.0001, when + duration);
     osc.connect(gain);
-    gain.connect(musicGain);
+    gain.connect(synthMusicGain);
     osc.start(when);
     osc.stop(when + duration);
 }
@@ -62,12 +77,12 @@ function playKick(when) {
     gain.gain.setValueAtTime(0.22, when);
     gain.gain.exponentialRampToValueAtTime(0.0001, when + 0.15);
     osc.connect(gain);
-    gain.connect(musicGain);
+    gain.connect(synthMusicGain);
     osc.start(when);
     osc.stop(when + 0.16);
 }
 
-function startBackgroundTrack() {
+function startSynthTrack() {
     if(musicIntervalId !== null) return;
     const bassPattern = [110, 110, 123.47, 98, 110, 110, 123.47, 98];
     const leadPattern = [329.63, 293.66, 261.63, 293.66, 329.63, 392.0, 329.63, 293.66];
@@ -83,10 +98,120 @@ function startBackgroundTrack() {
     }, stepDuration * 1000);
 }
 
-function stopBackgroundTrack() {
+function stopSynthTrack() {
     if(musicIntervalId === null) return;
     clearInterval(musicIntervalId);
     musicIntervalId = null;
+}
+
+// ---------- Recorded audio (public/audio, made by tools/elevenlabs.mjs) ----------
+// Each file loads once. Until it has loaded, or if it fails, the synthesized sound plays instead.
+const buffers = new Map(); // 'dir/key' -> AudioBuffer, or null when the file failed
+const loading = new Map(); // 'dir/key' -> Promise<AudioBuffer|null>
+
+function loadBuffer(dir, key) {
+    const id = `${dir}/${key}`;
+    if(!loading.has(id)) {
+        const url = new URL(`audio/${id}.mp3`, document.baseURI);
+        loading.set(id, fetch(url)
+            .then(response => {
+                if(!response.ok) throw new Error(`${response.status}`);
+                return response.arrayBuffer();
+            })
+            .then(data => new Promise((resolve, reject) => audioCtx.decodeAudioData(data, resolve, reject)))
+            .then(buffer => {
+                buffers.set(id, buffer);
+                return buffer;
+            })
+            .catch(() => {
+                buffers.set(id, null);
+                return null;
+            }));
+    }
+    return loading.get(id);
+}
+
+function playBuffer(buffer, destination, volume = 1) {
+    const source = audioCtx.createBufferSource();
+    source.buffer = buffer;
+    if(volume === 1) source.connect(destination);
+    else {
+        const gain = audioCtx.createGain();
+        gain.gain.value = volume;
+        source.connect(gain);
+        gain.connect(destination);
+    }
+    source.start();
+    return source;
+}
+
+// Effects are small, so they all load up front.
+for(const key of Object.keys(SFX)) loadBuffer('sfx', key);
+
+// Old sound names from before the recorded effects.
+const SFX_ALIASES = { shoot: 'shot-revolver', thud: 'hit' };
+// When a recorded effect is missing, the closest built-in beep plays.
+const BEEP_FOR = {
+    'shot-revolver': 'shoot', 'shot-twins': 'shoot', 'shot-rifle': 'shoot', 'shot-shotgun': 'shoot',
+    'shot-sawedoff': 'shoot', 'shot-buffalo': 'shoot', 'enemy-shot': 'shoot', dash: 'shoot', fuse: 'shoot',
+    hurt: 'hit', clang: 'hit', howl: 'heatUp', 'outlaw-down': 'heatUp', coin: 'powerup', bounty: 'powerup'
+};
+// Many enemies can fire in the same frame; one copy per key per 30 ms keeps it from clipping.
+const lastPlayedAt = new Map();
+const REPEAT_GAP = 0.03;
+
+function playRecordedSfx(key) {
+    const buffer = buffers.get(`sfx/${key}`);
+    if(!buffer) return false;
+    const now = audioCtx.currentTime;
+    if(now - (lastPlayedAt.get(key) ?? -1) < REPEAT_GAP) return true;
+    lastPlayedAt.set(key, now);
+    playBuffer(buffer, sfxGain);
+    return true;
+}
+
+// ---------- Music: a recorded loop per screen, the synth loop as fallback ----------
+let musicTrack = 'home';
+let musicSource = null;
+let musicSourceTrack = null;
+
+function stopRecordedMusic() {
+    if(!musicSource) return;
+    try { musicSource.stop(); } catch { /* already stopped */ }
+    musicSource.disconnect();
+    musicSource = null;
+    musicSourceTrack = null;
+}
+
+function startBackgroundTrack() {
+    const id = `music/${musicTrack}`;
+    const buffer = buffers.get(id);
+    if(buffer) {
+        stopSynthTrack();
+        if(musicSourceTrack === musicTrack) return;
+        stopRecordedMusic();
+        musicSource = audioCtx.createBufferSource();
+        musicSource.buffer = buffer;
+        musicSource.loop = true;
+        musicSource.connect(fileMusicGain);
+        musicSource.start();
+        musicSourceTrack = musicTrack;
+        return;
+    }
+    // Not loaded (yet): keep the synth loop going, then switch once the file arrives.
+    stopRecordedMusic();
+    startSynthTrack();
+    if(!loading.has(id)) {
+        const wanted = musicTrack;
+        loadBuffer('music', wanted).then(loaded => {
+            if(loaded && musicEnabled && musicTrack === wanted) startBackgroundTrack();
+        });
+    }
+}
+
+function stopBackgroundTrack() {
+    stopSynthTrack();
+    stopRecordedMusic();
 }
 
 loadAudioSettings();
@@ -97,9 +222,16 @@ export function resumeAudio() {
     if(musicEnabled) startBackgroundTrack();
 }
 
+// Plays a sound by its key in src/audioManifest.js (or an old name like 'shoot').
 export function playSound(type) {
     resumeAudio();
     if(!sfxEnabled) return;
+    const key = SFX_ALIASES[type] || type;
+    if(playRecordedSfx(key)) return;
+    playBeep(BEEP_FOR[key] || key);
+}
+
+function playBeep(type) {
     const now = audioCtx.currentTime;
 
     if(type === 'shoot') {
@@ -208,8 +340,36 @@ export function playSound(type) {
     }
 }
 
+// Switches the music loop: 'home', 'fight' or 'showdown'.
+export function setMusicTrack(track) {
+    if(!MUSIC[track] || track === musicTrack) return;
+    musicTrack = track;
+    if(musicEnabled && (musicIntervalId !== null || musicSource)) startBackgroundTrack();
+}
+
+// Voice lines load when first needed. One line at a time; a line that takes over
+// 2 seconds to arrive is skipped so it never plays out of context.
+let voiceSource = null;
+export function playVoice(key) {
+    if(!VOICE[key] || !sfxEnabled) return;
+    const requestedAt = performance.now();
+    loadBuffer('voice', key).then(buffer => {
+        if(!buffer || !sfxEnabled || performance.now() - requestedAt > 2000) return;
+        if(voiceSource) {
+            try { voiceSource.stop(); } catch { /* already stopped */ }
+        }
+        voiceSource = playBuffer(buffer, sfxGain, 1.2);
+    });
+}
+
 export function getAudioSettings() {
-    return { musicEnabled, sfxEnabled };
+    return { musicEnabled, sfxEnabled, musicVolume };
+}
+
+export function setMusicVolume(volume) {
+    musicVolume = Math.min(1, Math.max(0, Number(volume) || 0));
+    applyAudioSettings();
+    persistAudioSettings();
 }
 
 export function setMusicEnabled(enabled) {

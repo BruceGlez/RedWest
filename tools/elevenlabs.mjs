@@ -1,11 +1,11 @@
-// Make the game's audio with the ElevenLabs API from tools/audio-manifest.mjs into public/audio/.
+// Make the game's audio with the ElevenLabs API from src/audioManifest.js into public/audio/.
 //
 //   export ELEVENLABS_API_KEY=...   (set it in the environment's settings; never commit it)
 //   node tools/elevenlabs.mjs [sfx|music|voice|all] [--only key,key] [--force]
 //
 // Existing files are kept unless --force. Needs network access to api.elevenlabs.io.
 import { mkdir, writeFile, access } from 'node:fs/promises';
-import { SFX, MUSIC, VOICE } from './audio-manifest.mjs';
+import { SFX, MUSIC, VOICE } from '../src/audioManifest.js';
 
 const API = 'https://api.elevenlabs.io';
 const headers = () => ({ 'xi-api-key': process.env.ELEVENLABS_API_KEY, 'Content-Type': 'application/json' });
@@ -30,7 +30,8 @@ async function save(dir, key, data) {
 
 async function makeSfx(key, { prompt, seconds }) {
     // Low bitrate keeps effects to a few KB each.
-    return post('/v1/sound-generation?output_format=mp3_44100_64', { text: prompt, duration_seconds: seconds, prompt_influence: 0.6 });
+    // The API accepts 0.5 to 30 seconds.
+    return post('/v1/sound-generation?output_format=mp3_44100_64', { text: prompt, duration_seconds: Math.min(30, Math.max(0.5, seconds)), prompt_influence: 0.6 });
 }
 
 async function makeMusic(key, { prompt, seconds }) {

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { keys, touch } from './input.js';
-import { resumeAudio, playSound, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
+import { resumeAudio, playSound, playVoice, setMusicTrack, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { gameState, playerStats, obstacles, enemies, loots, resetGameState, resetPlayerStats, clearDynamicState } from './state.js';
 import { generateMap, updateSun } from './world.js';
 import { spawnEnemy, updateEnemies, updateHazards, clearHazards } from './enemySystem.js';
@@ -88,6 +88,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     // result: 'died' | 'banked' | 'escaped'
     function finishRun(result) {
         if(gameState.isGameOver) return;
+        setMusicTrack('home');
+        if(result === 'banked' || result === 'escaped') {
+            playSound('bounty');
+            playVoice(result === 'banked' ? 'announce-bounty' : 'announce-escaped');
+        }
         if(arena.enabled) {
             // Practice: show the result, record nothing.
             gameState.runWon = result !== 'died';
@@ -168,10 +173,13 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             if(performance.now() - lastDeflectAt < 600) return;
             lastDeflectAt = performance.now();
             floatText('CLANG!', position, '');
+            playSound('clang');
         },
         onGameOver: () => finishRun('died'),
         onBossDefeated: () => {
             if(bountyChoiceAt) return;
+            playSound('outlaw-down');
+            playVoice('announce-outlaw-down');
             addShake(0.9);
             haptic('heavy');
             hitStop(OUTLAW_DOWN_SLOWMO_MS);
@@ -230,9 +238,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             const count = outlaw.signature.style === 'brothers' ? 3 : 1;
             for(let i = 0; i < count; i++) spawn('boss');
             gameState.waveBossSpawned = true;
+            setMusicTrack('showdown');
+            playVoice(outlaw.id);
             // The banner teaches the outlaw's signature move.
             ui.showWaveBanner(`${outlaw.name} RIDE${count > 1 ? '' : 'S'} IN — ${outlaw.signature.tip}`, 3200);
         } else if(waveNumber === BONUS_WAVE) {
+            setMusicTrack('fight');
             const featured = featuredFor(gameState.outlawIndex);
             for(const type of ['gunslinger', 'wolf', 'wolf', ...(featured ? [featured] : [])]) {
                 spawn(type);
@@ -404,6 +415,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
     function resetGame() {
         bountyChoiceAt = 0;
+        setMusicTrack('home');
         resetFeedback();
         clearSceneCollections();
         resetGameState();
@@ -492,7 +504,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 sessionRun++;
                 ui.hideStartScreen();
                 camera.position.copy(cameraOffset());
+                setMusicTrack('fight');
                 resumeAudio();
+                playVoice('marshal-start');
                 // The arena goes straight to the outlaw.
                 beginWave(arena.enabled ? FINAL_WAVE : 1);
             }
