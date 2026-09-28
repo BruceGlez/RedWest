@@ -328,9 +328,9 @@ export function createUIManager(gameState, playerStats) {
 
     function posterHtml(index) {
         const outlaw = OUTLAWS[index];
-        const threats = outlaw.modifiers.length
-            ? outlaw.modifiers.map(id => `<span class="threat" title="${MODIFIERS[id].detail}">${MODIFIERS[id].label}</span>`).join('')
-            : '<span class="threat calm">NO TRICKS</span>';
+        // The outlaw's own attack first, then the gang's threats.
+        const threats = `<span class="threat signature" title="${outlaw.signature.detail}">&#9733; ${outlaw.signature.move}</span>`
+            + outlaw.modifiers.map(id => `<span class="threat" title="${MODIFIERS[id].detail}">${MODIFIERS[id].label}</span>`).join('');
         return '<div class="poster-wanted">WANTED</div><div class="poster-sub">DEAD OR ALIVE</div>'
             + portraitHtml(outlaw)
             + `<div class="poster-name">${outlaw.name}</div><div class="poster-title">${outlaw.title}</div>`
@@ -553,6 +553,7 @@ export function createUIManager(gameState, playerStats) {
             const status = defeated ? 'DEFEATED' : unlocked ? 'AT LARGE' : 'LOCKED';
             return `<div class="book-card outlaw${unlocked ? '' : ' locked'}">${portraitHtml(outlaw)}<div class="book-info">`
                 + `<h4>${unlocked ? outlaw.name : '???'}</h4><p class="book-from">${unlocked ? outlaw.title : `Stage ${i + 1}`}</p>`
+                + (unlocked ? `<p class="book-tip"><b>${outlaw.signature.move}:</b> ${outlaw.signature.detail}</p>` : '')
                 + `<p class="book-status ${defeated ? 'done' : ''}">${status}</p>`
                 + `<p class="poster-stars">${starsHtml(progress.stars[i])}</p></div></div>`;
         }).join('');

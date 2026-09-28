@@ -147,8 +147,16 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         beginWave(BONUS_WAVE);
     }
 
+    let lastDeflectAt = 0;
     const callbacks = {
         onUpdateHUD: () => ui.updateHUD(),
+        // Outlaw signature moves announce themselves (howl, reload, reappearing ghost).
+        onBossSignal: (text, position) => floatText(text, position, 'hot'),
+        onDeflect: position => {
+            if(performance.now() - lastDeflectAt < 600) return;
+            lastDeflectAt = performance.now();
+            floatText('CLANG!', position, '');
+        },
         onGameOver: () => finishRun('died'),
         onBossDefeated: () => {
             if(bountyChoiceAt) return;
@@ -206,9 +214,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         gameState.enemySpawnTimer = 0.55;
         gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, waveNumber);
         if(waveNumber === FINAL_WAVE) {
-            spawn('boss');
+            const outlaw = getOutlaw(gameState.outlawIndex);
+            const count = outlaw.signature.style === 'brothers' ? 3 : 1;
+            for(let i = 0; i < count; i++) spawn('boss');
             gameState.waveBossSpawned = true;
-            ui.showWaveBanner(`${getOutlaw(gameState.outlawIndex).name} RIDES IN — TAKE THE BOUNTY`, 2500);
+            // The banner teaches the outlaw's signature move.
+            ui.showWaveBanner(`${outlaw.name} RIDE${count > 1 ? '' : 'S'} IN — ${outlaw.signature.tip}`, 3200);
         } else if(waveNumber === BONUS_WAVE) {
             const featured = featuredFor(gameState.outlawIndex);
             for(const type of ['gunslinger', 'wolf', 'wolf', ...(featured ? [featured] : [])]) {

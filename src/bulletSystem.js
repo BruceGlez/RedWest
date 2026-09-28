@@ -150,6 +150,15 @@ function respawnObstacle(scene, type, playerGroup) {
     respawnTimeouts.add(timeoutId);
 }
 
+// True when a bullet comes at the enemy's face (within about 70 degrees of head-on).
+const facing = new THREE.Vector3();
+const travel = new THREE.Vector3();
+function isFrontalHit(enemy, bullet) {
+    enemy.getWorldDirection(facing).setY(0).normalize();
+    travel.copy(bullet.userData.velocity).setY(0).normalize();
+    return facing.dot(travel) < -0.35;
+}
+
 export function updateBullets(dt, scene, playerGroup, callbacks) {
     const runStats = gameState.runStats;
     rebuildEnemyGrid(enemies);
@@ -228,6 +237,16 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
             if(b.userData.hitEnemies?.includes(e)) continue; // a piercing bullet already went through
             const hitRad = e.userData.hitRadius ?? ((e.userData.type === 'boss') ? 2.5 : 2.0);
             
+            if(dist < hitRad && e.userData.frontArmor && isFrontalHit(e, b)) {
+                // Iron front: the shot bounces off. It still counts as on target for Heat.
+                resolveVolley(b, true, callbacks);
+                createExplosion(scene, b.position, 0xcfd8dc);
+                playSound('break');
+                callbacks.onDeflect?.(e.position);
+                releaseBullet(scene, b, i);
+                bulletHit = true;
+                break;
+            }
             if(dist < hitRad) {
                 resolveVolley(b, true, callbacks);
                 if(b.userData.pierce > 0) {
@@ -253,7 +272,8 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     else if(e.userData.type === 'boss') runStats.bossesKilled++;
                     runStats.kills[e.userData.type] = (runStats.kills[e.userData.type] || 0) + 1;
                     callbacks.onEnemyKilled?.(e.userData.type, e.position);
-                    if(e.userData.type === 'boss') callbacks.onBossDefeated?.();
+                    // Several outlaws (the Calloways) only count as beaten when the last one falls.
+                    if(e.userData.type === 'boss' && !enemies.some(other => other.userData.type === 'boss')) callbacks.onBossDefeated?.();
                 } else { 
                     // Enemy Hit
                     playSound('hit'); 

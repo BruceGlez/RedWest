@@ -465,16 +465,21 @@ export function createRattlerMesh() {
     return group;
 }
 
-export function createRiflemanMesh() {
-    const group = createHumanoid({ type: 'rifleman', coat: 0x2f5d8a, hat: 0x3b2a1a, bandana: 0xe0e0e0, weapon: 'rifle', hatStyle: 'bowler' });
-    // Aim laser: a thin red beam along the enemy's facing (+Z), stretched to the player while aiming.
-    const laser = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 1), new THREE.MeshBasicMaterial({ color: 0xff1744, transparent: true, opacity: 0.7, depthWrite: false }));
+// Aim laser: a thin red beam along the enemy's facing (+Z), stretched to the player while aiming.
+export function addAimLaser(group, { width = 0.12, height = 2.6 } = {}) {
+    const laser = new THREE.Mesh(new THREE.BoxGeometry(width, 0.05, 1), new THREE.MeshBasicMaterial({ color: 0xff1744, transparent: true, opacity: 0.7, depthWrite: false }));
     laser.geometry.translate(0, 0, 0.5);
-    laser.position.set(0, 2.6, 0);
+    laser.position.set(0, height, 0);
     laser.visible = false;
     laser.userData.noOutline = true;
     group.add(laser);
     group.userData.laser = laser;
+    return laser;
+}
+
+export function createRiflemanMesh() {
+    const group = createHumanoid({ type: 'rifleman', coat: 0x2f5d8a, hat: 0x3b2a1a, bandana: 0xe0e0e0, weapon: 'rifle', hatStyle: 'bowler' });
+    addAimLaser(group);
     addOutline(group);
     return group;
 }

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createBossMesh, createWolfMesh, createGunslingerMesh, createEnemyMesh, createRattlerMesh, createRiflemanMesh,
-    createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh } from './assets.js';
+    createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh, addAimLaser } from './assets.js';
 import { ENEMY_TYPES } from './enemyTypes.js';
 import { createExplosion } from './particleSystem.js';
 import { addShake, haptic } from './feedback.js';
@@ -77,9 +77,10 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
     // The wave director in gameLoop.js always chooses the type.
     const spawnType = requestedType || 'bandit';
 
+    const bossStyle = spawnType === 'boss' ? getOutlaw(gameState.outlawIndex).signature.style : null;
     if (spawnType === 'boss') { 
         enemy = createBossMesh(getOutlaw(gameState.outlawIndex).colors); 
-        enemy.scale.setScalar(1.2); 
+        enemy.scale.setScalar(bossStyle === 'brothers' ? 1.0 : 1.2); 
         speed = 3.2 + Math.min(wave * 0.08, 1.5); 
         type = 'boss'; 
         hp = 12 + Math.floor(wave * 1.5); 
@@ -144,7 +145,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
         aimSpread: stats.aimSpread,
         isMoving: true, 
         armAngle: 2.8,
-        behavior: type === 'boss' ? 'shooter' : (def?.behavior ?? 'chase'),
+        behavior: type === 'boss' ? 'boss' : (def?.behavior ?? 'chase'),
         heavy: !!def?.heavy,
         hitRadius: def?.hitRadius,
         state: 'move',
@@ -154,6 +155,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
         faded: false,
         untargetable: false
     });
+    if(type === 'boss') setupBoss(enemy, bossStyle);
     if(type === 'ghost') enemy.userData.stateTimer = 1.5 + Math.random();
     if(type === 'rider') enemy.userData.stateTimer = 2.5 + Math.random() * 1.5;
 
@@ -260,6 +262,229 @@ function keepRange(dir, dist, near, far) {
     return null;
 }
 
+// ---------- Outlaw signature attacks (OUTLAWS[].signature in outlaws.js) ----------
+// All timings are first guesses for playtesting. Every attack has a visible tell before it lands.
+const BROTHER_HP_SHARE = 0.45;
+
+function setupBoss(enemy, style) {
+    const u = enemy.userData;
+    u.bossStyle = style;
+    u.special = 3 + Math.random(); // time to the next signature move
+    u.shootTimer = 1.5 + Math.random();
+    if(style === 'brothers') {
+        u.hp = u.maxHp = Math.max(4, Math.ceil(u.hp * BROTHER_HP_SHARE));
+        u.strafe = Math.random() < 0.5 ? -1 : 1;
+        u.shootTimer = 0.8 + Math.random() * 1.6;
+    }
+    if(style === 'preacher') addAimLaser(enemy, { width: 0.3, height: 2.4 });
+    if(style === 'juggernaut') u.frontArmor = true;
+    if(style === 'specter') {
+        // Own see-through materials, so fading him never fades anyone else sharing a colour.
+        u.fadeMaterials = [];
+        enemy.traverse(o => {
+            if(!o.isMesh || o.userData.isOutline) return;
+            o.material = o.material.clone();
+            o.material.transparent = true;
+            u.fadeMaterials.push(o.material);
+        });
+        u.state = 'solid';
+        u.stateTimer = 3;
+    }
+}
+
+function turnToward(u, dir, maxAngle) {
+    if(!u.facing) u.facing = dir.clone();
+    const angle = Math.atan2(u.facing.x * dir.z - u.facing.z * dir.x, u.facing.dot(dir));
+    u.facing.applyAxisAngle(UP, -Math.sign(angle) * Math.min(Math.abs(angle), maxAngle)).normalize();
+    return u.facing;
+}
+
+function freeSpotNear(center, minR, maxR) {
+    for(let attempt = 0; attempt < 10; attempt++) {
+        const angle = Math.random() * Math.PI * 2;
+        const r = minR + Math.random() * (maxR - minR);
+        const x = center.x + Math.cos(angle) * r;
+        const z = center.z + Math.sin(angle) * r;
+        if(!checkCollision(x, z, 1.2)) return { x, z };
+    }
+    return null;
+}
+
+// Windup (shake) -> charge along a locked line -> recover (standing, open to shots).
+function chargeCycle(e, u, dir, dist, timeInSeconds, { range, windup, speed, time, recover, cooldown }) {
+    if(u.state === 'move' && dist < range && u.cooldown <= 0) { u.state = 'windup'; u.stateTimer = windup; }
+    if(u.state === 'windup') {
+        e.children[0].position.x = Math.sin(timeInSeconds * 60) * 0.15;
+        if(u.stateTimer <= 0) { u.state = 'charge'; u.stateTimer = time; u.lockedDir = dir.clone(); e.children[0].position.x = 0; }
+        return { moveDir: null, faceDir: u.facing ?? null };
+    }
+    if(u.state === 'charge') {
+        if(u.stateTimer <= 0) { u.state = 'recover'; u.stateTimer = recover; }
+        return { moveDir: u.lockedDir, faceDir: u.lockedDir, speed };
+    }
+    if(u.state === 'recover') {
+        if(u.stateTimer <= 0) { u.state = 'move'; u.cooldown = cooldown; }
+        return { moveDir: null, faceDir: u.lockedDir };
+    }
+    return null;
+}
+
+function updateBoss(e, u, ctx) {
+    const { dt, dist, dir, playerPos, scene, callbacks, timeInSeconds } = ctx;
+    u.shootTimer -= dt;
+    u.special -= dt;
+    const fan = () => { enemyShoot(e, playerPos, scene); u.shootTimer = u.shootCooldown || (2 + Math.random()); };
+    switch(u.bossStyle) {
+    case 'brawler': {
+        // Dusty Pete: no gun play, just a telegraphed charge and a breather after it.
+        const charge = chargeCycle(e, u, dir, dist, timeInSeconds, { range: 18, windup: 0.7, speed: 26, time: 0.7, recover: 1.1, cooldown: 1.8 });
+        return charge ?? { moveDir: dir };
+    }
+    case 'packleader': {
+        // Rattlesnake Rosa: keeps her distance, shoots, and howls wolves in.
+        if(u.state === 'howl') {
+            if(u.stateTimer <= 0) {
+                for(let i = 0; i < 2; i++) {
+                    spawnEnemy(scene, playerPos, 'wolf');
+                    const spot = freeSpotNear(e.position, 3, 5);
+                    if(spot) enemies.at(-1).position.set(spot.x, 0, spot.z);
+                }
+                u.state = 'move';
+                u.special = 9;
+            }
+            return { moveDir: null };
+        }
+        if(u.special <= 0 && enemies.filter(o => o.userData.type === 'wolf').length < 6) {
+            u.state = 'howl'; u.stateTimer = 0.9;
+            callbacks.onBossSignal?.('AWOOO!', e.position);
+            playSound('heatUp');
+            return { moveDir: null };
+        }
+        u.isAiming = u.shootTimer < 0.6 && dist < 40;
+        if(u.shootTimer <= 0 && dist < 38) fan();
+        return { moveDir: keepRange(dir, dist, 14, 24) };
+    }
+    case 'preacher': {
+        // Deacon Graves: a thick red line marks the triple shot; it locks just before firing.
+        const laser = u.laser;
+        if(u.shootTimer < 1.3 && dist < 55) {
+            u.isAiming = true;
+            if(u.shootTimer > 0.4 || !u.lockedDir) { u.lockedDir = dir.clone(); u.lockedTarget = playerPos.clone(); }
+            laser.visible = true;
+            laser.scale.z = Math.min(dist + 20, 70);
+            laser.material.opacity = u.shootTimer < 0.4 ? 0.95 : 0.45;
+            if(u.shootTimer <= 0) {
+                fireBullets(e, u.lockedTarget, 3, 0.12, 80, scene);
+                u.shootTimer = (u.shootCooldown || 2.5) + 0.8;
+                u.lockedDir = null;
+                laser.visible = false;
+            }
+            return { moveDir: null, faceDir: u.lockedDir };
+        }
+        laser.visible = false;
+        return { moveDir: keepRange(dir, dist, 20, 32) };
+    }
+    case 'brothers': {
+        // The Calloways: three weaker brothers circling and firing single shots.
+        const tangent = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(u.strafe);
+        const radial = dist > 22 ? 1 : dist < 10 ? -1 : 0;
+        u.isAiming = u.shootTimer < 0.5 && dist < 36;
+        if(u.shootTimer <= 0 && dist < 34) {
+            fireBullets(e, playerPos, 1, 0, u.projectileSpeed || 40, scene);
+            u.shootTimer = 1.4 + Math.random() * 1.2;
+        }
+        if(u.special <= 0) { u.strafe *= -1; u.special = 2 + Math.random() * 2; }
+        return { moveDir: tangent.addScaledVector(dir, radial).normalize() };
+    }
+    case 'juggernaut': {
+        // Iron Jack: armoured front (see bulletSystem), turns slowly, charges now and then.
+        // Turns slowly while walking; holds the charge line through the charge and recovery.
+        if((u.state === 'charge' || u.state === 'recover') && u.lockedDir) u.facing = u.lockedDir.clone();
+        const facing = u.state === 'move' ? turnToward(u, dir, 1.3 * dt) : (u.facing ??= dir.clone());
+        const charge = chargeCycle(e, u, facing, dist, timeInSeconds, { range: 22, windup: 1.0, speed: 22, time: 1.0, recover: 1.8, cooldown: 3.5 });
+        if(charge) return charge;
+        u.isAiming = u.shootTimer < 0.6 && dist < 36;
+        if(u.shootTimer <= 0 && dist < 34) fan();
+        return { moveDir: dist > 8 ? facing : null, faceDir: facing, speed: u.speed * 0.8 };
+    }
+    case 'bombardier': {
+        // Mad Mesa Morgan: three sticks of dynamite at once, around where you stand.
+        u.isAiming = u.shootTimer < 0.6 && dist < 32;
+        if(u.shootTimer <= 0 && dist < 30) {
+            const side = new THREE.Vector3(-dir.z, 0, dir.x);
+            for(const offset of [0, -6, 6]) throwDynamite(scene, e.position, playerPos.clone().addScaledVector(side, offset));
+            u.shootTimer = (u.shootCooldown || 2.5) + 1.6;
+        }
+        return { moveDir: keepRange(dir, dist, 14, 22) };
+    }
+    case 'fanhammer': {
+        // Silas Vane: aims, fans six fast shots, then stands still to reload.
+        if(u.state === 'burst') {
+            if(u.stateTimer <= 0) {
+                const target = playerPos.clone();
+                target.x += (Math.random() - 0.5) * 2.5;
+                target.z += (Math.random() - 0.5) * 2.5;
+                fireBullets(e, target, 1, 0, (u.projectileSpeed || 40) * 1.15, scene);
+                u.shotsLeft--;
+                u.stateTimer = 0.11;
+                if(u.shotsLeft <= 0) {
+                    u.state = 'reload'; u.stateTimer = 2.2;
+                    callbacks.onBossSignal?.('RELOADING', e.position);
+                }
+            }
+            return { moveDir: null };
+        }
+        if(u.state === 'reload') {
+            if(u.stateTimer <= 0) { u.state = 'move'; u.shootTimer = 1.2; }
+            return { moveDir: null };
+        }
+        u.isAiming = u.shootTimer < 0.7 && dist < 36;
+        if(u.shootTimer <= 0 && dist < 34) { u.state = 'burst'; u.stateTimer = 0; u.shotsLeft = 6; }
+        const tangent = new THREE.Vector3(-dir.z, 0, dir.x);
+        return { moveDir: (keepRange(dir, dist, 12, 22) ?? new THREE.Vector3()).addScaledVector(tangent, 0.6).normalize() };
+    }
+    case 'specter': {
+        // El Espectro: solid (fan shot) -> fades out, untouchable -> reappears beside you -> ring of bullets.
+        if(u.state === 'solid') {
+            if(u.shootTimer <= 0 && dist < 36) fan();
+            if(u.stateTimer <= 0) { setGhostFaded(e, true); u.state = 'fade'; u.stateTimer = 1.8; }
+            return { moveDir: keepRange(dir, dist, 10, 22) };
+        }
+        if(u.state === 'fade') {
+            if(u.stateTimer <= 0) {
+                const spot = freeSpotNear(playerPos, 8, 11);
+                if(spot) e.position.set(spot.x, 0, spot.z);
+                setGhostFaded(e, false);
+                u.state = 'appear'; u.stateTimer = 0.5;
+                callbacks.onBossSignal?.('BOO!', e.position);
+            }
+            return { moveDir: dir, speed: u.speed * 1.8 };
+        }
+        if(u.state === 'appear') {
+            e.children[0].position.x = Math.sin(timeInSeconds * 60) * 0.12;
+            if(u.stateTimer <= 0) {
+                e.children[0].position.x = 0;
+                const from = e.position.clone().setY(2.2);
+                for(let i = 0; i < 12; i++) {
+                    const angle = (i / 12) * Math.PI * 2;
+                    spawnBullet(scene, 'enemy', from, new THREE.Vector3(Math.cos(angle), 0, Math.sin(angle)).multiplyScalar(26));
+                }
+                playSound('shoot');
+                u.state = 'solid'; u.stateTimer = 3 + Math.random();
+                u.shootTimer = 1.4;
+            }
+            return { moveDir: null };
+        }
+        return { moveDir: dir };
+    }
+    default: {
+        u.isAiming = u.shootTimer < 0.8 && dist < 45;
+        if(u.shootTimer <= 0 && dist < 40) fan();
+        return { moveDir: dist < 15 ? null : dir };
+    }
+    }
+}
+
 /**
  * Main update loop for all enemies
  */
@@ -282,6 +507,13 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         u.cooldown -= dt;
 
         switch(u.behavior) {
+        case 'boss': {
+            const result = updateBoss(e, u, { dt, dist, dir, playerPos, scene, callbacks, timeInSeconds });
+            moveDir = result.moveDir;
+            if(result.faceDir) faceDir = result.faceDir;
+            if(result.speed) speed = result.speed;
+            break;
+        }
         case 'shooter': {
             u.shootTimer -= dt;
             u.isAiming = u.shootTimer < 0.8 && dist < 45;
@@ -416,8 +648,9 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
                 e.position.z += moveZ;
                 isMoving = true;
             } else if(u.state === 'charge') {
-                u.state = u.behavior === 'charger' ? 'recover' : 'move';
-                u.stateTimer = u.behavior === 'charger' ? 0.9 : 3;
+                const recovers = u.behavior === 'charger' || u.behavior === 'boss';
+                u.state = recovers ? 'recover' : 'move';
+                u.stateTimer = recovers ? 0.9 : 3;
                 addShake(0.15);
             }
         }
@@ -431,10 +664,14 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
 
         // --- COLLISION WITH PLAYER (DAMAGE) ---
         // Enemies stop moving at 2.0 units, so every reach must be larger than that.
-        const reach = u.heavy ? 3.2 : u.type === 'rattler' ? 2.2 : 2.5;
+        const big = u.heavy || u.type === 'boss';
+        const reach = u.type === 'boss' ? 3.4 : u.heavy ? 3.2 : u.type === 'rattler' ? 2.2 : 2.5;
         if(!u.faded && e.position.distanceTo(playerPos) < reach && damagePlayer(callbacks)) {
-            e.position.add(dir.clone().multiplyScalar(u.heavy ? -2 : -5));
-            if(u.state === 'charge') { u.state = u.behavior === 'charger' ? 'recover' : 'move'; u.stateTimer = 1; }
+            e.position.add(dir.clone().multiplyScalar(big ? -2.5 : -5));
+            if(u.state === 'charge') {
+                u.state = u.behavior === 'charger' || u.behavior === 'boss' ? 'recover' : 'move';
+                u.stateTimer = 1;
+            }
         }
     }
 }

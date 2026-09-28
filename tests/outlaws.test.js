@@ -33,3 +33,11 @@ test('inputs are not mutated and out-of-range stages clamp', () => {
     assert.equal(getOutlaw(99).id, OUTLAWS.at(-1).id);
     assert.equal(getOutlaw(-3).id, OUTLAWS[0].id);
 });
+
+test('every outlaw has its own signature attack with a tip and a description', () => {
+    const styles = OUTLAWS.map(outlaw => outlaw.signature?.style);
+    assert.equal(new Set(styles).size, OUTLAWS.length, 'no two outlaws share an attack');
+    for(const outlaw of OUTLAWS) {
+        assert.ok(outlaw.signature.move && outlaw.signature.tip && outlaw.signature.detail, outlaw.id);
+    }
+});

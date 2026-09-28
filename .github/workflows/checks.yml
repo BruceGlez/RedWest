@@ -29,3 +29,6 @@ jobs:
       - run: npm run test:store
         env:
           CHROME_PATH: /usr/bin/google-chrome
+      - run: npm run test:bosses
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
