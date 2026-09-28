@@ -84,15 +84,20 @@ function createStudio(renderer) {
     const center = new THREE.Vector3();
     const size = new THREE.Vector3();
     const viewDir = new THREE.Vector3(0.55, 0.45, 1).normalize();
+    // Soft front fill so faces under wide hat brims are not lost in shadow.
+    const fill = new THREE.DirectionalLight(0xfff0dc, 0.9);
+    fill.position.set(0, 1, 6);
+    scene.add(fill);
     return {
-        capture(model, zoom = 1.25) {
+        // view: direction from the model to the camera (default: a little above, three-quarter).
+        capture(model, zoom = 1.25, view = viewDir) {
             scene.add(model);
             model.updateMatrixWorld(true);
             bounds.setFromObject(model);
             bounds.getCenter(center);
             bounds.getSize(size);
             const radius = Math.max(size.x, size.y, size.z) * 0.5;
-            camera.position.copy(center).addScaledVector(viewDir, (radius / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * zoom);
+            camera.position.copy(center).addScaledVector(view, (radius / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))) * zoom);
             camera.lookAt(center);
             const previous = renderer.getRenderTarget();
             renderer.setRenderTarget(target);
@@ -133,11 +138,14 @@ export function renderEnemyPortraits(renderer) {
 // Shop preview: the player in a given outfit. The studio and model are reused between calls.
 let previewStudio = null;
 let previewModel = null;
+const CHARACTER_VIEW = new THREE.Vector3(0.3, -0.14, 1).normalize();
+
 // characterModel: an imported character (src/characterModels.js) to show instead of the Drifter.
 export function renderPlayerPreview(renderer, colors, characterModel = null) {
     try {
         previewStudio ??= createStudio(renderer);
-        if(characterModel) return previewStudio.capture(characterModel, 1.15);
+        // Eye level for imported characters: from above, a wide hat brim hides the face.
+        if(characterModel) return previewStudio.capture(characterModel, 1.1, CHARACTER_VIEW);
         if(!previewModel) {
             previewModel = createPlayerMesh();
             previewModel.rotation.y = -0.5;

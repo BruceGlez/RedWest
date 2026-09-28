@@ -125,6 +125,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         }
     }
 
+    let lastUpdateAt = 0;
     function update(dt, timeInSeconds) {
         if(playerStats.invulnerabilityTimer > 0) {
             playerStats.invulnerabilityTimer = Math.max(0, playerStats.invulnerabilityTimer - dt);
@@ -208,7 +209,10 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             let faceX = move.x;
             let faceZ = move.z;
             let target = null;
-            const quickFire = touch.quickFireAt > 0 && performance.now() - touch.quickFireAt < QUICK_FIRE_WINDOW_MS;
+            // A tap stays live for a short window (to wait out the gun's cooldown), and always for at
+            // least the first frame after it, so a slow frame can never swallow the shot.
+            const quickFire = touch.quickFireAt > 0
+                && (performance.now() - touch.quickFireAt < QUICK_FIRE_WINDOW_MS || touch.quickFireAt > lastUpdateAt);
             if(touch.aiming) {
                 faceX = touch.aimX;
                 faceZ = touch.aimY;
@@ -250,6 +254,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             playerStats.shootCooldown = playerStats.fireRate;
             touch.quickFireAt = 0;
         }
+        lastUpdateAt = performance.now();
     }
 
     function reset() {
