@@ -7,35 +7,88 @@ function addObstacle(obstacle) {
     markObstacleGridDirty();
 }
 
+
+// ---------- Cartoon look: cel shading + outlines (Brawl Stars-style readability) ----------
+// Three light bands instead of smooth shading.
+const TOON_GRADIENT = (() => {
+    const texture = new THREE.DataTexture(new Uint8Array([150, 215, 255]), 3, 1, THREE.RedFormat);
+    texture.minFilter = THREE.NearestFilter;
+    texture.magFilter = THREE.NearestFilter;
+    texture.generateMipmaps = false;
+    texture.needsUpdate = true;
+    return texture;
+})();
+
+// Accepts the old MeshStandardMaterial options; metals get a little glow so they still read as shiny.
+function toonMat({ color = 0xffffff, transparent = false, opacity = 1, metalness = 0 } = {}) {
+    const material = new THREE.MeshToonMaterial({ color, gradientMap: TOON_GRADIENT, transparent, opacity });
+    if(metalness > 0.5) material.emissive = new THREE.Color(color).multiplyScalar(0.25);
+    return material;
+}
+
+const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x1a0d05, side: THREE.BackSide });
+const OUTLINE_WIDTH = 0.05;
+
+// Inverted-hull outlines: a slightly larger back-face copy of each part, drawn in dark brown.
+// Tiny parts (eyes, gun details) are skipped to save draw calls on phones.
+function addOutline(root) {
+    const meshes = [];
+    (function collect(object) {
+        if(object.userData.noOutline) return;
+        if(object.isMesh && !object.userData.isOutline) meshes.push(object);
+        for(const child of object.children) collect(child);
+    })(root);
+    const size = new THREE.Vector3();
+    const center = new THREE.Vector3();
+    for(const mesh of meshes) {
+        const geometry = mesh.geometry;
+        if(!geometry.boundingBox) geometry.computeBoundingBox();
+        geometry.boundingBox.getSize(size);
+        if(Math.max(size.x, size.y, size.z) < 0.25) continue;
+        geometry.boundingBox.getCenter(center);
+        const outline = new THREE.Mesh(geometry, OUTLINE_MAT);
+        outline.userData.isOutline = true;
+        outline.raycast = () => {};
+        const sx = 1 + (2 * OUTLINE_WIDTH / Math.max(size.x, 0.05));
+        const sy = 1 + (2 * OUTLINE_WIDTH / Math.max(size.y, 0.05));
+        const sz = 1 + (2 * OUTLINE_WIDTH / Math.max(size.z, 0.05));
+        outline.scale.set(sx, sy, sz);
+        outline.position.set(center.x * (1 - sx), center.y * (1 - sy), center.z * (1 - sz));
+        mesh.add(outline);
+    }
+    return root;
+}
+
 const mat = {
     // ROUGH TEXTURES (Cloth, Skin, Wood)
-    skin: new THREE.MeshStandardMaterial({ color: 0xf5d7b8, roughness: 1.0 }),
-    coat: new THREE.MeshStandardMaterial({ color: 0x8b4513, roughness: 1.0 }),
-    enemyCoat: new THREE.MeshStandardMaterial({ color: 0x5a2c1c, roughness: 1.0 }),
-    poncho: new THREE.MeshStandardMaterial({ color: 0x4a5d23, roughness: 1.0 }),
-    hat: new THREE.MeshStandardMaterial({ color: 0x42210b, roughness: 1.0 }),
-    blackHat: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 1.0 }),
-    pants: new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.9 }),
-    belt: new THREE.MeshStandardMaterial({ color: 0x2e1a0f, roughness: 0.8 }),
-    red: new THREE.MeshStandardMaterial({ color: 0x8a0303, roughness: 1.0 }),
-    green: new THREE.MeshStandardMaterial({ color: 0x2e7d32, roughness: 1.0 }),
-    wood: new THREE.MeshStandardMaterial({ color: 0x8B4513, roughness: 0.9 }),
-    cork: new THREE.MeshStandardMaterial({ color: 0xd2b48c, roughness: 1.0 }),
+    skin: toonMat({ color: 0xf5d7b8, roughness: 1.0 }),
+    coat: toonMat({ color: 0xb8662a, roughness: 1.0 }),
+    enemyCoat: toonMat({ color: 0xa8432a, roughness: 1.0 }),
+    poncho: toonMat({ color: 0x7d9a34, roughness: 1.0 }),
+    hat: toonMat({ color: 0x7a4520, roughness: 1.0 }),
+    blackHat: toonMat({ color: 0x2e2a2a, roughness: 1.0 }),
+    pants: toonMat({ color: 0x3f5a8a, roughness: 0.9 }),
+    belt: toonMat({ color: 0x5a3417, roughness: 0.8 }),
+    red: toonMat({ color: 0xd32f2f, roughness: 1.0 }),
+    green: toonMat({ color: 0x43a047, roughness: 1.0 }),
+    wood: toonMat({ color: 0x8B4513, roughness: 0.9 }),
+    cork: toonMat({ color: 0xd2b48c, roughness: 1.0 }),
     
     // SHINY METALS (Gun, Gold, Steel)
-    gunMetal: new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.4, metalness: 0.6 }), 
-    darkSteel: new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3, metalness: 0.7 }),
-    grey: new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.5 }), 
-    darkGrey: new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 }),
-    gold: new THREE.MeshStandardMaterial({ color: 0xffd700, roughness: 0.2, metalness: 0.8 }),
+    gunMetal: toonMat({ color: 0x222222, roughness: 0.4, metalness: 0.6 }), 
+    darkSteel: toonMat({ color: 0x111111, roughness: 0.3, metalness: 0.7 }),
+    grey: toonMat({ color: 0x808080, roughness: 0.5 }), 
+    darkGrey: toonMat({ color: 0x333333, roughness: 0.5 }),
+    wolfFur: toonMat({ color: 0x8a8f99 }),
+    gold: toonMat({ color: 0xffd700, roughness: 0.2, metalness: 0.8 }),
     
     // ENVIRONMENT (New)
-    stone: new THREE.MeshStandardMaterial({ color: 0x888888, roughness: 0.9 }),
-    sandStone: new THREE.MeshStandardMaterial({ color: 0xa0825f, roughness: 1.0 }),
-    deadWood: new THREE.MeshStandardMaterial({ color: 0x4d3319, roughness: 1.0 }),
+    stone: toonMat({ color: 0x888888, roughness: 0.9 }),
+    sandStone: toonMat({ color: 0xa0825f, roughness: 1.0 }),
+    deadWood: toonMat({ color: 0x4d3319, roughness: 1.0 }),
 
     // SPECIAL
-    glass: new THREE.MeshStandardMaterial({ color: 0x8B4513, transparent: true, opacity: 0.8, roughness: 0.1 }),
+    glass: toonMat({ color: 0x8B4513, transparent: true, opacity: 0.8, roughness: 0.1 }),
     hpRed: new THREE.MeshBasicMaterial({ color: 0xff0000 }),
     hpGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00 })
 };
@@ -78,7 +131,7 @@ export function createPlayerMesh() {
 
     const eyeGeo = new THREE.BoxGeometry(0.25, 0.25, 0.1); const pupilGeo = new THREE.BoxGeometry(0.1, 0.1, 0.11);
     const leftEye = new THREE.Group(); leftEye.position.set(-0.3, 0.1, -0.6); 
-    const leWhite = new THREE.Mesh(eyeGeo, new THREE.MeshStandardMaterial({color: 0xffffff})); const lePupil = new THREE.Mesh(pupilGeo, new THREE.MeshStandardMaterial({color: 0x000000})); lePupil.position.z = -0.05; leftEye.add(leWhite); leftEye.add(lePupil); headGroup.add(leftEye);
+    const leWhite = new THREE.Mesh(eyeGeo, toonMat({color: 0xffffff})); const lePupil = new THREE.Mesh(pupilGeo, toonMat({color: 0x000000})); lePupil.position.z = -0.05; leftEye.add(leWhite); leftEye.add(lePupil); headGroup.add(leftEye);
     const rightEye = leftEye.clone(); rightEye.position.set(0.3, 0.1, -0.6); headGroup.add(rightEye);
 
     const stacheGeo = new THREE.BoxGeometry(0.8, 0.15, 0.1); const stache = new THREE.Mesh(stacheGeo, mat.hat); stache.position.set(0, -0.25, -0.6); 
@@ -89,6 +142,7 @@ export function createPlayerMesh() {
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 1.3), mat.hat); hatTop.position.y = 0.9; headGroup.add(hatTop);
 
     group.userData = { muzzle: gunGroup.userData.muzzle, gunMesh: gunGroup, type: 'player' };
+    addOutline(group);
     return group;
 }
 
@@ -122,6 +176,7 @@ export function createGunslingerMesh() {
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.4), mat.blackHat); hatTop.position.y = 5.0; mesh.add(hatTop);
 
     group.userData = { muzzle: gunGroup.userData.muzzle, type: 'gunslinger' };
+    addOutline(group);
     return group;
 }
 
@@ -138,27 +193,29 @@ export function createEnemyMesh() {
     const bandana = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.6, 1.25), mat.red); bandana.position.y = 3.9; mesh.add(bandana);
     const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 2.2), mat.blackHat); hatBrim.position.y = 4.6; mesh.add(hatBrim);
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 1.3), mat.blackHat); hatTop.position.y = 5.0; mesh.add(hatTop);
+    addOutline(group);
     return group;
 }
 
 export function createWolfMesh() {
     const group = new THREE.Group();
-    const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 3), mat.darkGrey); body.position.y = 1.5; body.castShadow = true; group.add(body);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(1.4, 1.4, 3), mat.wolfFur); body.position.y = 1.5; body.castShadow = true; group.add(body);
     const mane = new THREE.Mesh(new THREE.BoxGeometry(1.6, 1.6, 1.5), mat.blackHat); mane.position.set(0, 1.6, 1.5); group.add(mane);
     const legGeo = new THREE.BoxGeometry(0.4, 1.5, 0.4);
-    const fl = new THREE.Mesh(legGeo, mat.darkGrey); fl.position.set(-0.5, 0.75, 1.0); fl.name='fl'; group.add(fl);
-    const fr = new THREE.Mesh(legGeo, mat.darkGrey); fr.position.set(0.5, 0.75, 1.0); fr.name='fr'; group.add(fr);
-    const bl = new THREE.Mesh(legGeo, mat.darkGrey); bl.position.set(-0.5, 0.75, -1.0); bl.name='bl'; group.add(bl);
-    const br = new THREE.Mesh(legGeo, mat.darkGrey); br.position.set(0.5, 0.75, -1.0); br.name='br'; group.add(br);
-    const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.4), mat.darkGrey); head.position.set(0, 2.5, 2.0); group.add(head);
+    const fl = new THREE.Mesh(legGeo, mat.wolfFur); fl.position.set(-0.5, 0.75, 1.0); fl.name='fl'; group.add(fl);
+    const fr = new THREE.Mesh(legGeo, mat.wolfFur); fr.position.set(0.5, 0.75, 1.0); fr.name='fr'; group.add(fr);
+    const bl = new THREE.Mesh(legGeo, mat.wolfFur); bl.position.set(-0.5, 0.75, -1.0); bl.name='bl'; group.add(bl);
+    const br = new THREE.Mesh(legGeo, mat.wolfFur); br.position.set(0.5, 0.75, -1.0); br.name='br'; group.add(br);
+    const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.4), mat.wolfFur); head.position.set(0, 2.5, 2.0); group.add(head);
     const snout = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), mat.blackHat); snout.position.set(0, 2.3, 2.9); group.add(snout);
     const earGeo = new THREE.BoxGeometry(0.3, 0.4, 0.2);
-    const leftEar = new THREE.Mesh(earGeo, mat.darkGrey); leftEar.position.set(-0.4, 3.2, 1.8); group.add(leftEar);
-    const rightEar = new THREE.Mesh(earGeo, mat.darkGrey); rightEar.position.set(0.4, 3.2, 1.8); group.add(rightEar);
-    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.5), mat.darkGrey); tail.position.set(0, 1.8, -1.8); tail.rotation.x = -0.5; group.add(tail);
+    const leftEar = new THREE.Mesh(earGeo, mat.wolfFur); leftEar.position.set(-0.4, 3.2, 1.8); group.add(leftEar);
+    const rightEar = new THREE.Mesh(earGeo, mat.wolfFur); rightEar.position.set(0.4, 3.2, 1.8); group.add(rightEar);
+    const tail = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.3, 1.5), mat.wolfFur); tail.position.set(0, 1.8, -1.8); tail.rotation.x = -0.5; group.add(tail);
     const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), mat.red); leftEye.position.set(-0.3, 2.7, 2.75); group.add(leftEye);
     const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), mat.red); rightEye.position.set(0.3, 2.7, 2.75); group.add(rightEye);
     group.userData = { type: 'wolf' };
+    addOutline(group);
     return group;
 }
 
@@ -169,6 +226,7 @@ export function createWhiskeyMesh() {
     const neck = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.4, 0.2), mat.glass); neck.position.y = 1.1; group.add(neck);
     const cork = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.2, 0.25), mat.cork); cork.position.y = 1.3; group.add(cork);
     group.userData = { type: 'whiskey', floatOffset: Math.random() * 100 };
+    addOutline(group);
     return group;
 }
 
@@ -210,14 +268,16 @@ export function createAmmoMesh() {
     const box = new THREE.Mesh(new THREE.BoxGeometry(0.8, 0.6, 0.8), mat.gold); box.position.y = 0.3; box.castShadow = true; group.add(box);
     const strap1 = new THREE.Mesh(new THREE.BoxGeometry(0.9, 0.6, 0.2), mat.darkGrey); strap1.position.y = 0.3; group.add(strap1);
     group.userData = { type: 'ammo', floatOffset: Math.random() * 100 };
+    addOutline(group);
     return group;
 }
 
 // colors: optional { coat, poncho, bandana } hex values so each outlaw on the Wanted Road looks different.
 export function createBossMesh(colors = null) {
-    const coatMat = colors?.coat !== undefined ? new THREE.MeshStandardMaterial({ color: colors.coat, roughness: 1.0 }) : mat.enemyCoat;
-    const ponchoMat = colors?.poncho !== undefined ? new THREE.MeshStandardMaterial({ color: colors.poncho, roughness: 1.0 }) : mat.blackHat;
-    const bandanaMat = colors?.bandana !== undefined ? new THREE.MeshStandardMaterial({ color: colors.bandana, roughness: 0.6 }) : mat.gold;
+    const coatMat = colors?.coat !== undefined ? toonMat({ color: colors.coat, roughness: 1.0 }) : mat.enemyCoat;
+    const ponchoMat = colors?.poncho !== undefined ? toonMat({ color: colors.poncho, roughness: 1.0 }) : mat.blackHat;
+    const bandanaMat = colors?.bandana !== undefined ? toonMat({ color: colors.bandana, roughness: 0.6 }) : mat.gold;
+    const hatMat = colors?.hat !== undefined ? toonMat({ color: colors.hat }) : mat.blackHat;
     const group = new THREE.Group(); const mesh = new THREE.Group(); mesh.rotation.y = Math.PI; group.add(mesh);
     mesh.scale.set(1.5, 1.5, 1.5);
     const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.5), coatMat); body.position.y = 2.5; body.castShadow = true; mesh.add(body);
@@ -231,15 +291,16 @@ export function createBossMesh(colors = null) {
     const gunReal = createRevolverMesh(); gunReal.position.set(0, -0.2, 0.2); gunReal.rotation.set(-Math.PI / 2, 0, 0); rightHand.add(gunReal); 
     const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), mat.skin); head.position.y = 4.1; mesh.add(head);
     const bandana = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.6, 1.25), bandanaMat); bandana.position.y = 3.9; mesh.add(bandana);
-    const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 2.4), mat.blackHat); hatBrim.position.y = 4.6; mesh.add(hatBrim);
-    const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.4), mat.blackHat); hatTop.position.y = 5.0; mesh.add(hatTop);
+    const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 2.4), hatMat); hatBrim.position.y = 4.6; mesh.add(hatBrim);
+    const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.4), hatMat); hatTop.position.y = 5.0; mesh.add(hatTop);
     
-    const hpGroup = new THREE.Group(); hpGroup.position.set(0, 7.5, 0); 
+    const hpGroup = new THREE.Group(); hpGroup.position.set(0, 7.5, 0); hpGroup.userData.noOutline = true; 
     const hpBg = new THREE.Mesh(new THREE.BoxGeometry(3, 0.4, 0.1), mat.hpRed); hpGroup.add(hpBg);
     const hpFg = new THREE.Mesh(new THREE.BoxGeometry(3, 0.4, 0.11), mat.hpGreen); hpFg.position.z = 0.05; hpFg.geometry.translate(1.5, 0, 0); hpFg.position.x = -1.5; hpGroup.add(hpFg);
     mesh.add(hpGroup);
 
     group.userData = { muzzle: gunReal.userData.muzzle, hpBar: hpFg, type: 'boss' };
+    addOutline(group);
     return group;
 }
 

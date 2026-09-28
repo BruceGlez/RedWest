@@ -11,21 +11,21 @@ export const MODIFIERS = {
 
 export const OUTLAWS = [
     { id: 'dusty-pete', name: 'DUSTY PETE', title: 'The Saloon Brawler', modifiers: [], bounty: 50,
-        colors: { coat: 0x7a5230, poncho: 0x3b2a1a, bandana: 0xc62828 } },
+        colors: { hat: 0x7a4a26, coat: 0x7a5230, poncho: 0x3b2a1a, bandana: 0xc62828 } },
     { id: 'rattlesnake-rosa', name: 'RATTLESNAKE ROSA', title: 'Runs With Wolves', modifiers: ['FAST_WOLVES'], bounty: 75,
-        colors: { coat: 0x2e7d32, poncho: 0x1b3d1f, bandana: 0xfbc02d } },
+        colors: { hat: 0x33691e, coat: 0x2e7d32, poncho: 0x1b3d1f, bandana: 0xfbc02d } },
     { id: 'deacon-graves', name: 'DEACON GRAVES', title: 'The Preacher Gun', modifiers: ['SHARPSHOOTERS'], bounty: 100,
-        colors: { coat: 0x212121, poncho: 0x4a148c, bandana: 0xeeeeee } },
+        colors: { hat: 0x151515, coat: 0x212121, poncho: 0x4a148c, bandana: 0xeeeeee } },
     { id: 'calloway-gang', name: 'THE CALLOWAYS', title: 'Brothers By The Dozen', modifiers: ['SWARM'], bounty: 125,
-        colors: { coat: 0x5d4037, poncho: 0xbf360c, bandana: 0x1565c0 } },
+        colors: { hat: 0xc9a36b, coat: 0x5d4037, poncho: 0xbf360c, bandana: 0x1565c0 } },
     { id: 'iron-jack', name: 'IRON JACK HARLAN', title: 'Bulletproof, They Say', modifiers: ['HEAVY_HITTERS'], bounty: 150,
-        colors: { coat: 0x455a64, poncho: 0x263238, bandana: 0xff6f00 } },
+        colors: { hat: 0x546e7a, coat: 0x455a64, poncho: 0x263238, bandana: 0xff6f00 } },
     { id: 'mesa-morgan', name: 'MAD MESA MORGAN', title: 'Queen Of The Badlands', modifiers: ['SWARM', 'FAST_WOLVES'], bounty: 200,
-        colors: { coat: 0xad1457, poncho: 0x4e342e, bandana: 0xffd54f } },
+        colors: { hat: 0x880e4f, coat: 0xad1457, poncho: 0x4e342e, bandana: 0xffd54f } },
     { id: 'silas-vane', name: 'SILAS VANE', title: 'Six-Gun Silas', modifiers: ['SHARPSHOOTERS', 'HEAVY_HITTERS'], bounty: 250,
-        colors: { coat: 0x0d47a1, poncho: 0x111111, bandana: 0xb71c1c } },
+        colors: { hat: 0x1a237e, coat: 0x0d47a1, poncho: 0x111111, bandana: 0xb71c1c } },
     { id: 'el-espectro', name: 'EL ESPECTRO', title: 'The Ghost Of Red West', modifiers: ['FAST_WOLVES', 'SHARPSHOOTERS', 'SWARM', 'HEAVY_HITTERS'], bounty: 350,
-        colors: { coat: 0xeeeeee, poncho: 0x37474f, bandana: 0x6a1b9a } }
+        colors: { hat: 0xf5f5f5, coat: 0xeeeeee, poncho: 0x37474f, bandana: 0x6a1b9a } }
 ];
 
 export const STAR_GOALS = ['Defeat the outlaw', 'Collect the bounty at Heat 2+', 'Ride on and escape'];

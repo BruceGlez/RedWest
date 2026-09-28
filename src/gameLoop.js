@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { keys, touch } from './input.js';
 import { resumeAudio, playSound, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { gameState, playerStats, obstacles, enemies, loots, resetGameState, resetPlayerStats, clearDynamicState } from './state.js';
-import { generateMap } from './world.js';
+import { generateMap, updateSun } from './world.js';
 import { spawnEnemy, updateEnemies } from './enemySystem.js';
 import { updateLoots } from './lootSystem.js';
 import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats } from './bulletSystem.js';
@@ -509,6 +509,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         camera.position.z += shake.z;
         camera.lookAt(playerPos.x + shake.x * 0.5, playerPos.y, playerPos.z + shake.z * 0.5);
         updateFeedback(realDt, camera, enemies, playerPos);
+        updateSun(playerPos);
 
         emitDebug(realDt);
         renderer.render(scene, camera);

@@ -565,3 +565,8 @@ body.touch #btn-dash.ready { border-color: #00e5b0; color: #00e5b0; box-shadow: 
 #btn-swap { width: 66px; height: 66px; }
 .touch-only-inline { display: none; }
 body.touch .touch-only-inline { display: inline-block; }
+
+/* Rendered outlaw portraits (3D model snapshots), with a warm aged-print finish. */
+.portrait.portrait-render { background: #e7cf9c; }
+.portrait.portrait-render img { width: 100%; height: 100%; object-fit: cover; display: block; filter: sepia(0.35) saturate(1.1) contrast(1.05); }
+.road-node.locked .portrait-render img { filter: grayscale(1) brightness(0.35); }

@@ -1,29 +1,47 @@
 import * as THREE from 'three';
 import { createRock, createDeadTree, createCrate, createCactus, createFence } from './assets.js';
+import { createDesertGroundTexture, createSkyTexture } from './textures.js';
+
+let sunLight = null;
+const SUN_OFFSET = new THREE.Vector3(-26, 44, -18);
 
 export function setupScene(scene, camera, renderer) {
-    const skyColor = 0xffdcb3; 
-    scene.background = new THREE.Color(skyColor); 
-    scene.fog = new THREE.Fog(skyColor, 20, 80);
+    scene.background = createSkyTexture();
+    // Fog fades distant ground into the warm horizon colour.
+    scene.fog = new THREE.Fog(0xf1cf9c, 45, 110);
 
-    const ambientLight = new THREE.AmbientLight(0xffffff, 0.6);
-    scene.add(ambientLight);
+    // Warm sky light from above, reddish bounce from the sand below.
+    scene.add(new THREE.HemisphereLight(0xfff1d8, 0xc77f45, 1.6));
 
-    const sunLight = new THREE.DirectionalLight(0xffaa00, 1.5);
-    sunLight.position.set(-30, 40, -30);
+    sunLight = new THREE.DirectionalLight(0xffe2b0, 2.4);
     sunLight.castShadow = true;
-    sunLight.shadow.mapSize.set(2048, 2048);
-    sunLight.shadow.camera.left = -100; sunLight.shadow.camera.right = 100;
-    sunLight.shadow.camera.top = 100; sunLight.shadow.camera.bottom = -100;
+    // A tight shadow box that follows the player keeps shadows crisp (see updateSun).
+    const touch = window.matchMedia?.('(pointer: coarse)').matches;
+    sunLight.shadow.mapSize.set(touch ? 1024 : 2048, touch ? 1024 : 2048);
+    sunLight.shadow.camera.left = -48; sunLight.shadow.camera.right = 48;
+    sunLight.shadow.camera.top = 48; sunLight.shadow.camera.bottom = -48;
+    sunLight.shadow.camera.near = 1; sunLight.shadow.camera.far = 140;
+    sunLight.shadow.bias = -0.0008;
+    sunLight.shadow.normalBias = 0.02;
+    sunLight.position.copy(SUN_OFFSET);
     scene.add(sunLight);
+    scene.add(sunLight.target);
 
+    const groundTexture = createDesertGroundTexture();
+    groundTexture.repeat.set(9, 9);
     const groundMesh = new THREE.Mesh(
-        new THREE.PlaneGeometry(300, 300), 
-        new THREE.MeshStandardMaterial({ color: 0xe6c288, roughness: 1 })
+        new THREE.PlaneGeometry(300, 300),
+        new THREE.MeshLambertMaterial({ map: groundTexture })
     );
-    groundMesh.rotation.x = -Math.PI / 2; 
-    groundMesh.receiveShadow = true; 
+    groundMesh.rotation.x = -Math.PI / 2;
+    groundMesh.receiveShadow = true;
     scene.add(groundMesh);
+}
+
+export function updateSun(focus) {
+    if(!sunLight) return;
+    sunLight.position.copy(focus).add(SUN_OFFSET);
+    sunLight.target.position.copy(focus);
 }
 
 function getRandomPos(minDist) {

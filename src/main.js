@@ -10,6 +10,7 @@ import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
 import { loadRunLog, clearRunLog } from './runLog.js';
 import { loadProgress, saveProgress, isUnlocked } from './progress.js';
+import { renderOutlawPortraits } from './portraits.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -20,6 +21,9 @@ const isTouch = setupTouchControls();
 if(isTouch) renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+// Filmic tone mapping keeps the bright desert colours rich instead of washed out.
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.05;
 document.body.appendChild(renderer.domElement);
 
 setupScene(scene, camera, renderer);
@@ -35,6 +39,7 @@ ui.updateLeaderboard(loadHighScores());
 ui.setRunLog(loadRunLog());
 const progress = loadProgress();
 ui.setProgress(progress);
+ui.setPortraits(renderOutlawPortraits(renderer));
 ui.setPreferredName(getPreferredPlayerName());
 ui.updateHUD();
 ui.updateDashBar(1);

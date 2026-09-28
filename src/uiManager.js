@@ -11,6 +11,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
     let lastHeatLevel = 0;
     let runLog = [];
     let progress = null;
+    let portraits = {};
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
@@ -269,8 +270,11 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
     }
 
     function portraitHtml(outlaw) {
+        if(portraits[outlaw.id]) {
+            return `<div class="portrait portrait-render"><img src="${portraits[outlaw.id]}" alt="${outlaw.name}"></div>`;
+        }
         const c = outlaw.colors;
-        return `<div class="portrait" style="--coat:${hex(c.coat)};--poncho:${hex(c.poncho)};--bandana:${hex(c.bandana)}">`
+        return `<div class="portrait" style="--coat:${hex(c.coat)};--poncho:${hex(c.hat ?? c.poncho)};--bandana:${hex(c.bandana)}">`
             + '<div class="p-body"></div><div class="p-head"><div class="p-eyes"></div><div class="p-bandana"></div></div>'
             + '<div class="p-hat-brim"></div><div class="p-hat-top"></div></div>';
     }
@@ -297,6 +301,11 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
                 + `<span class="road-name">${outlaw.name}</span><span class="road-stars">${starsHtml(progress.stars[i])}</span>`
                 + `<span class="road-reward">$${outlaw.bounty}</span>${unlocked ? '' : '<span class="road-lock">LOCKED</span>'}</button>`;
         }).join('<span class="road-link" aria-hidden="true"></span>');
+    }
+
+    function setPortraits(images) {
+        portraits = images || {};
+        if(progress) setProgress(progress);
     }
 
     function setProgress(nextProgress) {
@@ -530,6 +539,7 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         showHeatEvent,
         setRunLog,
         setProgress,
+        setPortraits,
         hideBountyChoice,
         hideGameOverScreen,
         showStartScreen,
