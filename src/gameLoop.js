@@ -3,7 +3,7 @@ import { keys, touch } from './input.js';
 import { resumeAudio, playSound, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { gameState, playerStats, obstacles, enemies, loots, resetGameState, resetPlayerStats, clearDynamicState } from './state.js';
 import { generateMap, updateSun } from './world.js';
-import { spawnEnemy, updateEnemies } from './enemySystem.js';
+import { spawnEnemy, updateEnemies, updateHazards, clearHazards } from './enemySystem.js';
 import { updateLoots } from './lootSystem.js';
 import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats } from './bulletSystem.js';
 import { updateParticles, clearParticles, getParticlePoolStats } from './particleSystem.js';
@@ -11,6 +11,8 @@ import { markObstacleGridDirty, getGridStats } from './physics.js';
 import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
 import { buildRunRecord, appendRunRecord } from './runLog.js';
 import { getOutlaw, applyOutlawToWave } from './outlaws.js';
+import { ENEMY_TYPES, rosterWave, featuredFor, enemyCost } from './enemyTypes.js';
+import { markSeen, recordKills } from './progress.js';
 import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
 import { recordRun, saveProgress } from './progress.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
@@ -22,11 +24,7 @@ const CAMERA_OFFSET_PHONE = new THREE.Vector3(0, 26, 18.5);
 const OUTLAW_DOWN_SLOWMO_MS = 650;
 const BONUS_WAVE = FINAL_PURSUIT + 1;
 
-const ENEMY_COST = {
-    bandit: 1.0,
-    wolf: 1.2,
-    gunslinger: 2.0
-};
+const MIN_ENEMY_COST = 0.8;
 
 function getWaveDuration(wave) {
     if(wave === BONUS_WAVE) return BONUS_PURSUIT_SECONDS;
@@ -41,38 +39,18 @@ function getWaveBudget(wave) {
     return 12 + (wave * 4.5);
 }
 
-function getWaveCaps(wave) {
-    return {
-        bandit: 10 + Math.floor(wave * 0.8),
-        wolf: 4 + Math.floor(wave * 0.45),
-        gunslinger: Math.max(1, Math.floor(wave / 2))
-    };
-}
-
-function getWaveWeights(wave) {
-    return {
-        bandit: Math.max(0.8, 2.4 - (wave * 0.12)),
-        wolf: Math.min(2.2, 0.8 + (wave * 0.16)),
-        gunslinger: Math.min(2.4, 0.3 + (wave * 0.2))
-    };
-}
-
 // Base pursuit numbers, adjusted for the current Wanted Road outlaw.
 function getOutlawWave(wave) {
     return applyOutlawToWave({
         budget: getWaveBudget(wave),
         interval: getBaseSpawnInterval(wave),
-        weights: getWaveWeights(wave),
-        caps: getWaveCaps(wave)
+        ...rosterWave(gameState.outlawIndex, wave)
     }, gameState.outlawIndex);
 }
 
 function getActiveEnemyCounts() {
-    const counts = { bandit: 0, wolf: 0, gunslinger: 0 };
-    for(const e of enemies) {
-        const t = e.userData.type;
-        if(counts[t] !== undefined) counts[t]++;
-    }
+    const counts = {};
+    for(const e of enemies) counts[e.userData.type] = (counts[e.userData.type] || 0) + 1;
     return counts;
 }
 
@@ -97,6 +75,15 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     let bountyChoiceAt = 0; // slow-motion beat after the outlaw falls, then the choice opens
     const cameraOffset = () => (touch.enabled ? CAMERA_OFFSET_PHONE : CAMERA_OFFSET_DESKTOP);
 
+    // Spawn and record first sightings for the Bounty Book (with a NEW ENEMY card in play).
+    function spawn(type) {
+        spawnEnemy(scene, playerSystem.playerGroup.position, type);
+        if(type !== 'boss' && markSeen(progress, type)) {
+            saveProgress(progress);
+            ui.showNewEnemy(type);
+        }
+    }
+
     // result: 'died' | 'banked' | 'escaped'
     function finishRun(result) {
         if(gameState.isGameOver) return;
@@ -108,6 +95,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         ui.hideBountyChoice();
         ui.setRunLog(appendRunRecord(buildRunRecord(gameState, result, sessionRun)));
         const roadResult = recordRun(progress, gameState.outlawIndex, gameState.bounty, gameState.score);
+        recordKills(progress, gameState.runStats.kills);
         saveProgress(progress);
         ui.setProgress(progress);
         ui.showGameOver(result, roadResult);
@@ -194,22 +182,27 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         gameState.enemySpawnTimer = 0.55;
         gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, waveNumber);
         if(waveNumber === FINAL_WAVE) {
-            spawnEnemy(scene, playerSystem.playerGroup.position, 'boss');
+            spawn('boss');
             gameState.waveBossSpawned = true;
             ui.showWaveBanner(`${getOutlaw(gameState.outlawIndex).name} RIDES IN — TAKE THE BOUNTY`, 2500);
         } else if(waveNumber === BONUS_WAVE) {
-            for(const type of ['gunslinger', 'wolf', 'wolf']) {
-                spawnEnemy(scene, playerSystem.playerGroup.position, type);
-                gameState.waveBudgetRemaining -= ENEMY_COST[type];
+            const featured = featuredFor(gameState.outlawIndex);
+            for(const type of ['gunslinger', 'wolf', 'wolf', ...(featured ? [featured] : [])]) {
+                spawn(type);
+                gameState.waveBudgetRemaining -= enemyCost(type);
             }
             ui.showWaveBanner(`BONUS PURSUIT — SURVIVE ${BONUS_PURSUIT_SECONDS}s TO ESCAPE`, 2500);
         } else {
+            // Each stage opens by showing off its new enemy.
+            const featured = featuredFor(gameState.outlawIndex);
             const introductions = waveNumber === 1 ? ['bandit'] : ['wolf', 'gunslinger'];
+            if(featured) introductions.push(featured);
             for(const type of introductions) {
-                spawnEnemy(scene, playerSystem.playerGroup.position, type);
-                gameState.waveBudgetRemaining -= ENEMY_COST[type];
+                spawn(type);
+                gameState.waveBudgetRemaining -= enemyCost(type);
             }
-            const gang = waveNumber === 1 ? `${getOutlaw(gameState.outlawIndex).name}'S GANG — ` : '';
+            const boss = getOutlaw(gameState.outlawIndex).name;
+            const gang = waveNumber === 1 ? `${boss}${boss.endsWith('S') ? "'" : "'S"} GANG — ` : '';
             ui.showWaveBanner(`${gang}PURSUIT ${waveNumber} / ${FINAL_WAVE}`, waveNumber === 1 ? 2500 : 1800);
         }
     }
@@ -224,27 +217,27 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     function trySpawnDirectorEnemy() {
         const wave = gameState.waveNumber;
         const remaining = gameState.waveBudgetRemaining;
-        if(remaining < ENEMY_COST.bandit) return;
+        if(remaining < MIN_ENEMY_COST) return;
 
         const { caps, weights } = getOutlawWave(wave);
-        // Higher Heat sends more dangerous pursuers, not only more of them.
-        weights.gunslinger *= 1 + (gameState.heat.level * 0.25);
-        weights.wolf *= 1 + (gameState.heat.level * 0.15);
         const active = getActiveEnemyCounts();
         const candidates = [];
 
-        for(const type of ['bandit', 'wolf', 'gunslinger']) {
+        for(const type of Object.keys(weights)) {
+            // Higher Heat sends more dangerous pursuers, not only more of them.
+            const danger = ENEMY_TYPES[type]?.danger ?? 1;
+            const weight = weights[type] * (danger >= 2 ? 1 + (gameState.heat.level * 0.2) : 1);
             const heatCapBonus = type === 'bandit' ? gameState.heat.level * 2 : Math.floor(gameState.heat.level / 2);
-            if(active[type] >= (caps[type] || 0) + heatCapBonus) continue;
-            if(ENEMY_COST[type] > remaining) continue;
-            candidates.push({ type, weight: weights[type] || 0 });
+            if((active[type] || 0) >= (caps[type] || 0) + heatCapBonus) continue;
+            if(enemyCost(type) > remaining) continue;
+            candidates.push({ type, weight });
         }
 
         const chosenType = chooseWeightedType(candidates);
         if(!chosenType) return;
 
-        spawnEnemy(scene, playerSystem.playerGroup.position, chosenType);
-        gameState.waveBudgetRemaining = Math.max(0, gameState.waveBudgetRemaining - ENEMY_COST[chosenType]);
+        spawn(chosenType);
+        gameState.waveBudgetRemaining = Math.max(0, gameState.waveBudgetRemaining - enemyCost(chosenType));
     }
 
     function pauseGame() {
@@ -356,6 +349,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         for(const obs of obstacles) scene.remove(obs.mesh);
         clearBullets(scene);
         clearPendingRespawns();
+        clearHazards(scene);
         clearParticles(scene);
         clearDynamicState();
         markObstacleGridDirty();
@@ -397,7 +391,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         // The final pursuit only ends with the outlaw; keep reinforcements coming after the timer.
         if(gameState.waveTimer <= 0 && gameState.waveNumber === FINAL_WAVE) {
             gameState.waveTimer = 0;
-            if(gameState.waveBudgetRemaining < ENEMY_COST.bandit) gameState.waveBudgetRemaining = ENEMY_COST.bandit;
+            if(gameState.waveBudgetRemaining < 1) gameState.waveBudgetRemaining = 1;
         } else if(gameState.waveTimer <= 0 && gameState.waveNumber === BONUS_WAVE) {
             gameState.score = escapeWithBounty(gameState.bounty, gameState.score);
             finishRun('escaped');
@@ -495,6 +489,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         // A bullet can end the run or open the bounty choice; freeze the rest of this frame if so.
         const stillFighting = () => !gameState.isGameOver && !gameState.isChoosingBounty;
         if(stillFighting()) updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
+        if(stillFighting()) updateHazards(dt, scene, playerSystem.playerGroup, callbacks);
         if(stillFighting()) playerSystem.update(dt, timeInSeconds);
         if(stillFighting()) updateWaveFlow(dt);
         ui.updateHUD();

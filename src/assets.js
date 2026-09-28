@@ -347,3 +347,173 @@ export function createFence(scene, x, z, angle) {
     group.position.set(x, 0, z); group.rotation.y = angle; scene.add(group);
     addObstacle({ mesh: group, x: x, z: z, radius: 1.5, destructible: true, type: 'fence' });
 }
+
+// ---------- New enemy models (one per Wanted Road stage) ----------
+const colorMatCache = new Map();
+function colorMat(hex) {
+    if(!colorMatCache.has(hex)) colorMatCache.set(hex, toonMat({ color: hex }));
+    return colorMatCache.get(hex);
+}
+
+function box(w, h, d, material, x = 0, y = 0, z = 0) {
+    const m = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material);
+    m.position.set(x, y, z);
+    m.castShadow = true;
+    return m;
+}
+
+// Held weapons. Each returns { group, muzzle } where muzzle is an empty marker at the barrel tip.
+function createHeldWeapon(kind) {
+    const group = new THREE.Group();
+    const muzzle = new THREE.Object3D();
+    if(kind === 'rifle') {
+        group.add(box(0.22, 0.25, 2.8, mat.gunMetal, 0, 0.1, -1.1));
+        group.add(box(0.3, 0.45, 1.0, mat.wood, 0, -0.05, 0.6));
+        group.add(box(0.1, 0.18, 0.4, mat.darkGrey, 0, 0.3, -0.6));
+        muzzle.position.set(0, 0.1, -2.6);
+    } else if(kind === 'shotgun') {
+        group.add(box(0.4, 0.26, 1.5, mat.gunMetal, 0, 0.1, -0.6));
+        group.add(box(0.3, 0.45, 0.8, mat.wood, 0, -0.05, 0.45));
+        muzzle.position.set(0, 0.1, -1.4);
+    } else if(kind === 'dynamite') {
+        group.add(box(0.28, 0.9, 0.28, colorMat(0xd32f2f), 0, 0.2, 0));
+        group.add(box(0.06, 0.35, 0.06, colorMat(0xfff3c4), 0, 0.8, 0));
+        muzzle.position.set(0, 0.9, 0);
+    }
+    group.add(muzzle);
+    return { group, muzzle };
+}
+
+// A humanoid outlaw built like the original gunslinger (same part names, so animation works).
+// opts: { type, coat, hat, bandana, pants, weapon, bulk, materials }
+function createHumanoid(opts) {
+    const m = opts.materials || ((hex) => colorMat(hex));
+    const coat = m(opts.coat);
+    const hat = m(opts.hat);
+    const pants = m(opts.pants ?? 0x3f5a8a);
+    const skin = opts.skinMat || mat.skin;
+    const group = new THREE.Group();
+    const mesh = new THREE.Group(); mesh.rotation.y = Math.PI; group.add(mesh);
+    const bulk = opts.bulk ?? 1;
+    mesh.scale.set(bulk, bulk, bulk);
+
+    mesh.add(box(2, 2, 1.5, coat, 0, 2.5, 0));
+    if(opts.vest !== undefined) mesh.add(box(2.1, 1.2, 1.6, m(opts.vest), 0, 2.8, 0));
+    const leftLeg = box(0.6, 1.5, 0.8, pants, -0.5, 0.75, 0); leftLeg.name = 'leftLeg'; mesh.add(leftLeg);
+    const rightLeg = box(0.6, 1.5, 0.8, pants, 0.5, 0.75, 0); rightLeg.name = 'rightLeg'; mesh.add(rightLeg);
+    const leftArm = box(0.5, 1.5, 0.5, coat, -1.2, 2.5, 0); leftArm.name = 'leftArm'; mesh.add(leftArm);
+    const rightArmPivot = new THREE.Group(); rightArmPivot.position.set(1.2, 3.25, 0); rightArmPivot.name = 'rightArm'; mesh.add(rightArmPivot);
+    rightArmPivot.add(box(0.5, 1.5, 0.5, coat, 0, -0.75, 0));
+    const rightHand = box(0.4, 0.4, 0.4, skin, 0, -1.5, 0); rightArmPivot.add(rightHand);
+    const head = box(1.2, 1.2, 1.2, skin, 0, 4.1, 0); mesh.add(head);
+    if(opts.bandana !== undefined) mesh.add(box(1.25, 0.6, 1.25, m(opts.bandana), 0, 3.9, 0));
+    if(opts.hatStyle === 'bowler') {
+        mesh.add(box(1.9, 0.2, 1.9, hat, 0, 4.6, 0));
+        mesh.add(box(1.3, 0.7, 1.3, hat, 0, 5.0, 0));
+    } else if(opts.hatStyle === 'sombrero') {
+        mesh.add(box(3.2, 0.2, 3.2, hat, 0, 4.6, 0));
+        mesh.add(box(1.2, 1.0, 1.2, hat, 0, 5.1, 0));
+    } else if(opts.hatStyle === 'hood') {
+        mesh.add(box(1.5, 1.5, 1.5, hat, 0, 4.3, 0.1));
+    } else {
+        mesh.add(box(2.4, 0.2, 2.4, hat, 0, 4.6, 0));
+        mesh.add(box(1.4, 0.9, 1.4, hat, 0, 5.0, 0));
+    }
+
+    let muzzle = null;
+    if(opts.weapon) {
+        const weapon = createHeldWeapon(opts.weapon);
+        weapon.group.position.set(0, -0.2, 0.2);
+        weapon.group.rotation.set(-Math.PI / 2, 0, 0);
+        rightHand.add(weapon.group);
+        muzzle = weapon.muzzle;
+    }
+    group.userData = { muzzle, type: opts.type, shooter: !!opts.weapon && opts.weapon !== 'dynamite' };
+    return group;
+}
+
+export function createRattlerMesh() {
+    const group = new THREE.Group();
+    const scales = colorMat(0x9e8a4a);
+    const belly = colorMat(0x6d5a2a);
+    const segments = [];
+    for(let i = 0; i < 5; i++) {
+        const seg = box(0.8 - i * 0.08, 0.5, 0.9, i % 2 ? belly : scales, 0, 0.3, -i * 0.8);
+        seg.name = `seg${i}`;
+        group.add(seg);
+        segments.push(seg);
+    }
+    group.add(box(0.9, 0.55, 0.9, scales, 0, 0.35, 0.75));
+    group.add(box(0.12, 0.12, 0.12, colorMat(0xffeb3b), -0.3, 0.55, 1.1));
+    group.add(box(0.12, 0.12, 0.12, colorMat(0xffeb3b), 0.3, 0.55, 1.1));
+    group.add(box(0.3, 0.4, 0.4, colorMat(0xe0cfa0), 0, 0.4, -4.1));
+    group.userData = { type: 'rattler', segments };
+    addOutline(group);
+    return group;
+}
+
+export function createRiflemanMesh() {
+    const group = createHumanoid({ type: 'rifleman', coat: 0x2f5d8a, hat: 0x3b2a1a, bandana: 0xe0e0e0, weapon: 'rifle', hatStyle: 'bowler' });
+    // Aim laser: a thin red beam along the enemy's facing (+Z), stretched to the player while aiming.
+    const laser = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.05, 1), new THREE.MeshBasicMaterial({ color: 0xff1744, transparent: true, opacity: 0.7, depthWrite: false }));
+    laser.geometry.translate(0, 0, 0.5);
+    laser.position.set(0, 2.6, 0);
+    laser.visible = false;
+    laser.userData.noOutline = true;
+    group.add(laser);
+    group.userData.laser = laser;
+    addOutline(group);
+    return group;
+}
+
+export function createDynamiterMesh() {
+    const group = createHumanoid({ type: 'dynamiter', coat: 0x8d6e63, vest: 0xd84315, hat: 0x5d4037, bandana: 0x212121, weapon: 'dynamite', hatStyle: 'bowler' });
+    addOutline(group);
+    return group;
+}
+
+export function createBruteMesh() {
+    const group = createHumanoid({ type: 'brute', coat: 0x5d4037, vest: 0x78909c, hat: 0x3e2723, bandana: 0x8d0000, bulk: 1.45 });
+    addOutline(group);
+    return group;
+}
+
+export function createDuelistMesh() {
+    const group = createHumanoid({ type: 'duelist', coat: 0x4a148c, hat: 0x111111, bandana: 0xffc107, weapon: 'shotgun', hatStyle: 'sombrero' });
+    addOutline(group);
+    return group;
+}
+
+export function createGhostMesh() {
+    // Each ghost fades independently, so it gets its own transparent materials.
+    const own = hex => new THREE.MeshToonMaterial({ color: hex, gradientMap: TOON_GRADIENT, transparent: true, opacity: 1, emissive: new THREE.Color(hex).multiplyScalar(0.25) });
+    const group = createHumanoid({ type: 'ghost', coat: 0xcfd8dc, hat: 0xeceff1, pants: 0xb0bec5, bandana: 0x6a1b9a, materials: own, skinMat: own(0xe3f2fd), weapon: null, hatStyle: 'hood' });
+    const materials = new Set();
+    group.traverse(o => { if(o.isMesh && o.material.transparent) materials.add(o.material); });
+    group.userData.fadeMaterials = [...materials];
+    addOutline(group);
+    return group;
+}
+
+export function createRiderMesh() {
+    const group = new THREE.Group();
+    const horse = colorMat(0x6d4c41);
+    const mane = colorMat(0x2b1d16);
+    group.add(box(1.5, 1.5, 3.4, horse, 0, 2.2, 0));
+    group.add(box(1.0, 1.4, 1.1, horse, 0, 3.2, 1.9));
+    group.add(box(0.9, 0.8, 1.2, horse, 0, 3.1, 2.8));
+    group.add(box(0.3, 1.2, 1.4, mane, 0, 3.5, 1.5));
+    const legs = [['fl', -0.5, 1.2], ['fr', 0.5, 1.2], ['bl', -0.5, -1.2], ['br', 0.5, -1.2]];
+    for(const [name, x, z] of legs) {
+        const leg = box(0.4, 1.6, 0.4, horse, x, 0.8, z);
+        leg.name = name;
+        group.add(leg);
+    }
+    const rider = createHumanoid({ type: 'rider-person', coat: 0xbf360c, hat: 0x3e2723, bandana: 0x1b5e20, weapon: null });
+    rider.scale.setScalar(0.72);
+    rider.position.set(0, 2.1, -0.2);
+    group.add(rider);
+    group.userData = { type: 'rider', quadruped: true };
+    addOutline(group);
+    return group;
+}

@@ -186,7 +186,8 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
             const j = enemies.indexOf(e);
             if(j === -1) continue;
             const dist = new THREE.Vector3(e.position.x - b.position.x, 0, e.position.z - b.position.z).length();
-            const hitRad = (e.userData.type === 'boss') ? 2.5 : 2.0;
+            if(e.userData.untargetable) continue; // faded ghosts
+            const hitRad = e.userData.hitRadius ?? ((e.userData.type === 'boss') ? 2.5 : 2.0);
             
             if(dist < hitRad) {
                 resolveVolley(b, true, callbacks);
@@ -206,6 +207,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     else if(e.userData.type === 'gunslinger') runStats.gunslingersKilled++;
                     else if(e.userData.type === 'wolf') runStats.wolvesKilled++;
                     else if(e.userData.type === 'boss') runStats.bossesKilled++;
+                    runStats.kills[e.userData.type] = (runStats.kills[e.userData.type] || 0) + 1;
                     callbacks.onEnemyKilled?.(e.userData.type, e.position);
                     if(e.userData.type === 'boss') callbacks.onBossDefeated?.();
                 } else { 
@@ -213,7 +215,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     playSound('hit'); 
                     createExplosion(scene, e.position, 0xffaa00); 
                     // Knockback (except boss)
-                    if(e.userData.type !== 'boss') {
+                    if(e.userData.type !== 'boss' && !e.userData.heavy) {
                         const knockDir = b.userData.velocity.clone().normalize().multiplyScalar(1.0);
                         e.position.add(knockDir); 
                     }

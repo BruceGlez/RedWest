@@ -2,6 +2,7 @@ import { heatMultiplier, CHAIN_WINDOW, MAX_HEAT } from './heat.js';
 import { FINAL_PURSUIT } from './bounty.js';
 import { formatRunLog } from './runLog.js';
 import { OUTLAWS, MODIFIERS, STAR_GOALS, getOutlaw } from './outlaws.js';
+import { ENEMY_TYPES, ENEMY_ORDER } from './enemyTypes.js';
 import { isUnlocked, totalStars } from './progress.js';
 
 export function createUIManager(gameState, playerStats, onSaveScore) {
@@ -12,6 +13,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
     let runLog = [];
     let progress = null;
     let portraits = {};
+    let enemyPortraits = {};
+    let newEnemyTimeoutId = null;
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
@@ -55,7 +58,14 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         howtoBtn: document.getElementById('howto-btn'),
         homeSettingsBtn: document.getElementById('home-settings-btn'),
         starGoals: document.getElementById('star-goals'),
-        panels: ['road-screen', 'records-screen', 'howto-screen'].map(id => document.getElementById(id)),
+        panels: ['road-screen', 'records-screen', 'howto-screen', 'book-screen'].map(id => document.getElementById(id)),
+        bookBtn: document.getElementById('book-btn'),
+        bookProgress: document.getElementById('book-progress'),
+        bookEnemies: document.getElementById('book-enemies'),
+        bookOutlaws: document.getElementById('book-outlaws'),
+        bookCount: document.getElementById('book-count'),
+        bookTotal: document.getElementById('book-total'),
+        newEnemyCard: document.getElementById('new-enemy-card'),
         bountyChoice: document.getElementById('bounty-choice'),
         bountyAmount: document.getElementById('bounty-amount'),
         bountyHeat: document.getElementById('bounty-heat'),
@@ -187,9 +197,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
             ['Outlaw bounty', describeBounty(gameState.bounty)],
             ['Peak Heat', gameState.heat.peak],
             ['Enemies destroyed', s.enemiesKilled],
-            ['Bandits destroyed', s.banditsKilled],
-            ['Gunslingers destroyed', s.gunslingersKilled],
-            ['Wolves destroyed', s.wolvesKilled],
+            ...ENEMY_ORDER.filter(id => s.kills[id]).map(id => [`${ENEMY_TYPES[id].name[0]}${ENEMY_TYPES[id].name.slice(1).toLowerCase()}s bagged`, s.kills[id]]),
             ['Bosses destroyed', s.bossesKilled],
             ['Shots fired', s.shotsFired],
             ['Shot accuracy', accuracy],
@@ -303,8 +311,63 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         }).join('<span class="road-link" aria-hidden="true"></span>');
     }
 
-    function setPortraits(images) {
+    // ---------- Bounty Book ----------
+    const pips = (value, max, symbol = '&#9632;') => Array.from({ length: max }, (_, i) => `<span class="pip${i < value ? ' on' : ''}">${symbol}</span>`).join('');
+    const toughness = hp => Math.min(5, hp <= 3 ? hp : hp <= 5 ? 4 : 5);
+    const quickness = speed => (speed <= 4 ? 1 : speed <= 6 ? 2 : speed <= 8 ? 3 : speed <= 11 ? 4 : 5);
+
+    function bookPicture(id, seen) {
+        if(!enemyPortraits[id]) return '<div class="book-pic book-pic-empty">?</div>';
+        return `<div class="book-pic${seen ? '' : ' unknown'}"><img src="${enemyPortraits[id]}" alt=""></div>`;
+    }
+
+    function renderBook() {
+        const seenCount = ENEMY_ORDER.filter(id => progress.seen[id]).length;
+        els.bookProgress.textContent = `${seenCount} / ${ENEMY_ORDER.length} FOUND`;
+        els.bookCount.textContent = seenCount;
+        els.bookTotal.textContent = ENEMY_ORDER.length;
+        els.bookEnemies.innerHTML = ENEMY_ORDER.map(id => {
+            const def = ENEMY_TYPES[id];
+            const seen = !!progress.seen[id];
+            const boss = getOutlaw(def.stage).name;
+            const from = def.stage === 0 ? 'Every gang' : `${boss}${boss.endsWith('S') ? '\'' : '\'s'} gang`;
+            if(!seen) {
+                return `<div class="book-card locked">${bookPicture(id, false)}<div class="book-info"><h4>???</h4>`
+                    + `<p class="book-from">Rides with stage ${def.stage + 1} and beyond</p><p>Not met yet.</p></div></div>`;
+            }
+            return `<div class="book-card">${bookPicture(id, true)}<div class="book-info"><h4>${def.name}</h4>`
+                + `<p class="book-from">${from}</p><p>${def.blurb}</p><p class="book-tip"><b>TIP</b> ${def.tip}</p>`
+                + `<div class="book-stats"><span>TOUGH ${pips(toughness(def.hp), 5)}</span><span>SPEED ${pips(quickness(def.speed), 5)}</span>`
+                + `<span>DANGER ${pips(def.danger, 3, '&#9760;')}</span></div>`
+                + `<p class="book-kills">BAGGED: <b>${progress.kills[id] || 0}</b></p></div></div>`;
+        }).join('');
+        els.bookOutlaws.innerHTML = OUTLAWS.map((outlaw, i) => {
+            const unlocked = isUnlocked(progress, i);
+            const defeated = (progress.stars[i] & 1) !== 0;
+            const status = defeated ? 'DEFEATED' : unlocked ? 'AT LARGE' : 'LOCKED';
+            return `<div class="book-card outlaw${unlocked ? '' : ' locked'}">${portraitHtml(outlaw)}<div class="book-info">`
+                + `<h4>${unlocked ? outlaw.name : '???'}</h4><p class="book-from">${unlocked ? outlaw.title : `Stage ${i + 1}`}</p>`
+                + `<p class="book-status ${defeated ? 'done' : ''}">${status}</p>`
+                + `<p class="poster-stars">${starsHtml(progress.stars[i])}</p></div></div>`;
+        }).join('');
+    }
+
+    function showNewEnemy(type) {
+        const def = ENEMY_TYPES[type];
+        if(!def || !els.newEnemyCard) return;
+        els.newEnemyCard.innerHTML = `${bookPicture(type, true)}<div><div class="new-enemy-label">NEW ENEMY!</div>`
+            + `<div class="new-enemy-name">${def.name}</div><div class="new-enemy-tip">${def.tip}</div></div>`;
+        els.newEnemyCard.style.display = 'flex';
+        els.newEnemyCard.classList.remove('show');
+        void els.newEnemyCard.offsetWidth;
+        els.newEnemyCard.classList.add('show');
+        if(newEnemyTimeoutId) clearTimeout(newEnemyTimeoutId);
+        newEnemyTimeoutId = setTimeout(() => { els.newEnemyCard.style.display = 'none'; }, 4200);
+    }
+
+    function setPortraits(images, enemyImages = {}) {
         portraits = images || {};
+        enemyPortraits = enemyImages || {};
         if(progress) setProgress(progress);
     }
 
@@ -317,6 +380,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.roadProgress.textContent = `STAGE ${progress.selected + 1} / ${OUTLAWS.length}`;
         els.homePoster.innerHTML = posterHtml(progress.selected);
         renderRoad();
+        renderBook();
     }
 
     function showPanel(panel) {
@@ -384,7 +448,12 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
 
     function showStartScreen() {
         els.startScreen.style.display = 'flex';
+        hideNewEnemy();
         document.body.classList.add('in-lobby');
+    }
+
+    function hideNewEnemy() {
+        if(els.newEnemyCard) els.newEnemyCard.style.display = 'none';
     }
 
     function hideStartScreen() {
@@ -486,6 +555,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.roadBtn.addEventListener('click', () => showPanel(els.panels[0]));
         els.recordsBtn.addEventListener('click', () => showPanel(els.panels[1]));
         els.howtoBtn.addEventListener('click', () => showPanel(els.panels[2]));
+        els.bookBtn.addEventListener('click', () => showPanel(els.panels[3]));
         document.querySelectorAll('.panel-back').forEach(btn => btn.addEventListener('click', hidePanels));
         els.roadTrack.addEventListener('click', event => {
             const node = event.target.closest('.road-node');
@@ -540,6 +610,7 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         setRunLog,
         setProgress,
         setPortraits,
+        showNewEnemy,
         hideBountyChoice,
         hideGameOverScreen,
         showStartScreen,

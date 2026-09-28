@@ -13,6 +13,7 @@ export function pickTarget(origin, enemies, { range = AUTO_AIM_RANGE, dirX = nul
     let best = null;
     let bestDistance = range;
     for(const enemy of enemies) {
+        if(enemy.userData?.untargetable) continue;
         const dx = enemy.position.x - origin.x;
         const dz = enemy.position.z - origin.z;
         const distance = Math.hypot(dx, dz);

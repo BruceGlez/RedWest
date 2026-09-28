@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. The home screen shows the next outlaw's WANTED poster: press **PLAY** (or Space) to hunt them. The **Wanted Road** lists eight outlaws, each a harder stage with its own signature threat (wolf packs, sharpshooters, swarms, heavy hitters, then combinations) and a bigger bounty. Beating an outlaw unlocks the next; each outlaw has three stars to earn: defeat them, collect the bounty at Heat 2+, and ride on and escape. Progress is saved on the device. Use WASD to move, mouse to aim and shoot, Shift to dash, Q to change weapons, and P or Escape to pause. Chain accurate kills to raise Heat: points and enemy pressure both rise, while missed shots and hits taken cool it. Defeat the outlaw in pursuit 3, then bank the Heat-scaled bounty (B) or ride on (C) into a 30-second bonus pursuit: escape to collect the bounty and bonus earnings, or die and lose both.
+Open the local URL printed by Vite. The home screen shows the next outlaw's WANTED poster: press **PLAY** (or Space) to hunt them. The **Wanted Road** lists eight outlaws, each a harder stage with its own signature threat (wolf packs, sharpshooters, swarms, heavy hitters, then combinations) and a bigger bounty. Every stage after the first also brings a new enemy with its own tactics: Rattlers, Riflemen, Dynamiters, Brutes, Riders, Duelists and Ghosts. The **Bounty Book** collects every enemy you meet (picture, how it fights, a tip, stats, kills) and the outlaws you have faced. Beating an outlaw unlocks the next; each outlaw has three stars to earn: defeat them, collect the bounty at Heat 2+, and ride on and escape. Progress is saved on the device. Use WASD to move, mouse to aim and shoot, Shift to dash, Q to change weapons, and P or Escape to pause. Chain accurate kills to raise Heat: points and enemy pressure both rise, while missed shots and hits taken cool it. Defeat the outlaw in pursuit 3, then bank the Heat-scaled bounty (B) or ride on (C) into a 30-second bonus pursuit: escape to collect the bounty and bonus earnings, or die and lose both.
 
 The source page also works from a plain local HTTP server such as VS Code Live Server, using the Three.js CDN import map. Opening `index.html` as a `file://` URL may be blocked by browser module security; use an HTTP server.
 
@@ -38,6 +38,7 @@ npm run build
 npm run test:smoke
 npm run test:static
 npm run test:mobile
+npm run test:enemies
 ```
 
 The browser smoke tests look for an installed Chrome or Chromium in the usual location for Windows, macOS, or Linux. Set `CHROME_PATH` to use a different Chromium executable. Player feel, balance, and frame pacing still require hands-on playtesting.

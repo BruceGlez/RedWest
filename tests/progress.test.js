@@ -57,3 +57,19 @@ test('progress saves, loads, and ignores tampered or corrupt data', () => {
     storage.setItem('redWestProgress.v1', '{oops');
     assert.deepEqual(loadProgress(storage), createProgress());
 });
+
+test('the Bounty Book records first sightings once and totals kills across runs', async () => {
+    const { markSeen, recordKills } = await import('../src/progress.js');
+    const progress = createProgress();
+    assert.equal(markSeen(progress, 'rattler'), true);
+    assert.equal(markSeen(progress, 'rattler'), false);
+    assert.equal(markSeen(progress, 'boss'), false, 'outlaws are tracked on the road, not here');
+    recordKills(progress, { bandit: 3, wolf: 0, boss: 1, nonsense: 5 });
+    recordKills(progress, { bandit: 2 });
+    assert.deepEqual(progress.kills, { bandit: 5 });
+    assert.equal(progress.seen.bandit, true);
+    const storage = memoryStorage();
+    saveProgress(progress, storage);
+    assert.deepEqual(loadProgress(storage).kills, { bandit: 5 });
+    assert.deepEqual(loadProgress(storage).seen, { rattler: true, bandit: true });
+});

@@ -40,6 +40,7 @@
     <div id="debug-panel" class="debug-panel"></div>
 
     <div id="fx-layer" aria-hidden="true"></div>
+    <div id="new-enemy-card" class="new-enemy-card" style="display:none;" aria-live="polite"></div>
 
     <div id="touch-controls" aria-hidden="true">
         <div id="stick-move" class="stick-zone"><div class="stick-base"><div class="stick-knob"></div></div><span class="stick-hint">MOVE</span></div>
@@ -71,6 +72,7 @@
             <div class="home-side">
                 <button id="road-btn" class="side-btn" type="button">WANTED ROAD<small id="road-progress">STAGE 1 / 8</small></button>
                 <button id="records-btn" class="side-btn" type="button">RECORDS<small>TOP 5 BOUNTIES</small></button>
+                <button id="book-btn" class="side-btn" type="button">BOUNTY BOOK<small id="book-progress">0 / 10 FOUND</small></button>
                 <button id="howto-btn" class="side-btn" type="button">HOW TO PLAY<small>CONTROLS &amp; STARS</small></button>
             </div>
             <div id="home-poster" class="wanted-poster"></div>
@@ -94,6 +96,20 @@
             <div class="home-chip"><span class="chip-star">&#9733;</span> <span id="road-stars">0</span> / <span class="stars-max">24</span></div>
         </div>
         <div id="road-track" class="road-track"></div>
+    </div>
+
+    <div id="book-screen" class="panel-screen" style="display:none;">
+        <div class="panel-header">
+            <button class="round-btn panel-back" type="button" aria-label="Back">&#8249;</button>
+            <h2>BOUNTY BOOK</h2>
+            <div class="home-chip"><span id="book-count">0</span> / <span id="book-total">10</span></div>
+        </div>
+        <div class="panel-body book-body">
+            <h3 class="book-section">GANGS &amp; CRITTERS</h3>
+            <div id="book-enemies" class="book-grid"></div>
+            <h3 class="book-section">THE OUTLAWS</h3>
+            <div id="book-outlaws" class="book-grid"></div>
+        </div>
     </div>
 
     <div id="records-screen" class="panel-screen" style="display:none;">

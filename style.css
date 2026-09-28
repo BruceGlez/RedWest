@@ -570,3 +570,61 @@ body.touch .touch-only-inline { display: inline-block; }
 .portrait.portrait-render { background: #e7cf9c; }
 .portrait.portrait-render img { width: 100%; height: 100%; object-fit: cover; display: block; filter: sepia(0.35) saturate(1.1) contrast(1.05); }
 .road-node.locked .portrait-render img { filter: grayscale(1) brightness(0.35); }
+
+/* ---------- Bounty Book ---------- */
+.book-body { flex-direction: column; align-items: stretch; justify-content: flex-start; flex-wrap: nowrap; gap: 8px; }
+.book-section { margin: 6px 0 2px; font-family: 'Rye', serif; color: #ffcc33; font-size: 18px; letter-spacing: 1px; }
+.book-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(290px, 1fr)); gap: 12px; }
+.book-card {
+    display: flex; gap: 10px; align-items: flex-start; padding: 10px; border-radius: 10px; color: #3b2412;
+    background: radial-gradient(ellipse at center, #f7e6be 55%, #e2c68d 100%); border: 3px solid #6b4a2b;
+    box-shadow: 0 5px 0 #2a1a0c;
+}
+.book-card.locked { filter: saturate(0.2) brightness(0.75); }
+.book-pic, .book-card .portrait { flex: 0 0 96px; width: 96px; height: 96px; border: 3px solid #6b4a2b; border-radius: 6px; overflow: hidden; background: #e7cf9c; margin: 0; }
+.book-pic img { width: 100%; height: 100%; object-fit: cover; display: block; }
+.book-pic.unknown img { filter: brightness(0) opacity(0.55); }
+.book-pic-empty { display: flex; align-items: center; justify-content: center; font-family: 'Rye', serif; font-size: 40px; }
+.book-info { flex: 1; min-width: 0; font-size: 12px; line-height: 1.35; }
+.book-info h4 { margin: 0; font-family: 'Rye', serif; font-size: 18px; }
+.book-info p { margin: 3px 0; }
+.book-from { font-style: italic; opacity: 0.75; }
+.book-tip b { background: #2e7d32; color: #fff; padding: 0 4px; border-radius: 4px; margin-right: 4px; font-size: 10px; }
+.book-stats { display: flex; flex-wrap: wrap; gap: 4px 10px; font-size: 10px; font-weight: 700; margin-top: 4px; }
+.pip { color: rgba(59, 36, 18, 0.2); margin-left: 1px; }
+.pip.on { color: #b71c1c; }
+.book-kills { font-weight: 700; }
+.book-status { font-weight: 700; color: #9a1b1b; }
+.book-status.done { color: #2e7d32; }
+.book-card .poster-stars .star { font-size: 16px; }
+
+/* ---------- NEW ENEMY card during play ---------- */
+.new-enemy-card {
+    position: fixed; top: calc(60px + env(safe-area-inset-top)); left: 50%; z-index: 16; transform: translateX(-50%);
+    display: flex; gap: 10px; align-items: center; padding: 8px 14px 8px 8px; max-width: min(460px, 90vw); pointer-events: none;
+    background: radial-gradient(ellipse at center, #f7e6be 55%, #e2c68d 100%); color: #3b2412; border: 3px solid #b71c1c;
+    border-radius: 12px; box-shadow: 0 6px 0 #2a1a0c, 0 10px 20px rgba(0, 0, 0, 0.5); font-family: 'Roboto Mono', monospace;
+}
+.new-enemy-card.show { animation: new-enemy-in 4.2s ease-out forwards; }
+@keyframes new-enemy-in {
+    0% { transform: translate(-50%, -30px) scale(0.8); opacity: 0; }
+    8% { transform: translate(-50%, 0) scale(1.05); opacity: 1; }
+    12%, 88% { transform: translate(-50%, 0) scale(1); opacity: 1; }
+    100% { transform: translate(-50%, -20px); opacity: 0; }
+}
+.new-enemy-card .book-pic { flex-basis: 64px; width: 64px; height: 64px; }
+.new-enemy-label { color: #b71c1c; font-weight: 700; font-size: 12px; letter-spacing: 2px; }
+.new-enemy-name { font-family: 'Rye', serif; font-size: 22px; }
+.new-enemy-tip { font-size: 12px; }
+body.in-lobby .new-enemy-card { display: none !important; }
+@media (max-height: 560px), (max-width: 760px) {
+    .book-grid { grid-template-columns: repeat(auto-fill, minmax(250px, 1fr)); gap: 8px; }
+    .book-pic, .book-card .portrait { flex-basis: 72px; width: 72px; height: 72px; }
+    .book-info h4 { font-size: 15px; }
+    .book-info { font-size: 11px; }
+    .side-btn { padding: 6px 10px; }
+    .new-enemy-card { top: calc(44px + env(safe-area-inset-top)); padding: 6px 10px 6px 6px; }
+    .new-enemy-card .book-pic { flex-basis: 48px; width: 48px; height: 48px; }
+    .new-enemy-name { font-size: 17px; }
+    .new-enemy-tip { font-size: 10px; }
+}

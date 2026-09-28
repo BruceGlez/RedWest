@@ -1,4 +1,5 @@
 import { OUTLAWS } from './outlaws.js';
+import { ENEMY_TYPES } from './enemyTypes.js';
 
 // Wanted Road progress, saved on this device. Stars per outlaw are a bitmask of the three
 // STAR_GOALS in outlaws.js, so each goal can be earned on a different run.
@@ -8,7 +9,7 @@ export const STAR_HOT_BOUNTY = 2;
 export const STAR_ESCAPED = 4;
 
 export function createProgress() {
-    return { selected: 0, stars: OUTLAWS.map(() => 0), best: OUTLAWS.map(() => 0) };
+    return { selected: 0, stars: OUTLAWS.map(() => 0), best: OUTLAWS.map(() => 0), seen: {}, kills: {} };
 }
 
 export function starCount(mask) {
@@ -52,6 +53,11 @@ export function loadProgress(storage = globalThis.localStorage) {
             saved.stars.slice(0, OUTLAWS.length).forEach((mask, i) => { progress.stars[i] = Number(mask) & 7; });
             (saved.best || []).slice(0, OUTLAWS.length).forEach((score, i) => { progress.best[i] = Number(score) || 0; });
             if(isUnlocked(progress, saved.selected)) progress.selected = saved.selected;
+            for(const id of Object.keys(ENEMY_TYPES)) {
+                if(saved.seen?.[id] === true) progress.seen[id] = true;
+                const kills = Math.floor(Number(saved.kills?.[id]));
+                if(kills > 0) progress.kills[id] = kills;
+            }
         }
     } catch {
         // Missing or corrupt progress starts a fresh road.
@@ -64,5 +70,20 @@ export function saveProgress(progress, storage = globalThis.localStorage) {
         storage.setItem(PROGRESS_KEY, JSON.stringify(progress));
     } catch {
         // Storage full or blocked: progress lasts for this session only.
+    }
+}
+
+// Bounty Book: returns true the first time an enemy type is ever met.
+export function markSeen(progress, type) {
+    if(!ENEMY_TYPES[type] || progress.seen[type]) return false;
+    progress.seen[type] = true;
+    return true;
+}
+
+export function recordKills(progress, runKills) {
+    for(const [type, count] of Object.entries(runKills || {})) {
+        if(!ENEMY_TYPES[type] || !(count > 0)) continue;
+        progress.kills[type] = (progress.kills[type] || 0) + count;
+        progress.seen[type] = true;
     }
 }

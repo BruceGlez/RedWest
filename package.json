@@ -11,6 +11,7 @@
     "test:smoke": "node tests/smoke.mjs",
     "test:static": "node tests/static-smoke.mjs",
     "test:mobile": "node tests/mobile-smoke.mjs",
+    "test:enemies": "node tests/enemies-smoke.mjs",
     "ios:sync": "vite build && cap sync ios",
     "ios:open": "cap open ios"
   },

@@ -35,6 +35,7 @@ export const gameState = {
         lootCollected: 0,
         whiskeyCollected: 0,
         ammoCollected: 0,
+        kills: {}, // per enemy type, for the report and the Bounty Book
         waveReached: 1
     }
 };
@@ -93,6 +94,7 @@ export function resetGameState() {
     s.lootCollected = 0;
     s.whiskeyCollected = 0;
     s.ammoCollected = 0;
+    s.kills = {};
     s.waveReached = 1;
 }
 

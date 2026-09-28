@@ -10,7 +10,7 @@ import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
 import { loadRunLog, clearRunLog } from './runLog.js';
 import { loadProgress, saveProgress, isUnlocked } from './progress.js';
-import { renderOutlawPortraits } from './portraits.js';
+import { renderOutlawPortraits, renderEnemyPortraits } from './portraits.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -39,7 +39,7 @@ ui.updateLeaderboard(loadHighScores());
 ui.setRunLog(loadRunLog());
 const progress = loadProgress();
 ui.setProgress(progress);
-ui.setPortraits(renderOutlawPortraits(renderer));
+ui.setPortraits(renderOutlawPortraits(renderer), renderEnemyPortraits(renderer));
 ui.setPreferredName(getPreferredPlayerName());
 ui.updateHUD();
 ui.updateDashBar(1);
