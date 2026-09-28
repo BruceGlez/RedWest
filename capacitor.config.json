@@ -8,5 +8,12 @@
     "scrollEnabled": false,
     "allowsLinkPreview": false,
     "preferredContentMode": "mobile"
+  },
+  "plugins": {
+    "SystemBars": {
+      "hidden": true,
+      "style": "DARK",
+      "animation": "NONE"
+    }
   }
 }

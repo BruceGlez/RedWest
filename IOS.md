@@ -5,8 +5,9 @@ The iOS app is the same game wrapped with [Capacitor](https://capacitorjs.com/):
 runs offline and makes no network requests (fonts included).
 
 What the app does natively:
-- Landscape only, full screen, no status bar; the home indicator fades out and edge swipes need a second
-  swipe so thumbs on the sticks don't leave the game (`GameViewController` in `ios/App/App/SceneDelegate.swift`).
+- Landscape only, full screen, no status bar; the home indicator fades out (Capacitor `SystemBars` config in
+  `capacitor.config.json`) and edge swipes need a second swipe so thumbs on the sticks don't leave the game
+  (`GameViewController` in `ios/App/App/SceneDelegate.swift`).
 - Sheriff-star app icon and a dark launch screen (`ios/App/App/Assets.xcassets`).
 - Twin-stick touch controls, the same as the phone web build.
 

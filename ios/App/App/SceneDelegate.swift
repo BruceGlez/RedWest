@@ -23,10 +23,9 @@ class SceneDelegate: UIResponder, UIWindowSceneDelegate {
     }
 }
 
-/// Full-screen game presentation: no status bar, the home indicator fades out, and swipes from
-/// the screen edges need a second swipe, so thumbs on the sticks don't leave the game.
+/// Swipes from the screen edges need a second swipe, so thumbs on the sticks don't leave the game.
+/// The status bar and home indicator are hidden through Capacitor's SystemBars config instead
+/// (capacitor.config.json), because Capacitor already overrides those properties.
 class GameViewController: CAPBridgeViewController {
-    override var prefersStatusBarHidden: Bool { true }
-    override var prefersHomeIndicatorAutoHidden: Bool { true }
     override var preferredScreenEdgesDeferringSystemGestures: UIRectEdge { .all }
 }
