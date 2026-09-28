@@ -430,7 +430,8 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         if(u.hpBar) u.hpBar.scale.x = Math.max(0, u.hp / u.maxHp);
 
         // --- COLLISION WITH PLAYER (DAMAGE) ---
-        const reach = u.heavy ? 3.2 : u.type === 'rattler' ? 1.8 : 2.5;
+        // Enemies stop moving at 2.0 units, so every reach must be larger than that.
+        const reach = u.heavy ? 3.2 : u.type === 'rattler' ? 2.2 : 2.5;
         if(!u.faded && e.position.distanceTo(playerPos) < reach && damagePlayer(callbacks)) {
             e.position.add(dir.clone().multiplyScalar(u.heavy ? -2 : -5));
             if(u.state === 'charge') { u.state = u.behavior === 'charger' ? 'recover' : 'move'; u.stateTimer = 1; }

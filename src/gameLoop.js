@@ -485,7 +485,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         advanceHeat(gameState.heat, dt);
         updateParticles(dt, scene);
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();
-        updateBullets(dt, scene, playerSystem.playerGroup, callbacks);
+        // Sub-step bullets on slow frames so fast shots cannot skip past a target between frames.
+        const bulletSteps = Math.max(1, Math.ceil(dt / 0.02));
+        for(let step = 0; step < bulletSteps && !gameState.isGameOver && !gameState.isChoosingBounty; step++) {
+            updateBullets(dt / bulletSteps, scene, playerSystem.playerGroup, callbacks);
+        }
         // A bullet can end the run or open the bounty choice; freeze the rest of this frame if so.
         const stillFighting = () => !gameState.isGameOver && !gameState.isChoosingBounty;
         if(stillFighting()) updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);

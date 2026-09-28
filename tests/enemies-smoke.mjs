@@ -31,6 +31,19 @@ try {
         S.playerStats.hp = 99;
         window.__player = S.enemies[0].parent.children.find(o => o.userData.type === 'player');
     });
+    // The map is random; clear the area around the player so rocks never block a path or a shot.
+    await page.evaluate(async () => {
+        const { markObstacleGridDirty } = await import('/src/physics.js');
+        const p = window.__player.position;
+        for(let i = S.obstacles.length - 1; i >= 0; i--) {
+            const o = S.obstacles[i];
+            if(Math.hypot(o.x - p.x, o.z - p.z) < 30) {
+                o.mesh.parent?.remove(o.mesh);
+                S.obstacles.splice(i, 1);
+            }
+        }
+        markObstacleGridDirty();
+    });
     assert.equal(await page.evaluate(() => S.gameState.outlawIndex), 7);
     // Stage 8 features the ghost in its opening pursuit, with a NEW ENEMY card.
     await page.locator('#new-enemy-card').getByText('GHOST').waitFor();
@@ -64,10 +77,20 @@ try {
             enemy.userData.untargetable = false;
             enemy.userData.faded = false;
             enemy.userData.hp = 1;
-            enemy.position.set(player.position.x + 4, 0, player.position.z);
+            // Freeze it in a spot clear of obstacles so the kill shot cannot hit a rock instead.
+            Object.assign(enemy.userData, { behavior: 'chase', speed: 0, state: 'move' });
+            const { checkCollision } = await import('/src/physics.js');
+            for(let step = 0; step < 24; step++) {
+                const angle = step * Math.PI / 12;
+                const x = player.position.x + Math.cos(angle) * 6;
+                const z = player.position.z + Math.sin(angle) * 6;
+                if(!checkCollision(x, z, 2.5)) { enemy.position.set(x, 0, z); break; }
+            }
             const at = enemy.position.clone().setY(2);
             spawnBullet(player.parent, 'player', at, at.clone().set(0, 0, 0));
-            await new Promise(r => setTimeout(r, 300));
+            // Wait for the hit to be processed (a frame can take several hundred ms under software rendering).
+            const killDeadline = Date.now() + 10000;
+            while(S.enemies.includes(enemy) && Date.now() < killDeadline) await new Promise(r => setTimeout(r, 50));
             return { hurt, dead: !S.enemies.includes(enemy), kills: S.gameState.runStats.kills[type] || 0 };
         }, type);
         assert.ok(result.dead && result.kills >= 1, `${type} can be killed: ${JSON.stringify(result)} errors: ${errors.slice(0, 3).join(" | ")}`);
