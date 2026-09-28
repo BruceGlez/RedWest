@@ -11,9 +11,18 @@ const OUTLINE_WIDTH = 0.012; // in the model's own units (a Meshy character is ~
 const loader = new GLTFLoader();
 const cache = new Map();
 
+const loaded = new Map();
+
 export function loadCharacterModel(url) {
-    if(!cache.has(url)) cache.set(url, loader.loadAsync(url));
+    if(!cache.has(url)) {
+        cache.set(url, loader.loadAsync(url).then(gltf => { loaded.set(url, gltf); return gltf; }));
+    }
     return cache.get(url);
+}
+
+// The model if it has finished loading, else null (enemies spawn mid-fight and cannot wait).
+export function loadedCharacterModel(url) {
+    return loaded.get(url) ?? null;
 }
 
 // Inverted-hull outline that follows the skeleton: the same skinned mesh drawn back-faces only,

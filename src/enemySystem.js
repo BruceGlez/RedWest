@@ -10,6 +10,7 @@ import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
 import { applyOutlawToEnemy, getOutlaw } from './outlaws.js';
+import { loadedCharacterModel, createCharacterInstance } from './characterModels.js';
 
 /**
  * Handles enemy shooting logic (creation of bullets and sound)
@@ -155,7 +156,10 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
         faded: false,
         untargetable: false
     });
-    if(type === 'boss') setupBoss(enemy, bossStyle);
+    if(type === 'boss') {
+        attachOutlawModel(enemy, getOutlaw(gameState.outlawIndex));
+        setupBoss(enemy, bossStyle);
+    }
     if(type === 'ghost') enemy.userData.stateTimer = 1.5 + Math.random();
     if(type === 'rider') enemy.userData.stateTimer = 2.5 + Math.random() * 1.5;
 
@@ -266,6 +270,23 @@ function keepRange(dir, dist, near, far) {
 // All timings are first guesses for playtesting. Every attack has a visible tell before it lands.
 const BROTHER_HP_SHARE = 0.45;
 
+// Imported 3D outlaw (OUTLAWS[].model): shown instead of the box figure once loaded. The box
+// figure stays for its gun muzzle and health bar; everything else about the fight is unchanged.
+const OUTLAW_MODEL_HEIGHT = 6.5; // before the boss's own 1.2x scale
+function attachOutlawModel(enemy, outlaw) {
+    const gltf = outlaw.model ? loadedCharacterModel(outlaw.model) : null;
+    if(!gltf) return;
+    const instance = createCharacterInstance(gltf, OUTLAW_MODEL_HEIGHT);
+    const box = enemy.children[0];
+    const hpBar = enemy.userData.hpBar?.parent;
+    for(const part of box.children) if(part !== hpBar) part.visible = false;
+    enemy.add(instance.object);
+    enemy.userData.model = instance;
+}
+
+// The part that shakes as an attack tell: the imported model, or the box figure.
+const bodyOf = e => e.userData.model?.object ?? e.children[0];
+
 function setupBoss(enemy, style) {
     const u = enemy.userData;
     u.bossStyle = style;
@@ -314,8 +335,8 @@ function freeSpotNear(center, minR, maxR) {
 function chargeCycle(e, u, dir, dist, timeInSeconds, { range, windup, speed, time, recover, cooldown }) {
     if(u.state === 'move' && dist < range && u.cooldown <= 0) { u.state = 'windup'; u.stateTimer = windup; }
     if(u.state === 'windup') {
-        e.children[0].position.x = Math.sin(timeInSeconds * 60) * 0.15;
-        if(u.stateTimer <= 0) { u.state = 'charge'; u.stateTimer = time; u.lockedDir = dir.clone(); e.children[0].position.x = 0; }
+        bodyOf(e).position.x = Math.sin(timeInSeconds * 60) * 0.15;
+        if(u.stateTimer <= 0) { u.state = 'charge'; u.stateTimer = time; u.lockedDir = dir.clone(); bodyOf(e).position.x = 0; }
         return { moveDir: null, faceDir: u.facing ?? null };
     }
     if(u.state === 'charge') {
@@ -461,9 +482,9 @@ function updateBoss(e, u, ctx) {
             return { moveDir: dir, speed: u.speed * 1.8 };
         }
         if(u.state === 'appear') {
-            e.children[0].position.x = Math.sin(timeInSeconds * 60) * 0.12;
+            bodyOf(e).position.x = Math.sin(timeInSeconds * 60) * 0.12;
             if(u.stateTimer <= 0) {
-                e.children[0].position.x = 0;
+                bodyOf(e).position.x = 0;
                 const from = e.position.clone().setY(2.2);
                 for(let i = 0; i < 12; i++) {
                     const angle = (i / 12) * Math.PI * 2;
@@ -660,6 +681,10 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         else e.lookAt(playerPos.x, e.position.y, playerPos.z);
         if(u.state === 'rear') e.rotateX(-0.35); // the horse rears up before charging
         animateCharacter(e, timeInSeconds, isMoving);
+        if(u.model) {
+            u.model.play(isMoving ? (u.isAiming && u.model.has('runShoot') ? 'runShoot' : 'run') : 'idle');
+            u.model.mixer.update(dt);
+        }
         if(u.hpBar) u.hpBar.scale.x = Math.max(0, u.hp / u.maxHp);
 
         // --- COLLISION WITH PLAYER (DAMAGE) ---

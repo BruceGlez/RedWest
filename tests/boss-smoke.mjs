@@ -86,6 +86,26 @@ try {
         landed.push(`${result.style} (${result.seconds}s)`);
     }
 
+    // An outlaw with an imported 3D model (the Marshal's file stands in) shows the model, animates
+    // and still fights the same way.
+    const modelled = await page.evaluate(async () => {
+        const { loadCharacterModel } = await import('/src/characterModels.js');
+        O.OUTLAWS[0].model = 'models/marshal.glb';
+        await loadCharacterModel(O.OUTLAWS[0].model);
+        window.clearField();
+        S.playerStats.hp = 50;
+        S.playerStats.invulnerabilityTimer = 0;
+        const [pete] = await window.spawnOutlaw(0);
+        const skinned = pete.getObjectByProperty('isSkinnedMesh', true);
+        const start = S.gameState.runTime;
+        const deadline = Date.now() + 90000;
+        while(S.gameState.runTime - start < 8 && S.playerStats.hp === 50 && Date.now() < deadline) await new Promise(r => setTimeout(r, 100));
+        const result = { model: !!skinned && skinned.visible, animating: pete.userData.model?.mixer.time > 0, hurt: S.playerStats.hp < 50 };
+        O.OUTLAWS[0].model = undefined;
+        return result;
+    });
+    assert.deepEqual(modelled, { model: true, animating: true, hurt: true }, 'an imported outlaw model is shown, animated, and still charges');
+
     // Iron Jack: a shot at his face bounces off, a shot in the back hurts.
     const armour = await page.evaluate(async () => {
         const { spawnBullet } = await import('/src/bulletSystem.js');
@@ -132,7 +152,7 @@ try {
     await page.locator('#bounty-choice').waitFor({ state: 'visible', timeout: 60000 });
 
     assert.deepEqual(errors, [], `page errors: ${errors.join(' | ')}`);
-    console.log(`Boss smoke passed: every outlaw's signature attack lands (${landed.join(', ')}), Iron Jack's armour, and the Calloways' last-brother bounty.`);
+    console.log(`Boss smoke passed: every outlaw's signature attack lands (${landed.join(', ')}), an imported outlaw model, Iron Jack's armour, and the Calloways' last-brother bounty.`);
 } finally {
     await browser?.close();
     await server.close();

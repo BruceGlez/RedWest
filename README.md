@@ -25,7 +25,12 @@ Runs pay **Bounty Dollars** (score, collected bounties, new stars, daily jobs). 
 
 ## Characters
 
-The player is **Marshal Flint Reed**, an animated 3D character made with Meshy (image to 3D, auto-rig, animations) and saved as `public/models/marshal.glb`. The original box-built cowboy is still available as **The Drifter** in the shop's CHARACTERS tab, and is the one the hat, coat and pants colours apply to. To add another character: export a rigged GLB from Meshy (Mixamo skeleton, animations Idle, Running, Run and Shoot, Dead, single file), shrink it with `tools/optimize-model.mjs`, put it in `public/models/`, and add it to `CHARACTERS` in `src/cosmetics.js`.
+The player is **Marshal Flint Reed**, an animated 3D character made with Meshy (image to 3D, auto-rig, animations) and saved as `public/models/marshal.glb`. The original box-built cowboy is still available as **The Drifter** in the shop's CHARACTERS tab, and is the one the hat, coat and pants colours apply to. To add another character:
+
+- **With the Meshy API** (needs `MESHY_API_KEY` in the environment and network access to `api.meshy.ai`): `node tools/meshy.mjs front-view.png dusty-pete` runs image to 3D, auto-rig and the four animations (Idle, Running, Run and Shoot, Dead), then shrinks the result into `public/models/dusty-pete.glb`. It needs the model tools once: `npm i --no-save @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions sharp`.
+- **From the Meshy website**: export a rigged GLB (Mixamo skeleton, those animations, single file) and shrink it with `node tools/optimize-model.mjs input.glb public/models/name.glb`.
+
+Then add it as a player character in `CHARACTERS` (`src/cosmetics.js`), or give an outlaw `model: 'models/name.glb'` in `src/outlaws.js`: that outlaw then fights as the animated model (same attacks) and gets a WANTED poster drawn from it. Until then the box-built figure is used.
 
 ## iPhone / iPad app
 

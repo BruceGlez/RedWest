@@ -69,6 +69,14 @@ try {
             return { types: enemies.map(enemy => enemy.userData.type), wave: gameState.waveNumber, bossSpawned: gameState.waveBossSpawned, over: gameState.isGameOver };
         });
         assert.equal(bossState.types.includes('boss'), true, `final pursuit spawns the outlaw: ${JSON.stringify(bossState)}`);
+        // Hold the outlaw still: this test covers Heat and the bounty choice, and a charge landing
+        // mid-check would reset Heat. Each outlaw's attack is covered by boss-smoke.mjs.
+        await page.evaluate(async () => {
+            const { enemies } = await import('/src/state.js');
+            for(const boss of enemies.filter(enemy => enemy.userData.type === 'boss')) {
+                Object.assign(boss.userData, { speed: 0, cooldown: 999, shootTimer: 999, special: 999, state: 'move' });
+            }
+        });
     }
 
     // Give the boss one HP and place a player bullet on it to exercise the normal hit path.

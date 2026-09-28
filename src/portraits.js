@@ -90,10 +90,12 @@ function createStudio(renderer) {
     scene.add(fill);
     return {
         // view: direction from the model to the camera (default: a little above, three-quarter).
-        capture(model, zoom = 1.25, view = viewDir) {
+        // top: frame only the upper part of the model (0.4 = head and shoulders).
+        capture(model, zoom = 1.25, view = viewDir, top = 1) {
             scene.add(model);
             model.updateMatrixWorld(true);
             bounds.setFromObject(model);
+            if(top < 1) bounds.min.y = bounds.max.y - (bounds.max.y - bounds.min.y) * top;
             bounds.getCenter(center);
             bounds.getSize(size);
             const radius = Math.max(size.x, size.y, size.z) * 0.5;
@@ -139,6 +141,16 @@ export function renderEnemyPortraits(renderer) {
 let previewStudio = null;
 let previewModel = null;
 const CHARACTER_VIEW = new THREE.Vector3(0.3, -0.14, 1).normalize();
+
+// WANTED poster picture of an imported outlaw model: head and shoulders, at eye level.
+export function renderCharacterPortrait(renderer, characterModel) {
+    try {
+        previewStudio ??= createStudio(renderer);
+        return previewStudio.capture(characterModel, 1.0, CHARACTER_VIEW, 0.42);
+    } catch {
+        return '';
+    }
+}
 
 // characterModel: an imported character (src/characterModels.js) to show instead of the Drifter.
 export function renderPlayerPreview(renderer, colors, characterModel = null) {

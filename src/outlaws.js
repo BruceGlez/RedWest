@@ -11,6 +11,7 @@ export const MODIFIERS = {
 
 // signature: the outlaw's own attack (enemySystem.js, updateBoss), the banner tip shown when they
 // ride in, and the poster / Bounty Book description.
+// model (optional): an animated GLB in public/models/ (tools/meshy.mjs) used instead of the box figure.
 export const OUTLAWS = [
     { id: 'dusty-pete', name: 'DUSTY PETE', title: 'The Saloon Brawler', modifiers: [], bounty: 50,
         colors: { hat: 0x7a4a26, coat: 0x7a5230, poncho: 0x3b2a1a, bandana: 0xc62828 },

@@ -9,7 +9,8 @@ import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
 import { loadRunLog, clearRunLog } from './runLog.js';
 import { loadProgress, saveProgress, isUnlocked } from './progress.js';
-import { renderOutlawPortraits, renderEnemyPortraits, renderPlayerPreview } from './portraits.js';
+import { renderOutlawPortraits, renderEnemyPortraits, renderPlayerPreview, renderCharacterPortrait } from './portraits.js';
+import { OUTLAWS } from './outlaws.js';
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit } from './purchases.js';
@@ -41,7 +42,20 @@ ui = createUIManager(gameState, playerStats);
 ui.setRunLog(loadRunLog());
 const progress = loadProgress();
 ui.setProgress(progress);
-ui.setPortraits(renderOutlawPortraits(renderer), renderEnemyPortraits(renderer));
+const outlawPortraits = renderOutlawPortraits(renderer);
+const enemyPortraits = renderEnemyPortraits(renderer);
+ui.setPortraits(outlawPortraits, enemyPortraits);
+// Outlaws with an imported 3D model: load it for the fight and redraw their WANTED poster from it.
+for(const outlaw of OUTLAWS) {
+    if(!outlaw.model) continue;
+    loadCharacterModel(outlaw.model).then(gltf => {
+        const instance = createCharacterInstance(gltf, 6);
+        instance.mixer.update(0.4);
+        const picture = renderCharacterPortrait(renderer, instance.object);
+        if(picture) outlawPortraits[outlaw.id] = picture;
+        ui.setPortraits(outlawPortraits, enemyPortraits);
+    }).catch(() => {}); // missing file: the box outlaw is used
+}
 ui.updateHUD();
 ui.updateDashBar(1);
 
