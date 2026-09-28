@@ -10,7 +10,7 @@ import { pickTarget } from './aimAssist.js';
 import { getWeapon, defaultWeapon } from './weapons.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 
-const QUICK_FIRE_WINDOW_MS = 400;
+const QUICK_FIRE_WINDOW = 0.4; // seconds of game time a tap stays live, to wait out the gun's cooldown
 
 export function createPlayerSystem(scene, camera, gameState, playerStats) {
     const playerGroup = createPlayerMesh();
@@ -125,7 +125,8 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         }
     }
 
-    let lastUpdateAt = 0;
+    let seenTapAt = 0;
+    let quickFireLeft = 0;
     function update(dt, timeInSeconds) {
         if(playerStats.invulnerabilityTimer > 0) {
             playerStats.invulnerabilityTimer = Math.max(0, playerStats.invulnerabilityTimer - dt);
@@ -209,10 +210,14 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             let faceX = move.x;
             let faceZ = move.z;
             let target = null;
-            // A tap stays live for a short window (to wait out the gun's cooldown), and always for at
-            // least the first frame after it, so a slow frame can never swallow the shot.
-            const quickFire = touch.quickFireAt > 0
-                && (performance.now() - touch.quickFireAt < QUICK_FIRE_WINDOW_MS || touch.quickFireAt > lastUpdateAt);
+            // A tap stays live for a short window to wait out the gun's cooldown. Both count game time,
+            // so a slow frame (or a phone hiccup) can never let the tap expire before the gun is ready.
+            if(touch.quickFireAt > 0 && touch.quickFireAt !== seenTapAt) {
+                seenTapAt = touch.quickFireAt;
+                quickFireLeft = QUICK_FIRE_WINDOW;
+            }
+            const quickFire = quickFireLeft > 0;
+            quickFireLeft = Math.max(0, quickFireLeft - dt);
             if(touch.aiming) {
                 faceX = touch.aimX;
                 faceZ = touch.aimY;
@@ -253,8 +258,8 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             shoot();
             playerStats.shootCooldown = playerStats.fireRate;
             touch.quickFireAt = 0;
+            quickFireLeft = 0;
         }
-        lastUpdateAt = performance.now();
     }
 
     function reset() {

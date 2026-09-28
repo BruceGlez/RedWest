@@ -82,7 +82,23 @@ try {
         fire('pointerdown');
         fire('pointerup');
     });
-    await page.waitForFunction(before => S.gameState.runStats.shotsFired > before, shotsBeforeTap);
+    // Wait in game time; on failure, report the state that decides whether a tap fires.
+    const tapResult = await page.evaluate(async before => {
+        const { touch } = await import('/src/input.js');
+        const start = S.gameState.runTime;
+        const deadline = Date.now() + 30000;
+        while(S.gameState.runStats.shotsFired <= before && S.gameState.runTime - start < 3 && Date.now() < deadline) {
+            await new Promise(r => setTimeout(r, 50));
+        }
+        return {
+            fired: S.gameState.runStats.shotsFired > before,
+            quickFireAt: touch.quickFireAt, aiming: touch.aiming, firing: touch.firing,
+            cooldown: S.playerStats.shootCooldown, gameSeconds: +(S.gameState.runTime - start).toFixed(2),
+            over: S.gameState.isGameOver, paused: S.gameState.isPaused, choosing: S.gameState.isChoosingBounty,
+            enemies: S.enemies.length
+        };
+    }, shotsBeforeTap);
+    assert.ok(tapResult.fired, `a tap on the aim side quick-fires: ${JSON.stringify(tapResult)}`);
     const facing = await page.evaluate(() => {
         const p = window.__player;
         const forward = p.getWorldDirection(p.position.clone());
