@@ -1,7 +1,6 @@
 // Red West offline cache. Network first so playtesters always get the latest build when online;
 // the cached copy is only used when the network is unavailable.
-const CACHE = 'red-west-v1';
-const FONT_HOSTS = ['fonts.googleapis.com', 'fonts.gstatic.com'];
+const CACHE = 'red-west-v2';
 
 self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', event => event.waitUntil(self.clients.claim()));
@@ -10,7 +9,7 @@ self.addEventListener('fetch', event => {
     const request = event.request;
     if(request.method !== 'GET') return;
     const url = new URL(request.url);
-    if(url.origin !== self.location.origin && !FONT_HOSTS.includes(url.hostname)) return;
+    if(url.origin !== self.location.origin) return;
 
     event.respondWith(
         fetch(request)

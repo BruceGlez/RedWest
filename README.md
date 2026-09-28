@@ -19,6 +19,10 @@ The source page also works from a plain local HTTP server such as VS Code Live S
 
 The same build plays on phones. Open the Pages link, hold the phone sideways, and tap to draw: the left thumb moves, the right thumb aims and fires once pushed past about a third of the way, and the DASH, SWAP and pause buttons sit on the right. For a full-screen app with its own icon, use **Add to Home Screen** (Safari share menu on iPhone; browser menu or the install prompt on Android). After the first visit it also works offline.
 
+## iPhone / iPad app
+
+A native iOS app (for TestFlight and the App Store) is built from the same code with Capacitor. See [IOS.md](IOS.md) for building it on a Mac and submitting it.
+
 ## Playtest build
 
 Every push to `main` is built and published by `.github/workflows/pages.yml` to

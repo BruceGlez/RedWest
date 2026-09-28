@@ -1,0 +1,12 @@
+{
+  "appId": "com.bruceglez.redwest",
+  "appName": "Red West",
+  "webDir": "dist",
+  "backgroundColor": "#1a0f0a",
+  "ios": {
+    "contentInset": "never",
+    "scrollEnabled": false,
+    "allowsLinkPreview": false,
+    "preferredContentMode": "mobile"
+  }
+}
