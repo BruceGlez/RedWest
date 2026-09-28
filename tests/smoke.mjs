@@ -135,6 +135,8 @@ try {
         gameState.waveTimer = 0.01;
     });
     await page.locator('#result-title').getByText('ESCAPED').waitFor();
+    // Wanted Road: beating the first outlaw earns stars and unlocks the next stage.
+    assert.match(await page.locator('#result-road').textContent(), /NEW OUTLAW ON THE ROAD: RATTLESNAKE ROSA/);
     const escapedScore = Number(await page.locator('#finalScore').textContent());
     assert.ok(escapedScore >= scoreBeforeOutlaw + offered.amount, 'escaping pays the Heat-scaled bounty');
     await page.locator('#skipScoreBtn').click();
@@ -179,8 +181,20 @@ try {
     await page.locator('#start-screen').waitFor({ state: 'visible' });
     // The playtest log recorded one row per finished run, in order, with the bounty decision.
     const runLog = await page.evaluate(async () => (await import('/src/runLog.js')).loadRunLog());
-    assert.deepEqual(runLog.map(run => [run.sessionRun, run.result, run.bountyChoice]),
-        [[1, 'escaped', 'ride on'], [2, 'banked', 'bank'], [3, 'died', 'ride on']]);
+    assert.deepEqual(runLog.map(run => [run.sessionRun, run.outlaw, run.result, run.bountyChoice]),
+        [[1, 'dusty-pete', 'escaped', 'ride on'], [2, 'rattlesnake-rosa', 'banked', 'bank'], [3, 'deacon-graves', 'died', 'ride on']]);
+
+    // Progress persists; the road lets the player go back to an earlier outlaw.
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestProgress.v1')));
+    assert.deepEqual(saved.stars.slice(0, 3), [5, 1, 1], 'defeat+escape, defeat, defeat');
+    assert.equal(await page.locator('#home-stars').textContent(), '4');
+    assert.match(await page.locator('#home-poster').textContent(), /THE CALLOWAYS/, 'beating stage 3 selects stage 4');
+    await page.locator('#road-btn').click();
+    await page.locator('#road-screen').waitFor({ state: 'visible' });
+    assert.equal(await page.locator('.road-node.locked').count(), 4, 'stages 5-8 are still locked');
+    await page.locator('.road-node[data-index="0"]').click();
+    await page.locator('#road-screen').waitFor({ state: 'hidden' });
+    assert.match(await page.locator('#home-poster').textContent(), /DUSTY PETE/);
     assert.equal(await page.locator('#run-log-count').textContent(), '3 runs');
     await startRun();
 

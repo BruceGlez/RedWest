@@ -23,10 +23,11 @@ try {
     await page.evaluate(async () => { window.S = await import('/src/state.js'); });
 
     assert.equal(await page.evaluate(() => document.body.classList.contains('touch')), true, 'touch mode is detected');
-    assert.equal(await page.locator('.touch-only.blink-text').isVisible(), true, 'start screen shows TAP TO DRAW');
+    assert.equal(await page.locator('#play-btn').isVisible(), true, 'home screen shows PLAY');
+    assert.match(await page.locator('#home-poster').textContent(), /WANTED.*DUSTY PETE/);
     assert.equal(await page.locator('#crosshair').isVisible(), false, 'no mouse crosshair on touch');
 
-    await page.touchscreen.tap(422, 40);
+    await page.locator('#play-btn').tap({ force: true }); // it pulses, so never "stable"
     await page.waitForFunction(() => S.gameState.isGameStarted);
     await page.evaluate(() => { S.playerStats.hp = 99; });
 

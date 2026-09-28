@@ -11,10 +11,10 @@ export function createBountyState() {
     return { status: 'none', amount: 0, heatAtOffer: 0, scoreAtRideOn: 0 };
 }
 
-export function offerBounty(bounty, heatLevel) {
+export function offerBounty(bounty, heatLevel, baseBounty = OUTLAW_BOUNTY) {
     bounty.status = 'offered';
     bounty.heatAtOffer = heatLevel;
-    bounty.amount = Math.round(OUTLAW_BOUNTY * heatMultiplier(heatLevel));
+    bounty.amount = Math.round(baseBounty * heatMultiplier(heatLevel));
     return bounty.amount;
 }
 

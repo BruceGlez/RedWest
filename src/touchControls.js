@@ -107,12 +107,8 @@ export function setupTouchControls() {
     holdButton(document.getElementById('btn-swap'), () => { keys.weaponSwitchRequested = true; });
     holdButton(document.getElementById('btn-pause'), () => { keys.pauseToggleRequested = true; });
 
-    // Tap anywhere on the start screen (outside its buttons) to draw; go fullscreen landscape where allowed.
-    document.getElementById('start-screen').addEventListener('click', event => {
-        if(event.target.closest('button')) return;
-        keys.startRequested = true;
-        enterAppMode();
-    });
+    // PLAY also takes the browser fullscreen in landscape where that is allowed.
+    document.getElementById('play-btn').addEventListener('click', enterAppMode);
     document.getElementById('restart-msg').addEventListener('click', () => {
         if(document.getElementById('input-section').style.display === 'none') keys.restartRequested = true;
     });

@@ -1,6 +1,8 @@
 import { heatMultiplier, CHAIN_WINDOW, MAX_HEAT } from './heat.js';
 import { FINAL_PURSUIT } from './bounty.js';
 import { formatRunLog } from './runLog.js';
+import { OUTLAWS, MODIFIERS, STAR_GOALS, getOutlaw } from './outlaws.js';
+import { isUnlocked, totalStars } from './progress.js';
 
 export function createUIManager(gameState, playerStats, onSaveScore) {
     let preferredName = '';
@@ -8,6 +10,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
     let heatEventTimeoutId = null;
     let lastHeatLevel = 0;
     let runLog = [];
+    let progress = null;
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
@@ -37,6 +40,19 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         finalScore: document.getElementById('finalScore'),
         resultTitle: document.getElementById('result-title'),
         resultDetail: document.getElementById('result-detail'),
+        resultRoad: document.getElementById('result-road'),
+        homePoster: document.getElementById('home-poster'),
+        homeStars: document.getElementById('home-stars'),
+        roadStars: document.getElementById('road-stars'),
+        roadProgress: document.getElementById('road-progress'),
+        roadTrack: document.getElementById('road-track'),
+        playBtn: document.getElementById('play-btn'),
+        roadBtn: document.getElementById('road-btn'),
+        recordsBtn: document.getElementById('records-btn'),
+        howtoBtn: document.getElementById('howto-btn'),
+        homeSettingsBtn: document.getElementById('home-settings-btn'),
+        starGoals: document.getElementById('star-goals'),
+        panels: ['road-screen', 'records-screen', 'howto-screen'].map(id => document.getElementById(id)),
         bountyChoice: document.getElementById('bounty-choice'),
         bountyAmount: document.getElementById('bounty-amount'),
         bountyHeat: document.getElementById('bounty-heat'),
@@ -72,6 +88,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.inputSection.style.display = 'none';
         els.restartMsg.style.display = 'block';
     });
+
+    if(els.starGoals) els.starGoals.innerHTML = STAR_GOALS.map(goal => `<li>${goal}</li>`).join('');
 
     function updateHUD() {
         const hearts = [];
@@ -197,8 +215,8 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         died: ['WASTED', '']
     };
 
-    // result: 'died' | 'banked' | 'escaped'
-    function showGameOver(result = 'died') {
+    // result: 'died' | 'banked' | 'escaped'; roadResult: what the run changed on the Wanted Road
+    function showGameOver(result = 'died', roadResult = null) {
         hidePauseOverlay();
         hideSettingsModal();
         const [title, detail] = RESULT_TEXT[result] || RESULT_TEXT.died;
@@ -207,6 +225,7 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.resultDetail.textContent = gameState.bounty.status === 'forfeited'
             ? `You rode on and lost the ${gameState.bounty.amount} bounty and your bonus earnings.`
             : detail;
+        renderRoadResult(roadResult);
         els.gameOver.style.display = 'flex';
         els.finalScore.innerText = gameState.score;
         renderRunStats();
@@ -214,7 +233,10 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         els.restartMsg.style.display = 'none';
         els.playerName.value = preferredName;
         // On phones, focusing would pop the keyboard over the run report.
-        if(!document.body.classList.contains('touch')) els.playerName.focus();
+        if(!document.body.classList.contains('touch')) els.playerName.focus({ preventScroll: true });
+        // Start at the top so the stars and result are seen before the long run report.
+        const panel = els.gameOver.querySelector('.modal-content');
+        if(panel) panel.scrollTop = 0;
     }
 
     function showBountyChoice(bounty, bonusSeconds) {
@@ -228,6 +250,85 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
 
     function hideBountyChoice() {
         if(els.bountyChoice) els.bountyChoice.style.display = 'none';
+    }
+
+    // ---------- Home screen and Wanted Road (all markup below comes from static outlaw data) ----------
+    const hex = color => `#${color.toString(16).padStart(6, '0')}`;
+
+    function starsHtml(mask) {
+        return [1, 2, 4].map(bit => `<span class="star${mask & bit ? ' on' : ''}">&#9733;</span>`).join('');
+    }
+
+    function portraitHtml(outlaw) {
+        const c = outlaw.colors;
+        return `<div class="portrait" style="--coat:${hex(c.coat)};--poncho:${hex(c.poncho)};--bandana:${hex(c.bandana)}">`
+            + '<div class="p-body"></div><div class="p-head"><div class="p-eyes"></div><div class="p-bandana"></div></div>'
+            + '<div class="p-hat-brim"></div><div class="p-hat-top"></div></div>';
+    }
+
+    function posterHtml(index) {
+        const outlaw = OUTLAWS[index];
+        const threats = outlaw.modifiers.length
+            ? outlaw.modifiers.map(id => `<span class="threat" title="${MODIFIERS[id].detail}">${MODIFIERS[id].label}</span>`).join('')
+            : '<span class="threat calm">NO TRICKS</span>';
+        return '<div class="poster-wanted">WANTED</div><div class="poster-sub">DEAD OR ALIVE</div>'
+            + portraitHtml(outlaw)
+            + `<div class="poster-name">${outlaw.name}</div><div class="poster-title">${outlaw.title}</div>`
+            + `<div class="poster-threats">${threats}</div><div class="poster-reward">REWARD $${outlaw.bounty}</div>`
+            + `<div class="poster-footer"><span class="poster-stars">${starsHtml(progress.stars[index])}</span>`
+            + `<span class="poster-stage">STAGE ${index + 1}/${OUTLAWS.length}</span></div>`;
+    }
+
+    function renderRoad() {
+        els.roadTrack.innerHTML = OUTLAWS.map((outlaw, i) => {
+            const unlocked = isUnlocked(progress, i);
+            const classes = ['road-node', unlocked ? '' : 'locked', i === progress.selected ? 'selected' : ''].join(' ').trim();
+            return `<button type="button" class="${classes}" data-index="${i}"${unlocked ? '' : ' disabled'}>`
+                + `<span class="road-num">${i + 1}</span>${portraitHtml(outlaw)}`
+                + `<span class="road-name">${outlaw.name}</span><span class="road-stars">${starsHtml(progress.stars[i])}</span>`
+                + `<span class="road-reward">$${outlaw.bounty}</span>${unlocked ? '' : '<span class="road-lock">LOCKED</span>'}</button>`;
+        }).join('<span class="road-link" aria-hidden="true"></span>');
+    }
+
+    function setProgress(nextProgress) {
+        progress = nextProgress;
+        const stars = totalStars(progress);
+        els.homeStars.textContent = stars;
+        els.roadStars.textContent = stars;
+        document.querySelectorAll('.stars-max').forEach(el => { el.textContent = OUTLAWS.length * 3; });
+        els.roadProgress.textContent = `STAGE ${progress.selected + 1} / ${OUTLAWS.length}`;
+        els.homePoster.innerHTML = posterHtml(progress.selected);
+        renderRoad();
+    }
+
+    function showPanel(panel) {
+        for(const p of els.panels) p.style.display = p === panel ? 'flex' : 'none';
+        if(panel === els.panels[0]) {
+            els.roadTrack.querySelector('.selected')?.scrollIntoView({ inline: 'center', block: 'nearest' });
+        }
+    }
+
+    function hidePanels() {
+        for(const p of els.panels) p.style.display = 'none';
+    }
+
+    function renderRoadResult(roadResult) {
+        if(!roadResult || !progress) {
+            els.resultRoad.innerHTML = '';
+            return;
+        }
+        const index = gameState.outlawIndex;
+        const mask = progress.stars[index];
+        const goals = STAR_GOALS.map((goal, k) => {
+            const bit = 1 << k;
+            const isNew = (roadResult.newStars & bit) !== 0;
+            const cls = isNew ? 'new' : (mask & bit ? 'on' : '');
+            return `<li class="${cls}"><span class="star">&#9733;</span> ${goal}${isNew ? ' <b>NEW!</b>' : ''}</li>`;
+        }).join('');
+        const unlock = roadResult.unlockedNext
+            ? `<p class="unlock-note">NEW OUTLAW ON THE ROAD: ${getOutlaw(index + 1).name}</p>`
+            : '';
+        els.resultRoad.innerHTML = `<p class="result-outlaw">${getOutlaw(index).name}</p><ul class="result-goals">${goals}</ul>${unlock}`;
     }
 
     function setRunLog(records) {
@@ -265,10 +366,14 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
 
     function showStartScreen() {
         els.startScreen.style.display = 'flex';
+        document.body.classList.add('in-lobby');
     }
 
     function hideStartScreen() {
         els.startScreen.style.display = 'none';
+        document.body.classList.remove('in-lobby');
+        hidePanels();
+        closeHomeSettings();
     }
 
     function hideGameOverScreen() {
@@ -334,6 +439,18 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         if(els.settingsModal) els.settingsModal.style.display = 'none';
     }
 
+    // Settings opened from the home screen: sound and playtest options only, no resume/restart.
+    function openHomeSettings() {
+        els.settingsModal.classList.add('home-mode');
+        els.settingsModal.style.display = 'flex';
+    }
+
+    function closeHomeSettings() {
+        if(!els.settingsModal.classList.contains('home-mode')) return;
+        els.settingsModal.classList.remove('home-mode');
+        els.settingsModal.style.display = 'none';
+    }
+
     function bindControlHandlers(handlers) {
         if(els.pauseResumeBtn) els.pauseResumeBtn.addEventListener('click', handlers.onResumeGame);
         if(els.pauseSettingsBtn) els.pauseSettingsBtn.addEventListener('click', handlers.onOpenSettings);
@@ -342,6 +459,22 @@ export function createUIManager(gameState, playerStats, onSaveScore) {
         if(els.settingsRestartBtn) els.settingsRestartBtn.addEventListener('click', handlers.onRestartRun);
         if(els.settingsMusicBtn) els.settingsMusicBtn.addEventListener('click', handlers.onToggleMusic);
         if(els.settingsSfxBtn) els.settingsSfxBtn.addEventListener('click', handlers.onToggleSfx);
+        els.settingsCloseBtn?.addEventListener('click', closeHomeSettings);
+        els.homeSettingsBtn.addEventListener('click', openHomeSettings);
+        els.playBtn.addEventListener('click', () => {
+            els.playBtn.blur();
+            handlers.onPlay();
+        });
+        els.roadBtn.addEventListener('click', () => showPanel(els.panels[0]));
+        els.recordsBtn.addEventListener('click', () => showPanel(els.panels[1]));
+        els.howtoBtn.addEventListener('click', () => showPanel(els.panels[2]));
+        document.querySelectorAll('.panel-back').forEach(btn => btn.addEventListener('click', hidePanels));
+        els.roadTrack.addEventListener('click', event => {
+            const node = event.target.closest('.road-node');
+            if(!node || node.disabled) return;
+            handlers.onSelectOutlaw(Number(node.dataset.index));
+            hidePanels();
+        });
         if(els.bankBountyBtn) els.bankBountyBtn.addEventListener('click', handlers.onBankBounty);
         if(els.rideOnBtn) els.rideOnBtn.addEventListener('click', handlers.onRideOn);
         els.copyRunLogBtn?.addEventListener('click', () => copyRunLog(els.copyRunLogBtn));
@@ -387,6 +520,7 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         showBountyChoice,
         showHeatEvent,
         setRunLog,
+        setProgress,
         hideBountyChoice,
         hideGameOverScreen,
         showStartScreen,

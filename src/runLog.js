@@ -1,4 +1,5 @@
 import { FINAL_PURSUIT } from './bounty.js';
+import { getOutlaw } from './outlaws.js';
 
 // Playtest run log (REFACTOR_PLAN.md Stage 1 gate). One record per finished run, kept in this
 // browser so an observer can copy the rows into a sheet after each tester.
@@ -6,7 +7,7 @@ const RUN_LOG_KEY = 'redWestRunLog.v1';
 const MAX_RUNS = 200;
 
 export const RUN_LOG_COLUMNS = [
-    'endedAt', 'sessionRun', 'result', 'pursuitReached', 'peakHeat', 'bountyChoice', 'heatAtOutlaw',
+    'endedAt', 'sessionRun', 'outlaw', 'result', 'pursuitReached', 'peakHeat', 'bountyChoice', 'heatAtOutlaw',
     'bountyAmount', 'score', 'seconds', 'shotsFired', 'accuracy', 'kills', 'damageTaken'
 ];
 
@@ -19,6 +20,7 @@ export function buildRunRecord(gameState, result, sessionRun, endedAt = new Date
     return {
         endedAt: endedAt.toISOString(),
         sessionRun,
+        outlaw: getOutlaw(gameState.outlawIndex ?? 0).id,
         result,
         pursuitReached: s.waveReached > FINAL_PURSUIT ? 'bonus' : s.waveReached,
         peakHeat: gameState.heat.peak,

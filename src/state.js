@@ -20,6 +20,7 @@ export const gameState = {
     isChoosingBounty: false,
     runWon: false,
     runTime: 0,
+    outlawIndex: 0, // stage on the Wanted Road; set when a run starts, kept across resets
     MAP_SIZE: 140,
     runStats: {
         shotsFired: 0,

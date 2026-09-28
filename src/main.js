@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { setupInputs } from './input.js';
+import { setupInputs, keys } from './input.js';
 import { setupTouchControls } from './touchControls.js';
 import { gameState, playerStats } from './state.js';
 import { setupScene, generateMap } from './world.js';
@@ -9,6 +9,7 @@ import { createUIManager } from './uiManager.js';
 import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
 import { loadRunLog, clearRunLog } from './runLog.js';
+import { loadProgress, saveProgress, isUnlocked } from './progress.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -32,12 +33,14 @@ ui = createUIManager(gameState, playerStats, (name, score) => {
 });
 ui.updateLeaderboard(loadHighScores());
 ui.setRunLog(loadRunLog());
+const progress = loadProgress();
+ui.setProgress(progress);
 ui.setPreferredName(getPreferredPlayerName());
 ui.updateHUD();
 ui.updateDashBar(1);
 
 const playerSystem = createPlayerSystem(scene, camera, gameState, playerStats);
-const gameLoop = createGameLoop(scene, camera, renderer, playerSystem, ui);
+const gameLoop = createGameLoop(scene, camera, renderer, playerSystem, ui, progress);
 ui.bindControlHandlers({
     onResumeGame: () => gameLoop.resumeGame(),
     onOpenSettings: () => gameLoop.openSettings(),
@@ -45,6 +48,13 @@ ui.bindControlHandlers({
     onRestartRun: () => gameLoop.resetGame(),
     onBankBounty: () => gameLoop.bankAndLeave(),
     onRideOn: () => gameLoop.rideOnToBonus(),
+    onPlay: () => { keys.startRequested = true; },
+    onSelectOutlaw: index => {
+        if(!isUnlocked(progress, index)) return;
+        progress.selected = index;
+        saveProgress(progress);
+        ui.setProgress(progress);
+    },
     onClearRunLog: () => {
         clearRunLog();
         ui.setRunLog([]);

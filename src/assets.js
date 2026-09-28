@@ -213,20 +213,24 @@ export function createAmmoMesh() {
     return group;
 }
 
-export function createBossMesh() {
+// colors: optional { coat, poncho, bandana } hex values so each outlaw on the Wanted Road looks different.
+export function createBossMesh(colors = null) {
+    const coatMat = colors?.coat !== undefined ? new THREE.MeshStandardMaterial({ color: colors.coat, roughness: 1.0 }) : mat.enemyCoat;
+    const ponchoMat = colors?.poncho !== undefined ? new THREE.MeshStandardMaterial({ color: colors.poncho, roughness: 1.0 }) : mat.blackHat;
+    const bandanaMat = colors?.bandana !== undefined ? new THREE.MeshStandardMaterial({ color: colors.bandana, roughness: 0.6 }) : mat.gold;
     const group = new THREE.Group(); const mesh = new THREE.Group(); mesh.rotation.y = Math.PI; group.add(mesh);
     mesh.scale.set(1.5, 1.5, 1.5);
-    const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.5), mat.enemyCoat); body.position.y = 2.5; body.castShadow = true; mesh.add(body);
-    const poncho = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 1.7), mat.blackHat); poncho.position.y = 3.2; mesh.add(poncho);
+    const body = new THREE.Mesh(new THREE.BoxGeometry(2, 2, 1.5), coatMat); body.position.y = 2.5; body.castShadow = true; mesh.add(body);
+    const poncho = new THREE.Mesh(new THREE.BoxGeometry(2.2, 1.0, 1.7), ponchoMat); poncho.position.y = 3.2; mesh.add(poncho);
     const leftLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants); leftLeg.position.set(-0.5, 0.75, 0); leftLeg.name = 'leftLeg'; mesh.add(leftLeg);
     const rightLeg = new THREE.Mesh(new THREE.BoxGeometry(0.6, 1.5, 0.8), mat.pants); rightLeg.position.set(0.5, 0.75, 0); rightLeg.name = 'rightLeg'; mesh.add(rightLeg);
-    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), mat.enemyCoat); leftArm.position.set(-1.2, 2.5, 0); leftArm.name = 'leftArm'; mesh.add(leftArm);
+    const leftArm = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), coatMat); leftArm.position.set(-1.2, 2.5, 0); leftArm.name = 'leftArm'; mesh.add(leftArm);
     const rightArmPivot = new THREE.Group(); rightArmPivot.position.set(1.2, 3.25, 0); rightArmPivot.name = 'rightArm'; mesh.add(rightArmPivot);
-    const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), mat.enemyCoat); rightArmMesh.position.set(0, -0.75, 0); rightArmPivot.add(rightArmMesh);
+    const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), coatMat); rightArmMesh.position.set(0, -0.75, 0); rightArmPivot.add(rightArmMesh);
     const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), mat.skin); rightHand.position.set(0, -1.5, 0); rightArmPivot.add(rightHand);
     const gunReal = createRevolverMesh(); gunReal.position.set(0, -0.2, 0.2); gunReal.rotation.set(-Math.PI / 2, 0, 0); rightHand.add(gunReal); 
     const head = new THREE.Mesh(new THREE.BoxGeometry(1.2, 1.2, 1.2), mat.skin); head.position.y = 4.1; mesh.add(head);
-    const bandana = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.6, 1.25), mat.gold); bandana.position.y = 3.9; mesh.add(bandana);
+    const bandana = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.6, 1.25), bandanaMat); bandana.position.y = 3.9; mesh.add(bandana);
     const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.4, 0.2, 2.4), mat.blackHat); hatBrim.position.y = 4.6; mesh.add(hatBrim);
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.4), mat.blackHat); hatTop.position.y = 5.0; mesh.add(hatTop);
     

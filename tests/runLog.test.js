@@ -31,7 +31,7 @@ function finishedState() {
 test('a run record captures the Heat and bounty decisions the gate asks about', () => {
     const record = buildRunRecord(finishedState(), 'died', 2, new Date('2026-09-25T12:00:00Z'));
     assert.deepEqual(record, {
-        endedAt: '2026-09-25T12:00:00.000Z', sessionRun: 2, result: 'died', pursuitReached: 'bonus',
+        endedAt: '2026-09-25T12:00:00.000Z', sessionRun: 2, outlaw: 'dusty-pete', result: 'died', pursuitReached: 'bonus',
         peakHeat: 3, bountyChoice: 'ride on', heatAtOutlaw: 2, bountyAmount: 100, score: 120,
         seconds: 188, shotsFired: 40, accuracy: 75, kills: 22, damageTaken: 5
     });

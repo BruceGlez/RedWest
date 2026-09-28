@@ -15,7 +15,7 @@
     <link rel="apple-touch-icon" href="icons/apple-touch-icon.png">
     <link rel="stylesheet" href="style.css">
 </head>
-<body>
+<body class="in-lobby">
 
     <div id="crosshair"></div>
 
@@ -57,38 +57,88 @@
         <div id="dash-bar"></div>
     </div>
 
-    <div id="start-screen" class="modal-overlay">
-        <div class="modal-content">
-            <h1 class="western-title">RED WEST</h1>
+    <div id="start-screen" class="home-screen">
+        <div class="home-top">
+            <div class="home-logo">RED WEST</div>
+            <div class="home-top-right">
+                <div class="home-chip"><span class="chip-star">&#9733;</span> <span id="home-stars">0</span> / <span class="stars-max">24</span></div>
+                <button id="home-settings-btn" class="round-btn" type="button" aria-label="Settings">&#9881;</button>
+            </div>
+        </div>
+        <div class="home-main">
+            <div class="home-side">
+                <button id="road-btn" class="side-btn" type="button">WANTED ROAD<small id="road-progress">STAGE 1 / 8</small></button>
+                <button id="records-btn" class="side-btn" type="button">RECORDS<small>TOP 5 BOUNTIES</small></button>
+                <button id="howto-btn" class="side-btn" type="button">HOW TO PLAY<small>CONTROLS &amp; STARS</small></button>
+            </div>
+            <div id="home-poster" class="wanted-poster"></div>
+            <div class="home-play">
+                <button id="play-btn" class="play-btn" type="button">PLAY</button>
+                <p class="play-hint desktop-only">or press <span class="key-highlight">SPACE</span></p>
+            </div>
+        </div>
+        <div class="run-log-box">
+            PLAYTEST LOG: <span id="run-log-count">0 runs</span>
+            <button id="copyRunLogBtn" type="button">COPY</button>
+            <button id="clearRunLogBtn" type="button">CLEAR</button>
+            <span id="run-log-status"></span>
+        </div>
+    </div>
+
+    <div id="road-screen" class="panel-screen" style="display:none;">
+        <div class="panel-header">
+            <button class="round-btn panel-back" type="button" aria-label="Back">&#8249;</button>
+            <h2>WANTED ROAD</h2>
+            <div class="home-chip"><span class="chip-star">&#9733;</span> <span id="road-stars">0</span> / <span class="stars-max">24</span></div>
+        </div>
+        <div id="road-track" class="road-track"></div>
+    </div>
+
+    <div id="records-screen" class="panel-screen" style="display:none;">
+        <div class="panel-header">
+            <button class="round-btn panel-back" type="button" aria-label="Back">&#8249;</button>
+            <h2>RECORDS</h2>
+            <div></div>
+        </div>
+        <div class="panel-body">
             <div class="leaderboard-box">
                 <h3>WANTED LIST (TOP 5)</h3>
                 <ul id="highscore-list">
                     <li>LOADING...</li>
                 </ul>
             </div>
-            <div class="controls-box touch-only">
+        </div>
+    </div>
+
+    <div id="howto-screen" class="panel-screen" style="display:none;">
+        <div class="panel-header">
+            <button class="round-btn panel-back" type="button" aria-label="Back">&#8249;</button>
+            <h2>HOW TO PLAY</h2>
+            <div></div>
+        </div>
+        <div class="panel-body howto-body">
+            <div class="howto-card">
+                <h3>THE HUNT</h3>
+                <p>Survive 3 pursuits against the outlaw's gang, then take down the outlaw. Bank the bounty, or ride on through a 30s bonus pursuit: escape to collect everything, die and lose it.</p>
+                <p><span>HEAT</span> Chain accurate kills for more points and deadlier pursuers. Misses and hits taken cool it.</p>
+            </div>
+            <div class="howto-card">
+                <h3>STARS</h3>
+                <ol id="star-goals" class="star-goals"></ol>
+                <p>Defeat an outlaw to unlock the next one on the Wanted Road.</p>
+            </div>
+            <div class="howto-card controls-box touch-only">
+                <h3>CONTROLS</h3>
                 <p><span>LEFT THUMB</span> MOVE</p>
                 <p><span>RIGHT THUMB</span> AIM &mdash; PUSH FURTHER TO FIRE</p>
                 <p><span>DASH / SWAP</span> DASH, SWITCH WEAPON</p>
-                <p><span>HEAT</span> CHAIN ACCURATE KILLS FOR MORE POINTS AND DEADLIER PURSUERS. MISSES AND HITS TAKEN COOL IT</p>
             </div>
-            <div class="controls-box desktop-only">
-                <p><span>WASD</span> MOVE</p>
-                <p><span>MOUSE</span> AIM / SHOOT</p>
-                <p><span>SHIFT</span> DASH</p>
-                <p><span>Q</span> SWITCH WEAPON</p>
-                <p><span>HEAT</span> CHAIN ACCURATE KILLS FOR MORE POINTS AND DEADLIER PURSUERS. MISSES AND HITS TAKEN COOL IT</p>
-                <p><span>P / ESC</span> PAUSE</p>
-                <p><span>O</span> SETTINGS</p>
-                <p><span>M / N</span> TOGGLE MUSIC / SFX</p>
-            </div>
-            <p class="blink-text desktop-only">PRESS <span class="key-highlight">SPACE</span> TO DRAW</p>
-            <p class="blink-text touch-only">TAP TO DRAW</p>
-            <div class="run-log-box">
-                PLAYTEST LOG: <span id="run-log-count">0 runs</span>
-                <button id="copyRunLogBtn" type="button">COPY</button>
-                <button id="clearRunLogBtn" type="button">CLEAR</button>
-                <span id="run-log-status"></span>
+            <div class="howto-card controls-box desktop-only">
+                <h3>CONTROLS</h3>
+                <p><span>WASD</span> MOVE &nbsp; <span>MOUSE</span> AIM / SHOOT</p>
+                <p><span>SHIFT</span> DASH &nbsp; <span>Q</span> SWITCH WEAPON</p>
+                <p><span>P / ESC</span> PAUSE &nbsp; <span>O</span> SETTINGS</p>
+                <p><span>M / N</span> MUSIC / SFX</p>
             </div>
         </div>
     </div>
@@ -97,6 +147,7 @@
         <div class="modal-content">
             <h1 id="result-title" class="western-title wasted-text">WASTED</h1>
             <p id="result-detail" class="result-detail"></p>
+            <div id="result-road" class="result-road"></div>
             <p class="score-text">FINAL SCORE: <span id="finalScore">0</span></p>
             <div class="run-summary-box">
                 <h3>RUN REPORT</h3>
@@ -111,8 +162,8 @@
             </div>
 
             <p id="restart-msg" class="restart-text" style="display: none;">
-                <span class="desktop-only">PRESS <span class="key-highlight">R</span> TO RESTART</span>
-                <span class="touch-only restart-tap">TAP HERE TO RIDE AGAIN</span>
+                <span class="desktop-only">PRESS <span class="key-highlight">R</span> TO RETURN TO TOWN</span>
+                <span class="touch-only restart-tap">TAP HERE TO RETURN TO TOWN</span>
             </p>
             <button id="resultCopyLogBtn" type="button">COPY RUN LOG</button>
         </div>

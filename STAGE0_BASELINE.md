@@ -21,6 +21,7 @@
 
 - Playtest support: the game is published to GitHub Pages from `main`, and each finished run is appended to an in-browser run log (copyable as spreadsheet rows) that records the result, peak Heat, bank / ride-on choice, bounty, time, and run order within the session. Whether a second run was *voluntary* still needs the observer's note.
 
+- Wanted Road (added 2026-09-28 at the owner's request, ahead of the Stage 2 contract work in REFACTOR_PLAN.md): a game-style home screen and eight named outlaw stages (`src/outlaws.js`) that reuse the original wave modifiers as signature threats, scale difficulty and bounty per stage, tint each boss, and unlock in order. Three stars per outlaw (`src/progress.js`), saved on the device. The run log records which outlaw each run was against. For the Stage 1 Heat gate, compare testers on the same stage.
 - Phone support: touch mode (floating twin sticks, DASH / SWAP / pause buttons, tap to start and restart), compact layout, a landscape prompt, and an installable web app (manifest, icons, network-first offline cache). A phone-emulation smoke test runs in CI. Balance was set for mouse aim; record touch testers separately.
 
 ## Prototype balance values to watch in playtests

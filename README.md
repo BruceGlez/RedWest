@@ -11,7 +11,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. Use WASD to move, mouse to aim and shoot, Shift to dash, Q to change weapons, and P or Escape to pause. Chain accurate kills to raise Heat: points and enemy pressure both rise, while missed shots and hits taken cool it. Defeat the outlaw in pursuit 3, then bank the Heat-scaled bounty (B) or ride on (C) into a 30-second bonus pursuit: escape to collect the bounty and bonus earnings, or die and lose both.
+Open the local URL printed by Vite. The home screen shows the next outlaw's WANTED poster: press **PLAY** (or Space) to hunt them. The **Wanted Road** lists eight outlaws, each a harder stage with its own signature threat (wolf packs, sharpshooters, swarms, heavy hitters, then combinations) and a bigger bounty. Beating an outlaw unlocks the next; each outlaw has three stars to earn: defeat them, collect the bounty at Heat 2+, and ride on and escape. Progress is saved on the device. Use WASD to move, mouse to aim and shoot, Shift to dash, Q to change weapons, and P or Escape to pause. Chain accurate kills to raise Heat: points and enemy pressure both rise, while missed shots and hits taken cool it. Defeat the outlaw in pursuit 3, then bank the Heat-scaled bounty (B) or ride on (C) into a 30-second bonus pursuit: escape to collect the bounty and bonus earnings, or die and lose both.
 
 The source page also works from a plain local HTTP server such as VS Code Live Server, using the Three.js CDN import map. Opening `index.html` as a `file://` URL may be blocked by browser module security; use an HTTP server.
 

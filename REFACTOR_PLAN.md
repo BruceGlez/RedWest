@@ -41,6 +41,8 @@ These Steam page observations show that these games found an audience; they do n
 4. Face the named outlaw in a telegraphed boss fight. Winning opens an exit; the player may bank the bounty or continue into a harder bonus round for score.
 5. Show a run report with contract result, time, build, kills, damage, and best score. Restart directly into another contract.
 
+> **Implemented early (2026-09-28):** a Wanted Road home screen with eight named outlaw stages, stars, and unlocks stands in for contract selection (item 1) until the full encounter/reward structure is built.
+
 ### 2. Combat identity
 
 - **Signature system: Heat.** Consecutive accurate kills raise the player's wanted level during an encounter. Higher Heat increases the bounty multiplier and sends more dangerous pursuers. Dropping the chain lowers Heat. After the outlaw falls, the player can bank the bounty or carry that Heat into a bonus encounter. Prototype this first; keep it only if testers understand the risk and enjoy choosing when to cash out.

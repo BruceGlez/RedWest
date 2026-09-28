@@ -377,3 +377,164 @@ body.touch .pause-actions button { font-size: 16px; padding: 12px 18px; }
 }
 .rotate-icon { font-size: 64px; animation: rotate-hint 2s ease-in-out infinite; }
 @keyframes rotate-hint { 0%, 30% { transform: rotate(0deg); } 60%, 100% { transform: rotate(90deg); } }
+
+/* ---------- Home screen (game-lobby style) ---------- */
+.home-screen {
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; box-sizing: border-box;
+    padding: calc(14px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+    background: radial-gradient(ellipse at 50% 55%, rgba(255, 170, 60, 0.10) 0%, rgba(60, 22, 8, 0.55) 60%, rgba(25, 10, 4, 0.9) 100%);
+    font-family: 'Roboto Mono', monospace; color: #fff; touch-action: auto;
+}
+.home-top { display: flex; justify-content: space-between; align-items: center; }
+.home-logo {
+    font-family: 'Rye', serif; font-size: 46px; color: #ffcc33; transform: rotate(-2deg);
+    -webkit-text-stroke: 2px #3b1d00; text-shadow: 0 5px 0 #6b2d0f, 0 8px 14px rgba(0, 0, 0, 0.6);
+}
+.home-top-right { display: flex; gap: 10px; align-items: center; }
+.home-chip {
+    background: rgba(20, 10, 5, 0.75); border: 2px solid #ffcc33; border-radius: 999px; padding: 6px 14px;
+    font-weight: 700; font-size: 16px; box-shadow: 0 3px 0 #3b1d00;
+}
+.chip-star { color: #ffc107; }
+.round-btn {
+    width: 44px; height: 44px; border-radius: 50%; border: 3px solid #1b1208; background: linear-gradient(#6d4c33, #3e2723);
+    color: #ffcc33; font-size: 22px; line-height: 1; cursor: pointer; box-shadow: 0 4px 0 #1b1208;
+}
+.round-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1b1208; }
+.home-main { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 0; }
+.home-side { display: flex; flex-direction: column; gap: 12px; width: 200px; }
+.side-btn {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 16px; cursor: pointer;
+    background: linear-gradient(#5b8def, #3a5fc8); color: #fff; border: 3px solid #14142b; border-radius: 14px;
+    font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 16px; text-shadow: 0 2px 0 #14142b;
+    box-shadow: 0 5px 0 #14142b, 0 8px 14px rgba(0, 0, 0, 0.35); text-align: left;
+}
+.side-btn small { font-size: 11px; opacity: 0.85; text-shadow: none; }
+.side-btn:nth-child(2) { background: linear-gradient(#b86be0, #8a3fc0); }
+.side-btn:nth-child(3) { background: linear-gradient(#4cc38a, #2a9563); }
+.side-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #14142b; }
+.home-play { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 220px; }
+.play-btn {
+    font-family: 'Rye', serif; font-size: 46px; color: #3b1d00; cursor: pointer; padding: 16px 40px;
+    background: linear-gradient(#fff07a, #ffc21a 55%, #ff9f00); border: 4px solid #3b1d00; border-radius: 20px;
+    box-shadow: 0 8px 0 #3b1d00, 0 14px 22px rgba(0, 0, 0, 0.45); animation: play-pulse 1.6s ease-in-out infinite;
+}
+.play-btn:active { transform: translateY(6px); box-shadow: 0 2px 0 #3b1d00; animation: none; }
+@keyframes play-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.play-hint { margin: 0; font-size: 13px; color: #ddd; }
+.home-screen .run-log-box { margin-top: 4px; }
+
+/* ---------- Wanted poster ---------- */
+.wanted-poster {
+    width: 250px; box-sizing: border-box; padding: 12px 14px 10px; text-align: center; color: #3b2412; transform: rotate(-1.5deg);
+    background: radial-gradient(ellipse at center, #f7e6be 55%, #e2c68d 100%); border: 3px solid #6b4a2b; border-radius: 4px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55), inset 0 0 18px rgba(107, 74, 43, 0.35);
+}
+.poster-wanted { font-family: 'Rye', serif; font-size: 40px; line-height: 1; letter-spacing: 2px; }
+.poster-sub { font-size: 10px; letter-spacing: 3px; margin: 2px 0 6px; }
+.poster-name { font-family: 'Rye', serif; font-size: 19px; margin-top: 6px; }
+.poster-title { font-size: 11px; font-style: italic; opacity: 0.8; }
+.poster-threats { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 6px 0; }
+.threat { background: #b71c1c; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px; }
+.threat.calm { background: #6b4a2b; }
+.poster-reward { font-family: 'Rye', serif; font-size: 22px; color: #9a1b1b; }
+.poster-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 11px; font-weight: 700; }
+.star { color: rgba(59, 36, 18, 0.25); font-size: 18px; }
+.star.on { color: #ffb300; text-shadow: 0 1px 0 #6b3a00; }
+
+/* A drawn outlaw portrait tinted with each outlaw's colors. */
+.portrait {
+    position: relative; width: 110px; height: 96px; margin: 0 auto; overflow: hidden;
+    background: linear-gradient(#e9d3a0, #cfb177); border: 3px solid #6b4a2b; border-radius: 3px;
+}
+.p-body { position: absolute; left: 12%; right: 12%; bottom: -6px; height: 34%; background: var(--coat); border-radius: 18px 18px 0 0; border: 2px solid rgba(0, 0, 0, 0.35); }
+.p-head { position: absolute; left: 50%; bottom: 26%; width: 40px; height: 40px; margin-left: -20px; background: #e6b88a; border: 2px solid rgba(0, 0, 0, 0.35); border-radius: 6px; overflow: hidden; }
+.p-eyes { position: absolute; top: 13px; left: 9px; width: 5px; height: 5px; background: #1b1208; border-radius: 50%; box-shadow: 17px 0 0 #1b1208; }
+.p-bandana { position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: var(--bandana); }
+.p-hat-brim { position: absolute; left: 50%; bottom: 62%; width: 76px; height: 9px; margin-left: -38px; background: var(--poncho); border-radius: 4px; border: 2px solid rgba(0, 0, 0, 0.4); }
+.p-hat-top { position: absolute; left: 50%; bottom: 69%; width: 42px; height: 22px; margin-left: -21px; background: var(--poncho); border-radius: 8px 8px 2px 2px; border: 2px solid rgba(0, 0, 0, 0.4); }
+
+/* ---------- Panels: Wanted Road, Records, How to play ---------- */
+.panel-screen {
+    position: fixed; inset: 0; z-index: 22; display: flex; flex-direction: column; box-sizing: border-box;
+    padding: calc(12px + env(safe-area-inset-top)) calc(16px + env(safe-area-inset-right)) calc(12px + env(safe-area-inset-bottom)) calc(16px + env(safe-area-inset-left));
+    background: linear-gradient(180deg, rgba(38, 18, 8, 0.97), rgba(18, 8, 3, 0.97)); font-family: 'Roboto Mono', monospace; color: #fff; touch-action: auto;
+}
+.panel-header { display: grid; grid-template-columns: 60px 1fr auto; align-items: center; }
+.panel-header h2 { margin: 0; text-align: center; font-family: 'Rye', serif; font-size: 32px; color: #ffcc33; text-shadow: 0 3px 0 #6b2d0f; }
+.panel-body { flex: 1; overflow-y: auto; display: flex; gap: 16px; justify-content: center; align-items: flex-start; padding-top: 16px; flex-wrap: wrap; }
+.panel-body .leaderboard-box { width: min(420px, 100%); }
+.howto-card { background: rgba(0, 0, 0, 0.35); border: 2px solid #5d4037; border-radius: 12px; padding: 12px 16px; width: min(300px, 100%); box-sizing: border-box; font-size: 13px; line-height: 1.5; }
+.howto-card h3 { margin: 0 0 6px; color: #ffcc33; font-family: 'Rye', serif; }
+.howto-card span { color: #ffcc80; font-weight: 700; }
+body.touch .howto-card.touch-only { display: block; }
+.star-goals { margin: 0 0 6px; padding-left: 20px; }
+.road-track {
+    flex: 1; display: flex; align-items: center; gap: 0; overflow-x: auto; overflow-y: hidden; padding: 20px 30px;
+    scroll-snap-type: x proximity; -webkit-overflow-scrolling: touch;
+}
+.road-node {
+    flex: 0 0 150px; position: relative; display: flex; flex-direction: column; align-items: center; gap: 4px; padding: 12px 8px 10px;
+    background: radial-gradient(ellipse at center, #f7e6be 55%, #e2c68d 100%); color: #3b2412; border: 3px solid #6b4a2b; border-radius: 6px;
+    font-family: 'Roboto Mono', monospace; cursor: pointer; scroll-snap-align: center; box-shadow: 0 6px 0 #2a1a0c, 0 10px 18px rgba(0, 0, 0, 0.5);
+}
+.road-node:nth-of-type(odd) { transform: translateY(-14px) rotate(-1.5deg); }
+.road-node:nth-of-type(even) { transform: translateY(14px) rotate(1.5deg); }
+.road-node.selected { border-color: #ffcc33; box-shadow: 0 0 0 4px #ffcc33, 0 6px 0 #2a1a0c, 0 10px 22px rgba(255, 204, 51, 0.45); }
+.road-node.locked { filter: grayscale(1) brightness(0.6); cursor: default; }
+.road-node .portrait { width: 96px; height: 84px; }
+.road-num {
+    position: absolute; top: -12px; left: -12px; width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center;
+    background: #ffcc33; color: #3b1d00; font-weight: 700; border: 3px solid #3b1d00;
+}
+.road-name { font-family: 'Rye', serif; font-size: 13px; text-align: center; min-height: 32px; display: flex; align-items: center; }
+.road-reward { font-family: 'Rye', serif; color: #9a1b1b; font-size: 15px; }
+.road-lock {
+    position: absolute; top: 40%; left: 50%; transform: translate(-50%, -50%) rotate(-12deg); background: #1b1208; color: #ffcc33;
+    padding: 4px 10px; border-radius: 6px; font-weight: 700; font-size: 13px; letter-spacing: 1px;
+}
+.road-link { flex: 0 0 34px; height: 0; border-top: 5px dashed rgba(255, 204, 51, 0.7); }
+
+/* ---------- Result screen: stars for this outlaw ---------- */
+.result-road { margin: 0 0 6px; }
+.result-outlaw { margin: 0 0 4px; font-family: 'Rye', serif; color: #ffcc33; font-size: 18px; }
+.result-goals { list-style: none; margin: 0; padding: 0; display: inline-block; text-align: left; font-family: 'Roboto Mono', monospace; font-size: 13px; }
+.result-goals li { color: #aaa; }
+.result-goals li .star { color: rgba(255, 255, 255, 0.25); }
+.result-goals li.on { color: #eee; }
+.result-goals li.on .star, .result-goals li.new .star { color: #ffc107; }
+.result-goals li.new { color: #fff; }
+.result-goals li.new b { color: #7cff6b; }
+.unlock-note { margin: 6px 0 0; font-family: 'Roboto Mono', monospace; font-weight: 700; color: #7cff6b; }
+
+/* Settings opened from the home screen: sound + playtest only. */
+#settings-modal.home-mode #settings-resume-btn, #settings-modal.home-mode #settings-restart-btn { display: none; }
+
+@media (max-height: 560px), (max-width: 760px) {
+    .home-logo { font-size: 30px; }
+    .home-chip { font-size: 13px; padding: 4px 10px; }
+    .round-btn { width: 38px; height: 38px; font-size: 18px; }
+    .home-side { width: 160px; gap: 8px; }
+    .side-btn { padding: 8px 10px; font-size: 13px; }
+    .side-btn small { font-size: 9px; }
+    .home-play { width: 170px; }
+    .play-btn { font-size: 34px; padding: 10px 26px; }
+    .wanted-poster { width: 200px; padding: 8px 10px 6px; }
+    .poster-wanted { font-size: 30px; }
+    .poster-name { font-size: 15px; margin-top: 4px; }
+    .poster-reward { font-size: 17px; }
+    .portrait { width: 88px; height: 74px; }
+    .p-head { width: 32px; height: 32px; margin-left: -16px; }
+    .p-eyes { top: 10px; left: 7px; box-shadow: 13px 0 0 #1b1208; }
+    .p-hat-brim { width: 60px; margin-left: -30px; }
+    .p-hat-top { width: 34px; margin-left: -17px; height: 18px; }
+    .panel-header h2 { font-size: 22px; }
+    .road-node { flex-basis: 124px; padding: 10px 6px 8px; }
+    .road-node .portrait { width: 80px; height: 68px; }
+    .home-screen .run-log-box { font-size: 10px; margin-top: 0; }
+}
+
+/* In the lobby, gameplay UI stays out of the way. */
+body.in-lobby #ui-layer, body.in-lobby #dash-bar-container, body.in-lobby .debug-panel,
+body.in-lobby #touch-controls, body.in-lobby #crosshair, body.in-lobby .wave-banner { display: none !important; }
+.panel-screen { background: linear-gradient(180deg, #2a1409, #120703); }

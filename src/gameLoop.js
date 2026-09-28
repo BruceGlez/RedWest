@@ -10,6 +10,8 @@ import { updateParticles, clearParticles, getParticlePoolStats } from './particl
 import { markObstacleGridDirty, getGridStats } from './physics.js';
 import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
 import { buildRunRecord, appendRunRecord } from './runLog.js';
+import { getOutlaw, applyOutlawToWave } from './outlaws.js';
+import { recordRun, saveProgress } from './progress.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 
 const FINAL_WAVE = FINAL_PURSUIT;
@@ -50,6 +52,16 @@ function getWaveWeights(wave) {
     };
 }
 
+// Base pursuit numbers, adjusted for the current Wanted Road outlaw.
+function getOutlawWave(wave) {
+    return applyOutlawToWave({
+        budget: getWaveBudget(wave),
+        interval: getBaseSpawnInterval(wave),
+        weights: getWaveWeights(wave),
+        caps: getWaveCaps(wave)
+    }, gameState.outlawIndex);
+}
+
 function getActiveEnemyCounts() {
     const counts = { bandit: 0, wolf: 0, gunslinger: 0 };
     for(const e of enemies) {
@@ -71,7 +83,7 @@ function chooseWeightedType(candidates) {
     return candidates[candidates.length - 1]?.type || null;
 }
 
-export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
+export function createGameLoop(scene, camera, renderer, playerSystem, ui, progress) {
     let lastTime = 0;
     let debugElapsed = 0;
     let fpsSmoothed = 60;
@@ -88,12 +100,15 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         playerSystem.playerGroup.visible = false;
         ui.hideBountyChoice();
         ui.setRunLog(appendRunRecord(buildRunRecord(gameState, result, sessionRun)));
-        ui.showGameOver(result);
+        const roadResult = recordRun(progress, gameState.outlawIndex, gameState.bounty, gameState.score);
+        saveProgress(progress);
+        ui.setProgress(progress);
+        ui.showGameOver(result, roadResult);
     }
 
     function openBountyChoice() {
         if(gameState.isGameOver || gameState.isChoosingBounty) return;
-        offerBounty(gameState.bounty, gameState.heat.level);
+        offerBounty(gameState.bounty, gameState.heat.level, getOutlaw(gameState.outlawIndex).bounty);
         gameState.isChoosingBounty = true;
         clearBullets(scene);
         ui.showBountyChoice(gameState.bounty, BONUS_PURSUIT_SECONDS);
@@ -153,13 +168,13 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         gameState.isIntermission = false;
         gameState.intermissionTimer = 0;
         gameState.waveBossSpawned = false;
-        gameState.waveBudgetRemaining = getWaveBudget(waveNumber);
+        gameState.waveBudgetRemaining = getOutlawWave(waveNumber).budget;
         gameState.enemySpawnTimer = 0.55;
         gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, waveNumber);
         if(waveNumber === FINAL_WAVE) {
             spawnEnemy(scene, playerSystem.playerGroup.position, 'boss');
             gameState.waveBossSpawned = true;
-            ui.showWaveBanner('OUTLAW ARRIVES — TAKE THE BOUNTY', 2500);
+            ui.showWaveBanner(`${getOutlaw(gameState.outlawIndex).name} RIDES IN — TAKE THE BOUNTY`, 2500);
         } else if(waveNumber === BONUS_WAVE) {
             for(const type of ['gunslinger', 'wolf', 'wolf']) {
                 spawnEnemy(scene, playerSystem.playerGroup.position, type);
@@ -172,7 +187,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
                 spawnEnemy(scene, playerSystem.playerGroup.position, type);
                 gameState.waveBudgetRemaining -= ENEMY_COST[type];
             }
-            ui.showWaveBanner(`PURSUIT ${waveNumber} / ${FINAL_WAVE}`);
+            const gang = waveNumber === 1 ? `${getOutlaw(gameState.outlawIndex).name}'S GANG — ` : '';
+            ui.showWaveBanner(`${gang}PURSUIT ${waveNumber} / ${FINAL_WAVE}`, waveNumber === 1 ? 2500 : 1800);
         }
     }
 
@@ -188,8 +204,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         const remaining = gameState.waveBudgetRemaining;
         if(remaining < ENEMY_COST.bandit) return;
 
-        const caps = getWaveCaps(wave);
-        const weights = getWaveWeights(wave);
+        const { caps, weights } = getOutlawWave(wave);
         // Higher Heat sends more dangerous pursuers, not only more of them.
         weights.gunslinger *= 1 + (gameState.heat.level * 0.25);
         weights.wolf *= 1 + (gameState.heat.level * 0.15);
@@ -378,7 +393,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
         else phaseMultiplier = 1.0; // stabilize ending
 
         trySpawnDirectorEnemy();
-        let interval = getBaseSpawnInterval(gameState.waveNumber) * phaseMultiplier;
+        let interval = getOutlawWave(gameState.waveNumber).interval * phaseMultiplier;
         gameState.enemySpawnTimer = interval / heatSpawnMultiplier(gameState.heat.level);
     }
 
@@ -405,6 +420,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui) {
             if(keys.space || keys.startRequested) {
                 keys.startRequested = false;
                 gameState.isGameStarted = true;
+                gameState.outlawIndex = progress.selected;
                 sessionRun++;
                 ui.hideStartScreen();
                 camera.position.set(0, 35, 25);

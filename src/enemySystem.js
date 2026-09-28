@@ -5,6 +5,7 @@ import { checkCollision } from './physics.js';
 import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
+import { applyOutlawToEnemy, getOutlaw } from './outlaws.js';
 
 /**
  * Handles enemy shooting logic (creation of bullets and sound)
@@ -56,7 +57,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
     const spawnType = requestedType || 'bandit';
 
     if (spawnType === 'boss') { 
-        enemy = createBossMesh(); 
+        enemy = createBossMesh(getOutlaw(gameState.outlawIndex).colors); 
         enemy.scale.setScalar(1.2); 
         speed = 3.2 + Math.min(wave * 0.08, 1.5); 
         type = 'boss'; 
@@ -94,19 +95,18 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
     enemy.position.set(ex, 0, ez);
     
     // Initialize enemy state
-    let shootCooldown = 2.0 + Math.random();
-    let projectileSpeed = 40;
-    let aimSpread = 2.0;
+    // The current Wanted Road outlaw sets stage difficulty and signature threats.
+    const stats = applyOutlawToEnemy(type, { speed, hp, shootCooldown: 2.0 + Math.random(), projectileSpeed: 40, aimSpread: 2.0 }, gameState.outlawIndex);
 
     Object.assign(enemy.userData, { 
-        speed: speed, 
+        speed: stats.speed, 
         type: type, 
-        hp: hp, 
-        maxHp: hp, 
+        hp: stats.hp, 
+        maxHp: stats.hp, 
         shootTimer: Math.random() * 2,
-        shootCooldown: shootCooldown,
-        projectileSpeed: projectileSpeed,
-        aimSpread: aimSpread,
+        shootCooldown: stats.shootCooldown,
+        projectileSpeed: stats.projectileSpeed,
+        aimSpread: stats.aimSpread,
         isMoving: true, 
         armAngle: 2.8 
     });
