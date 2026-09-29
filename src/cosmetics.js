@@ -1,4 +1,6 @@
 import { WEAPONS, WEAPON_SLOTS } from './weapons.js';
+import { OUTLAWS } from './outlaws.js';
+import { OUTLAW_PERKS } from './perks.js';
 
 // Shop catalog: guns (src/weapons.js) plus cosmetics. Cosmetics never change gameplay; guns do,
 // so they are sold for earned Bounty Dollars only (no pay-to-win). Price 0 = owned by default.
@@ -13,7 +15,13 @@ export const CHARACTERS = [
     { id: 'char-marshal', slot: 'character', name: 'Marshal Flint Reed', model: 'models/marshal.glb', price: 0, currency: 'dollars',
         blurb: 'Fully animated lawman.' },
     { id: 'char-drifter', slot: 'character', name: 'The Drifter', model: null, price: 0, currency: 'dollars',
-        blurb: 'The classic cowboy. Wears your shop hat, coat and pants colours.' }
+        blurb: 'The classic cowboy. Wears your shop hat, coat and pants colours.' },
+    // Beaten outlaws: unlocked by earning all three of that outlaw's stars, never bought (src/perks.js).
+    ...OUTLAWS.map((outlaw, index) => {
+        const perk = OUTLAW_PERKS[outlaw.id];
+        return { id: `char-${outlaw.id}`, slot: 'character', name: outlaw.name, model: outlaw.model, price: 0, currency: 'dollars',
+            unlock: { outlaw: index }, perk, blurb: `${perk.name}: ${perk.perk} ${perk.drawback}` };
+    })
 ];
 
 export const COSMETICS = [

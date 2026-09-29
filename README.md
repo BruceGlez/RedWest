@@ -27,6 +27,10 @@ Runs pay **Bounty Dollars** (score, collected bounties, new stars, daily jobs). 
 
 The **TOWN** button (next to SHOP) opens the town between runs. The **Jail** holds every outlaw you have beaten; each pays a tenth of their bounty in Bounty Dollars every hour you are away, stored for up to 8 hours, and the TOWN button shows what is waiting. The **Sheriff's Office** posts the daily jobs, the **Gunsmith** and **Tailor** open the shop. Upgrading the Jail (more per hour, longer storage) or the Sheriff's Office (jobs pay more) costs earned Bounty Dollars only and finishes at once: there are no build timers and nothing to speed up with money, and buildings never change combat (a unit test checks this). With the server connected, the server's clock decides what the Jail has earned. Rules in `src/town.js`, screen in `src/townPanel.js`.
 
+### Jail reminders and playable outlaws
+
+In the iPhone app, the first jail collect offers a **reminder when the jail is full** (local notifications, no server): at most one a day, never between 9 pm and 9 am, only about the jail, and switchable in Settings. Earning **all three stars** on an outlaw unlocks them as a **playable character** in the shop's CHARACTERS tab, each with one perk and one drawback (for example Silas Vane fires 30% faster but reloads after six shots; Iron Jack has two extra hearts but moves slower). They are earned only, never sold (unit tests check that every perk has a drawback and that none can be bought). Perks live in `src/perks.js`.
+
 ## Privacy and players under 13
 
 On first launch the game asks a neutral question, "What year were you born?", and offers optional gameplay statistics (unticked by default). Only the age band is kept (under 13, 13–17, 18+), never the year. Players under 13 get no statistics, a generated outlaw name instead of a typed one, and no real-money packs. **Settings** has the statistics switch, links to the privacy policy, terms and support (set `VITE_PRIVACY_URL`, `VITE_TERMS_URL`, `VITE_SUPPORT_EMAIL`), and **Delete my data**, which removes everything on the device and, with the server connected, the account (keeping only purchase transaction ids). Leaderboard names can be reported; a name reported by three accounts is hidden until reviewed. Statistics are first-party only (no third-party SDK or advertising id), stored as days played and event counts; `node tools/retention.mjs` prints return rates. See [GROWTH_PLAN.md](GROWTH_PLAN.md) (Phase 0), [docs/POLICY_GENERATOR_ANSWERS.md](docs/POLICY_GENERATOR_ANSWERS.md) and [ASSETS.md](ASSETS.md).
@@ -62,6 +66,7 @@ npm run test:mobile
 npm run test:enemies
 npm run test:store
 npm run test:bosses
+npm run test:characters
 ```
 
 The browser smoke tests look for an installed Chrome or Chromium in the usual location for Windows, macOS, or Linux. Set `CHROME_PATH` to use a different Chromium executable. Player feel, balance, and frame pacing still require hands-on playtesting.

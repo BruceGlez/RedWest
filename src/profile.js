@@ -41,11 +41,6 @@ export function normalizeProfile(raw, now = new Date()) {
         if(value > 0) profile.balances[currency] = value;
     }
     profile.owned = [...new Set((raw.owned || []).filter(id => getShopItem(id)))];
-    for(const slot of SLOTS) {
-        const id = raw.loadout?.[slot];
-        const item = getShopItem(id);
-        if(item && item.slot === slot && ownsItem(profile, id)) profile.loadout[slot] = id;
-    }
     if(raw.jobs?.day === profile.jobs.day && Array.isArray(raw.jobs.list)) {
         profile.jobs.list = raw.jobs.list.filter(j => getJob(j.id)).map(j => ({ id: j.id, progress: Math.max(0, Number(j.progress) || 0), done: !!j.done }));
         profile.jobs.bonusPaid = !!raw.jobs.bonusPaid;
@@ -63,6 +58,12 @@ export function normalizeProfile(raw, now = new Date()) {
         profile.stats.stageStars[i] = num(s.stageStars?.[i]) & 7;
     });
     if(s.weekly?.week === profile.stats.weekly.week) profile.stats.weekly.score = num(s.weekly.score);
+    // After the stats: an outlaw character counts as owned only with that outlaw's three stars.
+    for(const slot of SLOTS) {
+        const id = raw.loadout?.[slot];
+        const item = getShopItem(id);
+        if(item && item.slot === slot && ownsItem(profile, id)) profile.loadout[slot] = id;
+    }
     return profile;
 }
 
@@ -92,9 +93,12 @@ export function setName(profile, raw) {
     return profile.name;
 }
 
+// Outlaw characters are owned once all three of that outlaw's stars are earned on the account.
 export function ownsItem(profile, id) {
     const item = getShopItem(id);
-    return !!item && (item.price === 0 || profile.owned.includes(id));
+    if(!item) return false;
+    if(item.unlock) return profile.stats.stageStars[item.unlock.outlaw] === 7;
+    return item.price === 0 || profile.owned.includes(id);
 }
 
 // New day: fresh jobs.
@@ -109,6 +113,7 @@ export function buyItem(profile, id) {
     const item = getShopItem(id);
     if(!item) throw new EconomyError('unknown_item', 'That item does not exist.');
     if(ownsItem(profile, id)) throw new EconomyError('owned', 'You already own this.');
+    if(item.unlock) throw new EconomyError('earned', 'Earn all three of this outlaw\'s stars to play as them.');
     if(profile.balances[item.currency] < item.price) throw new EconomyError('funds', `Not enough ${CURRENCIES[item.currency].name.toLowerCase()}.`);
     profile.balances[item.currency] -= item.price;
     profile.owned.push(id);
@@ -118,7 +123,7 @@ export function buyItem(profile, id) {
 export function equipItem(profile, id) {
     const item = getShopItem(id);
     if(!item) throw new EconomyError('unknown_item', 'That item does not exist.');
-    if(!ownsItem(profile, id)) throw new EconomyError('not_owned', 'Buy it first.');
+    if(!ownsItem(profile, id)) throw new EconomyError('not_owned', item.unlock ? 'Earn all three of this outlaw\'s stars first.' : 'Buy it first.');
     profile.loadout[item.slot] = id;
     return item;
 }

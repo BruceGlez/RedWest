@@ -192,6 +192,12 @@ badge, server routes `/api/town/collect` and `/api/town/upgrade`, and statistics
 - Leaderboards record which character was used; per-outlaw boards stay comparable because perks are
   side-grades.
 
+**Built (2026-09-29):** all eight outlaws, perks as in the table except Dusty Pete (dashes twice as far,
+recharges in 2.8 s instead of a knock-back), Rosa (15% faster instead of a wolf companion), Iron Jack (two
+extra hearts, slower, instead of a frontal shield) and Mesa Morgan (40% bigger bullets, 25% less range),
+which reuse existing systems. Shop cards show the perk and "EARN ★★★ ON STAGE n" until unlocked.
+Leaderboards do not record the character yet.
+
 **Measure:** share of players who reach three stars on outlaw 1 and 2; runs per player after unlocks.
 **Size:** medium (perks need balancing in playtests).
 
@@ -202,6 +208,9 @@ badge, server routes `/api/town/collect` and `/api/town/upgrade`, and statistics
   offers. A Settings switch turns them off.
 - (App Store guideline 4.5.4: notifications must not be used for marketing without separate consent.
   This plan sends none.)
+
+**Built (2026-09-29):** `@capacitor/local-notifications`, offered after the first jail collect, at most one
+per 20 hours, moved out of 9 pm–9 am, Settings switch, cancelled by *Delete my data*.
 
 **Size:** small.
 

@@ -16,7 +16,8 @@
     "test:store": "node tests/store-smoke.mjs",
     "test:bosses": "node tests/boss-smoke.mjs",
     "ios:sync": "vite build && cap sync ios",
-    "ios:open": "cap open ios"
+    "ios:open": "cap open ios",
+    "test:characters": "node tests/characters-smoke.mjs"
   },
   "dependencies": {
     "@capacitor/core": "^8.5.2",

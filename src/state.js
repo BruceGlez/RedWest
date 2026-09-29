@@ -53,7 +53,9 @@ export const playerStats = {
     fireRate: 0.2,
     tripleShotTimer: 0,
     weapon: 'primary', // which of the two carried guns is in hand
-    guns: { primary: 'gun-revolver', secondary: 'gun-shotgun' } // equipped from the shop loadout
+    guns: { primary: 'gun-revolver', secondary: 'gun-shotgun' }, // equipped from the shop loadout
+    perk: {}, // the equipped outlaw character's mods (src/perks.js)
+    shotsFired: 0 // this run, for perks that count shots
 };
 
 // Global Arrays
@@ -108,6 +110,7 @@ export function resetPlayerStats() {
     playerStats.invulnerabilityTimer = 0;
     playerStats.tripleShotTimer = 0;
     playerStats.weapon = 'primary';
+    playerStats.shotsFired = 0;
 }
 
 export function clearDynamicState() {

@@ -8,6 +8,7 @@ import { getWeapon, defaultWeapon, weaponBars } from './weapons.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { PRODUCTS } from './products.js';
 import { track } from './analytics.js';
+import { ownsItem } from './profile.js';
 import { purchaseSupport } from './purchases.js';
 import { arena } from './arena.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
@@ -359,7 +360,7 @@ export function createUIManager(gameState, playerStats) {
     // ---------- Economy: balances, shop, daily jobs, earnings ----------
     const hexColor = color => `#${color.toString(16).padStart(6, '0')}`;
     const priceLabel = item => (item.currency === 'nuggets' ? `&#9670;${item.price}` : `$${item.price}`);
-    const owns = id => { const item = getShopItem(id); return !!item && (item.price === 0 || profile.owned.includes(id)); };
+    const owns = id => ownsItem(profile, id);
 
     function setProfile(nextProfile) {
         profile = nextProfile;
@@ -417,7 +418,10 @@ export function createUIManager(gameState, playerStats) {
             const owned = owns(item.id);
             const equipped = profile.loadout[item.slot] === item.id;
             const pending = confirmId === item.id;
-            const action = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : pending ? `CONFIRM ${priceLabel(item)}` : priceLabel(item);
+            // Outlaw characters are earned (three stars on their stage), never bought.
+            const locked = item.unlock && !owned;
+            const action = equipped ? 'EQUIPPED' : owned ? 'EQUIP' : locked ? `EARN &#9733;&#9733;&#9733; ON STAGE ${item.unlock.outlaw + 1}`
+                : pending ? `CONFIRM ${priceLabel(item)}` : priceLabel(item);
             // Characters show their picture, guns what they do (bars + trade-off), looks a colour swatch.
             const top = item.slot === 'character'
                 ? `<div class="char-thumb">${characterThumbs[item.id] ? `<img src="${characterThumbs[item.id]}" alt="">` : '<span>LOADING</span>'}</div>`
@@ -428,7 +432,7 @@ export function createUIManager(gameState, playerStats) {
                 + top
                 + `<div class="shop-name">${item.name}</div>`
                 + (item.blurb ? `<div class="shop-sub gun-blurb">${item.blurb}</div>` : '')
-                + `<button type="button" class="shop-action${equipped ? ' equipped' : ''}${pending ? ' confirm' : ''}${item.currency === 'nuggets' && !owned ? ' nugget' : ''}" data-item="${item.id}"${equipped ? ' disabled' : ''}>${action}</button></div>`;
+                + `<button type="button" class="shop-action${equipped ? ' equipped' : ''}${pending ? ' confirm' : ''}${item.currency === 'nuggets' && !owned ? ' nugget' : ''}" data-item="${item.id}"${equipped || locked ? ' disabled' : ''}>${action}</button></div>`;
         }).join('') + outfitNote;
     }
 

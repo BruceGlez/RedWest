@@ -9,6 +9,7 @@ import { enemies } from './state.js';
 import { pickTarget } from './aimAssist.js';
 import { getWeapon, defaultWeapon } from './weapons.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
+import { BASE_DASH_TIME, BASE_DASH_COOLDOWN } from './perks.js';
 
 const QUICK_FIRE_WINDOW = 0.4; // seconds of game time a tap stays live, to wait out the gun's cooldown
 
@@ -51,7 +52,11 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         playSound(heldWeapon().id.replace(/^gun-/, 'shot-'));
 
         const weaponCfg = heldGun();
-        const volleyOffsets = playerStats.tripleShotTimer > 0 ? [-0.15, 0, 0.15] : [0];
+        const perk = playerStats.perk || {};
+        playerStats.shotsFired++;
+        // Deacon's perk: every Nth shot is a triple shot, like the ammo pickup.
+        const perkTriple = perk.tripleEvery && playerStats.shotsFired % perk.tripleEvery === 0;
+        const volleyOffsets = playerStats.tripleShotTimer > 0 || perkTriple ? [-0.15, 0, 0.15] : [0];
         const pelletsPerVolley = weaponCfg.pellets;
         const volley = { pending: volleyOffsets.length * pelletsPerVolley, hit: false };
         const gunPos = new THREE.Vector3();
@@ -69,7 +74,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
                 }
                 dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), volleyOffset + pelletOffset);
                 spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(weaponCfg.speed), volley,
-                    { damage: weaponCfg.damage, pierce: weaponCfg.pierce, range: weaponCfg.range, size: weaponCfg.size });
+                    { damage: weaponCfg.damage, pierce: weaponCfg.pierce, range: weaponCfg.range * (perk.range || 1), size: weaponCfg.size * (perk.bulletSize || 1) });
             }
         }
         gameState.runStats.shotsFired += volleyOffsets.length * pelletsPerVolley;
@@ -140,12 +145,15 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             playerStats.weapon = playerStats.weapon === 'primary' ? 'secondary' : 'primary';
         }
 
-        playerStats.fireRate = heldGun().fireRate;
+        const perk = playerStats.perk || {};
+        playerStats.fireRate = heldGun().fireRate * (perk.fireRate || 1);
 
         if(keys.shift && playerStats.dashCooldown <= 0) {
             playerStats.isDashing = true;
-            playerStats.dashDuration = 0.15;
-            playerStats.dashCooldown = 2.0;
+            playerStats.dashDuration = perk.dashTime || BASE_DASH_TIME;
+            playerStats.dashCooldown = perk.dashCooldown || BASE_DASH_COOLDOWN;
+            // El Espectro's perk: untouchable for a moment after the dash ends.
+            if(perk.dashGhost) playerStats.invulnerabilityTimer = Math.max(playerStats.invulnerabilityTimer, playerStats.dashDuration + perk.dashGhost);
             playSound('dash');
         }
         if(playerStats.dashDuration > 0) playerStats.dashDuration -= dt;
@@ -259,6 +267,11 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if((keys.space || keys.mouse || touchWantsFire) && playerStats.shootCooldown <= 0) {
             shoot();
             playerStats.shootCooldown = playerStats.fireRate;
+            // Silas's drawback: a reload pause after every full cylinder.
+            if(perk.magazine && playerStats.shotsFired % perk.magazine.shots === 0) {
+                playerStats.shootCooldown = perk.magazine.reload;
+                playSound('reload');
+            }
             touch.quickFireAt = 0;
             quickFireLeft = 0;
         }

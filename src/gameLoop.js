@@ -569,7 +569,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         if(stillFighting()) updateWaveFlow(dt);
         ui.updateHUD();
 
-        const dashPct = Math.max(0, 1 - (playerStats.dashCooldown / 2.0));
+        const dashPct = Math.max(0, 1 - (playerStats.dashCooldown / (playerStats.perk?.dashCooldown || 2.0)));
         ui.updateDashBar(dashPct);
 
         const playerPos = playerSystem.playerGroup.position;

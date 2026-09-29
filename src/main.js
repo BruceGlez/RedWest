@@ -24,6 +24,7 @@ import { generatedName } from './names.js';
 import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { applyPlayerLoadout } from './assets.js';
+import { applyPerk } from './perks.js';
 import { setPlayerBulletColor } from './bulletSystem.js';
 
 const scene = new THREE.Scene();
@@ -65,6 +66,7 @@ function loadOutlawModel(index) {
             const picture = renderCharacterPortrait(renderer, instance.object);
             if(picture) outlawPortraits[outlaw.id] = picture;
             ui.setPortraits(outlawPortraits, enemyPortraits);
+            syncOutlawThumbs();
         }).catch(() => {})); // missing file: the box outlaw is used
     }
     return outlawModelRequests.get(index);
@@ -90,6 +92,8 @@ function applyProfile(next) {
     playerSystem.setCharacter(getShopItem(profile.loadout.character)).then(() => ui.refreshShop());
     // Guns apply from the next shot (the shop is only open between runs).
     playerStats.guns = { primary: profile.loadout.primary, secondary: profile.loadout.secondary };
+    // An outlaw character brings its perk and drawback (src/perks.js).
+    applyPerk(playerStats, getShopItem(profile.loadout.character)?.perk?.mods, gameState.isGameStarted && !gameState.isGameOver);
     ui.updateHUD();
     setPlayerBulletColor(colors.bullets);
     ui.setProfile(profile);
@@ -159,9 +163,16 @@ function previewCharacter(id) {
 }
 ui.setPreviewRenderer(loadout => renderPlayerPreview(renderer, loadoutColors(loadout), previewCharacter(loadout.character)));
 for(const item of CHARACTERS) {
+    if(item.unlock) continue; // outlaws use their WANTED portrait; their model loads only when tried on or picked
     if(item.model) previewCharacter(item.id);
     else ui.setCharacterThumb(item.id, renderPlayerPreview(renderer, loadoutColors(profile.loadout)));
 }
+function syncOutlawThumbs() {
+    for(const item of CHARACTERS) {
+        if(item.unlock && !previewCharacters.get(item.id)) ui.setCharacterThumb(item.id, outlawPortraits[OUTLAWS[item.unlock.outlaw].id]);
+    }
+}
+syncOutlawThumbs();
 
 async function afterPayment(before) {
     ui.shopMessage('Payment received. Your nuggets are on the way...');
