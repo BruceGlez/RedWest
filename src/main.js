@@ -17,6 +17,7 @@ import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit } from './purchases.js';
 import { createPrivacyPanel } from './privacyPanel.js';
 import { createTownPanel } from './townPanel.js';
+import { disableReminders } from './reminders.js';
 import { isChild, canShareStats } from './privacy.js';
 import { configureAnalytics, track } from './analytics.js';
 import { generatedName } from './names.js';
@@ -107,6 +108,7 @@ wallet.load().then(next => {
 const privacyPanel = createPrivacyPanel({
     onChange: applyPrivacy,
     onDelete: async () => {
+        await disableReminders(false);
         await wallet.deleteAccount();
         location.reload(); // starts again from the first-launch question
     }

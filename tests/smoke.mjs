@@ -264,10 +264,29 @@ try {
     await page.locator('#town-screen .panel-back').click();
     await page.locator('#town-badge').waitFor({ state: 'visible', timeout: 35000 }); // the badge refreshes every 30 s
     await page.locator('#town-btn').click();
+    // Stand in for the phone's notification system (the reminders exist only in the app).
+    await page.evaluate(() => {
+        window.__redWestNotifications = {
+            requestPermissions: async () => ({ display: 'granted' }),
+            cancel: async () => {},
+            schedule: async request => { window.__scheduled = request; }
+        };
+    });
     const collect = page.locator('[data-collect]');
     assert.match(await collect.textContent(), /COLLECT \$[1-9]/);
     await collect.click();
     await page.locator('#town-message').getByText('Collected').waitFor();
+    // The first collect offers reminders; accepting schedules one for when the jail is full, never at night.
+    await page.locator('#town-reminder').waitFor({ state: 'visible' });
+    await page.locator('#town-reminder-yes').click();
+    await page.waitForFunction(() => window.__scheduled);
+    const reminder = await page.evaluate(() => {
+        const n = window.__scheduled.notifications[0];
+        return { title: n.title, hour: new Date(n.schedule.at).getHours() };
+    });
+    assert.equal(reminder.title, 'Your jail is full');
+    assert.ok(reminder.hour >= 9 && reminder.hour < 21, `reminder at ${reminder.hour}:00`);
+    assert.equal(await page.locator('#settings-reminders-btn').textContent(), 'Jail reminders: ON');
     assert.ok(await townDollars() > dollarsBefore, 'collected dollars land in the wallet');
     assert.equal(await page.locator('[data-collect]').isDisabled(), true, 'nothing left to collect');
     await page.evaluate(() => { window.Date = window.__RealDate; });
@@ -309,7 +328,7 @@ try {
     await startRun();
 
     assert.deepEqual(relevantErrors(), [], `browser errors: ${pageErrors.join(', ')}`);
-    console.log('Browser smoke passed: first-launch question, start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, run log, restarts, Frontier Town jail collect, statistics switch, delete my data, under-13 rules.');
+    console.log('Browser smoke passed: first-launch question, start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, run log, restarts, Frontier Town jail collect and reminder, statistics switch, delete my data, under-13 rules.');
 } finally {
     await browser?.close();
     await server.close();

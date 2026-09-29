@@ -1,6 +1,7 @@
 import { OUTLAWS } from './outlaws.js';
 import { BUILDINGS, buildingEffects, jailedOutlaws, jailRate, jailCapacity, jailStored, hoursUntilFull, upgradeCost } from './town.js';
 import { track } from './analytics.js';
+import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, disableReminders, updateJailReminder } from './reminders.js';
 
 // The Frontier Town screen (src/town.js has the rules) and the badge on the home screen's TOWN button.
 export function createTownPanel({ wallet, onProfile, ui }) {
@@ -11,7 +12,11 @@ export function createTownPanel({ wallet, onProfile, ui }) {
         screen: $('town-screen'),
         grid: $('town-grid'),
         dollars: $('town-dollars'),
-        message: $('town-message')
+        message: $('town-message'),
+        reminder: $('town-reminder'),
+        reminderYes: $('town-reminder-yes'),
+        reminderNo: $('town-reminder-no'),
+        reminderSetting: $('settings-reminders-btn')
     };
     let profile = null;
     let confirmUpgrade = null; // building id armed for a second tap
@@ -124,6 +129,8 @@ export function createTownPanel({ wallet, onProfile, ui }) {
                 onProfile(result.profile);
                 track('town_collect');
                 say(result.collected ? `Collected ${money(result.collected)} in bounties.` : 'Nothing to collect yet.');
+                // The first collect is the moment to offer reminders (never at launch).
+                if(result.collected && remindersSupported() && !remindersAsked()) els.reminder.style.display = 'flex';
             });
         } else if(button.dataset.upgrade) {
             const id = button.dataset.upgrade;
@@ -162,10 +169,42 @@ export function createTownPanel({ wallet, onProfile, ui }) {
     // Keep the jail's numbers and the badge ticking while the game is open.
     setInterval(render, 30000);
 
+    // ---------- Reminders (app only) ----------
+    let replan = null;
+    const planReminder = () => {
+        clearTimeout(replan);
+        replan = setTimeout(() => { if(profile) updateJailReminder(profile); }, 1000);
+    };
+    function renderReminderSetting() {
+        els.reminderSetting.style.display = remindersSupported() ? '' : 'none';
+        els.reminderSetting.textContent = `Jail reminders: ${remindersEnabled() ? 'ON' : 'OFF'}`;
+        els.reminderSetting.className = remindersEnabled() ? '' : 'off';
+    }
+    els.reminderYes.addEventListener('click', async () => {
+        els.reminder.style.display = 'none';
+        say((await enableReminders()) ? 'Reminders on. Change it any time in Settings.' : 'Reminders are off in your phone settings.');
+        renderReminderSetting();
+        planReminder();
+    });
+    els.reminderNo.addEventListener('click', async () => {
+        els.reminder.style.display = 'none';
+        await disableReminders();
+        renderReminderSetting();
+    });
+    els.reminderSetting.addEventListener('click', async () => {
+        if(remindersEnabled()) await disableReminders();
+        else await enableReminders();
+        renderReminderSetting();
+        planReminder();
+    });
+    document.addEventListener('visibilitychange', () => { if(document.visibilityState === 'hidden' && profile) updateJailReminder(profile); });
+    renderReminderSetting();
+
     return {
         setProfile(next) {
             profile = next;
             render();
+            planReminder();
         }
     };
 }

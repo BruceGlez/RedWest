@@ -916,3 +916,9 @@ a.round-btn { display: flex; align-items: center; justify-content: center; text-
     .town-blurb, .town-stat { font-size: 11px; }
 }
 .shop-action.upgrade { background: linear-gradient(#ffd98a, #e0a030); color: #3b1d00; border-color: #3b1d00; box-shadow: 0 3px 0 #3b1d00; }
+.town-reminder {
+    display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 8px; width: min(820px, 100%); box-sizing: border-box;
+    padding: 10px 12px; background: rgba(0, 0, 0, 0.4); border: 2px solid #ffd54f; border-radius: 10px; color: #fff; font-size: 13px;
+}
+.town-reminder span { flex: 1 1 260px; }
+.town-reminder .shop-action { width: auto; padding: 6px 12px; }
