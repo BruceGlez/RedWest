@@ -309,12 +309,20 @@ Nothing here needs new game modes. Each item is a piece of text or a picture on 
 - **Fixed while doing the first pass:** `index.html` and the README still said "eight outlaws"; they now say ten (and
   the road button text no longer hard-codes a count).
 
+**Built 2026-09-29 (story cards and the Case File).** `src/story.js` holds three cards and one ledger page per outlaw
+and the chapter-one ending, written from sections 5 and 4b in the serious voice. In the Bounty Book, each unlocked outlaw
+has a STORY n / 3 button that opens a card overlay (back, next, close; a locked card names the star that opens it), and a
+**Case File** shows the ten ledger pages (a page comes with the second star) and the ending once all ten are held. The
+result screen names a new card when a run earns a star. `tests/story.test.js` checks the cards, lengths and that nothing
+graphic appears; `npm run test:story` drives the screens. Not built: opening and ending comic panels, town barks, the home
+grounds' story props, re-recorded voice lines, an acknowledgement when a beaten outlaw is played as a hero.
+
 ## 9. Suggested order
 
 1. **First pass (small): done for the ride-in line, the home ground and the bio** (2026-09-29). Not done: the
    opening and ending text.
-2. **Story cards and the Case File** (medium): the three cards per outlaw and the ledger page collectible.
-3. **Home grounds** (with the world and props work): sky, fog, sun and props per stage.
+2. **Story cards and the Case File** (medium): **done** (2026-09-29), see above.
+3. **Home grounds** (with the world and props work): sky, fog, sun and tint per stage **done**; story props per stage still open.
 4. **Town barks and visible changes** (medium): each beaten outlaw appears in Lantern Rock.
 5. **Comics and voice** (medium): the opening and ending panels, and re-recorded taunts.
 

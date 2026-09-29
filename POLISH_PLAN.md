@@ -70,6 +70,23 @@ model, plus an outline), which is already few. Test change: `tests/boss-smoke.mj
 on the outlaw, which is now the box figure's hidden baked body; it looks inside the imported model instead.
 `npm run test:demo` fails the same way on `main` (the ad fetches outlaw models; not touched here).
 
+**Done 2026-09-29: world and props, first pass.**
+- **Instanced scenery.** Rocks, dead trees, crates, cacti and fences are one `InstancedMesh` each (`src/scenery.js`,
+  five draw calls for about 125 props). Every prop is still an entry in `obstacles`; its `mesh` is an empty marker in the
+  scene, and taking the marker out of the scene frees the instance, so collision, destruction, respawn and the smoke tests
+  are unchanged. Per-instance colour, size and turn give the variety. **Fight, 15 enemies: 73 draw calls before this, about
+  30 to 40 after** (runs of 30, 34, 35, 38, 40, 42, 46: the crowd size still varies). Triangles rose from about 29,000 to
+  about 39,000 because unused instance slots and the shadow pass are counted; capacities are kept tight to limit that.
+- **Stage atmosphere** (`src/atmosphere.js`, applied by `setAtmosphere` in `src/world.js`): each outlaw's home ground sets
+  sky, fog, sun or moon, hemisphere light, a sand tint and a scenery tint. Only colours and numbers change, so no shader is
+  rebuilt. The start screen shows the selected outlaw's look. A unit test keeps every look complete and readable.
+- **Wind and life** (`src/ambience.js`): 700 grass tufts that sway in the wind, up to four tumbleweeds, and drifting motes
+  (dust, ash, embers, mist, snow per stage). Three draw calls in all. The shader count went from 23 to about 30 (skinned and
+  instanced variants), which makes a cold load in software rendering slower; not measured on a phone.
+- **Not done:** dirt-patch ground texture, footprints and scorch decals, sway for cacti and dead trees, modelled props
+  (barrels, wagon wheels, bones, signs), stage-specific props (Pete's piano, the stopped clock), the horizon ring of mesas,
+  and a real-phone check of the colours (red ground under red-coated enemies) and of frame pacing.
+
 - **Instance the scenery (M).** `src/world.js` makes about 60 rocks, 15 trees, 15 crates, 20 cacti and 15 fence
   pieces, each its own mesh. Turn each kind into an `InstancedMesh` (or `BatchedMesh`, in three r160) with per-instance
   colour and scale variation. Collision stays as it is (`obstacles` in `src/physics.js`).
