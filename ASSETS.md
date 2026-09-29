@@ -10,6 +10,7 @@ show what licence applied if anyone asks.
 | Sound effects, music, voice lines | `public/audio/` | ElevenLabs API (`tools/elevenlabs.mjs`, list in `src/audioManifest.js`) | **Paid plan** (confirmed by the owner, 2026-09-29): commercial use allowed | 2026-09-28 | Voices are ElevenLabs stock voices only. Cloned voices are skipped by the script; never clone a real person's voice. Regenerating needs a paid plan too. |
 | Character pictures (front views) | `art/characters/` | OpenAI Images API (`tools/character-picture.mjs`, prompts in `tools/character-prompts.mjs`) | OpenAI terms: outputs belong to the user | 2026-09-28 | Prompts describe original characters; keep them free of real people, brands and other games' characters. |
 | Animated 3D characters | `public/models/` | Meshy API (`tools/meshy.mjs`) from the pictures above | **Paid plan** (confirmed by the owner, 2026-09-29): private models, commercial use allowed | 2026-09-28 | |
+| Town concept pictures | `art/town/` | OpenAI Images API (prompts describe a mood only; no show or game names) | OpenAI terms: outputs belong to the user | 2026-09-29 | Reference for the 3D town, which is built in code (`src/townScene.js`); not shipped in the game. |
 | Fonts: Rye, Roboto Mono | `fonts/` | Google Fonts | SIL Open Font License 1.1 (`fonts/OFL-*.txt`) | | Keep the licence files next to the fonts. |
 | App icons | `public/icons/` | Made for the project | Owned | | |
 | Three.js | npm `three` | | MIT licence | | |

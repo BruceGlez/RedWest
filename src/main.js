@@ -212,6 +212,7 @@ const economy = {
 };
 
 const gameLoop = createGameLoop(scene, camera, renderer, playerSystem, ui, progress, economy);
+gameLoop.setLobbyView(town);
 ui.bindControlHandlers({
     onResumeGame: () => gameLoop.resumeGame(),
     onOpenSettings: () => gameLoop.openSettings(),

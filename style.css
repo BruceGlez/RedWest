@@ -928,3 +928,38 @@ a.round-btn { display: flex; align-items: center; justify-content: center; text-
 .event-targets li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 8px; border-radius: 6px; background: rgba(59, 36, 18, 0.1); }
 .event-targets li.done { background: rgba(63, 191, 74, 0.25); }
 .event-card .town-actions .shop-action { flex: 0 1 220px; margin: 0 auto; }
+
+/* ---------- Frontier Town in 3D ---------- */
+.panel-screen.town-screen { background: transparent; pointer-events: none; }
+.town-screen > * { pointer-events: auto; }
+.town-screen .panel-header { position: relative; z-index: 3; }
+.town-touch { position: absolute; inset: 0; z-index: 0; touch-action: none; cursor: grab; }
+.town-labels { position: absolute; inset: 0; z-index: 1; pointer-events: none !important; overflow: hidden; }
+.town-label {
+    position: absolute; transform: translate(-50%, -100%); pointer-events: auto; cursor: pointer; white-space: nowrap;
+    display: flex; flex-direction: column; align-items: center; gap: 2px; padding: 3px 10px; border-radius: 8px;
+    background: rgba(26, 15, 10, 0.82); border: 2px solid #c8a050; color: #f0d9a8; font-family: 'Rye', serif; font-size: 14px;
+    box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
+}
+.town-label small { font-family: 'Roboto Mono', monospace; font-size: 10px; color: #ffcc80; }
+.town-label.soon { opacity: 0.75; border-color: #6d4c41; }
+.town-label .town-bubble { font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 11px; color: #fff; background: #3fbf4a; border-radius: 8px; padding: 0 6px; }
+.town-label .town-bubble.full { background: #e53935; }
+.town-label.event { border-color: #e53935; color: #ffd54f; }
+.town-hint { position: absolute; left: 50%; bottom: calc(10px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 2; margin: 0;
+    font-size: 12px; color: #f0d9a8; text-shadow: 0 1px 3px #000; pointer-events: none !important; }
+.town-screen .town-reminder { position: absolute; left: 50%; top: calc(70px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 3; width: min(620px, calc(100% - 32px)); }
+.town-sheet {
+    position: absolute; left: 50%; bottom: calc(8px + env(safe-area-inset-bottom)); transform: translateX(-50%); z-index: 4;
+    width: min(560px, calc(100% - 24px)); max-height: calc(100% - 90px); overflow-y: auto; box-sizing: border-box;
+    padding: 10px; border-radius: 12px; background: rgba(20, 10, 5, 0.9); border: 2px solid #8d6e63; box-shadow: 0 -6px 24px rgba(0, 0, 0, 0.6);
+}
+.town-sheet .town-grid { display: block; width: 100%; }
+.town-sheet .event-card { grid-column: auto; }
+.town-sheet-close { position: absolute; top: 6px; right: 6px; width: 34px; height: 34px; font-size: 20px; z-index: 1; }
+.town-sheet .town-card { padding-right: 46px; }
+body.town-open #start-screen { visibility: hidden; }
+@media (max-height: 500px) {
+    .town-sheet { max-height: calc(100% - 70px); }
+    .town-label { font-size: 12px; padding: 2px 8px; }
+}

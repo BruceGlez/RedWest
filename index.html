@@ -138,18 +138,23 @@
         </div>
     </div>
 
-    <div id="town-screen" class="panel-screen" style="display:none;">
+    <!-- Frontier Town: a 3D town at dusk (src/townScene.js) with building labels; tapping one opens its card. -->
+    <div id="town-screen" class="panel-screen town-screen" style="display:none;">
+        <div id="town-touch" class="town-touch" aria-hidden="true"></div>
+        <div id="town-labels" class="town-labels"></div>
         <div class="panel-header">
             <button class="round-btn panel-back" type="button" aria-label="Back">&#8249;</button>
             <h2>FRONTIER TOWN</h2>
             <div class="home-chip money-chip"><span class="cur-dollar">$</span><span id="town-dollars">0</span></div>
         </div>
-        <div class="panel-body town-body">
-            <div id="town-reminder" class="town-reminder" style="display:none;">
-                <span>Want a reminder when your jail is full? At most once a day, never at night.</span>
-                <button id="town-reminder-yes" type="button" class="shop-action collect">YES, REMIND ME</button>
-                <button id="town-reminder-no" type="button" class="shop-action upgrade">NO THANKS</button>
-            </div>
+        <p id="town-hint" class="town-hint">Drag to look around. Tap a building.</p>
+        <div id="town-reminder" class="town-reminder" style="display:none;">
+            <span>Want a reminder when your jail is full? At most once a day, never at night.</span>
+            <button id="town-reminder-yes" type="button" class="shop-action collect">YES, REMIND ME</button>
+            <button id="town-reminder-no" type="button" class="shop-action upgrade">NO THANKS</button>
+        </div>
+        <div id="town-sheet" class="town-sheet" style="display:none;">
+            <button id="town-sheet-close" class="round-btn town-sheet-close" type="button" aria-label="Close">&#215;</button>
             <div id="town-grid" class="town-grid"></div>
             <p id="town-message" class="shop-message" role="status"></p>
         </div>

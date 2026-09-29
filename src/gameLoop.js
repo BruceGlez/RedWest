@@ -75,6 +75,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     let pausedBeforeSettings = false;
     let sessionRun = 0;
     let bountyChoiceAt = 0; // slow-motion beat after the outlaw falls, then the choice opens
+    let lobbyView = null; // another scene to draw on the home screen (Frontier Town), when active
     const cameraOffset = () => (touch.enabled ? CAMERA_OFFSET_PHONE : CAMERA_OFFSET_DESKTOP);
 
     // Spawn and record first sightings for the Bounty Book (with a NEW ENEMY card in play).
@@ -500,6 +501,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             keys.rideOnRequested = false;
         }
 
+        // Frontier Town open: draw the town instead of the desert (src/townPanel.js).
+        if(!gameState.isGameStarted && lobbyView?.isActive()) {
+            lobbyView.frame(renderer, realDt);
+            return;
+        }
         if(!gameState.isGameStarted) {
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 20, Math.cos(timeInSeconds * 0.5) * 30);
             camera.lookAt(playerSystem.playerGroup.position);
@@ -603,6 +609,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         openSettings,
         closeSettings,
         bankAndLeave,
-        rideOnToBonus
+        rideOnToBonus,
+        setLobbyView: view => { lobbyView = view; }
     };
 }

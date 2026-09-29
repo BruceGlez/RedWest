@@ -4,8 +4,10 @@ import { weekKey } from './profile.js';
 import { BUILDINGS, buildingEffects, jailedOutlaws, jailRate, jailCapacity, jailStored, hoursUntilFull, upgradeCost } from './town.js';
 import { track } from './analytics.js';
 import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, disableReminders, updateJailReminder } from './reminders.js';
+import { createTownScene, TOWN_LAYOUT } from './townScene.js';
 
-// The Frontier Town screen (src/town.js has the rules) and the badge on the home screen's TOWN button.
+// The Frontier Town screen (src/town.js has the rules): a 3D town at dusk (src/townScene.js) with a label over
+// each building; tapping a building or its label opens its card in a sheet. Also the TOWN button's badge.
 export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
     const $ = id => document.getElementById(id);
     const els = {
@@ -13,6 +15,10 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
         badge: $('town-badge'),
         screen: $('town-screen'),
         grid: $('town-grid'),
+        sheet: $('town-sheet'),
+        sheetClose: $('town-sheet-close'),
+        touch: $('town-touch'),
+        labels: $('town-labels'),
         dollars: $('town-dollars'),
         message: $('town-message'),
         reminder: $('town-reminder'),
@@ -21,6 +27,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
         reminderSetting: $('settings-reminders-btn')
     };
     let profile = null;
+    let town3d = null; // built the first time the town opens
+    let openId = null; // the building whose card is showing
     let confirmUpgrade = null; // building id armed for a second tap
     let busy = false;
 
@@ -115,6 +123,51 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
             + '</div>';
     }
 
+    // Buildings that are only scenery for now.
+    function soonCard(spot) {
+        return `<div class="town-card" data-building="${spot.id}"><div class="town-sign"><span>${spot.label}</span></div>`
+            + `<p class="town-blurb">${spot.soon}.</p></div>`;
+    }
+
+    function sheetHtml(id) {
+        if(id === 'depot') return eventCard();
+        const building = BUILDINGS.find(b => b.id === id);
+        if(building) return card(building);
+        const spot = TOWN_LAYOUT.find(s => s.id === id);
+        return spot ? soonCard(spot) : '';
+    }
+
+    // ---------- Building labels over the 3D town ----------
+    const labelEls = new Map();
+    for(const spot of TOWN_LAYOUT) {
+        const label = document.createElement('button');
+        label.type = 'button';
+        label.className = `town-label${spot.soon ? ' soon' : ''}${spot.id === 'depot' ? ' event' : ''}`;
+        label.dataset.openBuilding = spot.id;
+        els.labels.append(label);
+        labelEls.set(spot.id, label);
+    }
+    function renderLabels() {
+        const stored = jailStored(profile);
+        const full = stored > 0 && stored >= jailCapacity(profile);
+        for(const spot of TOWN_LAYOUT) {
+            const label = labelEls.get(spot.id);
+            const building = BUILDINGS.find(b => b.id === spot.id);
+            let extra = '';
+            if(building && building.levels.length > 1) extra = `<small>LV ${profile.town.levels[spot.id]}</small>`;
+            if(spot.id === 'jail' && stored > 0) extra += `<span class="town-bubble${full ? ' full' : ''}">${full ? 'FULL ' : ''}${money(stored)}</span>`;
+            if(spot.id === 'depot') extra = `<small>${OUTLAWS[eventForWeek(weekKey(new Date())).outlaw].name}</small>`;
+            label.innerHTML = `<span>${spot.label}</span>${extra}`;
+        }
+    }
+
+    function openBuilding(id) {
+        openId = id;
+        confirmUpgrade = null;
+        say('');
+        render();
+    }
+
     function renderBadge() {
         if(!profile) return;
         const stored = jailStored(profile);
@@ -128,7 +181,10 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
         renderBadge();
         if(!profile || !isOpen()) return;
         els.dollars.textContent = profile.balances.dollars.toLocaleString();
-        els.grid.innerHTML = eventCard() + BUILDINGS.map(card).join('');
+        renderLabels();
+        town3d?.setLevels(profile.town.levels);
+        els.sheet.style.display = openId ? '' : 'none';
+        if(openId) els.grid.innerHTML = sheetHtml(openId);
     }
 
     async function act(work) {
@@ -189,10 +245,74 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
     els.button.addEventListener('click', () => {
         track('town_open');
         confirmUpgrade = null;
+        openId = null;
         say('');
+        if(!town3d) town3d = createTownScene();
+        town3d.resize(window.innerWidth, window.innerHeight);
         ui.showTown();
         render();
     });
+    els.labels.addEventListener('click', event => {
+        const label = event.target.closest('[data-open-building]');
+        if(label) openBuilding(label.dataset.openBuilding);
+    });
+    els.sheetClose.addEventListener('click', () => {
+        openId = null;
+        render();
+    });
+    window.addEventListener('resize', () => town3d?.resize(window.innerWidth, window.innerHeight));
+
+    // ---------- Looking around: drag to pan, pinch or scroll to zoom, tap a building ----------
+    const pointers = new Map();
+    let dragged = 0;
+    let pinchFrom = 0;
+    const YAW = 0.52; // matches the camera in src/townScene.js
+    els.touch.addEventListener('pointerdown', event => {
+        els.touch.setPointerCapture(event.pointerId);
+        pointers.set(event.pointerId, { x: event.clientX, y: event.clientY });
+        dragged = 0;
+        if(pointers.size === 2) {
+            const [a, b] = [...pointers.values()];
+            pinchFrom = Math.hypot(a.x - b.x, a.y - b.y);
+        }
+    });
+    els.touch.addEventListener('pointermove', event => {
+        const last = pointers.get(event.pointerId);
+        if(!last || !town3d) return;
+        const dx = event.clientX - last.x;
+        const dy = event.clientY - last.y;
+        last.x = event.clientX;
+        last.y = event.clientY;
+        dragged += Math.abs(dx) + Math.abs(dy);
+        if(pointers.size === 2) {
+            const [a, b] = [...pointers.values()];
+            const now = Math.hypot(a.x - b.x, a.y - b.y);
+            if(pinchFrom > 0 && now > 0) town3d.zoom(pinchFrom / now);
+            pinchFrom = now;
+            return;
+        }
+        // Screen drag moves the ground under the finger (camera yaw taken into account).
+        const scale = town3d.distance / window.innerHeight * 0.85;
+        const rightX = Math.cos(YAW), rightZ = -Math.sin(YAW);
+        const upX = -Math.sin(YAW), upZ = -Math.cos(YAW);
+        town3d.pan((-dx * rightX + dy * upX) * scale, (-dx * rightZ + dy * upZ) * scale);
+    });
+    const release = event => {
+        const wasTap = pointers.size === 1 && dragged < 10;
+        pointers.delete(event.pointerId);
+        if(pointers.size < 2) pinchFrom = 0;
+        if(wasTap && town3d && event.type === 'pointerup') {
+            const id = town3d.pick((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            if(id) openBuilding(id);
+            else if(openId) { openId = null; render(); }
+        }
+    };
+    els.touch.addEventListener('pointerup', release);
+    els.touch.addEventListener('pointercancel', release);
+    els.touch.addEventListener('wheel', event => {
+        event.preventDefault();
+        town3d?.zoom(event.deltaY > 0 ? 1.1 : 0.9);
+    }, { passive: false });
     // Keep the jail's numbers and the badge ticking while the game is open.
     setInterval(render, 30000);
 
@@ -232,6 +352,25 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
             profile = next;
             render();
             planReminder();
+        },
+        // Called by the home-screen loop every frame (src/gameLoop.js): while the town is open it is drawn
+        // instead of the desert.
+        isActive() {
+            const open = isOpen() && !!town3d;
+            document.body.classList.toggle('town-open', open);
+            return open;
+        },
+        frame(renderer, dt) {
+            town3d.update(dt);
+            renderer.render(town3d.scene, town3d.camera);
+            const w = window.innerWidth;
+            const h = window.innerHeight;
+            for(const [id, p] of Object.entries(town3d.labelPositions())) {
+                const label = labelEls.get(id);
+                label.style.left = `${Math.round(p.x * w)}px`;
+                label.style.top = `${Math.round(p.y * h)}px`;
+                label.style.visibility = p.visible ? '' : 'hidden';
+            }
         }
     };
 }

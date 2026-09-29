@@ -37,6 +37,9 @@ try {
     const event = await page.evaluate(() => ({ ...window.EVENT, name: window.EVENT_NAME }));
 
     await page.locator('#town-btn').click();
+    // The Most Wanted outlaw arrives at the railway depot.
+    assert.match(await page.locator('[data-open-building="depot"]').textContent(), new RegExp(event.name));
+    await page.locator('[data-open-building="depot"]').click();
     const card = page.locator('.event-card');
     await card.waitFor();
     const text = await card.textContent();
@@ -74,6 +77,7 @@ try {
     await page.locator('#start-screen').waitFor({ state: 'visible' });
     assert.equal(await page.evaluate(() => S.gameState.event), null);
     await page.locator('#town-btn').click();
+    await page.locator('[data-open-building="depot"]').click();
     assert.equal(await page.locator('.event-targets li.done').count(), 3);
     assert.deepEqual(errors, [], `browser errors: ${errors.join(', ')}`);
     console.log(`Event smoke passed: ${event.name} (${event.twist.name}) from Frontier Town, all three targets and the first prize, no Wanted Road change.`);

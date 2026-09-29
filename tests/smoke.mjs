@@ -248,7 +248,9 @@ try {
     await page.evaluate(async () => { window.__rwTestState = await import('/src/state.js'); });
     await page.locator('#town-btn').click();
     await page.locator('#town-screen').waitFor({ state: 'visible' });
-    const jailText = await page.locator('[data-building="jail"]').textContent();
+    // The town is a 3D view; tapping a building's label opens its card.
+    await page.locator('[data-open-building="jail"]').click();
+    const jailText = await page.locator('.town-card[data-building="jail"]').textContent();
     assert.match(jailText, /3 of 8 outlaws jailed/, jailText);
     const townDollars = async () => Number((await page.locator('#town-dollars').textContent()).replace(/\D/g, ''));
     const dollarsBefore = await townDollars();
@@ -264,6 +266,7 @@ try {
     await page.locator('#town-screen .panel-back').click();
     await page.locator('#town-badge').waitFor({ state: 'visible', timeout: 35000 }); // the badge refreshes every 30 s
     await page.locator('#town-btn').click();
+    await page.locator('[data-open-building="jail"]').click();
     // Stand in for the phone's notification system (the reminders exist only in the app).
     await page.evaluate(() => {
         window.__redWestNotifications = {
