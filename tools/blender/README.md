@@ -74,5 +74,5 @@ humanoids only; animals must stay in place on their own).
 - **Snake and horse with rider: not done.** They still use `createRattlerMesh` and `createRiderMesh`. Each
   needs its own rig and clips, and the same few lines in `enemySystem.js` to load it.
 - The wolf's `dead` clip is not played yet: killed enemies are removed at once, as before.
-- The wolf's menu picture (the NEW ENEMY card, Bounty Book) is still drawn from the box wolf
-  (`src/portraits.js`).
+- The wolf's picture on the NEW ENEMY card and in the Bounty Book is rendered from the model once it has
+  loaded (`renderEnemyModelPortrait` in `src/portraits.js`, called from `main.js`); until then, the box wolf.
