@@ -166,7 +166,7 @@ try {
         window.S = await import('/src/state.js');
         localStorage.clear();
     });
-    assert.equal(await arenaPage.locator('.arena-fight').count(), 8, 'all eight outlaws can be picked');
+    assert.equal(await arenaPage.locator('.arena-fight').count(), 10, 'all ten outlaws can be picked');
     assert.equal(await arenaPage.locator('#start-screen').isVisible(), false, 'the arena replaces the home screen');
     await arenaPage.locator('#arena-invincible').click();
     await arenaPage.locator('[data-arena="4"]').click(); // Iron Jack

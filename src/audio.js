@@ -132,9 +132,10 @@ function loadBuffer(dir, key) {
     return loading.get(id);
 }
 
-function playBuffer(buffer, destination, volume = 1) {
+function playBuffer(buffer, destination, volume = 1, rate = 1) {
     const source = audioCtx.createBufferSource();
     source.buffer = buffer;
+    source.playbackRate.value = rate;
     if(volume === 1) source.connect(destination);
     else {
         const gain = audioCtx.createGain();
@@ -144,6 +145,11 @@ function playBuffer(buffer, destination, volume = 1) {
     }
     source.start();
     return source;
+}
+
+// Every download started so far (the entry screen's loading bar counts them).
+export function audioDownloads() {
+    return [...loading.values()];
 }
 
 // Effects are small, so they all load up front, with the menu music so it is ready for the first tap.
@@ -161,14 +167,22 @@ const BEEP_FOR = {
 // Many enemies can fire in the same frame; one copy per key per 30 ms keeps it from clipping.
 const lastPlayedAt = new Map();
 const REPEAT_GAP = 0.03;
+// Gunshots are the most repeated sound, so they sit under the rest of the mix (playtest: "a bit
+// overwhelming"), and each one is pitched slightly differently so rapid fire does not drone.
+export const SFX_MIX = {
+    'shot-revolver': 0.45, 'shot-twins': 0.4, 'shot-rifle': 0.5, 'shot-shotgun': 0.5, 'shot-sawedoff': 0.5,
+    'shot-buffalo': 0.6, 'enemy-shot': 0.3
+};
+const REPEAT_GAPS = { 'enemy-shot': 0.08 };
 
 function playRecordedSfx(key) {
     const buffer = buffers.get(`sfx/${key}`);
     if(!buffer) return false;
     const now = audioCtx.currentTime;
-    if(now - (lastPlayedAt.get(key) ?? -1) < REPEAT_GAP) return true;
+    if(now - (lastPlayedAt.get(key) ?? -1) < (REPEAT_GAPS[key] ?? REPEAT_GAP)) return true;
     lastPlayedAt.set(key, now);
-    playBuffer(buffer, sfxGain);
+    const isShot = key in SFX_MIX;
+    playBuffer(buffer, sfxGain, SFX_MIX[key] ?? 1, isShot ? 0.93 + Math.random() * 0.14 : 1);
     return true;
 }
 

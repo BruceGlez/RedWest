@@ -10,11 +10,20 @@ show what licence applied if anyone asks.
 | Sound effects, music, voice lines | `public/audio/` | ElevenLabs API (`tools/elevenlabs.mjs`, list in `src/audioManifest.js`) | **Paid plan** (confirmed by the owner, 2026-09-29): commercial use allowed | 2026-09-28 | Voices are ElevenLabs stock voices only. Cloned voices are skipped by the script; never clone a real person's voice. Regenerating needs a paid plan too. |
 | Character pictures (front views) | `art/characters/` | OpenAI Images API (`tools/character-picture.mjs`, prompts in `tools/character-prompts.mjs`) | OpenAI terms: outputs belong to the user | 2026-09-28 | Prompts describe original characters; keep them free of real people, brands and other games' characters. |
 | Animated 3D characters | `public/models/` | Meshy API (`tools/meshy.mjs`) from the pictures above | **Paid plan** (confirmed by the owner, 2026-09-29): private models, commercial use allowed | 2026-09-28 | |
+| New characters (2026-09-29) | `art/characters/june-holloway.jpg`, `ezra-stone.jpg`, `lucky-lou.jpg`, `colonel-crane.jpg`; `public/models/` same names | OpenAI Images API, then Meshy API (same tools and prompts file) | As the two rows above | 2026-09-29 | Original characters. All models (old and new) now carry two more Meshy library animations: Cowboy Quick Draw Shooting and Walk Forward While Shooting. |
+| Character pictures in the menus | `public/portraits/` | Rendered from the models above (`tools/render-portraits.mjs`) | Same as the models | 2026-09-29 | |
 | Town concept pictures | `art/town/` | OpenAI Images API (prompts describe a mood only; no show or game names) | OpenAI terms: outputs belong to the user | 2026-09-29 | Reference for the 3D town, which is built in code (`src/townScene.js`); not shipped in the game. |
 | Fonts: Rye, Roboto Mono | `fonts/` | Google Fonts | SIL Open Font License 1.1 (`fonts/OFL-*.txt`) | | Keep the licence files next to the fonts. |
 | App icons | `public/icons/` | Made for the project | Owned | | |
 | Three.js | npm `three` | | MIT licence | | |
 | Other code-built art (props, box characters, the Drifter) | `src/` | Written in code | Owned | | |
+
+## Animals
+
+Meshy's auto-rig is for humanoids only. A test on 2026-09-29 (a wolf picture through `tools/meshy.mjs`) did
+produce a rigged model, but on a human skeleton: running tore the body apart. Animals stay code-built
+(`src/assets.js`, legs animated in `src/animation.js`). To use modelled animals later, get a model that already
+comes with a four-legged rig and animations, under a licence that allows commercial use.
 
 ## Rules for new assets
 

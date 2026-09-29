@@ -430,6 +430,10 @@ function createHeldWeapon(kind) {
         group.add(box(0.4, 0.26, 1.5, mat.gunMetal, 0, 0.1, -0.6));
         group.add(box(0.3, 0.45, 0.8, mat.wood, 0, -0.05, 0.45));
         muzzle.position.set(0, 0.1, -1.4);
+    } else if(kind === 'knife') {
+        group.add(box(0.12, 0.12, 0.8, colorMat(0xcfd8dc), 0, 0.1, -0.5));
+        group.add(box(0.16, 0.2, 0.35, mat.wood, 0, 0.05, 0.1));
+        muzzle.position.set(0, 0.1, -0.9);
     } else if(kind === 'dynamite') {
         group.add(box(0.28, 0.9, 0.28, colorMat(0xd32f2f), 0, 0.2, 0));
         group.add(box(0.06, 0.35, 0.06, colorMat(0xfff3c4), 0, 0.8, 0));
@@ -534,6 +538,19 @@ export function createDynamiterMesh() {
 
 export function createBruteMesh() {
     const group = createHumanoid({ type: 'brute', coat: 0x5d4037, vest: 0x78909c, hat: 0x3e2723, bandana: 0x8d0000, bulk: 1.45 });
+    addOutline(group);
+    return group;
+}
+
+export function createKniferMesh() {
+    const group = createHumanoid({ type: 'knifer', coat: 0x1b1b1b, vest: 0x8e1b1b, hat: 0x111111, bandana: 0xf5f5f5, weapon: 'knife', hatStyle: 'bowler' });
+    addOutline(group);
+    return group;
+}
+
+export function createTrooperMesh() {
+    const group = createHumanoid({ type: 'trooper', coat: 0x546e7a, hat: 0x37474f, bandana: 0xfbc02d, weapon: 'rifle' });
+    addAimLaser(group);
     addOutline(group);
     return group;
 }

@@ -118,7 +118,7 @@ try {
     await page.locator('#book-screen').waitFor({ state: 'visible' });
     assert.equal(await page.locator('#book-enemies .book-card:not(.locked)').count(), types.length, 'every enemy met is in the book');
     assert.match(await page.locator('#book-enemies').textContent(), /BAGGED: 1/);
-    assert.equal(await page.locator('#book-outlaws .book-card').count(), 8);
+    assert.equal(await page.locator('#book-outlaws .book-card').count(), 10);
     assert.deepEqual(errors, [], `page errors: ${errors.join(' | ')}`);
     console.log(`Enemy smoke passed: ${types.length} enemy types spawn, attack (${hurtBy.length} landed hits), die, and fill the Bounty Book.`);
 } finally {

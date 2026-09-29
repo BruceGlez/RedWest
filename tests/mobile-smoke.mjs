@@ -23,6 +23,8 @@ try {
     await page.goto(server.resolvedUrls.local[0], { waitUntil: 'commit', timeout: 30000 });
     await page.locator('canvas').waitFor();
     await page.evaluate(async () => { window.S = await import('/src/state.js'); });
+    // The entry screen (src/loadingScreen.js) lifts once the first downloads finish.
+    await page.locator('#loading-screen').waitFor({ state: 'detached', timeout: 60000 });
 
     assert.equal(await page.evaluate(() => document.body.classList.contains('touch')), true, 'touch mode is detected');
     assert.equal(await page.locator('#play-btn').isVisible(), true, 'home screen shows PLAY');
@@ -155,6 +157,7 @@ try {
     await tall.goto(server.resolvedUrls.local[0], { waitUntil: 'commit', timeout: 30000 });
     await tall.locator('canvas').waitFor({ timeout: 30000 });
     await tall.evaluate(async () => { window.S = await import('/src/state.js'); });
+    await tall.locator('#loading-screen').waitFor({ state: 'detached', timeout: 60000 });
     const fits = async what => {
         const overflow = await tall.evaluate(() => [...document.querySelectorAll('button, .panel-screen, .wanted-poster')]
             .filter(el => el.offsetParent && el.getBoundingClientRect().width > 0)

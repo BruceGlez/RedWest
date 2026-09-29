@@ -1,0 +1,26 @@
+// Written by tools/render-portraits.mjs: pictures in public/portraits/ (<name>.webp).
+export const PORTRAIT_FILES = new Set([
+    'calloway-gang',
+    'char-calloway-gang',
+    'char-colonel-crane',
+    'char-deacon-graves',
+    'char-dusty-pete',
+    'char-el-espectro',
+    'char-ezra-stone',
+    'char-iron-jack',
+    'char-june-holloway',
+    'char-lucky-lou',
+    'char-marshal',
+    'char-mesa-morgan',
+    'char-rattlesnake-rosa',
+    'char-silas-vane',
+    'colonel-crane',
+    'deacon-graves',
+    'dusty-pete',
+    'el-espectro',
+    'iron-jack',
+    'lucky-lou',
+    'mesa-morgan',
+    'rattlesnake-rosa',
+    'silas-vane'
+]);

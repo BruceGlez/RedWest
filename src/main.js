@@ -3,7 +3,7 @@ import { setupInputs, keys } from './input.js';
 import { setupTouchControls } from './touchControls.js';
 import { gameState, playerStats } from './state.js';
 import { setupScene, generateMap } from './world.js';
-import { resumeAudio, playSound, getAudioSettings, setMusicVolume, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
+import { audioDownloads, resumeAudio, playSound, getAudioSettings, setMusicVolume, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { createUIManager } from './uiManager.js';
 import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
@@ -25,10 +25,16 @@ import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { applyPlayerLoadout } from './assets.js';
 import { applyPerk } from './perks.js';
-import { DEMO, openStore } from './demo.js';
+import { DEMO, openStore, assetUrl } from './demo.js';
 import { setPlayerBulletColor } from './bulletSystem.js';
 import { appleSignInMode, authorizeWithApple } from './appleSignIn.js';
+import { PORTRAIT_FILES } from './portraitFiles.js';
+import { createLoadingScreen } from './loadingScreen.js';
 
+// Entry screen with a loading bar (not in the playable ad, which has its own start card).
+const loadingScreen = DEMO ? null : createLoadingScreen();
+if(DEMO) document.getElementById('loading-screen')?.remove();
+gameState.loading = !DEMO;
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -57,7 +63,10 @@ ui = createUIManager(gameState, playerStats);
 ui.setRunLog(loadRunLog());
 const progress = loadProgress();
 ui.setProgress(progress);
+// Pictures of the 3D characters ship as files (tools/render-portraits.mjs), so menus never wait on a model.
+const portraitFile = name => (PORTRAIT_FILES.has(name) ? assetUrl(`portraits/${name}.webp`) : null);
 const outlawPortraits = renderOutlawPortraits(renderer);
+for(const outlaw of OUTLAWS) outlawPortraits[outlaw.id] = portraitFile(outlaw.id) ?? outlawPortraits[outlaw.id];
 const enemyPortraits = renderEnemyPortraits(renderer);
 ui.setPortraits(outlawPortraits, enemyPortraits);
 // Outlaws' 3D models load one at a time (about 1 MB each): the selected outlaw now, others when
@@ -70,7 +79,7 @@ function loadOutlawModel(index) {
         outlawModelRequests.set(index, loadCharacterModel(outlaw.model).then(gltf => {
             const instance = createCharacterInstance(gltf, 6);
             instance.mixer.update(0.4);
-            const picture = renderCharacterPortrait(renderer, instance.object);
+            const picture = portraitFile(outlaw.id) ? null : renderCharacterPortrait(renderer, instance.object);
             if(picture) outlawPortraits[outlaw.id] = picture;
             ui.setPortraits(outlawPortraits, enemyPortraits);
             syncOutlawThumbs();
@@ -79,7 +88,7 @@ function loadOutlawModel(index) {
     return outlawModelRequests.get(index);
 }
 if(arena.enabled) OUTLAWS.forEach((_, i) => loadOutlawModel(i)); // the arena shows them all
-else loadOutlawModel(progress.selected);
+else loadingScreen?.track(loadOutlawModel(progress.selected));
 ui.updateHUD();
 ui.updateDashBar(1);
 if(arena.enabled) ui.showStartScreen(); // the Boss Arena list replaces the home screen
@@ -103,12 +112,17 @@ const town = createTownPanel({
         loadOutlawModel(event.outlaw).then(() => { keys.startRequested = true; });
     }
 });
+let profileCharacterTracked = false;
 function applyProfile(next) {
     profile = next;
     records.setProfile(profile);
     const colors = loadoutColors(profile.loadout);
     applyPlayerLoadout(playerSystem.playerGroup, colors);
-    playerSystem.setCharacter(getShopItem(profile.loadout.character)).then(() => ui.refreshShop());
+    const characterReady = playerSystem.setCharacter(getShopItem(profile.loadout.character)).then(() => ui.refreshShop());
+    if(!profileCharacterTracked) {
+        profileCharacterTracked = true;
+        loadingScreen?.track(characterReady);
+    }
     // Guns apply from the next shot (the shop is only open between runs).
     playerStats.guns = { primary: profile.loadout.primary, secondary: profile.loadout.secondary };
     // An outlaw character brings its perk and drawback (src/perks.js).
@@ -208,7 +222,20 @@ if(DEMO) {
     });
     document.getElementById('demo-store').addEventListener('click', openStore);
 } else {
-    privacyPanel.ask().then(() => track('session_start'));
+    // Behind the entry screen: sounds, fonts and the character pictures (small files, see portraitFiles.js).
+    for(const download of audioDownloads()) loadingScreen.track(download);
+    if(document.fonts?.ready) loadingScreen.track(document.fonts.ready);
+    for(const name of PORTRAIT_FILES) {
+        loadingScreen.track(new Promise(resolve => {
+            const image = new Image();
+            image.onload = image.onerror = resolve;
+            image.src = assetUrl(`portraits/${name}.webp`);
+        }));
+    }
+    loadingScreen.finish()
+        .then(() => { gameState.loading = false; })
+        .then(() => privacyPanel.ask())
+        .then(() => track('session_start'));
 }
 // Shop preview and character cards: imported characters get their own posed copy once loaded.
 const previewCharacters = new Map();
@@ -222,21 +249,27 @@ function previewCharacter(id) {
             instance.mixer.update(0.4); // a moment into the idle pose
             instance.object.rotation.y = 0.5;
             previewCharacters.set(id, instance.object);
-            ui.setCharacterThumb(id, renderPlayerPreview(renderer, null, instance.object));
+            ui.setCharacterThumb(id, portraitFile(id) ?? renderPlayerPreview(renderer, null, instance.object));
             ui.refreshShop();
         }).catch(() => {});
     }
     return previewCharacters.get(id);
 }
-ui.setPreviewRenderer(loadout => renderPlayerPreview(renderer, loadoutColors(loadout), previewCharacter(loadout.character)));
+// The big shop picture shows the model once loaded; until then, its picture file (never the wrong character).
+ui.setPreviewRenderer(loadout => {
+    const model = previewCharacter(loadout.character);
+    if(!model && getShopItem(loadout.character)?.model && portraitFile(loadout.character)) return portraitFile(loadout.character);
+    return renderPlayerPreview(renderer, loadoutColors(loadout), model);
+});
 for(const item of CHARACTERS) {
-    if(item.unlock) continue; // outlaws use their WANTED portrait; their model loads only when tried on or picked
+    if(item.model && portraitFile(item.id)) ui.setCharacterThumb(item.id, portraitFile(item.id));
+    if(item.unlock) continue; // outlaws' models load only when tried on or picked
     if(item.model) previewCharacter(item.id);
     else ui.setCharacterThumb(item.id, renderPlayerPreview(renderer, loadoutColors(profile.loadout)));
 }
 function syncOutlawThumbs() {
     for(const item of CHARACTERS) {
-        if(item.unlock && !previewCharacters.get(item.id)) ui.setCharacterThumb(item.id, outlawPortraits[OUTLAWS[item.unlock.outlaw].id]);
+        if(item.unlock && !portraitFile(item.id) && !previewCharacters.get(item.id)) ui.setCharacterThumb(item.id, outlawPortraits[OUTLAWS[item.unlock.outlaw].id]);
     }
 }
 syncOutlawThumbs();

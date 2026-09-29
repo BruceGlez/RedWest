@@ -533,7 +533,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             camera.lookAt(playerSystem.playerGroup.position);
             renderer.render(scene, camera);
             emitDebug(realDt);
-            if(gameState.startBlocked) keys.startRequested = false; // first-launch question still open
+            // Entry screen still up, or the first-launch question still open.
+            if(gameState.startBlocked || gameState.loading) keys.startRequested = false;
             else if(keys.space || keys.startRequested) {
                 keys.startRequested = false;
                 track('run_start');

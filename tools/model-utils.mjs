@@ -1,11 +1,15 @@
 // Shared clean-up for AI-generated characters (Meshy GLB), used by optimize-model.mjs and meshy.mjs.
 // Needs: npm i --no-save @gltf-transform/core @gltf-transform/extensions @gltf-transform/functions sharp
 
-export const ROLES = ['idle', 'run', 'runShoot', 'dead'];
+// draw: a cowboy quick draw (the game plays its draw-and-fire part before a shot);
+// walkShoot: walking forward aiming a pistol, used while shooting at walking pace or standing.
+export const ROLES = ['idle', 'run', 'runShoot', 'dead', 'draw', 'walkShoot'];
 
 // Which of the game's animations a clip name means, or null. Order matters: "Run and Shoot" is not "run".
 export function roleForClip(name) {
     const n = String(name).toLowerCase().replace(/[^a-z]/g, '');
+    if(/draw/.test(n)) return 'draw';
+    if(/walk.*shoot|shoot.*walk/.test(n)) return 'walkShoot';
     if(/shoot|fire|gun/.test(n)) return 'runShoot';
     if(/dead|dying|death|die/.test(n)) return 'dead';
     if(/idle|stand|breath/.test(n)) return 'idle';

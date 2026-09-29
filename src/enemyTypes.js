@@ -52,6 +52,16 @@ export const ENEMY_TYPES = {
         name: 'GHOST', stage: 7, cost: 2.0, weight: 1.2, cap: 3, hp: 2, speed: 7, behavior: 'phantom', danger: 3,
         blurb: 'El Espectro’s riders fade from sight and reappear beside you.',
         tip: 'Bullets pass through while faded. Fire when they flicker back.'
+    },
+    knifer: {
+        name: 'KNIFE THROWER', stage: 8, cost: 1.8, weight: 1.3, cap: 4, hp: 2, speed: 9, behavior: 'knives', danger: 3,
+        blurb: 'Lucky Lou’s riverboat crew: they dart in and throw three knives at once.',
+        tip: 'The knives fly straight. Step sideways when the arm goes back.'
+    },
+    trooper: {
+        name: 'TROOPER', stage: 9, cost: 2.4, weight: 1.1, cap: 3, hp: 3, speed: 5.5, behavior: 'volley', danger: 3,
+        blurb: 'The Colonel’s renegade cavalry. They hold their ground and fire three-round bursts.',
+        tip: 'Close in between bursts: they reload before the next one.'
     }
 };
 

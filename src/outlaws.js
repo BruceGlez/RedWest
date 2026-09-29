@@ -44,7 +44,16 @@ export const OUTLAWS = [
     { id: 'el-espectro', name: 'EL ESPECTRO', title: 'The Ghost Of Red West', modifiers: ['FAST_WOLVES', 'SHARPSHOOTERS', 'SWARM', 'HEAVY_HITTERS'], bounty: 350,
         colors: { hat: 0xf5f5f5, coat: 0xeeeeee, poncho: 0x37474f, bandana: 0x6a1b9a },
         model: 'models/el-espectro.glb',
-        signature: { style: 'specter', move: 'GHOST RING', tip: 'WATCH WHERE HE REAPPEARS', detail: 'Vanishes, reappears beside you and fires a ring of bullets.' } }
+        signature: { style: 'specter', move: 'GHOST RING', tip: 'WATCH WHERE HE REAPPEARS', detail: 'Vanishes, reappears beside you and fires a ring of bullets.' } },
+    // Past the Ghost: the legends. Added 2026-09-29; new stages go at the end so saved stars keep their places.
+    { id: 'lucky-lou', name: 'LUCKY LOU', title: 'The Riverboat Card Sharp', modifiers: ['SHARPSHOOTERS', 'SWARM', 'HEAVY_HITTERS'], bounty: 400,
+        colors: { hat: 0x111111, coat: 0x1b1b1b, poncho: 0x8e1b1b, bandana: 0xf5f5f5 },
+        model: 'models/lucky-lou.glb',
+        signature: { style: 'cardsharp', move: 'DEAD MAN\'S HAND', tip: 'FIND THE GAP IN THE FAN', detail: 'Deals two fans of razor cards, one right after the other. Each fan has one gap: slip through it.' } },
+    { id: 'colonel-crane', name: 'COLONEL CRANE', title: 'The Gatling Colonel', modifiers: ['FAST_WOLVES', 'SHARPSHOOTERS', 'SWARM', 'HEAVY_HITTERS'], bounty: 450,
+        colors: { hat: 0x37474f, coat: 0x546e7a, poncho: 0x263238, bandana: 0xfbc02d },
+        model: 'models/colonel-crane.glb',
+        signature: { style: 'gatling', move: 'GATLING SWEEP', tip: 'RUN AGAINST THE SWEEP', detail: 'Sets up a gatling gun and sweeps a stream of bullets across the field, then has to let it cool. Hit him while it smokes.' } }
 ];
 
 export const STAR_GOALS = ['Defeat the outlaw', 'Collect the bounty at Heat 2+', 'Ride on and escape'];
@@ -53,15 +62,20 @@ export function getOutlaw(index) {
     return OUTLAWS[Math.max(0, Math.min(OUTLAWS.length - 1, index))];
 }
 
-// Stage difficulty on top of the per-pursuit scaling.
+// Stage difficulty on top of the per-pursuit scaling. Raised 2026-09-29 after playtesting ("went through all
+// of them easily"): more and faster enemies from the first stage, much tougher outlaws later on, and later
+// outlaws and gunmen fire more often.
+const BOSS_SHOT_COOLDOWN = 2.3; // fallback when a spawn passes no cooldown (spawnEnemy passes 2-3 s)
 export function outlawDifficulty(index) {
     const tier = Math.max(0, index);
     return {
-        enemySpeed: 1 + (tier * 0.04),
-        budget: 1 + (tier * 0.08),
-        spawnInterval: Math.max(0.75, 1 - (tier * 0.03)),
-        bossHp: 16 + (tier * 3),
-        bossSpeed: 3.4 + (tier * 0.12)
+        enemySpeed: 1.05 + (tier * 0.05),
+        budget: 1.15 + (tier * 0.12),
+        spawnInterval: Math.max(0.62, 0.92 - (tier * 0.035)),
+        bossHp: 22 + (tier * 5),
+        bossSpeed: 3.6 + (tier * 0.15),
+        bossFire: Math.max(0.65, 1 - (tier * 0.04)), // outlaw shot cooldown multiplier
+        gunFire: Math.max(0.75, 1 - (tier * 0.03)) // gunmen's shot cooldown multiplier
     };
 }
 
@@ -104,8 +118,10 @@ export function applyOutlawToEnemy(type, stats, index) {
     if(type === 'boss') {
         result.hp = difficulty.bossHp;
         result.speed = difficulty.bossSpeed;
+        result.shootCooldown = (result.shootCooldown || BOSS_SHOT_COOLDOWN) * difficulty.bossFire;
     } else {
         result.speed *= difficulty.enemySpeed;
+        if(result.shootCooldown) result.shootCooldown *= difficulty.gunFire;
     }
     const shooter = type === 'gunslinger' || type === 'boss';
     const modifiers = activeModifiers(outlaw);

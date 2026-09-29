@@ -11,9 +11,13 @@ test('the road has unique outlaws with known threats and rising bounties', () =>
     for(let i = 1; i < OUTLAWS.length; i++) assert.ok(OUTLAWS[i].bounty > OUTLAWS[i - 1].bounty);
 });
 
-test('the first outlaw plays the base game', () => {
-    assert.deepEqual(applyOutlawToWave(wave, 0), wave);
-    assert.deepEqual(applyOutlawToEnemy('bandit', stats, 0), stats);
+test('the first outlaw is the base game, a step up (playtest: too easy), with no signature threats', () => {
+    const pete = applyOutlawToWave(wave, 0);
+    assert.deepEqual({ weights: pete.weights, caps: pete.caps }, { weights: wave.weights, caps: wave.caps });
+    assert.ok(Math.abs(pete.budget - wave.budget * 1.15) < 1e-9);
+    const bandit = applyOutlawToEnemy('bandit', stats, 0);
+    assert.ok(Math.abs(bandit.speed - stats.speed * 1.05) < 1e-9);
+    assert.equal(bandit.hp, stats.hp);
 });
 
 test('later outlaws are harder and apply their signature threats', () => {
@@ -40,4 +44,17 @@ test('every outlaw has its own signature attack with a tip and a description', (
     for(const outlaw of OUTLAWS) {
         assert.ok(outlaw.signature.move && outlaw.signature.tip && outlaw.signature.detail, outlaw.id);
     }
+});
+
+test('difficulty climbs every stage, and the last outlaws are much tougher than the first', () => {
+    for(let i = 1; i < OUTLAWS.length; i++) {
+        const [a, b] = [outlawDifficulty(i - 1), outlawDifficulty(i)];
+        assert.ok(b.budget > a.budget && b.enemySpeed > a.enemySpeed && b.bossHp > a.bossHp, `stage ${i + 1}`);
+        assert.ok(b.spawnInterval <= a.spawnInterval && b.bossFire <= a.bossFire && b.gunFire <= a.gunFire, `stage ${i + 1}`);
+    }
+    const [first, last] = [outlawDifficulty(0), outlawDifficulty(OUTLAWS.length - 1)];
+    assert.ok(last.bossHp >= first.bossHp * 2.5, 'the last outlaw takes over twice as many hits');
+    assert.ok(last.budget >= first.budget * 1.8, 'and brings nearly twice the gang');
+    const stats = { speed: 5, hp: 1, shootCooldown: 2.5, projectileSpeed: 40, aimSpread: 2 };
+    assert.ok(applyOutlawToEnemy('boss', stats, OUTLAWS.length - 1).shootCooldown < applyOutlawToEnemy('boss', stats, 0).shootCooldown);
 });

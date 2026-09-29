@@ -26,7 +26,15 @@ export const OUTLAW_PERKS = {
     'iron-jack': { name: 'Iron Hide', perk: 'Two extra hearts.', drawback: 'Moves 20% slower and dashes less often.', mods: { hearts: 2, speed: 0.8, dashCooldown: 2.6 } },
     'mesa-morgan': { name: 'Big Bang', perk: 'Bullets are 40% bigger (easier hits).', drawback: 'Shots reach 25% less far.', mods: { bulletSize: 1.4, range: 0.75 } },
     'silas-vane': { name: 'Fan The Hammer', perk: 'Fires 30% faster.', drawback: 'Reloads for 1.2 s after every 6 shots.', mods: { fireRate: 0.7, magazine: { shots: 6, reload: 1.2 } } },
-    'el-espectro': { name: 'Ghost Step', perk: 'Untouchable for 0.6 s after each dash.', drawback: 'One heart less.', mods: { dashGhost: 0.6, hearts: -1 } }
+    'el-espectro': { name: 'Ghost Step', perk: 'Untouchable for 0.6 s after each dash.', drawback: 'One heart less.', mods: { dashGhost: 0.6, hearts: -1 } },
+    'lucky-lou': { name: 'Stacked Deck', perk: 'Fires 20% faster.', drawback: 'Shots reach 20% less far.', mods: { fireRate: 0.8, range: 0.8 } },
+    'colonel-crane': { name: 'Gatling Drill', perk: 'Every 3rd shot is a triple shot.', drawback: 'Moves 15% slower.', mods: { tripleEvery: 3, speed: 0.85 } }
+};
+
+// Characters bought with earned Bounty Dollars (never nuggets): side-grades like the outlaws' perks.
+export const HIRED_PERKS = {
+    'june-holloway': { name: 'Steady Aim', perk: 'Shots reach 30% farther.', drawback: 'Fires 10% slower.', mods: { range: 1.3, fireRate: 1.1 } },
+    'ezra-stone': { name: 'Anvil Chest', perk: 'One extra heart.', drawback: 'Dash recharges in 2.6 s instead of 2.', mods: { hearts: 1, dashCooldown: 2.6 } }
 };
 
 // Which way each mod helps: +1 when a bigger number is better for the player, -1 when smaller is.

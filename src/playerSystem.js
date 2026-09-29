@@ -119,7 +119,8 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     // Animation for an imported character; runs every frame, also after the run ends.
     function animateModel(dt, { moving = false, shooting = false } = {}) {
         if(!character) return;
-        if(!gameState.isGameOver) character.instance.play(moving ? (shooting && character.instance.has('runShoot') ? 'runShoot' : 'run') : 'idle');
+        // The gun comes out while shooting (run-and-aim or standing aim) and goes back after a moment.
+        if(!gameState.isGameOver) character.instance.combat(dt, { moving, aiming: shooting });
         character.instance.mixer.update(dt);
     }
 

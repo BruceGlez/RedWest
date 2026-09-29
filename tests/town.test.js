@@ -37,7 +37,8 @@ test('the jail pays a share of each beaten outlaw\'s bounty per hour, up to its 
     assert.equal(hoursUntilFull(one, later(6)), 2);
     const all = profileWithBeaten(OUTLAWS.length);
     assert.equal(jailRate(all), Math.round(OUTLAWS.reduce((sum, o) => sum + o.bounty, 0) * JAIL_BOUNTY_SHARE));
-    assert.ok(jailCapacity(all) <= 600, 'a full jail is worth about two good runs, not a day of play');
+    // With all ten outlaws, a full jail is worth at most one top run (the upgraded bank's cap), not a day of play.
+    assert.ok(jailCapacity(all) <= 900, `full jail ${jailCapacity(all)}`);
 });
 
 test('collecting pays once and a clock moved backwards pays nothing', () => {

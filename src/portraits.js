@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createBossMesh, createPlayerMesh, applyPlayerLoadout, createEnemyMesh, createWolfMesh, createGunslingerMesh, createRattlerMesh, createRiflemanMesh,
-    createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh } from './assets.js';
+    createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh, createKniferMesh, createTrooperMesh } from './assets.js';
 import { OUTLAWS } from './outlaws.js';
 
 // Renders each outlaw's in-game 3D model into a small image for the WANTED posters and the road,
@@ -61,7 +61,7 @@ export function renderOutlawPortraits(renderer) {
 const ENEMY_MESHES = {
     bandit: createEnemyMesh, wolf: createWolfMesh, gunslinger: createGunslingerMesh, rattler: createRattlerMesh,
     rifleman: createRiflemanMesh, dynamiter: createDynamiterMesh, brute: createBruteMesh, rider: createRiderMesh,
-    duelist: createDuelistMesh, ghost: createGhostMesh
+    duelist: createDuelistMesh, ghost: createGhostMesh, knifer: createKniferMesh, trooper: createTrooperMesh
 };
 
 // A small off-screen photo studio: frames any model from its bounding box and returns a PNG URL.

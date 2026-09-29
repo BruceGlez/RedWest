@@ -1018,3 +1018,23 @@ body.demo #start-screen, body.demo #welcome-modal { display: none !important; }
 .settings-actions .apple-btn:disabled { opacity: 1; background: #000; color: #fff; cursor: default; }
 
 .settings-build { margin: 4px 0 0; font-size: 11px; color: #8d6e63; text-align: center; }
+
+/* ---------- Entry screen (src/loadingScreen.js) ---------- */
+.loading-screen {
+    position: fixed; inset: 0; z-index: 10000; display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 14px; padding: 24px; box-sizing: border-box; text-align: center; color: #f3dfb4;
+    background: linear-gradient(180deg, #1d3640 0%, #6b3a2a 55%, #c0603a 78%, #2a160c 100%);
+    transition: opacity 0.35s ease;
+}
+.loading-screen.loaded { opacity: 0; pointer-events: none; }
+.loading-sky { position: absolute; left: 50%; top: 58%; width: 60vmin; height: 60vmin; transform: translate(-50%, -50%);
+    border-radius: 50%; background: radial-gradient(circle, rgba(255, 196, 92, 0.55), rgba(255, 140, 60, 0) 70%); pointer-events: none; }
+.loading-logo { position: relative; margin: 0; font-family: 'Rye', 'Times New Roman', serif; font-size: clamp(44px, 12vmin, 96px); letter-spacing: 3px;
+    color: #ffcc33; text-shadow: 0 4px 0 #7a1f10, 0 8px 18px rgba(0, 0, 0, 0.6); }
+.loading-sub { position: relative; margin: 0 0 10px; font-family: 'Roboto Mono', monospace; font-size: 12px; letter-spacing: 3px; color: #f3dfb4; opacity: 0.85; }
+.loading-bar { position: relative; width: min(420px, 80vw); height: 18px; border: 3px solid #2a160c; border-radius: 12px; background: rgba(0, 0, 0, 0.45);
+    box-shadow: 0 0 0 2px #c8a050; overflow: hidden; }
+.loading-fill { width: 8%; height: 100%; border-radius: 8px; transition: width 0.25s ease;
+    background: repeating-linear-gradient(-45deg, #ffcc33 0 12px, #f2a81d 12px 24px); }
+.loading-label { position: relative; margin: 0; font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 13px; letter-spacing: 2px; }
+.loading-tip { position: relative; margin: 8px 0 0; max-width: 420px; font-family: 'Roboto Mono', monospace; font-size: 12px; line-height: 1.5; color: #e8d2a6; }

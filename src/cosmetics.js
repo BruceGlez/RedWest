@@ -1,6 +1,6 @@
 import { WEAPONS, WEAPON_SLOTS } from './weapons.js';
 import { OUTLAWS } from './outlaws.js';
-import { OUTLAW_PERKS } from './perks.js';
+import { OUTLAW_PERKS, HIRED_PERKS } from './perks.js';
 import { EVENT_COSMETICS } from './events.js';
 import { PASS_COSMETICS } from './pass.js';
 
@@ -18,6 +18,15 @@ export const CHARACTERS = [
         blurb: 'Fully animated lawman.' },
     { id: 'char-drifter', slot: 'character', name: 'The Drifter', model: null, price: 0, currency: 'dollars',
         blurb: 'The classic cowboy. Wears your shop hat, coat and pants colours.' },
+    // Hired hands: bought with earned Bounty Dollars only, each with a side-grade perk (src/perks.js).
+    ...[
+        ['june-holloway', 'Deputy June Holloway', 1500],
+        ['ezra-stone', 'Ezra Stone', 2500]
+    ].map(([id, name, price]) => {
+        const perk = HIRED_PERKS[id];
+        return { id: `char-${id}`, slot: 'character', name, model: `models/${id}.glb`, price, currency: 'dollars',
+            perk, blurb: `${perk.name}: ${perk.perk} ${perk.drawback}` };
+    }),
     // Beaten outlaws: unlocked by earning all three of that outlaw's stars, never bought (src/perks.js).
     ...OUTLAWS.map((outlaw, index) => {
         const perk = OUTLAW_PERKS[outlaw.id];

@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { createBossMesh, createWolfMesh, createGunslingerMesh, createEnemyMesh, createRattlerMesh, createRiflemanMesh,
-    createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh, addAimLaser } from './assets.js';
+    createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh, createKniferMesh, createTrooperMesh, addAimLaser } from './assets.js';
 import { ENEMY_TYPES } from './enemyTypes.js';
 import { createExplosion } from './particleSystem.js';
 import { addShake, haptic } from './feedback.js';
@@ -20,6 +20,7 @@ export function enemyShoot(enemy, playerPos, scene) {
     if(!muzzle) return; 
 
     playSound('enemy-shot');
+    enemy.userData.shotAt = Date.now() / 1000; // same clock as updateEnemies
     const isBoss = (enemy.userData.type === 'boss');
     const shotCount = isBoss ? 3 : 1;
     const aimSpread = enemy.userData.aimSpread ?? 2.0;
@@ -60,14 +61,18 @@ const NEW_TYPE_MESHES = {
     brute: createBruteMesh,
     rider: createRiderMesh,
     duelist: createDuelistMesh,
-    ghost: createGhostMesh
+    ghost: createGhostMesh,
+    knifer: createKniferMesh,
+    trooper: createTrooperMesh
 };
 
 // Per-type shooting numbers (outlaw modifiers are applied on top).
 const SHOT_PROFILE = {
     rifleman: { cooldown: 3.4, projectileSpeed: 85, aimSpread: 0 },
     duelist: { cooldown: 2.4, projectileSpeed: 44, aimSpread: 0 },
-    dynamiter: { cooldown: 3.4, projectileSpeed: 0, aimSpread: 0 }
+    dynamiter: { cooldown: 3.4, projectileSpeed: 0, aimSpread: 0 },
+    knifer: { cooldown: 2.2, projectileSpeed: 38, aimSpread: 0 },
+    trooper: { cooldown: 3.0, projectileSpeed: 60, aimSpread: 0 }
 };
 
 export function spawnEnemy(scene, playerPos, requestedType = null) {
@@ -283,6 +288,8 @@ function attachOutlawModel(enemy, outlaw) {
     if(hpBar) hpBar.position.y = (OUTLAW_MODEL_HEIGHT + 0.9) / box.scale.y; // just above the model's head
     enemy.add(instance.object);
     enemy.userData.model = instance;
+    // Shots leave from the revolver in the model's hand, not the hidden box figure's gun.
+    if(instance.muzzle) enemy.userData.muzzle = instance.muzzle;
 }
 
 // The part that shakes as an attack tell: the imported model, or the box figure.
@@ -500,6 +507,85 @@ function updateBoss(e, u, ctx) {
         }
         return { moveDir: dir };
     }
+    case 'cardsharp': {
+        // Lucky Lou: deals a fan of seven cards with one gap, then a second fan offset by half a step.
+        if(u.state === 'deal') {
+            u.isAiming = true;
+            if(u.stateTimer <= 0) {
+                const from = new THREE.Vector3();
+                (u.muzzle || e).getWorldPosition(from);
+                from.y = Math.max(from.y, 2);
+                const toward = new THREE.Vector3(playerPos.x - from.x, 0, playerPos.z - from.z).normalize();
+                const STEP = 0.2; // radians between cards: a gap is two steps, wide enough to slip through
+                const offset = u.fansLeft === 2 ? 0 : STEP / 2;
+                for(let i = -3; i <= 3; i++) {
+                    if(i === u.gap) continue;
+                    const dir = toward.clone().applyAxisAngle(UP, i * STEP + offset);
+                    spawnBullet(scene, 'enemy', from, dir.multiplyScalar((u.projectileSpeed || 40) * 0.8), null, { size: 1.3 });
+                }
+                playSound('enemy-shot');
+                u.shotAt = Date.now() / 1000;
+                u.fansLeft--;
+                u.gap = Math.floor(Math.random() * 5) - 2;
+                u.stateTimer = 0.45;
+                if(u.fansLeft <= 0) { u.state = 'move'; u.shootTimer = 2.4 + Math.random(); }
+            }
+            return { moveDir: null };
+        }
+        u.isAiming = u.shootTimer < 0.7 && dist < 36;
+        if(u.shootTimer <= 0 && dist < 34) {
+            u.state = 'deal'; u.stateTimer = 0.55; u.fansLeft = 2; u.gap = Math.floor(Math.random() * 5) - 2;
+            callbacks.onBossSignal?.('DEALING', e.position);
+        }
+        const side = new THREE.Vector3(-dir.z, 0, dir.x).multiplyScalar(u.strafe || 1);
+        if(Math.random() < dt * 0.4) u.strafe = -(u.strafe || 1);
+        return { moveDir: (keepRange(dir, dist, 14, 24) ?? new THREE.Vector3()).addScaledVector(side, 0.8).normalize() };
+    }
+    case 'gatling': {
+        // Colonel Crane: sets up (1 s tell), sweeps a stream of bullets across 120 degrees, then overheats.
+        if(u.state === 'setup') {
+            u.isAiming = true;
+            bodyOf(e).position.x = Math.sin(timeInSeconds * 50) * 0.08;
+            if(u.stateTimer <= 0) {
+                bodyOf(e).position.x = 0;
+                u.state = 'spray'; u.stateTimer = 2.4; u.fireIn = 0;
+                u.sweepFrom = Math.atan2(dir.x, dir.z) + (u.sweepSide = Math.random() < 0.5 ? -1 : 1) * 1.05;
+            }
+            return { moveDir: null, faceDir: dir };
+        }
+        if(u.state === 'spray') {
+            u.isAiming = true;
+            const angle = u.sweepFrom - u.sweepSide * 2.1 * (1 - u.stateTimer / 2.4);
+            const aim = new THREE.Vector3(Math.sin(angle), 0, Math.cos(angle));
+            u.fireIn -= dt;
+            while(u.fireIn <= 0) {
+                u.fireIn += 0.07;
+                const from = new THREE.Vector3();
+                (u.muzzle || e).getWorldPosition(from);
+                from.y = Math.max(from.y, 2);
+                spawnBullet(scene, 'enemy', from, aim.clone().multiplyScalar((u.projectileSpeed || 40) * 1.1));
+            }
+            if(Math.random() < dt * 12) playSound('enemy-shot');
+            u.shotAt = Date.now() / 1000;
+            if(u.stateTimer <= 0) {
+                u.state = 'cool'; u.stateTimer = 1.8;
+                callbacks.onBossSignal?.('OVERHEATED', e.position);
+            }
+            return { moveDir: null, faceDir: aim };
+        }
+        if(u.state === 'cool') {
+            if(u.stateTimer <= 0) { u.state = 'move'; u.special = 2.5 + Math.random() * 1.5; u.shootTimer = 1.2; }
+            return { moveDir: null };
+        }
+        // Between sweeps he keeps his distance and fires ordinary volleys.
+        u.isAiming = u.shootTimer < 0.7 && dist < 40;
+        if(u.shootTimer <= 0 && dist < 38) fan();
+        if(u.special <= 0 && dist < 34) {
+            u.state = 'setup'; u.stateTimer = 1.0;
+            callbacks.onBossSignal?.('GATLING!', e.position);
+        }
+        return { moveDir: keepRange(dir, dist, 16, 26) };
+    }
     default: {
         u.isAiming = u.shootTimer < 0.8 && dist < 45;
         if(u.shootTimer <= 0 && dist < 40) fan();
@@ -636,6 +722,43 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
             }
             break;
         }
+        case 'knives': {
+            // Darts in on a zigzag, stops to throw three knives in a narrow fan.
+            u.shootTimer -= dt;
+            moveDir.applyAxisAngle(UP, Math.sin((timeInSeconds * 4) + u.phase) * 0.6);
+            if(dist < 12) moveDir = null;
+            if(u.shootTimer < 0.45 && dist < 20) { u.isAiming = true; moveDir = null; }
+            if(u.shootTimer <= 0 && dist < 20) {
+                fireBullets(e, playerPos, 3, 0.32, u.projectileSpeed, scene);
+                u.shootTimer = u.shootCooldown;
+            }
+            break;
+        }
+        case 'volley': {
+            // Holds range, aims (laser) and fires a three-round burst, then reloads.
+            u.shootTimer -= dt;
+            moveDir = keepRange(dir, dist, 18, 26);
+            if(u.burstLeft > 0) {
+                moveDir = null;
+                u.isAiming = true;
+                u.burstIn -= dt;
+                if(u.burstIn <= 0) {
+                    fireBullets(e, playerPos, 1, 0, u.projectileSpeed, scene);
+                    u.burstLeft--;
+                    u.burstIn = 0.14;
+                    if(!u.burstLeft) u.shootTimer = u.shootCooldown;
+                }
+            } else if(u.shootTimer < 0.7 && dist < 34) {
+                moveDir = null;
+                u.isAiming = true;
+                if(u.shootTimer <= 0) { u.burstLeft = 3; u.burstIn = 0; }
+            }
+            if(u.laser) {
+                u.laser.visible = u.isAiming;
+                if(u.isAiming) u.laser.scale.z = Math.min(dist + 20, 70);
+            }
+            break;
+        }
         case 'phantom': {
             if(!u.faded && u.stateTimer <= 0) {
                 setGhostFaded(e, true);
@@ -684,7 +807,8 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         if(u.state === 'rear') e.rotateX(-0.35); // the horse rears up before charging
         animateCharacter(e, timeInSeconds, isMoving);
         if(u.model) {
-            u.model.play(isMoving ? (u.isAiming && u.model.has('runShoot') ? 'runShoot' : 'run') : 'idle');
+            // Outlaws draw before they fire (u.isAiming is set just before a shot), aim, then holster.
+            u.model.combat(dt, { moving: isMoving, aiming: u.isAiming || timeInSeconds - (u.shotAt ?? -9) < 0.2, quickDraw: true });
             u.model.mixer.update(dt);
         }
         if(u.hpBar) u.hpBar.scale.x = Math.max(0, u.hp / u.maxHp);

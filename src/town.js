@@ -74,8 +74,8 @@ export function jailedOutlaws(profile) {
     return OUTLAWS.filter((_, i) => profile.stats.stageStars[i] & 1);
 }
 
-// Bounty Dollars per hour: a twentieth of each jailed outlaw's bounty, raised by Jail upgrades. With all eight
-// that is $65 an hour, so a full 8-hour jail is worth about two good runs (balance pass, GROWTH_PLAN.md).
+// Bounty Dollars per hour: a twentieth of each jailed outlaw's bounty, raised by Jail upgrades. With all ten
+// that is $108 an hour, so a full 8-hour jail is worth about one top run (balance pass, GROWTH_PLAN.md).
 export const JAIL_BOUNTY_SHARE = 1 / 20;
 export function jailRate(profile) {
     const base = jailedOutlaws(profile).reduce((sum, outlaw) => sum + outlaw.bounty, 0) * JAIL_BOUNTY_SHARE;

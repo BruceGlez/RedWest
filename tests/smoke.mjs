@@ -27,7 +27,8 @@ try {
     assert.equal(response.status, 200, 'Vite serves the game');
     await page.goto(url, { waitUntil: 'commit', timeout: 30000 });
     await page.waitForTimeout(1000);
-    const relevantErrors = () => pageErrors.filter(error => !error.includes('fonts.googleapis.com') && !error.includes('fonts.gstatic.com') && !error.includes('Failed to load resource'));
+    const relevantErrors = () => pageErrors.filter(error => !error.includes('fonts.googleapis.com') && !error.includes('fonts.gstatic.com') && !error.includes('Failed to load resource')
+        && !error.endsWith('net::ERR_ABORTED')); // downloads cancelled by the test's own reloads
     if(relevantErrors().length) throw new Error(`Page initialization: ${relevantErrors().join(', ')}`);
     try {
         await page.locator('canvas').waitFor();
@@ -234,7 +235,7 @@ try {
     assert.match(await page.locator('#home-poster').textContent(), /THE CALLOWAYS/, 'beating stage 3 selects stage 4');
     await page.locator('#road-btn').click();
     await page.locator('#road-screen').waitFor({ state: 'visible' });
-    assert.equal(await page.locator('.road-node.locked').count(), 4, 'stages 5-8 are still locked');
+    assert.equal(await page.locator('.road-node.locked').count(), 6, 'stages 5-10 are still locked');
     await page.locator('.road-node[data-index="0"]').click();
     await page.locator('#road-screen').waitFor({ state: 'hidden' });
     assert.match(await page.locator('#home-poster').textContent(), /DUSTY PETE/);
@@ -251,7 +252,7 @@ try {
     // The town is a 3D view; tapping a building's label opens its card.
     await page.locator('[data-open-building="jail"]').click();
     const jailText = await page.locator('.town-card[data-building="jail"]').textContent();
-    assert.match(jailText, /3 of 8 outlaws jailed/, jailText);
+    assert.match(jailText, /3 of 10 outlaws jailed/, jailText);
     const townDollars = async () => Number((await page.locator('#town-dollars').textContent()).replace(/\D/g, ''));
     const dollarsBefore = await townDollars();
     await page.evaluate(() => {
