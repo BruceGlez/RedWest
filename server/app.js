@@ -5,6 +5,7 @@ import { validateName, isGeneratedName } from '../src/names.js';
 import { AGE_BANDS } from '../src/privacy.js';
 import { collectJail, upgradeBuilding } from '../src/town.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
+import { createApple, AppleError } from './apple.js';
 
 // Red West economy server. The game talks to /api/*; the stores talk to /webhooks/*.
 // Paid Gold Nuggets are only ever credited from a verified store webhook, never by the client.
@@ -24,6 +25,7 @@ const LIMITS = {
 };
 const REFUND_EVENTS = new Set(['CANCELLATION']); // RevenueCat reports a refunded one-off purchase this way
 const MAX_ACTIVE_DAYS = 400;
+const MAX_DEVICE_TOKENS = 5; // phones and browsers signed in to one Apple-linked account
 const ALLOWED_EVENTS = new Set(ANALYTICS_EVENTS);
 const dayOf = date => date.toISOString().slice(0, 10); // UTC day
 
@@ -68,6 +70,7 @@ export function createRateLimiter(now = () => Date.now()) {
 
 export function createApp({ store, env = {}, now = () => new Date(), fetchImpl = globalThis.fetch }) {
     const allow = createRateLimiter(() => now().getTime());
+    const apple = createApple({ env, fetchImpl, now: () => now().getTime() });
     // Behind a proxy (Render, Fly, ...) set TRUST_PROXY=1 so the caller's address comes from X-Forwarded-For.
     const callerIp = req => (env.TRUST_PROXY === '1' && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim())
         || req.socket?.remoteAddress || 'unknown';
@@ -133,6 +136,40 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
         return { ok: true, credited };
     }
 
+    function newAccount(extra = {}) {
+        const userId = `rw_${randomBytes(9).toString('hex')}`;
+        const token = randomBytes(32).toString('hex');
+        store.putUser(userId, { tokenHash: sha256(token), profile: createProfile(now()), lastRunAt: 0, createdAt: now().toISOString(), ...extra });
+        store.save();
+        return { userId, token };
+    }
+
+    // One Apple ID, one account. Three cases:
+    // - the Apple ID already has an account: this device gets a token for it (a new phone, or after a reinstall);
+    // - the device's current account has no Apple ID yet: link it, keeping all progress;
+    // - no account on this device: make one, linked from the start.
+    async function appleSignIn(body, caller) {
+        const { sub, clientId } = await apple.verifyIdentityToken(body.identityToken, body.nonce);
+        const existing = store.listUsers().find(entry => entry.user.apple?.sub === sub);
+        if(existing) {
+            const token = randomBytes(32).toString('hex');
+            existing.user.tokenHashes = [...(existing.user.tokenHashes || []), sha256(token)].slice(-MAX_DEVICE_TOKENS);
+            store.putUser(existing.id, existing.user);
+            store.save();
+            return { userId: existing.id, token, linked: false, switched: !!caller && caller.id !== existing.id };
+        }
+        const link = { sub, clientId, linkedAt: now().toISOString() };
+        const refreshToken = await apple.refreshTokenFor(body.authorizationCode, clientId, !!body.web);
+        if(refreshToken) link.refreshToken = refreshToken;
+        if(caller?.user) {
+            caller.user.apple = link;
+            store.putUser(caller.id, caller.user);
+            store.save();
+            return { userId: caller.id, token: null, linked: true, switched: false };
+        }
+        return { ...newAccount({ apple: link }), linked: true, switched: false };
+    }
+
     return async function handle(req, res) {
         res.requestOrigin = req.headers.origin;
         try {
@@ -142,11 +179,23 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
 
             if(url.pathname === '/api/account' && req.method === 'POST') {
                 if(!allow('account', callerIp(req))) return tooMany(res);
-                const userId = `rw_${randomBytes(9).toString('hex')}`;
-                const token = randomBytes(32).toString('hex');
-                store.putUser(userId, { tokenHash: sha256(token), profile: createProfile(now()), lastRunAt: 0, createdAt: now().toISOString() });
-                store.save();
-                return send(res, 201, { userId, token });
+                return send(res, 201, newAccount());
+            }
+
+            // ---- Sign in with Apple (optional, see server/apple.js) ----
+            if(url.pathname.startsWith('/api/apple/')) {
+                if(!apple.enabled) return send(res, 404, { code: 'apple_off', message: 'Sign in with Apple is not set up.' });
+                if(!allow('account', callerIp(req))) return tooMany(res);
+                if(url.pathname === '/api/apple/nonce' && req.method === 'POST') return send(res, 200, { nonce: apple.issueNonce() });
+                if(url.pathname === '/api/apple/signin' && req.method === 'POST') {
+                    const body = JSON.parse((await readBody(req)) || '{}');
+                    try {
+                        return send(res, 200, await appleSignIn(body, authenticate(req)));
+                    } catch(error) {
+                        if(error instanceof AppleError) return send(res, error.code === 'apple_down' ? 503 : 400, { code: error.code, message: error.message });
+                        throw error;
+                    }
+                }
             }
 
             // ---- Store webhooks ----
@@ -243,7 +292,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 if(url.pathname === '/api/profile' && req.method === 'GET') {
                     refreshJobs(user.profile, now());
                     save();
-                    return send(res, 200, { userId: id, profile: user.profile, nameHidden: !!user.nameHidden });
+                    return send(res, 200, { userId: id, profile: user.profile, nameHidden: !!user.nameHidden, apple: !!user.apple });
                 }
                 const body = JSON.parse((await readBody(req)) || '{}');
                 if(url.pathname === '/api/run' && req.method === 'POST') {
@@ -329,6 +378,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 if(url.pathname === '/api/account/delete' && req.method === 'POST') {
                     // Keep only purchase transaction ids (tax, refunds, fraud), with no link to the player.
                     const deletedAt = now().toISOString();
+                    const appleRevoked = user.apple ? await apple.revoke(user.apple.refreshToken, user.apple.clientId) : false;
                     store.retainPurchases((user.profile.processed || []).map(transactionId => ({ transactionId, deletedAt })));
                     for(const entry of store.listUsers()) {
                         if(!entry.user.reportedBy?.includes(id)) continue;
@@ -337,7 +387,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     }
                     store.deleteUser(id);
                     store.save();
-                    return send(res, 200, { deleted: true });
+                    return send(res, 200, { deleted: true, appleRevoked });
                 }
                 // Frontier Town: the server clock decides what the Jail has earned.
                 if(url.pathname === '/api/town/collect' && req.method === 'POST') {

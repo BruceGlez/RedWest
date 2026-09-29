@@ -8,7 +8,7 @@ import { loadProgress } from './progress.js';
 // - local: this browser only (playtesting; not secure, only earned currency, no real money).
 // - remote: the Red West server (server/), the source of truth once real purchases are on.
 // Both expose the same async API: load, buy, equip, reportRun, refresh, setName, leaderboard,
-// setPrivacy, reportName, deleteAccount, collectJail, upgradeBuilding; `statsSender` is how statistics reach the server (null offline).
+// setPrivacy, reportName, deleteAccount, collectJail, upgradeBuilding, signInWithApple; `statsSender` is how statistics reach the server (null offline).
 // Leaderboards rank accounts, so they only exist online; `online` says whether they are available.
 
 const PROFILE_KEY = 'redWestProfile.v1';
@@ -83,6 +83,8 @@ export function createLocalWallet() {
         async reportName() {},
         async restorePurchases() { throw new Error('Restoring purchases needs the Red West server.'); },
         async deleteAccount() { clearDeviceData(); },
+        apple: false,
+        async signInWithApple() { throw new Error('Sign in with Apple needs the Red West server.'); },
         async reportRun(summary) {
             const result = applyRun(profile, summary);
             persist();
@@ -121,9 +123,11 @@ export function createRemoteWallet(apiBase) {
         online: true,
         get userId() { return account?.userId; },
         nameHidden: false,
+        apple: false, // whether this account is linked to an Apple ID
         async load() {
             const data = await call('/api/profile');
             this.nameHidden = !!data.nameHidden;
+            this.apple = !!data.apple;
             writeJson(PROFILE_KEY, data.profile); // offline display cache only
             return data.profile;
         },
@@ -134,6 +138,26 @@ export function createRemoteWallet(apiBase) {
         async deleteAccount() {
             if(account) await call('/api/account/delete', {});
             clearDeviceData();
+        },
+        // `authorize(nonce)` runs Apple's sheet and resolves to { identityToken, authorizationCode, web }.
+        // The server links this account, or hands this device the account the Apple ID already has.
+        async signInWithApple(authorize) {
+            const nonceResponse = await fetch(`${apiBase}/api/apple/nonce`, { method: 'POST' });
+            if(!nonceResponse.ok) throw new Error('Sign in with Apple is not available right now.');
+            const { nonce } = await nonceResponse.json();
+            const answer = await authorize(nonce);
+            const response = await fetch(`${apiBase}/api/apple/signin`, {
+                method: 'POST',
+                headers: { ...(account ? { Authorization: `Bearer ${account.token}` } : {}), 'Content-Type': 'application/json' },
+                body: JSON.stringify({ ...answer, nonce })
+            });
+            const data = await response.json().catch(() => ({}));
+            if(!response.ok) throw new Error(data.message || 'Apple sign-in did not work. Try again.');
+            if(data.token) {
+                account = { userId: data.userId, token: data.token };
+                writeJson(ACCOUNT_KEY, account);
+            }
+            return data;
         },
         async refresh() { return this.load(); },
         async buy(id) { return (await call('/api/buy', { itemId: id })).profile; },

@@ -33,3 +33,14 @@ services:
         sync: false
       - key: STRIPE_PAYMENT_LINKS
         sync: false
+      # Sign in with Apple (optional, MONETIZATION.md section 5). Leave empty to keep it off.
+      - key: APPLE_CLIENT_IDS
+        sync: false
+      - key: APPLE_TEAM_ID
+        sync: false
+      - key: APPLE_KEY_ID
+        sync: false
+      - key: APPLE_PRIVATE_KEY
+        sync: false
+      - key: APPLE_REDIRECT_URI
+        sync: false

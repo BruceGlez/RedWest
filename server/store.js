@@ -13,7 +13,7 @@ export function createMemoryStore(initial = {}) {
         deleteUser: id => { delete data.users[id]; },
         retainPurchases: records => { data.retainedPurchases.push(...records); },
         retainedPurchases: () => data.retainedPurchases,
-        findUserByTokenHash: hash => Object.entries(data.users).find(([, user]) => user.tokenHash === hash)?.[0] ?? null,
+        findUserByTokenHash: hash => Object.entries(data.users).find(([, user]) => user.tokenHash === hash || user.tokenHashes?.includes(hash))?.[0] ?? null,
         listUsers: () => Object.entries(data.users).map(([id, user]) => ({ id, user })),
         save: () => {}
     };

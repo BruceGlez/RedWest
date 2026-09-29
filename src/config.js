@@ -13,6 +13,11 @@ export const CONFIG = {
     privacyUrl: env.VITE_PRIVACY_URL || '',
     termsUrl: env.VITE_TERMS_URL || '',
     supportEmail: env.VITE_SUPPORT_EMAIL || '',
+    // Sign in with Apple (optional; the server also needs APPLE_CLIENT_IDS, see MONETIZATION.md).
+    // iOS app: VITE_APPLE_SIGN_IN=1. Web: a Services ID and its return URL registered with Apple.
+    appleNative: env.VITE_APPLE_SIGN_IN === '1',
+    appleServiceId: env.VITE_APPLE_SERVICE_ID || '',
+    appleRedirectUri: env.VITE_APPLE_REDIRECT_URI || '',
     // Stripe Payment Links for web purchases, one per product id.
     stripeLinks: {
         nuggets_100: env.VITE_STRIPE_LINK_NUGGETS_100 || '',

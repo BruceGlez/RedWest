@@ -66,6 +66,7 @@ Any Node host works (Render, Railway, Fly.io, a VPS). Set these environment vari
 | `DATA_FILE` | Path on the persistent disk |
 | `REVENUECAT_SECRET_KEY` | RevenueCat secret API key (`sk_…`), used only by the server for **Restore purchases** of the Deputy's Kit. |
 | `ADMIN_TOKEN` | A long random string for moderation (below). Never put it in a `VITE_*` variable. |
+| `APPLE_CLIENT_IDS`, `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY`, `APPLE_REDIRECT_URI` | Optional **Sign in with Apple** (section 5). Leave empty to keep it off. |
 
 Then point the game at it. In GitHub go to **Settings → Secrets and variables → Actions → Variables** and
 add `VITE_API_BASE` = your server URL (e.g. `https://redwest-api.onrender.com`). The next Pages deploy
@@ -124,6 +125,29 @@ commission. The game uses RevenueCat whenever it runs as the native app.
 
 The same RevenueCat plugin covers Google Play: add an Android app in RevenueCat, create the same product
 ids in Play Console, and set `VITE_REVENUECAT_GOOGLE_KEY`. Building the Android app is a separate step.
+
+## 5. Sign in with Apple (optional)
+
+Without it, an account is a random token saved on the device: deleting the app or changing phones loses the
+save (except restored purchases). Sign in with Apple links the save to the player's Apple ID. No name or
+email is requested; the server keeps only Apple's user id for the account, plus a refresh token so it can
+revoke the link when the player deletes the account (App Store rule 5.1.1(v), done automatically).
+
+1. Apple Developer → Identifiers → the app id `com.bruceglez.redwest`: turn on **Sign in with Apple**. In
+   Xcode, add the **Sign in with Apple** capability to the App target (it adds the entitlement).
+2. Keys → new key with **Sign in with Apple**, download the `.p8` once. Server variables:
+   `APPLE_TEAM_ID`, `APPLE_KEY_ID`, `APPLE_PRIVATE_KEY` (the `.p8` text; `\n` for line breaks is fine) and
+   `APPLE_CLIENT_IDS=com.bruceglez.redwest`.
+3. GitHub variable `VITE_APPLE_SIGN_IN=1` and rebuild the app (`npm run ios:sync`). The button appears in
+   Settings.
+4. Web (optional): Identifiers → **Services ID** (e.g. `com.bruceglez.redwest.web`) with Sign in with Apple
+   configured for the domain `bruceglez.github.io` and a return URL (e.g.
+   `https://bruceglez.github.io/RedWest/`). Add the Services ID to `APPLE_CLIENT_IDS` (comma-separated), set
+   `APPLE_REDIRECT_URI` on the server, and `VITE_APPLE_SERVICE_ID` + `VITE_APPLE_REDIRECT_URI` in GitHub.
+
+How it behaves: on a device whose account has no Apple ID yet, signing in links it and keeps all progress.
+If the Apple ID already has a save (a new phone, a reinstall), the device switches to that save; the Settings
+note says so before the tap. One Apple ID is never linked to two accounts.
 
 ## Refunds
 

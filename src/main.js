@@ -27,6 +27,7 @@ import { applyPlayerLoadout } from './assets.js';
 import { applyPerk } from './perks.js';
 import { DEMO, openStore } from './demo.js';
 import { setPlayerBulletColor } from './bulletSystem.js';
+import { appleSignInMode, authorizeWithApple } from './appleSignIn.js';
 
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
@@ -118,7 +119,35 @@ wallet.load().then(next => {
     profileLoaded = true;
     applyProfile(next);
     giveChildAName();
+    renderApple();
 }).catch(error => ui.shopMessage(error.message, true));
+
+// ---------- Sign in with Apple (optional): keeps the save when changing phones ----------
+const appleBtn = document.getElementById('settings-apple-btn');
+const appleLabel = document.getElementById('settings-apple-label');
+const appleNote = document.getElementById('settings-apple-note');
+function renderApple(message) {
+    const mode = appleSignInMode();
+    appleBtn.style.display = mode ? '' : 'none';
+    appleNote.style.display = mode ? '' : 'none';
+    if(!mode) return;
+    appleBtn.disabled = wallet.apple;
+    appleLabel.textContent = wallet.apple ? 'Signed in with Apple' : 'Sign in with Apple';
+    appleNote.textContent = message || (wallet.apple
+        ? 'Your save is linked to your Apple ID. Sign in with Apple on a new phone to carry on.'
+        : 'Keeps your save if you change phones. Only an Apple user id is stored, no name or email. '
+            + 'If this Apple ID already has a Red West save, this device switches to that save.');
+}
+appleBtn.addEventListener('click', async () => {
+    appleBtn.disabled = true;
+    try {
+        const result = await wallet.signInWithApple(authorizeWithApple);
+        applyProfile(await wallet.load());
+        renderApple(result.switched ? 'Switched to the save linked to this Apple ID.' : '');
+    } catch(error) {
+        renderApple(/cancel|1001/i.test(error?.message || '') ? '' : error.message); // closing Apple's sheet is not an error
+    }
+});
 
 // ---------- Privacy: first-launch age question, statistics consent, delete my data ----------
 // Nothing starts until the first-launch question is answered (gameLoop checks startBlocked).
@@ -325,8 +354,6 @@ function fitCamera() {
 fitCamera();
 window.addEventListener('resize', () => {
     fitCamera();
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
 });
 // Browsers only allow sound after the player interacts, so the first input starts the menu music.

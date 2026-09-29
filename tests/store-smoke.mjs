@@ -6,6 +6,7 @@ import { findChrome } from './chrome-path.mjs';
 import { answeredPrivacy } from './privacy-seed.mjs';
 import { createApp } from '../server/app.js';
 import { createMemoryStore } from '../server/store.js';
+import { generateKeyPairSync, sign } from 'node:crypto';
 
 // Store flow end to end: a run pays Bounty Dollars and advances daily jobs, the shop needs a
 // confirm tap, buying + equipping recolours the player, and paid packs stay off until configured.
@@ -135,10 +136,23 @@ try {
 
     // ---- 2. Real server wallet ----
     const store = createMemoryStore();
-    apiServer = createHttpServer(createApp({ store, env: { REVENUECAT_WEBHOOK_AUTH: 'Bearer rc-test', ALLOWED_ORIGIN: '*' } }));
+    // A stand-in for Apple (web Sign in with Apple): its keys for the server, its popup for the page.
+    const appleKey = generateKeyPairSync('rsa', { modulusLength: 2048 });
+    const appleJwks = { keys: [{ ...appleKey.publicKey.export({ format: 'jwk' }), kid: 'smoke', alg: 'RS256' }] };
+    const appleToken = nonce => {
+        const part = value => Buffer.from(JSON.stringify(value)).toString('base64url');
+        const signed = `${part({ alg: 'RS256', kid: 'smoke' })}.${part({ iss: 'https://appleid.apple.com', aud: 'com.redwest.smoke', sub: 'smoke.apple.user', exp: Math.floor(Date.now() / 1000) + 600, nonce })}`;
+        return `${signed}.${sign('RSA-SHA256', Buffer.from(signed), appleKey.privateKey).toString('base64url')}`;
+    };
+    const fetchImpl = async url => url === 'https://appleid.apple.com/auth/keys' ? new Response(JSON.stringify(appleJwks)) : new Response('{}', { status: 404 });
+    const fakeAppleJs = `window.AppleID = { auth: { init(options) { this.options = options; },
+        async signIn() { return { authorization: { id_token: await window.__appleToken(this.options.nonce), code: 'smoke-code' } }; } } };`;
+    apiServer = createHttpServer(createApp({ store, fetchImpl, env: { REVENUECAT_WEBHOOK_AUTH: 'Bearer rc-test', ALLOWED_ORIGIN: '*', APPLE_CLIENT_IDS: 'com.redwest.smoke' } }));
     await new Promise(r => apiServer.listen(0, '127.0.0.1', r));
     const apiBase = `http://127.0.0.1:${apiServer.address().port}`;
     process.env.VITE_API_BASE = apiBase;
+    process.env.VITE_APPLE_SERVICE_ID = 'com.redwest.smoke';
+    process.env.VITE_APPLE_REDIRECT_URI = 'https://example.test/apple';
     const remoteVite = await createServer({ server: { host: '127.0.0.1', port: 0 }, logLevel: 'error' });
     viteServers.push(remoteVite);
     await remoteVite.listen();
@@ -202,9 +216,34 @@ try {
         await page.reload({ waitUntil: 'commit', timeout: 60000 });
         await page.locator('canvas').waitFor({ timeout: 90000 });
         await page.waitForFunction(() => document.getElementById('home-nuggets').textContent === '100');
+
+        // Sign in with Apple links this account; a second device then signs in to the same save.
+        const withApple = async target => {
+            await target.exposeFunction('__appleToken', appleToken);
+            await target.route('https://appleid.cdn-apple.com/**', route => route.fulfill({ contentType: 'text/javascript', body: fakeAppleJs }));
+        };
+        await withApple(page);
+        await page.locator('#home-settings-btn').click();
+        await page.locator('#settings-apple-btn').getByText('Sign in with Apple').waitFor();
+        await page.locator('#settings-apple-btn').click();
+        await page.locator('#settings-apple-label').getByText('Signed in with Apple').waitFor();
+        assert.equal(store.getUser(userId).apple.sub, 'smoke.apple.user');
+        assert.equal(await page.locator('#settings-apple-btn').isDisabled(), true);
+        await page.locator('#settings-close-btn').click();
+
+        const second = await openPage(browser, remoteVite.resolvedUrls.local[0]);
+        await withApple(second.page);
+        await second.page.waitForFunction(() => !!JSON.parse(localStorage.getItem('redWestAccount.v1') || 'null')?.token);
+        assert.notEqual(await second.page.evaluate(() => JSON.parse(localStorage.getItem('redWestAccount.v1')).userId), userId);
+        await second.page.locator('#home-settings-btn').click();
+        await second.page.locator('#settings-apple-btn').click();
+        await second.page.locator('#settings-apple-note').getByText('Switched to the save').waitFor();
+        assert.equal(await second.page.evaluate(() => JSON.parse(localStorage.getItem('redWestAccount.v1')).userId), userId);
+        await second.page.waitForFunction(() => document.getElementById('home-nuggets').textContent === '100');
+        assert.deepEqual(second.errors, [], second.errors.join(' | '));
         assert.deepEqual(errors, [], errors.join(' | '));
     }
-    console.log('Store smoke passed: run earnings, daily jobs, confirm-to-buy, equip, gated paid packs, account records and name, server wallet, online leaderboards and webhook credit.');
+    console.log('Store smoke passed: run earnings, daily jobs, confirm-to-buy, equip, gated paid packs, account records and name, server wallet, online leaderboards, webhook credit and Sign in with Apple on two devices.');
 } finally {
     await browser?.close();
     for(const server of viteServers) await server.close();
