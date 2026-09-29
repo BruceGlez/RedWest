@@ -11,7 +11,10 @@ test('looping clips lose root motion but keep the vertical bob', () => {
     const fixed = inPlace(clip);
     const values = [...fixed.tracks[0].values];
     assert.deepEqual(values.filter((_, i) => i % 3 !== 1), [0, 0, 0, 0, 0, 0], 'x and z pinned to the first frame');
-    assert.deepEqual(values.filter((_, i) => i % 3 === 1).map(v => +v.toFixed(2)), [0.66, 0.7, 0.66], 'vertical bob kept');
+    // A running clip keeps only part of its vertical bob (0.66 / 0.7 / 0.66 becomes a gentler swing).
+    assert.deepEqual(values.filter((_, i) => i % 3 === 1).map(v => +v.toFixed(2)), [0.67, 0.68, 0.67], 'vertical bob softened');
+    const idle = inPlace(new THREE.AnimationClip('idle', 1, [hips.clone()]));
+    assert.deepEqual([...idle.tracks[0].values].filter((_, i) => i % 3 === 1).map(v => +v.toFixed(2)), [0.66, 0.7, 0.66], 'other clips keep the full bob');
     assert.deepEqual([...fixed.tracks[1].values], [...arm.values], 'other bones untouched');
     assert.equal(+clip.tracks[0].values[8].toFixed(2), 1.1, 'the original clip is not modified');
     assert.equal(inPlace(clip), fixed, 'cached');
