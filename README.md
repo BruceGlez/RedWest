@@ -75,6 +75,8 @@ Each finished run is recorded in that browser's playtest log: result, pursuit re
 
 [POLISH_PLAN.md](POLISH_PLAN.md) lists what "studio grade" needs, in order (world and props first, then combat
 feel, post-processing, audio, UI), and gathers the open items from the other documents in one place.
+[STORY_BIBLE.md](STORY_BIBLE.md) proposes the story: the marshal's background, one home ground and one story
+per outlaw, and how the story reaches the player. It is a proposal for the owner to approve, not built yet.
 
 ## Verify
 

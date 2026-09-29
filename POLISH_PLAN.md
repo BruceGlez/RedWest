@@ -40,8 +40,10 @@ change below can be checked against them. Phone target from the research: under 
   footprints or tracks and scorch marks as small pooled decals.
 - **Wind and life (S to M).** A vertex shader sway for cacti and grass, tumbleweeds rolling across, dust drifting
   low, a few birds. All cheap, all far from the player culled.
-- **Stage atmosphere (M).** Each of the eight outlaws gets its own sky, fog colour, sun angle and light colour
+- **Stage atmosphere (M).** Each of the ten outlaws gets its own sky, fog colour, sun angle and light colour
   (dusk, noon, night with a moon, storm), set from `src/outlaws.js`. Biggest look change for the least cost.
+  [STORY_BIBLE.md](STORY_BIBLE.md) (section 5) proposes each outlaw's home ground, mood and props, so this work
+  and the story work are the same work.
 - **Horizon (S).** A distant mesa and mountain ring, and a heat-haze band, so the world edge is not a flat fog wall.
 
 ### 2. Combat feel (M)
