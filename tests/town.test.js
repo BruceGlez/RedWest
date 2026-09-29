@@ -69,6 +69,20 @@ test('upgrades cost dollars, finish at once, and keep what the jail had stored',
     assert.equal(jailCapacity(p), jailRate(p) * 12);
 });
 
+test('the bank raises how much one run can pay', () => {
+    const p = createProfile(T0);
+    const big = { score: 20000, seconds: 900, kills: {}, bounty: 'banked' }; // pays far more than any cap
+    const before = structuredClone(p);
+    const level1 = applyRun(before, big, T0).dollars;
+    p.balances.dollars = 800;
+    upgradeBuilding(p, 'bank', T0);
+    const afterUpgrade = p.balances.dollars;
+    const level2 = applyRun(p, big, T0).dollars;
+    assert.equal(level1, 600);
+    assert.equal(level2, 750);
+    assert.equal(p.balances.dollars, afterUpgrade + 750);
+});
+
 test('the sheriff raises daily job rewards', () => {
     const p = createProfile(T0);
     p.balances.dollars = 500;

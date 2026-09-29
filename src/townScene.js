@@ -62,11 +62,14 @@ function sign(text, width = 5, color = '#2a1d15', ink = '#f0d9a8') {
     return mesh;
 }
 
+// How lively the town looks: more windows light up as buildings are upgraded (set before building).
+let litBoost = 0;
+
 // Windows on a facade (front face at +z = depth/2): lit amber ones and a few dark ones.
 function windows(group, { w, y, z, count, lit = 0.7, size = 0.9 }) {
     for(let i = 0; i < count; i++) {
         const x = -w / 2 + (w / (count + 1)) * (i + 1);
-        const on = ((i * 7 + Math.round(y * 3)) % 10) / 10 < lit;
+        const on = ((i * 7 + Math.round(y * 3)) % 10) / 10 < Math.min(1, lit - 0.25 + litBoost);
         group.add(box(size, size * 1.3, 0.15, on ? C.glow : C.timberDark, x, y, z, on ? 0.9 : 0));
     }
 }
@@ -136,8 +139,14 @@ const BUILDERS = {
         }
         return g;
     },
-    gunsmith() {
+    // extra: how many shop guns the player owns, shown on a rack by the door.
+    gunsmith(level, extra = 0) {
         const g = new THREE.Group();
+        for(let i = 0; i < Math.min(4, extra); i++) {
+            const rifle = box(0.18, 1.9, 0.18, C.timberDark, 2.3 + i * 0.35, 1.2, 3.3);
+            rifle.rotation.z = 0.12;
+            g.add(rifle, box(0.1, 0.9, 0.12, C.iron, 2.3 + i * 0.35, 2.0, 3.36));
+        }
         g.add(box(6, 4.5, 6, C.timberDark, 0, 2.25, 0));
         g.add(box(6, 1.6, 0.4, C.timber, 0, 5.3, 2.9));
         g.add(box(1.5, 2.6, 0.2, C.trim, -1.5, 1.3, 3.05));
@@ -150,8 +159,15 @@ const BUILDERS = {
         porch(g, { w: 6, z: 3, h: 2.8 });
         return g;
     },
-    tailor() {
+    // extra: how many looks the player owns; the window fills with mannequins.
+    tailor(level, extra = 0) {
         const g = new THREE.Group();
+        for(let i = 0; i < Math.min(3, Math.floor(extra / 3)); i++) {
+            const x = -0.2 + i * 1;
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.22, 8, 6), mat(0xe0cfb0));
+            head.position.set(x, 2.35, 2.9);
+            g.add(box(0.5, 0.9, 0.3, [0x37474f, 0x6b1d1d, 0x3e2723][i], x, 1.75, 2.9), head);
+        }
         g.add(box(6, 6, 6, C.brick, 0, 3, 0));
         windows(g, { w: 6, y: 4.6, z: 3.05, count: 2, lit: 0.8 });
         g.add(box(3.5, 1.6, 0.15, C.glow, 0.8, 1.8, 3.05, 0.7));
@@ -180,8 +196,22 @@ const BUILDERS = {
         g.userData.smoke = new THREE.Vector3(-3.5, 11.6, -2);
         return g;
     },
-    bank() {
+    bank(level) {
         const g = new THREE.Group();
+        if(level >= 2) { // a vault annex with an iron door
+            g.add(box(3.5, 4, 5, C.stoneDark, -5.3, 2, -0.3), box(1.6, 1.6, 0.25, C.iron, -5.3, 1.6, 2.3));
+            const wheel = new THREE.Mesh(new THREE.TorusGeometry(0.45, 0.08, 6, 12), mat(C.brass));
+            wheel.position.set(-5.3, 1.6, 2.45);
+            g.add(wheel);
+        }
+        if(level >= 3) { // an upper floor and a clock
+            g.add(box(6, 3, 5, C.stone, 0, 8, -0.4), box(6.4, 0.4, 5.4, C.stoneDark, 0, 9.7, -0.4));
+            windows(g, { w: 6, y: 8, z: 2.15, count: 3, lit: 0.8 });
+            const clock = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.2, 16), mat(0xf0e6cc, 0.2));
+            clock.rotation.x = Math.PI / 2;
+            clock.position.set(0, 10.8, 2);
+            g.add(box(2.4, 2.4, 0.5, C.stoneDark, 0, 10.8, 1.7), clock);
+        }
         g.add(box(7, 6, 6, C.stone, 0, 3, 0));
         for(const x of [-2.6, -0.9, 0.9, 2.6]) g.add(box(0.6, 4.6, 0.6, 0xb8ac98, x, 2.3, 3.3));
         g.add(box(7.6, 1, 1.2, 0xb8ac98, 0, 5.2, 3.2));
@@ -229,7 +259,7 @@ const BUILDERS = {
 export const TOWN_LAYOUT = [
     { id: 'saloon', x: -15, z: -14, label: 'SALOON' },
     { id: 'sheriff', x: 0, z: -13, label: "SHERIFF'S OFFICE" },
-    { id: 'bank', x: 14, z: -13, label: 'BANK', soon: 'Coming later' },
+    { id: 'bank', x: 14, z: -13, label: 'BANK' },
     { id: 'jail', x: -16, z: 5, label: 'JAIL' },
     { id: 'gunsmith', x: 1, z: 5, label: 'GUNSMITH' },
     { id: 'tailor', x: 12, z: 5, label: 'TAILOR' },
@@ -285,13 +315,15 @@ export function createTownScene() {
     const buildings = new Map();
     const hitMeshes = [];
     const smokeSources = [];
+    let extras = {};
+    const builtKey = (id, level) => `${level}|${extras[id] || 0}|${litBoost}`;
     function placeBuilding(spot, level = 1) {
         const old = buildings.get(spot.id);
         if(old) {
             scene.remove(old.group);
             old.group.traverse(o => { if(o.isMesh) hitMeshes.splice(hitMeshes.indexOf(o), 1); });
         }
-        const group = BUILDERS[spot.id](level);
+        const group = BUILDERS[spot.id](level, extras[spot.id] || 0);
         group.position.set(spot.x, 0, spot.z);
         group.rotation.y = spot.rotation || 0;
         group.traverse(o => {
@@ -303,12 +335,34 @@ export function createTownScene() {
         scene.add(group);
         group.updateMatrixWorld(true);
         const box3 = new THREE.Box3().setFromObject(group);
-        buildings.set(spot.id, { group, level, top: new THREE.Vector3((box3.min.x + box3.max.x) / 2, box3.max.y + 1.2, (box3.min.z + box3.max.z) / 2) });
+        buildings.set(spot.id, { group, key: builtKey(spot.id, level), level, top: new THREE.Vector3((box3.min.x + box3.max.x) / 2, box3.max.y + 1.2, (box3.min.z + box3.max.z) / 2) });
         const smoke = smokeSources.findIndex(s => s.id === spot.id);
         if(smoke >= 0) smokeSources.splice(smoke, 1);
         if(group.userData.smoke) smokeSources.push({ id: spot.id, at: group.localToWorld(group.userData.smoke.clone()) });
     }
     for(const spot of TOWN_LAYOUT) placeBuilding(spot);
+
+    // Scenery (not tappable): a stable with horses and the undertaker's.
+    const stable = new THREE.Group();
+    stable.add(box(8, 4.5, 6, C.timber, 0, 2.25, 0), roof(8, 6, 2.2, C.timberDark, 4.5), box(3, 3, 0.2, C.trim, 0, 1.5, 3.05));
+    for(let i = 0; i < 5; i++) stable.add(box(0.2, 1.2, 0.2, C.timberDark, -4 + i * 2, 0.6, 5.5), box(2, 0.15, 0.15, C.timberDark, -3 + i * 2, 1, 5.5));
+    for(const [x, z, color] of [[-2.5, 7.5, 0x5d4037], [2, 8, 0x3e2723]]) {
+        const horse = new THREE.Group();
+        horse.add(box(2.4, 1.1, 0.8, color, 0, 1.6, 0), box(0.8, 0.9, 0.5, color, 1.3, 2.3, 0));
+        for(const lx of [-0.9, 0.9]) for(const lz of [-0.25, 0.25]) horse.add(box(0.2, 1.1, 0.2, color, lx, 0.55, lz));
+        horse.position.set(x, 0, z);
+        horse.rotation.y = x < 0 ? 0.4 : -0.3;
+        stable.add(horse);
+    }
+    stable.position.set(-32, 0, -14);
+    scene.add(stable);
+    const undertaker = new THREE.Group();
+    undertaker.add(box(5, 4.5, 5, C.timberDark, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+    const undertakerSign = sign('UNDERTAKER', 4.4);
+    undertakerSign.position.set(0, 3.6, 2.6);
+    undertaker.add(undertakerSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    undertaker.position.set(-31, 0, 6);
+    scene.add(undertaker);
 
     // A foundry chimney on the skyline.
     const foundry = new THREE.Group();
@@ -417,10 +471,15 @@ export function createTownScene() {
         scene,
         camera,
         update,
-        setLevels(levels) {
+        // levels: building levels; nextExtras: { gunsmith: guns owned, tailor: looks owned }.
+        setLevels(levels, nextExtras = {}) {
+            extras = nextExtras;
+            // Upgrades beyond the first level brighten the whole town.
+            const prosperity = Object.values(levels || {}).reduce((sum, level) => sum + Math.max(0, (level || 1) - 1), 0);
+            litBoost = Math.min(0.5, prosperity * 0.06);
             for(const spot of TOWN_LAYOUT) {
                 const level = levels?.[spot.id] || 1;
-                if(buildings.get(spot.id)?.level !== level) placeBuilding(spot, level);
+                if(buildings.get(spot.id)?.key !== builtKey(spot.id, level)) placeBuilding(spot, level);
             }
         },
         resize(width, height) {

@@ -8,7 +8,7 @@ import { EconomyError } from './economyError.js';
 //   as a speed-up. Buildings only change income, never combat (tests/town.test.js checks this).
 
 // Every effect a building level may have. Anything that touches a fight must never be added here.
-export const TOWN_EFFECTS = ['jailRate', 'jailHours', 'jobRewards'];
+export const TOWN_EFFECTS = ['jailRate', 'jailHours', 'jobRewards', 'runCap'];
 
 export const BUILDINGS = [
     {
@@ -27,6 +27,14 @@ export const BUILDINGS = [
             { cost: 0, effects: { jobRewards: 1.0 } },
             { cost: 500, effects: { jobRewards: 1.15 } },
             { cost: 1200, effects: { jobRewards: 1.3 } }
+        ]
+    },
+    {
+        id: 'bank', name: 'BANK', blurb: 'Keeps your bounty money. Upgrades raise how much one run can pay out.',
+        levels: [
+            { cost: 0, effects: { runCap: 600 } },
+            { cost: 800, effects: { runCap: 750 } },
+            { cost: 1800, effects: { runCap: 900 } }
         ]
     },
     { id: 'gunsmith', name: 'GUNSMITH', blurb: 'Sells side-arms and long guns.', opens: 'primary', levels: [{ cost: 0, effects: {} }] },

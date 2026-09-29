@@ -201,7 +201,9 @@ export function applyRun(profile, summary, now = new Date()) {
 
     // Run and event dollars (event prizes come on top of the per-run cap, so reaching targets never crowds
     // out run earnings).
-    const runDollars = Math.min(MAX_DOLLARS_PER_RUN, lines.reduce((sum, line) => sum + (line.dollars || 0), 0))
+    // The bank's level sets the most one run can pay (src/town.js); MAX_DOLLARS_PER_RUN at level 1.
+    const runCap = buildingEffects(profile.town, 'bank').runCap || MAX_DOLLARS_PER_RUN;
+    const runDollars = Math.min(runCap, lines.reduce((sum, line) => sum + (line.dollars || 0), 0))
         + eventLines.reduce((sum, line) => sum + (line.dollars || 0), 0);
     profile.balances.dollars += runDollars;
     profile.balances.nuggets += nuggets;

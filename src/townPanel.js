@@ -75,6 +75,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
             return `Next level: ${money(base * next.jailRate)} an hour (+${Math.round((next.jailRate - 1) * 100)}%), holds ${next.jailHours} hours.`;
         }
         if(building.id === 'sheriff') return `Next level: daily jobs pay +${Math.round((next.jobRewards - 1) * 100)}%.`;
+        if(building.id === 'bank') return `Next level: one run can pay up to $${next.runCap}.`;
         return '';
     }
 
@@ -85,6 +86,9 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
         let body = '';
         const actions = [];
         if(building.id === 'jail') body = jailBody();
+        if(building.id === 'bank') {
+            body = `<p class="town-stat">One run can pay up to $${buildingEffects(profile.town, 'bank').runCap} (before event and pass prizes).</p>`;
+        }
         if(building.id === 'sheriff') {
             const bonus = Math.round((buildingEffects(profile.town, 'sheriff').jobRewards - 1) * 100);
             body = `<p class="town-stat">${bonus ? `Daily jobs pay +${bonus}%.` : 'Daily jobs pay their normal reward.'}</p>`;
@@ -228,7 +232,10 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
         if(!profile || !isOpen()) return;
         els.dollars.textContent = profile.balances.dollars.toLocaleString();
         renderLabels();
-        town3d?.setLevels(profile.town.levels);
+        town3d?.setLevels(profile.town.levels, {
+            gunsmith: profile.owned.filter(id => id.startsWith('gun-')).length,
+            tailor: profile.owned.filter(id => /^(hat|coat|pants|bullets)-/.test(id)).length
+        });
         els.sheet.style.display = openId ? '' : 'none';
         if(openId) els.grid.innerHTML = sheetHtml(openId);
     }
@@ -425,11 +432,23 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
             const h = window.innerHeight;
             // Signs never slide under the header, where they could not be tapped.
             const minTop = (headerBottom ||= els.screen.querySelector('.panel-header').getBoundingClientRect().bottom) + 48;
-            for(const [id, p] of Object.entries(town3d.labelPositions())) {
-                const label = labelEls.get(id);
-                label.style.left = `${Math.round(p.x * w)}px`;
-                label.style.top = `${Math.max(minTop, Math.round(p.y * h))}px`;
-                label.style.visibility = p.visible ? '' : 'hidden';
+            // Place the signs top to bottom, nudging any that would overlap one already placed.
+            const placed = [];
+            const signs = Object.entries(town3d.labelPositions())
+                .map(([id, p]) => ({ id, p, x: Math.round(p.x * w), y: Math.max(minTop, Math.round(p.y * h)) }))
+                .sort((a, b) => a.y - b.y);
+            for(const s of signs) {
+                const label = labelEls.get(s.id);
+                const width = label.offsetWidth;
+                const height = label.offsetHeight;
+                for(const other of placed) {
+                    const overlapX = Math.abs(s.x - other.x) < (width + other.width) / 2 + 4;
+                    if(overlapX && s.y - height < other.y && s.y > other.y - other.height) s.y = other.y + height + 4;
+                }
+                placed.push({ x: s.x, y: s.y, width, height });
+                label.style.left = `${s.x}px`;
+                label.style.top = `${s.y}px`;
+                label.style.visibility = s.p.visible ? '' : 'hidden';
             }
         }
     };
