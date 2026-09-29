@@ -30,7 +30,11 @@ Code through the Blender MCP running on your own machine (a cloud session cannot
    pushed to an NLA track or marked Fake User, +Y up, apply modifiers.
 6. Put it in `public/models/<name>.glb`, run `node tools/optimize-model.mjs` on it (shrinks the textures, drops
    the normal and roughness maps), and add a row to `ASSETS.md` the same day (made with: Meshy + Blender).
-7. Save the finished setup as a script in `tools/blender/` so it can run again without the MCP.
+7. Save the finished setup as a script in `tools/blender/` so it can run again without the MCP. The wolf's is
+   `wolf_rig.py`:
+   `blender -b --factory-startup --python tools/blender/wolf_rig.py -- raw.glb out.glb [out.blend]`
+   (checked on 2026-09-29: it reproduces the hand-made export exactly). Then
+   `node tools/optimize-model.mjs out.glb public/models/wolf.glb`.
 
 ## What the game needs from each model
 
@@ -62,9 +66,13 @@ humanoids only; animals must stay in place on their own).
 - File under about 1.5 MB after `optimize-model.mjs` (phone performance, see `STAGE0_BASELINE.md`).
 - Open it in the game or `tools/render-portraits.mjs`, and look at idle and run from the side.
 
-## Not done yet
+## Status
 
-Nothing loads these animals as models yet: `enemySystem.js` still builds them with `createWolfMesh`,
-`createRattlerMesh` and `createRiderMesh`, and `characterModels.js` is written for gun-carrying humanoids
-(hand gun, draw clips). Once a rigged animal GLB exists, a small change is needed to load it for those enemy
-types and to skip the gun logic. That comes after the first rig is approved.
+- **Wolf: done (2026-09-29).** `public/models/wolf.glb` (584 KB, clips idle, run, dead). `enemySystem.js` swaps
+  it in for the box wolf (`attachWolfModel`) and `main.js` preloads it; without the file the box wolf is used.
+  `createCharacterInstance` already handles a model with no gun: `combat()` just plays idle or run.
+- **Snake and horse with rider: not done.** They still use `createRattlerMesh` and `createRiderMesh`. Each
+  needs its own rig and clips, and the same few lines in `enemySystem.js` to load it.
+- The wolf's `dead` clip is not played yet: killed enemies are removed at once, as before.
+- The wolf's menu picture (the NEW ENEMY card, Bounty Book) is still drawn from the box wolf
+  (`src/portraits.js`).

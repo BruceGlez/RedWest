@@ -165,6 +165,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
         attachOutlawModel(enemy, getOutlaw(gameState.outlawIndex));
         setupBoss(enemy, bossStyle);
     }
+    if(type === 'wolf') attachWolfModel(enemy);
     if(type === 'ghost') enemy.userData.stateTimer = 1.5 + Math.random();
     if(type === 'rider') enemy.userData.stateTimer = 2.5 + Math.random() * 1.5;
 
@@ -290,6 +291,20 @@ function attachOutlawModel(enemy, outlaw) {
     enemy.userData.model = instance;
     // Shots leave from the revolver in the model's hand, not the hidden box figure's gun.
     if(instance.muzzle) enemy.userData.muzzle = instance.muzzle;
+}
+
+// Imported 3D wolf (public/models/wolf.glb, rigged in Blender: tools/blender/README.md): shown instead
+// of the box wolf once it has loaded, else the box wolf stays. Its clips are idle and run; the shared
+// enemy update below plays them (no gun, so createCharacterInstance's combat() just picks idle or run).
+export const WOLF_MODEL = 'models/wolf.glb';
+const WOLF_MODEL_HEIGHT = 3.4; // ears to paws; the box wolf is about 3.5 tall
+function attachWolfModel(enemy) {
+    const gltf = loadedCharacterModel(WOLF_MODEL);
+    if(!gltf) return;
+    const instance = createCharacterInstance(gltf, WOLF_MODEL_HEIGHT);
+    for(const part of enemy.children) part.visible = false;
+    enemy.add(instance.object);
+    enemy.userData.model = instance;
 }
 
 // The part that shakes as an attack tell: the imported model, or the box figure.

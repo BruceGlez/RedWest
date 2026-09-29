@@ -23,6 +23,7 @@ import { configureAnalytics, track } from './analytics.js';
 import { generatedName } from './names.js';
 import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
+import { WOLF_MODEL } from './enemySystem.js';
 import { applyPlayerLoadout } from './assets.js';
 import { applyPerk } from './perks.js';
 import { DEMO, openStore, assetUrl } from './demo.js';
@@ -87,6 +88,9 @@ function loadOutlawModel(index) {
     }
     return outlawModelRequests.get(index);
 }
+// The 3D wolf (about 0.6 MB) loads in the background: wolves spawn as the box wolf until it is ready,
+// and stay the box wolf if the file is missing. Not needed in the playable ad.
+if(!DEMO) loadCharacterModel(WOLF_MODEL).catch(() => {});
 if(arena.enabled) OUTLAWS.forEach((_, i) => loadOutlawModel(i)); // the arena shows them all
 else loadingScreen?.track(loadOutlawModel(progress.selected));
 ui.updateHUD();
