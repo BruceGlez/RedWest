@@ -71,6 +71,11 @@ https://bruceglez.github.io/RedWest/ (the repository's Pages source must be set 
 
 Each finished run is recorded in that browser's playtest log: result, pursuit reached, peak Heat, bank or ride-on choice and the Heat at that moment, bounty, score, time, shots, accuracy, kills, damage taken, and its order in the session. Use **COPY** on the start screen or **COPY RUN LOG** on the result screen to copy the rows as tab-separated text for a spreadsheet, and **CLEAR** on the start screen before the next tester.
 
+## What is next
+
+[POLISH_PLAN.md](POLISH_PLAN.md) lists what "studio grade" needs, in order (world and props first, then combat
+feel, post-processing, audio, UI), and gathers the open items from the other documents in one place.
+
 ## Verify
 
 ```powershell
