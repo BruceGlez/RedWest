@@ -147,12 +147,13 @@ building with a level:
 | **Saloon** | Season pass (Phase 3), locked until then | New |
 
 **Jail income:**
-- Rate per hour = sum of the beaten outlaws' bounties ÷ 10 (Dusty Pete 50 → 5 $/h; all eight → 130 $/h).
+- Rate per hour = sum of the beaten outlaws' bounties ÷ 20 (Dusty Pete 50 → 3 $/h; all eight → 65 $/h).
+  (Was ÷ 10 until the balance pass below.)
 - It stores at most **8 hours** of income, so checking in once or twice a day gets it all and nobody is
   punished for sleeping. Upgrading the Jail raises the cap (8 → 10 → 12 h) and the rate (+10% per level).
 - Server clock only when the server is connected; the local wallet ignores a device clock moved
   backwards and caps a single collect at the storage limit (no clock-change exploits).
-- Balance: 8 hours of all-eight income (1,040 $) is worth roughly two good runs. The town adds a daily
+- Balance: 8 hours of all-eight income (520 $) is worth roughly two good runs. The town adds a daily
   habit; it does not replace playing.
 
 **Upgrades:**
@@ -234,7 +235,7 @@ per 20 hours, moved out of 9 pm–9 am, Settings switch, cancelled by *Delete my
   timer).
 
 **Built (2026-09-29):** four twists (Wolf Moon, Deadeye Week, Iron Posse, Hot Trail = Heat twice as fast),
-the event card and RIDE OUT in Frontier Town, targets rising 15% per stage, $100 / $200 / $300 plus four
+the event card and RIDE OUT in Frontier Town, targets 400 / 1,000 / 1,800 for every outlaw, $100 / $200 / $300 plus four
 collectibles in order (then +$300), prizes paid on top of the per-run cap, a MOST WANTED board, and event
 runs kept off the Wanted Road and the other boards. Rank titles are not built. Targets need playtesting.
 
@@ -313,6 +314,27 @@ ads separately.
 **Size:** medium.
 
 ---
+
+## Balance pass (2026-09-29)
+
+No playtest notes yet, so a simple bot played real runs in a headless browser (stands and auto-aims,
+backs away from close enemies, dashes, banks the bounty). It stands in for a weak new player:
+
+| Stage | Result | Score | Run time | Earned |
+|---|---|---|---|---|
+| 1 Dusty Pete | won, banked | 550 | 75 s | $202 |
+| 3 Deacon Graves | died in pursuit 2 | 170 | 37 s | $42 |
+| 5 Iron Jack | died in pursuit 2 | 315 | 49 s | $78 |
+| 8 El Espectro | died in pursuit 1 | 310 | 21 s | $77 |
+
+Changes:
+- **Event targets** were 500 / 1,200 / 2,200 rising 15% per stage (4,200 at the top for Silas Vane). Later
+  outlaws are harder, so the same player scores less against them: targets are now **400 / 1,000 / 1,800
+  for every outlaw**. A plain win reaches the first; the top one needs a strong Heat run.
+- **Jail income** was a tenth of each bounty per hour ($130/h with all eight, a full jail worth about five
+  winning runs). It is now **a twentieth** ($65/h, a full jail worth about two good runs), as planned.
+- Unchanged: run earnings (about $200 for a win), upgrade costs ($300 first jail upgrade = about two
+  runs), event prizes, perks. Revisit with real playtest numbers: the run log's COPY button gives them.
 
 ## Order and dependencies
 

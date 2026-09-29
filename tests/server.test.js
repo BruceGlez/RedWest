@@ -241,8 +241,9 @@ test('the town uses the server clock', async () => {
         const before = (await s.call('/api/profile', { token: a.token })).data.profile.balances.dollars;
         s.advanceDays(3 / 24);
         const collected = await s.call('/api/town/collect', { token: a.token, body: {} });
-        assert.equal(collected.data.collected, 3 * 5, 'three hours of Dusty Pete');
-        assert.equal(collected.data.profile.balances.dollars, before + 15);
+        const rate = Math.round(50 / 20);
+        assert.equal(collected.data.collected, 3 * rate, 'three hours of Dusty Pete');
+        assert.equal(collected.data.profile.balances.dollars, before + 3 * rate);
         assert.equal((await s.call('/api/town/collect', { token: a.token, body: {} })).data.collected, 0);
         const poor = await s.call('/api/town/upgrade', { token: a.token, body: { building: 'sheriff' } });
         assert.equal(poor.status, 400);

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createProfile, normalizeProfile, applyRun } from '../src/profile.js';
-import { BUILDINGS, TOWN_EFFECTS, jailRate, jailCapacity, jailStored, collectJail, upgradeBuilding, upgradeCost, hoursUntilFull } from '../src/town.js';
+import { BUILDINGS, TOWN_EFFECTS, JAIL_BOUNTY_SHARE, jailRate, jailCapacity, jailStored, collectJail, upgradeBuilding, upgradeCost, hoursUntilFull } from '../src/town.js';
 import { WEAPONS } from '../src/weapons.js';
 import { OUTLAWS } from '../src/outlaws.js';
 import { getJob } from '../src/jobs.js';
@@ -27,16 +27,17 @@ test('buildings only ever change income, never combat', () => {
     }
 });
 
-test('the jail pays a tenth of each beaten outlaw\'s bounty per hour, up to its storage', () => {
+test('the jail pays a share of each beaten outlaw\'s bounty per hour, up to its storage', () => {
     assert.equal(jailRate(profileWithBeaten(0)), 0);
     const one = profileWithBeaten(1);
-    assert.equal(jailRate(one), OUTLAWS[0].bounty / 10);
+    assert.equal(jailRate(one), Math.round(OUTLAWS[0].bounty * JAIL_BOUNTY_SHARE));
     assert.equal(jailStored(one, later(3)), 3 * jailRate(one));
     assert.equal(jailCapacity(one), 8 * jailRate(one));
     assert.equal(jailStored(one, later(30)), jailCapacity(one), 'capped at 8 hours');
     assert.equal(hoursUntilFull(one, later(6)), 2);
     const all = profileWithBeaten(OUTLAWS.length);
-    assert.equal(jailRate(all), OUTLAWS.reduce((sum, o) => sum + o.bounty, 0) / 10);
+    assert.equal(jailRate(all), Math.round(OUTLAWS.reduce((sum, o) => sum + o.bounty, 0) * JAIL_BOUNTY_SHARE));
+    assert.ok(jailCapacity(all) <= 600, 'a full jail is worth about two good runs, not a day of play');
 });
 
 test('collecting pays once and a clock moved backwards pays nothing', () => {
@@ -59,7 +60,7 @@ test('upgrades cost dollars, finish at once, and keep what the jail had stored',
     const stored = jailStored(p, later(4));
     assert.equal(upgradeBuilding(p, 'jail', later(4)), 2);
     assert.equal(p.balances.dollars, 1000 - 300 + stored, 'stored income collected before the upgrade');
-    assert.equal(jailRate(p), Math.round((OUTLAWS[0].bounty / 10) * 1.1));
+    assert.equal(jailRate(p), Math.round(OUTLAWS[0].bounty * JAIL_BOUNTY_SHARE * 1.1));
     assert.throws(() => upgradeBuilding(p, 'saloon'), { code: 'unknown_building' });
     assert.throws(() => upgradeBuilding(p, 'gunsmith'), { code: 'max_level' });
     p.balances.dollars = 100000;

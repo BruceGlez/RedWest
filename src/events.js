@@ -13,9 +13,9 @@ export const TWISTS = [
     { id: 'hot-trail', name: 'HOT TRAIL', detail: 'Heat builds twice as fast.', modifiers: [], heatGain: 2 }
 ];
 
-// Score targets against the first outlaw; later outlaws pay bigger bounties, so their targets rise
-// 15% per stage.
-const BASE_TARGETS = [500, 1200, 2200];
+// Score targets, the same for every outlaw (balance pass 2026-09-29, GROWTH_PLAN.md): a plain win reaches the
+// first; the top one needs a strong Heat run. Later outlaws are harder, so they get no higher targets.
+const BASE_TARGETS = [400, 1000, 1800];
 export const TIER_DOLLARS = [100, 200, 300];
 
 // Collectibles for the top target, one per event, in order. After all are owned, the top target pays
@@ -42,8 +42,7 @@ export function eventForWeek(week) {
     const h = hash(`most-wanted:${week}`);
     const outlaw = h % OUTLAWS.length;
     const twist = TWISTS[Math.floor(h / OUTLAWS.length) % TWISTS.length];
-    const scale = 1 + (outlaw * 0.15);
-    return { week, outlaw, twist, targets: BASE_TARGETS.map(t => Math.round((t * scale) / 50) * 50) };
+    return { week, outlaw, twist, targets: [...BASE_TARGETS] };
 }
 
 // Start of the next week (Monday 00:00 UTC), for "ends in".

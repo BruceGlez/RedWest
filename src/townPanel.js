@@ -1,7 +1,7 @@
 import { OUTLAWS } from './outlaws.js';
 import { eventForWeek, eventEndsAt, TIER_DOLLARS, EVENT_COSMETICS, ALL_COSMETICS_OWNED_DOLLARS } from './events.js';
 import { weekKey } from './profile.js';
-import { BUILDINGS, buildingEffects, jailedOutlaws, jailRate, jailCapacity, jailStored, hoursUntilFull, upgradeCost } from './town.js';
+import { BUILDINGS, buildingEffects, jailedOutlaws, jailRate, jailCapacity, jailStored, hoursUntilFull, upgradeCost, JAIL_BOUNTY_SHARE } from './town.js';
 import { track } from './analytics.js';
 import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, disableReminders, updateJailReminder } from './reminders.js';
 import { createTownScene, TOWN_LAYOUT } from './townScene.js';
@@ -67,7 +67,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
         const next = building.levels[level]?.effects;
         if(!next) return 'Top level.';
         if(building.id === 'jail') {
-            const base = jailedOutlaws(profile).reduce((sum, outlaw) => sum + outlaw.bounty, 0) / 10;
+            const base = jailedOutlaws(profile).reduce((sum, outlaw) => sum + outlaw.bounty, 0) * JAIL_BOUNTY_SHARE;
             return `Next level: ${money(base * next.jailRate)} an hour (+${Math.round((next.jailRate - 1) * 100)}%), holds ${next.jailHours} hours.`;
         }
         if(building.id === 'sheriff') return `Next level: daily jobs pay +${Math.round((next.jobRewards - 1) * 100)}%.`;
