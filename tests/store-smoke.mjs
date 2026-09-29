@@ -186,7 +186,8 @@ try {
         await page.locator('#records-board-list li.me').waitFor();
         const rows = await page.locator('#records-board-list li').evaluateAll(items => items.map(li =>
             [...li.querySelectorAll('span')].map(span => span.textContent).join('')));
-        assert.deepEqual(rows, ['#1RIVAL ROSA2,000', '#2SMOKE KID480']);
+        // Each row also says who the best run was played as.
+        assert.deepEqual(rows, ['#1RIVAL ROSAas Marshal Flint Reed2,000', '#2SMOKE KIDas Marshal Flint Reed480']);
         // Other players' names can be reported (two taps); my own row has no report button.
         assert.equal(await page.locator('#records-board-list li.me .records-report').count(), 0);
         store.getUser(userId).profile.stats.runs = 3; // only players with a few runs can report

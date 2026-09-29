@@ -76,5 +76,5 @@ test('event progress resets with the week', () => {
     profile.event = { week: WEEK, best: 900, tiers: 1 };
     assert.equal(normalizeProfile(structuredClone(profile), NOW).event.best, 900);
     const nextWeek = new Date(NOW.getTime() + 7 * 86400000);
-    assert.deepEqual(normalizeProfile(structuredClone(profile), nextWeek).event, { week: weekKey(nextWeek), best: 0, tiers: 0 });
+    assert.deepEqual(normalizeProfile(structuredClone(profile), nextWeek).event, { week: weekKey(nextWeek), best: 0, tiers: 0, character: '' });
 });

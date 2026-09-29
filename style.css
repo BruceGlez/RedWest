@@ -849,6 +849,9 @@ body.in-lobby .new-enemy-card { display: none !important; }
 .records-list li.me { background: rgba(255, 204, 51, 0.25); color: #ffd700; font-weight: 700; }
 .records-who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .records-rank { width: 3.5em; color: #ffcc80; }
+.records-who small { display: flex; gap: 8px; font-size: 11px; font-weight: 400; color: #d7ccc8; overflow: hidden; }
+.records-title { font-style: normal; font-weight: 700; color: #1b1208; background: #ffcc33; border-radius: 3px; padding: 0 5px; white-space: nowrap; }
+.records-char { font-style: normal; overflow: hidden; text-overflow: ellipsis; }
 .records-report {
     margin-left: 8px; padding: 2px 8px; font-family: 'Roboto Mono', monospace; font-size: 12px;
     background: transparent; color: #bcaaa4; border: 1px solid #6d4c41; border-radius: 4px; cursor: pointer;

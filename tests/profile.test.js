@@ -147,7 +147,7 @@ test('leaderboards rank named accounts, show my rank, and reset weekly', async (
     ];
     const weekly = rankBoard(accounts, 'weekly', 'd', 2, day);
     assert.deepEqual(weekly.entries.map(e => e.name), ['BART', 'ANNIE'], 'unnamed accounts are hidden');
-    assert.deepEqual(weekly.me, { rank: 3, name: 'DOC', value: 300, me: true });
+    assert.deepEqual(weekly.me, { rank: 3, name: 'DOC', value: 300, me: true, character: '' });
     assert.equal(rankBoard(accounts, 'stars', null, 50, day).entries[0].name, 'DOC');
     const nextWeek = new Date(day.getTime() + 8 * 86400000);
     assert.equal(rankBoard(accounts, 'weekly', null, 50, nextWeek).entries.length, 0);

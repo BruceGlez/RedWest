@@ -54,7 +54,17 @@ export function eventEndsAt(now = new Date()) {
 }
 
 export function createEventProgress(week = '') {
-    return { week, best: 0, tiers: 0 };
+    return { week, best: 0, tiers: 0, character: '' };
+}
+
+// Titles on the MOST WANTED board, by rank this week. A name on a poster only: no rewards come with them.
+export const EVENT_TITLES = [
+    { upTo: 1, title: 'PUBLIC ENEMY NO. 1' },
+    { upTo: 3, title: 'DESPERADO' },
+    { upTo: 10, title: 'GUNSLINGER' }
+];
+export function eventTitle(rank) {
+    return EVENT_TITLES.find(t => rank >= 1 && rank <= t.upTo)?.title ?? '';
 }
 
 export function normalizeEventProgress(raw, week) {
@@ -62,7 +72,8 @@ export function normalizeEventProgress(raw, week) {
     return {
         week,
         best: Math.max(0, Math.floor(Number(raw.best)) || 0),
-        tiers: Math.max(0, Math.min(BASE_TARGETS.length, Math.floor(Number(raw.tiers)) || 0))
+        tiers: Math.max(0, Math.min(BASE_TARGETS.length, Math.floor(Number(raw.tiers)) || 0)),
+        character: /^char-[a-z0-9-]+$/.test(raw.character) ? raw.character : ''
     };
 }
 

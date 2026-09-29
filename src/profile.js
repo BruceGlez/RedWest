@@ -5,7 +5,7 @@ import { OUTLAWS } from './outlaws.js';
 import { starsForRun, starCount } from './progress.js';
 import { EconomyError } from './economyError.js';
 import { createTown, normalizeTown, buildingEffects } from './town.js';
-import { eventForWeek, createEventProgress, normalizeEventProgress, recordEventScore } from './events.js';
+import { eventForWeek, createEventProgress, normalizeEventProgress, recordEventScore, eventTitle } from './events.js';
 import { createPass, normalizePass, payPassRewards, pointsForRun, tierReward } from './pass.js';
 
 // The player's economy profile: balances, owned cosmetics, loadout and daily jobs. These pure
@@ -32,13 +32,22 @@ export function createProfile(now = new Date()) {
         event: createEventProgress(weekKey(now)), // this week's Most Wanted event (src/events.js)
         pass: createPass(now), // this season's Wanted Poster Pass (src/pass.js)
         // Account records, also the source for online leaderboards.
-        stats: { runs: 0, bestScore: 0, stageBest: OUTLAWS.map(() => 0), stageStars: OUTLAWS.map(() => 0), weekly: { week: weekKey(now), score: 0 }, kills: 0 },
+        // stageChar and weekly.character: who the player was playing as for that best run (shown on the boards).
+        stats: {
+            runs: 0, bestScore: 0, stageBest: OUTLAWS.map(() => 0), stageStars: OUTLAWS.map(() => 0), stageChar: OUTLAWS.map(() => ''),
+            weekly: { week: weekKey(now), score: 0, character: '' }, kills: 0
+        },
         processed: [], // ids of already-credited purchases (idempotency)
         bought: [], // one-time products already bought (the starter pack)
         purchases: [], // what each purchase gave, so a refund can take exactly that back
         refunded: [], // transaction ids already reversed
         nuggetDebt: 0 // refunded nuggets that had already been spent; paid from the next nuggets earned
     };
+}
+
+// A character id from the shop, or '' (older saves and anything unknown).
+export function characterId(id) {
+    return getShopItem(id)?.slot === 'character' ? id : '';
 }
 
 export function normalizeProfile(raw, now = new Date()) {
@@ -70,8 +79,12 @@ export function normalizeProfile(raw, now = new Date()) {
     OUTLAWS.forEach((_, i) => {
         profile.stats.stageBest[i] = num(s.stageBest?.[i]);
         profile.stats.stageStars[i] = num(s.stageStars?.[i]) & 7;
+        profile.stats.stageChar[i] = characterId(s.stageChar?.[i]);
     });
-    if(s.weekly?.week === profile.stats.weekly.week) profile.stats.weekly.score = num(s.weekly.score);
+    if(s.weekly?.week === profile.stats.weekly.week) {
+        profile.stats.weekly.score = num(s.weekly.score);
+        profile.stats.weekly.character = characterId(s.weekly.character);
+    }
     // After the stats: an outlaw character counts as owned only with that outlaw's three stars.
     for(const slot of SLOTS) {
         const id = raw.loadout?.[slot];
@@ -188,8 +201,10 @@ export function applyRun(profile, summary, now = new Date()) {
     const event = eventForWeek(week);
     const eventRun = summary.event === week && stage === event.outlaw;
     const eventLines = [];
+    const character = profile.loadout.character; // the server's record of who played, not the client's word
     if(ranked && eventRun) {
         profile.event = normalizeEventProgress(profile.event, week);
+        if(score > profile.event.best) profile.event.character = character;
         for(const reward of recordEventScore(profile, event, score)) {
             eventLines.push({ label: `Most Wanted target ${reward.tier}: ${reward.target.toLocaleString()}`, dollars: reward.dollars });
             if(reward.item) eventLines.push({ label: `Prize: ${reward.item.name} ${reward.item.slot}`, item: reward.item.id });
@@ -197,10 +212,16 @@ export function applyRun(profile, summary, now = new Date()) {
     }
     if(ranked && !eventRun) {
         stats.bestScore = Math.max(stats.bestScore, score);
-        stats.weekly.score = Math.max(stats.weekly.score, score);
+        if(score > stats.weekly.score) {
+            stats.weekly.score = score;
+            stats.weekly.character = character;
+        }
         // Stages unlock in order: a record needs the previous outlaw beaten on this account.
         if(stage >= 0 && stage < OUTLAWS.length && (stage === 0 || stats.stageStars[stage - 1] & 1)) {
-            stats.stageBest[stage] = Math.max(stats.stageBest[stage], score);
+            if(score > stats.stageBest[stage]) {
+                stats.stageBest[stage] = score;
+                stats.stageChar[stage] = character;
+            }
             stats.stageStars[stage] |= starsForRun({ status: run.bounty === 'none' ? 'none' : run.bounty, heatAtOffer: Number(summary.heatAtOutlaw) || 0 });
         }
     }
@@ -350,15 +371,26 @@ export function boardValue(profile, board, now = new Date()) {
     return stage !== undefined ? (s.stageBest[Number(stage)] || 0) : 0;
 }
 
+// Who played the run behind a board value ('' for the stars board and older records).
+export function boardCharacter(profile, board, now = new Date()) {
+    if(board === 'weekly') return profile.stats.weekly.week === weekKey(now) ? profile.stats.weekly.character || '' : '';
+    if(board === 'event') return profile.event?.week === weekKey(now) ? profile.event.character || '' : '';
+    const stage = /^stage-(\d+)$/.exec(board)?.[1];
+    return stage !== undefined ? profile.stats.stageChar[Number(stage)] || '' : '';
+}
+
 // accounts: [{ id, profile }]. Named accounts with a score only; ties go to the earlier row.
 export function rankBoard(accounts, board, meId = null, limit = 50, now = new Date()) {
     if(!BOARDS[board]) throw new EconomyError('bad_board', 'Unknown leaderboard.');
     const rows = accounts
-        .map(({ id, profile }) => ({ id, name: profile.name, value: boardValue(profile, board, now) }))
+        .map(({ id, profile }) => ({ id, name: profile.name, value: boardValue(profile, board, now), character: boardCharacter(profile, board, now) }))
         .filter(row => row.name && row.value > 0)
         .sort((a, b) => b.value - a.value);
     rows.forEach((row, i) => { row.rank = i + 1; });
     const me = meId ? rows.find(row => row.id === meId) ?? null : null;
-    const strip = row => ({ rank: row.rank, name: row.name, value: row.value, me: row.id === meId });
+    const strip = row => ({
+        rank: row.rank, name: row.name, value: row.value, me: row.id === meId, character: row.character,
+        ...(board === 'event' && eventTitle(row.rank) ? { title: eventTitle(row.rank) } : {})
+    });
     return { board, entries: rows.slice(0, limit).map(strip), me: me ? strip(me) : null, total: rows.length };
 }

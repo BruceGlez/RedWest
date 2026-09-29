@@ -3,6 +3,7 @@ import { BOARDS } from './profile.js';
 import { starCount } from './progress.js';
 import { NAME_MAX } from './names.js';
 import { track } from './analytics.js';
+import { getShopItem } from './cosmetics.js';
 
 // Records screen: the account's outlaw name, its personal records, and the online leaderboards.
 // Leaderboards rank accounts (like Brawl Stars trophies), never per-run name entries.
@@ -93,7 +94,16 @@ export function createRecordsPanel({ wallet, onProfile, suggestedName = '' }) {
     function boardRow(entry) {
         const li = document.createElement('li');
         li.classList.toggle('me', !!entry.me);
-        li.append(text('span', `#${entry.rank}`, 'records-rank'), text('span', entry.name, 'records-who'), text('span', entry.value.toLocaleString(), 'records-value'));
+        // Name, then the MOST WANTED title and who they played the run as (small, so the name still leads).
+        const who = text('span', entry.name, 'records-who');
+        const character = getShopItem(entry.character)?.name;
+        if(entry.title || character) {
+            const detail = document.createElement('small');
+            if(entry.title) detail.append(text('em', entry.title, 'records-title'));
+            if(character) detail.append(text('i', `as ${character}`, 'records-char'));
+            who.append(detail);
+        }
+        li.append(text('span', `#${entry.rank}`, 'records-rank'), who, text('span', entry.value.toLocaleString(), 'records-value'));
         if(!entry.me) li.append(reportButton(entry.name));
         return li;
     }
