@@ -88,6 +88,11 @@ const scratch = { matrix: new THREE.Matrix4(), position: new THREE.Vector3(), qu
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
 const material = toonVertexColorMaterial();
 
+// The stage's tint over every prop (white leaves them alone); see atmosphere.js.
+export function setSceneryTint(hex) {
+    material.color.setHex(hex);
+}
+
 function kindsFor(scene) {
     if(current?.scene === scene) return current.kinds;
     const kinds = {};

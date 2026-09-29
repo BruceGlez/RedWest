@@ -232,6 +232,9 @@ try {
         assert.equal(await page.locator('#settings-apple-btn').isDisabled(), true);
         await page.locator('#settings-close-btn').click();
 
+        // The first device has done its part. Closing it frees the shared software GPU: two live scenes made
+        // the second device's page load take longer than the wait below.
+        await page.close();
         const second = await openPage(browser, remoteVite.resolvedUrls.local[0]);
         await withApple(second.page);
         await second.page.waitForFunction(() => !!JSON.parse(localStorage.getItem('redWestAccount.v1') || 'null')?.token);

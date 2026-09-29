@@ -2,7 +2,8 @@ import * as THREE from 'three';
 import { keys, touch } from './input.js';
 import { resumeAudio, playSound, playVoice, setMusicTrack, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { gameState, playerStats, obstacles, enemies, loots, resetGameState, resetPlayerStats, clearDynamicState } from './state.js';
-import { generateMap, updateSun } from './world.js';
+import { generateMap, updateSun, setAtmosphere } from './world.js';
+import { updateAmbience } from './ambience.js';
 import { spawnEnemy, updateEnemies, updateHazards, clearHazards } from './enemySystem.js';
 import { updateLoots } from './lootSystem.js';
 import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats } from './bulletSystem.js';
@@ -527,6 +528,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             return;
         }
         if(!gameState.isGameStarted) {
+            // The desert behind the start screen wears the look of the outlaw the player is about to face.
+            setAtmosphere(scene, getOutlaw(arena.enabled ? arena.outlaw : progress.selected).id);
+            updateAmbience(realDt, timeInSeconds, playerSystem.playerGroup.position);
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 20, Math.cos(timeInSeconds * 0.5) * 30);
             camera.lookAt(playerSystem.playerGroup.position);
             renderer.render(scene, camera);
@@ -543,6 +547,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 gameState.event = event || null;
                 setEventModifiers(event?.twist.modifiers);
                 gameState.outlawIndex = arena.enabled ? arena.outlaw : event ? event.outlaw : progress.selected;
+                setAtmosphere(scene, getOutlaw(gameState.outlawIndex).id);
                 sessionRun++;
                 ui.hideStartScreen();
                 camera.position.copy(cameraOffset());
@@ -622,6 +627,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         camera.lookAt(playerPos.x + shake.x * 0.5, playerPos.y, playerPos.z + shake.z * 0.5);
         updateFeedback(realDt, camera, enemies, playerPos);
         updateSun(playerPos);
+        updateAmbience(realDt, timeInSeconds, playerPos);
 
         emitDebug(realDt);
         renderer.render(scene, camera);
