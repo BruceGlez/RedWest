@@ -980,3 +980,14 @@ body.town-open #start-screen { visibility: hidden; }
 .town-screen .panel-header { pointer-events: none; }
 .town-screen .panel-header > * { pointer-events: auto; }
 .shop-action.upgrade:disabled { background: #bca68a; color: #5d4037; border-color: #8d6e63; box-shadow: none; cursor: default; }
+
+/* ---------- Playable ad (demo build) ---------- */
+.demo-overlay {
+    position: fixed; inset: 0; z-index: 60; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px;
+    padding: 16px; text-align: center; background: radial-gradient(ellipse at center, rgba(40, 18, 8, 0.75), rgba(10, 4, 2, 0.92));
+    color: #f0d9a8; font-family: 'Roboto Mono', monospace;
+}
+.demo-overlay p { margin: 0; max-width: 420px; font-size: 15px; }
+.demo-logo { font-family: 'Rye', serif; font-size: 44px; color: #ffcc33; text-shadow: 0 4px 0 #6b2d0f; }
+.demo-overlay .play-btn { font-size: 30px; padding: 10px 28px; }
+body.demo #start-screen, body.demo #welcome-modal { display: none !important; }

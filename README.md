@@ -43,6 +43,10 @@ Real-money items, all showing "SOON" until the server and stores are connected (
 
 Every week (Monday to Sunday, UTC) one outlaw is **Most Wanted** with a twist (Wolf Moon, Deadeye Week, Iron Posse or Hot Trail), shown at the top of Frontier Town. **RIDE OUT** fights them with the twist, even before they are unlocked on the Wanted Road; event runs do not move the road. It is free to enter as often as you like. Prizes come from your own best score reaching three targets (Bounty Dollars, and at the top a collectible hat, bullet colour, coat or pants, in order), never from rank, and have no cash value; the event prizes can never be bought. With the server connected there is also a MOST WANTED leaderboard. Rules in `src/events.js`.
 
+### Playable ad
+
+`npm run build:demo` builds a playable ad into one self-contained file, `dist-demo/red-west-playable.html` (about 4 MB, under the usual 5 MB limit; nothing is loaded from the network). It skips the home screen: a tap starts the fight with Dusty Pete and his gang, and when the outlaw falls, the player dies, or after 45 seconds an end card offers the full game. Its button opens the store through the ad network's MRAID `open()` when present (set the store address with `VITE_STORE_URL`). It shows only real gameplay. `npm run test:demo` checks all of this. Code in `src/demo.js` and `tools/inline-demo.mjs`.
+
 ## Privacy and players under 13
 
 On first launch the game asks a neutral question, "What year were you born?", and offers optional gameplay statistics (unticked by default). Only the age band is kept (under 13, 13–17, 18+), never the year. Players under 13 get no statistics, a generated outlaw name instead of a typed one, and no real-money packs. **Settings** has the statistics switch, links to the privacy policy, terms and support (set `VITE_PRIVACY_URL`, `VITE_TERMS_URL`, `VITE_SUPPORT_EMAIL`), and **Delete my data**, which removes everything on the device and, with the server connected, the account (keeping only purchase transaction ids). Leaderboard names can be reported; a name reported by three accounts is hidden until reviewed. Statistics are first-party only (no third-party SDK or advertising id), stored as days played and event counts; `node tools/retention.mjs` prints return rates. See [GROWTH_PLAN.md](GROWTH_PLAN.md) (Phase 0), [docs/POLICY_GENERATOR_ANSWERS.md](docs/POLICY_GENERATOR_ANSWERS.md) and [ASSETS.md](ASSETS.md).
@@ -80,6 +84,7 @@ npm run test:store
 npm run test:bosses
 npm run test:characters
 npm run test:event
+npm run test:demo
 ```
 
 The browser smoke tests look for an installed Chrome or Chromium in the usual location for Windows, macOS, or Linux. Set `CHROME_PATH` to use a different Chromium executable. Player feel, balance, and frame pacing still require hands-on playtesting.

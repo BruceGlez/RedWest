@@ -25,6 +25,7 @@ import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { applyPlayerLoadout } from './assets.js';
 import { applyPerk } from './perks.js';
+import { DEMO, openStore } from './demo.js';
 import { setPlayerBulletColor } from './bulletSystem.js';
 
 const scene = new THREE.Scene();
@@ -154,7 +155,25 @@ async function giveChildAName() {
     namingChild = false;
 }
 applyPrivacy(privacyPanel.privacy);
-privacyPanel.ask().then(() => track('session_start'));
+if(DEMO) {
+    // Playable ad: no home screen, no questions, nothing sent anywhere. A tap starts the fight with Dusty
+    // Pete and his gang (the Boss Arena's direct start); src/demo.js shows the end card.
+    arena.enabled = true;
+    arena.outlaw = 0;
+    arena.gang = true;
+    gameState.startBlocked = false;
+    document.body.classList.add('demo');
+    const start = document.getElementById('demo-start');
+    start.style.display = 'flex';
+    document.getElementById('demo-play').addEventListener('click', () => {
+        start.style.display = 'none';
+        resumeAudio();
+        keys.startRequested = true;
+    });
+    document.getElementById('demo-store').addEventListener('click', openStore);
+} else {
+    privacyPanel.ask().then(() => track('session_start'));
+}
 // Shop preview and character cards: imported characters get their own posed copy once loaded.
 const previewCharacters = new Map();
 function previewCharacter(id) {
@@ -312,6 +331,6 @@ document.addEventListener('click', event => {
 });
 
 // Installable app: cache the game for offline play. Only on https (GitHub Pages), never in local dev.
-if('serviceWorker' in navigator && location.protocol === 'https:') {
+if(!DEMO && 'serviceWorker' in navigator && location.protocol === 'https:') {
     navigator.serviceWorker.register('sw.js').catch(() => { /* Offline support is optional. */ });
 }

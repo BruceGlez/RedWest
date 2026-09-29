@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { clone as cloneSkinned } from 'three/addons/utils/SkeletonUtils.js';
 import { toonTexturedMaterial } from './assets.js';
+import { assetUrl } from './demo.js';
 import { inPlace, LOCOMOTION } from './animationClips.js';
 
 // Animated 3D characters made outside the game (Meshy / Mixamo GLB, see tools/optimize-model.mjs).
@@ -15,7 +16,7 @@ const loaded = new Map();
 
 export function loadCharacterModel(url) {
     if(!cache.has(url)) {
-        cache.set(url, loader.loadAsync(url).then(gltf => { loaded.set(url, gltf); return gltf; }));
+        cache.set(url, loader.loadAsync(assetUrl(url)).then(gltf => { loaded.set(url, gltf); return gltf; }));
     }
     return cache.get(url);
 }

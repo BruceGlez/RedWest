@@ -11,6 +11,7 @@ import { markObstacleGridDirty, getGridStats } from './physics.js';
 import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
 import { buildRunRecord, appendRunRecord } from './runLog.js';
 import { track } from './analytics.js';
+import { DEMO, DEMO_SECONDS, showDemoEnd } from './demo.js';
 import { getOutlaw, applyOutlawToWave, setEventModifiers } from './outlaws.js';
 import { ENEMY_TYPES, rosterWave, featuredFor, enemyCost } from './enemyTypes.js';
 import { markSeen, recordKills } from './progress.js';
@@ -90,6 +91,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     // result: 'died' | 'banked' | 'escaped'
     function finishRun(result) {
         if(gameState.isGameOver) return;
+        if(DEMO) { // the playable ad ends on its end card
+            gameState.isGameOver = true;
+            if(result === 'died') playerSystem.die();
+            showDemoEnd(result === 'died' ? 'SHOT DOWN!' : 'OUTLAW DOWN!');
+            return;
+        }
         track('run_end');
         setMusicTrack('home');
         if(result === 'banked' || result === 'escaped') {
@@ -182,6 +189,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         },
         onGameOver: () => finishRun('died'),
         onBossDefeated: () => {
+            if(DEMO) {
+                playSound('outlaw-down');
+                finishRun('banked');
+                return;
+            }
             if(bountyChoiceAt) return;
             track('outlaw_win');
             playSound('outlaw-down');
@@ -569,6 +581,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
         if(arena.enabled && arena.invincible) playerStats.hp = playerStats.maxHp;
         gameState.runTime += dt;
+        if(DEMO && gameState.runTime > DEMO_SECONDS) {
+            gameState.isGameOver = true;
+            showDemoEnd('THE HUNT GOES ON');
+            return;
+        }
         advanceHeat(gameState.heat, dt);
         updateParticles(dt, scene);
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();

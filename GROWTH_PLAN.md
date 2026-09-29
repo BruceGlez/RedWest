@@ -315,6 +315,15 @@ ads separately.
 
 ---
 
+## Phase 3 and 4 status (2026-09-29)
+
+**Built:** the Deputy's Kit starter pack (3.1), nugget prices with real-money estimates and pack-friendly
+prices (3.3), the Wanted Poster Pass in the saloon (3.2; paid track never pays Bounty Dollars), the bank,
+stable and undertaker, and the playable ad (4.1, `npm run build:demo`). Not built: rewarded ads (3.4, decided
+against for now) and the vertical videos (4.2): rough 16:9 gameplay and town clips were recorded in a
+headless browser for reference; final clips should be recorded on a phone. Real-money items stay "SOON"
+until the server, the policy and the store products exist (MONETIZATION.md).
+
 ## Balance pass (2026-09-29)
 
 No playtest notes yet, so a simple bot played real runs in a headless browser (stands and auto-aims,

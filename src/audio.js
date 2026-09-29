@@ -1,4 +1,5 @@
 import { SFX, MUSIC, VOICE } from './audioManifest.js';
+import { DEMO, assetUrl } from './demo.js';
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const masterGain = audioCtx.createGain();
@@ -112,7 +113,7 @@ const loading = new Map(); // 'dir/key' -> Promise<AudioBuffer|null>
 function loadBuffer(dir, key) {
     const id = `${dir}/${key}`;
     if(!loading.has(id)) {
-        const url = new URL(`audio/${id}.mp3`, document.baseURI);
+        const url = assetUrl(`audio/${id}.mp3`);
         loading.set(id, fetch(url)
             .then(response => {
                 if(!response.ok) throw new Error(`${response.status}`);
@@ -147,7 +148,7 @@ function playBuffer(buffer, destination, volume = 1) {
 
 // Effects are small, so they all load up front, with the menu music so it is ready for the first tap.
 for(const key of Object.keys(SFX)) loadBuffer('sfx', key);
-loadBuffer('music', 'home');
+if(!DEMO) loadBuffer('music', 'home');
 
 // Old sound names from before the recorded effects.
 const SFX_ALIASES = { shoot: 'shot-revolver', thud: 'hit' };
@@ -172,7 +173,7 @@ function playRecordedSfx(key) {
 }
 
 // ---------- Music: a recorded loop per screen, the synth loop as fallback ----------
-let musicTrack = 'home';
+let musicTrack = DEMO ? 'fight' : 'home';
 let musicSource = null;
 let musicSourceTrack = null;
 const switchPending = new Set(); // tracks that will replace the synth loop once loaded
@@ -355,6 +356,7 @@ function playBeep(type) {
 
 // Switches the music loop: 'home', 'fight' or 'showdown'.
 export function setMusicTrack(track) {
+    if(DEMO) track = 'fight'; // the playable ad carries one music track
     if(!MUSIC[track] || track === musicTrack) return;
     musicTrack = track;
     if(musicEnabled && (musicIntervalId !== null || musicSource)) startBackgroundTrack();
