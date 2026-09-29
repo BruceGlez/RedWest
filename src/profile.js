@@ -3,6 +3,8 @@ import { jobsForDay, getJob, dayKey, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { validateName } from './names.js';
 import { OUTLAWS } from './outlaws.js';
 import { starsForRun, starCount } from './progress.js';
+import { EconomyError } from './economyError.js';
+import { createTown, normalizeTown, buildingEffects } from './town.js';
 
 // The player's economy profile: balances, owned cosmetics, loadout and daily jobs. These pure
 // functions are shared by the in-browser playtest wallet and the server (server/), so both apply
@@ -24,6 +26,7 @@ export function createProfile(now = new Date()) {
         loadout: defaultLoadout(),
         jobs: { day: dayKey(now), list: jobsForDay(dayKey(now)), bonusPaid: false },
         name: '',
+        town: createTown(now), // Frontier Town buildings and the Jail's last collection (src/town.js)
         // Account records, also the source for online leaderboards.
         stats: { runs: 0, bestScore: 0, stageBest: OUTLAWS.map(() => 0), stageStars: OUTLAWS.map(() => 0), weekly: { week: weekKey(now), score: 0 }, kills: 0 },
         processed: [] // ids of already-credited purchases (idempotency)
@@ -48,6 +51,7 @@ export function normalizeProfile(raw, now = new Date()) {
         profile.jobs.bonusPaid = !!raw.jobs.bonusPaid;
     }
     profile.processed = (raw.processed || []).filter(id => typeof id === 'string').slice(-500);
+    profile.town = normalizeTown(raw.town, now);
     if(raw.name && validateName(raw.name).ok) profile.name = validateName(raw.name).name;
     const s = raw.stats || {};
     const num = v => Math.max(0, Math.floor(Number(v)) || 0);
@@ -99,12 +103,7 @@ export function refreshJobs(profile, now = new Date()) {
     if(profile.jobs.day !== today) profile.jobs = { day: today, list: jobsForDay(today), bonusPaid: false };
 }
 
-export class EconomyError extends Error {
-    constructor(code, message) {
-        super(message);
-        this.code = code;
-    }
-}
+export { EconomyError };
 
 export function buyItem(profile, id) {
     const item = getShopItem(id);
@@ -144,7 +143,7 @@ export function applyRun(profile, summary, now = new Date()) {
         if(entry.progress >= job.goal) {
             entry.done = true;
             jobsCompleted.push(job.id);
-            lines.push({ label: `Job: ${job.text}`, dollars: job.reward });
+            lines.push({ label: `Job: ${job.text}`, dollars: Math.round(job.reward * buildingEffects(profile.town, 'sheriff').jobRewards) });
         }
     }
     let nuggets = 0;

@@ -3,7 +3,8 @@
 // count per event (server/app.js, /api/events), which is enough for return rates and where players stop.
 
 // The only events that exist. The server rejects anything else.
-export const ANALYTICS_EVENTS = ['session_start', 'run_start', 'run_end', 'outlaw_win', 'shop_open', 'records_open', 'purchase_start'];
+export const ANALYTICS_EVENTS = ['session_start', 'run_start', 'run_end', 'outlaw_win', 'shop_open', 'records_open', 'purchase_start',
+    'town_open', 'town_collect', 'building_upgrade'];
 const ALLOWED = new Set(ANALYTICS_EVENTS);
 const FLUSH_MS = 30000;
 const MAX_BATCH = 50;

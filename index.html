@@ -65,6 +65,7 @@
         <div class="home-top">
             <div class="home-logo">RED WEST</div>
             <div class="home-top-right">
+                <button id="town-btn" class="shop-btn town-btn" type="button">TOWN<span id="town-badge" class="town-badge" style="display:none;"></span></button>
                 <button id="shop-btn" class="shop-btn" type="button">SHOP</button>
                 <div class="home-chip money-chip"><span class="cur-dollar">$</span><span id="home-dollars">0</span></div>
                 <div class="home-chip money-chip"><span class="cur-nugget">&#9670;</span><span id="home-nuggets">0</span></div>
@@ -134,6 +135,18 @@
                 <div id="shop-grid" class="shop-grid"></div>
                 <p id="shop-message" class="shop-message" role="status"></p>
             </div>
+        </div>
+    </div>
+
+    <div id="town-screen" class="panel-screen" style="display:none;">
+        <div class="panel-header">
+            <button class="round-btn panel-back" type="button" aria-label="Back">&#8249;</button>
+            <h2>FRONTIER TOWN</h2>
+            <div class="home-chip money-chip"><span class="cur-dollar">$</span><span id="town-dollars">0</span></div>
+        </div>
+        <div class="panel-body town-body">
+            <div id="town-grid" class="town-grid"></div>
+            <p id="town-message" class="shop-message" role="status"></p>
         </div>
     </div>
 

@@ -240,6 +240,39 @@ try {
     assert.match(await page.locator('#home-poster').textContent(), /DUSTY PETE/);
     assert.equal(await page.locator('#run-log-count').textContent(), '3 runs');
 
+    // Frontier Town: beaten outlaws sit in the jail and pay each hour; three hours later there is money to collect.
+    // (These test runs are too short to count as account records, so come back later like a player would:
+    // on load the device's stars are copied into the account.)
+    await page.reload({ waitUntil: 'commit' });
+    await page.locator('canvas').waitFor();
+    await page.evaluate(async () => { window.__rwTestState = await import('/src/state.js'); });
+    await page.locator('#town-btn').click();
+    await page.locator('#town-screen').waitFor({ state: 'visible' });
+    const jailText = await page.locator('[data-building="jail"]').textContent();
+    assert.match(jailText, /3 of 8 outlaws jailed/, jailText);
+    const townDollars = async () => Number((await page.locator('#town-dollars').textContent()).replace(/\D/g, ''));
+    const dollarsBefore = await townDollars();
+    await page.evaluate(() => {
+        const Real = Date;
+        const shift = 3 * 3600000;
+        window.__RealDate = Real;
+        window.Date = class extends Real {
+            constructor(...args) { super(...(args.length ? args : [Real.now() + shift])); }
+            static now() { return Real.now() + shift; }
+        };
+    });
+    await page.locator('#town-screen .panel-back').click();
+    await page.locator('#town-badge').waitFor({ state: 'visible', timeout: 35000 }); // the badge refreshes every 30 s
+    await page.locator('#town-btn').click();
+    const collect = page.locator('[data-collect]');
+    assert.match(await collect.textContent(), /COLLECT \$[1-9]/);
+    await collect.click();
+    await page.locator('#town-message').getByText('Collected').waitFor();
+    assert.ok(await townDollars() > dollarsBefore, 'collected dollars land in the wallet');
+    assert.equal(await page.locator('[data-collect]').isDisabled(), true, 'nothing left to collect');
+    await page.evaluate(() => { window.Date = window.__RealDate; });
+    await page.locator('#town-screen .panel-back').click();
+
     // Settings: statistics can be switched off, and "Delete my data" takes two taps, then starts over.
     await page.locator('#home-settings-btn').click();
     await page.locator('#settings-stats-btn').click();
@@ -276,7 +309,7 @@ try {
     await startRun();
 
     assert.deepEqual(relevantErrors(), [], `browser errors: ${pageErrors.join(', ')}`);
-    console.log('Browser smoke passed: first-launch question, start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, run log, restarts, statistics switch, delete my data, under-13 rules.');
+    console.log('Browser smoke passed: first-launch question, start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, run log, restarts, Frontier Town jail collect, statistics switch, delete my data, under-13 rules.');
 } finally {
     await browser?.close();
     await server.close();

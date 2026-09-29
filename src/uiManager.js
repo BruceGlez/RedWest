@@ -75,7 +75,7 @@ export function createUIManager(gameState, playerStats) {
         howtoBtn: document.getElementById('howto-btn'),
         homeSettingsBtn: document.getElementById('home-settings-btn'),
         starGoals: document.getElementById('star-goals'),
-        panels: ['road-screen', 'records-screen', 'howto-screen', 'book-screen', 'shop-screen', 'jobs-screen'].map(id => document.getElementById(id)),
+        panels: ['road-screen', 'records-screen', 'howto-screen', 'book-screen', 'shop-screen', 'jobs-screen', 'town-screen'].map(id => document.getElementById(id)),
         bookBtn: document.getElementById('book-btn'),
         bookProgress: document.getElementById('book-progress'),
         bookEnemies: document.getElementById('book-enemies'),
@@ -432,8 +432,10 @@ export function createUIManager(gameState, playerStats) {
         }).join('') + outfitNote;
     }
 
-    function openShop() {
+    // tab: optionally open on one shop tab (the town's Gunsmith and Tailor do).
+    function openShop(tab) {
         track('shop_open');
+        if(typeof tab === 'string' && (SLOTS.includes(tab) || tab === 'nuggets')) shopTab = tab;
         tryOn = null;
         confirmId = null;
         shopMessage('');
@@ -848,6 +850,13 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         shopMessage,
         showEarnings,
         openShop,
+        openJobs() {
+            showPanel(els.panels[5]);
+            renderJobs();
+        },
+        showTown() {
+            showPanel(els.panels[6]);
+        },
         setChildMode(on) {
             childMode = !!on;
             if(els.panels[4].style.display !== 'none') renderShop();

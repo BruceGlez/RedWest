@@ -1,5 +1,6 @@
 import { CONFIG } from './config.js';
 import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, refreshJobs, setName, importProgress } from './profile.js';
+import { collectJail, upgradeBuilding } from './town.js';
 import { validateName } from './names.js';
 import { loadProgress } from './progress.js';
 
@@ -7,7 +8,7 @@ import { loadProgress } from './progress.js';
 // - local: this browser only (playtesting; not secure, only earned currency, no real money).
 // - remote: the Red West server (server/), the source of truth once real purchases are on.
 // Both expose the same async API: load, buy, equip, reportRun, refresh, setName, leaderboard,
-// setPrivacy, reportName, deleteAccount; `statsSender` is how statistics reach the server (null offline).
+// setPrivacy, reportName, deleteAccount, collectJail, upgradeBuilding; `statsSender` is how statistics reach the server (null offline).
 // Leaderboards rank accounts, so they only exist online; `online` says whether they are available.
 
 const PROFILE_KEY = 'redWestProfile.v1';
@@ -73,6 +74,8 @@ export function createLocalWallet() {
         async buy(id) { buyItem(profile, id); persist(); return snapshot(); },
         async equip(id) { equipItem(profile, id); persist(); return snapshot(); },
         async setName(name) { setName(profile, name); persist(); return snapshot(); },
+        async collectJail() { const collected = collectJail(profile); persist(); return { collected, profile: snapshot() }; },
+        async upgradeBuilding(id) { upgradeBuilding(profile, id); persist(); return snapshot(); },
         async leaderboard() { throw new Error('Leaderboards need the Red West server. Your records are saved on this device.'); },
         nameHidden: false,
         statsSender: null, // offline: statistics are never collected
@@ -134,6 +137,8 @@ export function createRemoteWallet(apiBase) {
         async buy(id) { return (await call('/api/buy', { itemId: id })).profile; },
         async equip(id) { return (await call('/api/equip', { itemId: id })).profile; },
         async setName(name) { return (await call('/api/name', { name })).profile; },
+        async collectJail() { return call('/api/town/collect', {}); },
+        async upgradeBuilding(id) { return (await call('/api/town/upgrade', { building: id })).profile; },
         async leaderboard(board) { return call(`/api/leaderboard?board=${encodeURIComponent(board)}`); },
         async reportRun(summary) { return call('/api/run', summary); }
     };

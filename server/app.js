@@ -3,6 +3,7 @@ import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, creditNu
 import { getProduct } from '../src/products.js';
 import { validateName, isGeneratedName } from '../src/names.js';
 import { AGE_BANDS } from '../src/privacy.js';
+import { collectJail, upgradeBuilding } from '../src/town.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 
 // Red West economy server. The game talks to /api/*; the stores talk to /webhooks/*.
@@ -245,6 +246,17 @@ export function createApp({ store, env = {}, now = () => new Date() }) {
                     store.deleteUser(id);
                     store.save();
                     return send(res, 200, { deleted: true });
+                }
+                // Frontier Town: the server clock decides what the Jail has earned.
+                if(url.pathname === '/api/town/collect' && req.method === 'POST') {
+                    const collected = collectJail(user.profile, now());
+                    save();
+                    return send(res, 200, { collected, profile: user.profile });
+                }
+                if(url.pathname === '/api/town/upgrade' && req.method === 'POST') {
+                    upgradeBuilding(user.profile, body.building, now());
+                    save();
+                    return send(res, 200, { profile: user.profile });
                 }
                 if(url.pathname === '/api/buy' && req.method === 'POST') {
                     buyItem(user.profile, body.itemId);

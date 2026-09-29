@@ -164,6 +164,11 @@ building with a level:
 to the profile (`src/profile.js`, bump `version` and migrate in `normalizeProfile`). Server: `POST
 /api/town/collect` and `POST /api/town/upgrade` using the same wallet rules as `/api/buy`.
 
+**Built (2026-09-29):** Jail (5 levels: +10% rate and +1 hour storage each), Sheriff's Office (3 levels:
+daily jobs +15% / +30%), Gunsmith and Tailor as shortcuts into the shop, TOWN button with a waiting-money
+badge, server routes `/api/town/collect` and `/api/town/upgrade`, and statistics events `town_open`,
+`town_collect`, `building_upgrade`. The Saloon comes with the season pass (Phase 3).
+
 **Measure:** share of players who collect on day 2; day-1 and day-7 return before vs after.
 **Size:** medium.
 

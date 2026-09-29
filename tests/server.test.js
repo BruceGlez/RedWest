@@ -232,3 +232,22 @@ test('deleting an account removes the player and keeps only purchase ids', async
         await s.close();
     }
 });
+
+test('the town uses the server clock', async () => {
+    const s = await startAdminServer();
+    try {
+        const a = await s.account();
+        await s.call('/api/run', { token: a.token, body: { score: 900, seconds: 120, outlawIndex: 0, bounty: 'banked', kills: {} } });
+        const before = (await s.call('/api/profile', { token: a.token })).data.profile.balances.dollars;
+        s.advanceDays(3 / 24);
+        const collected = await s.call('/api/town/collect', { token: a.token, body: {} });
+        assert.equal(collected.data.collected, 3 * 5, 'three hours of Dusty Pete');
+        assert.equal(collected.data.profile.balances.dollars, before + 15);
+        assert.equal((await s.call('/api/town/collect', { token: a.token, body: {} })).data.collected, 0);
+        const poor = await s.call('/api/town/upgrade', { token: a.token, body: { building: 'sheriff' } });
+        assert.equal(poor.status, 400);
+        assert.equal(poor.data.code, 'funds');
+    } finally {
+        await s.close();
+    }
+});

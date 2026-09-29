@@ -16,6 +16,7 @@ import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit } from './purchases.js';
 import { createPrivacyPanel } from './privacyPanel.js';
+import { createTownPanel } from './townPanel.js';
 import { isChild, canShareStats } from './privacy.js';
 import { configureAnalytics, track } from './analytics.js';
 import { generatedName } from './names.js';
@@ -79,6 +80,7 @@ const wallet = createWallet();
 let profile = cachedProfile();
 const records = createRecordsPanel({ wallet, onProfile: next => applyProfile(next), suggestedName: legacyName() });
 document.getElementById('records-btn').addEventListener('click', () => records.open());
+const town = createTownPanel({ wallet, onProfile: next => applyProfile(next), ui });
 function applyProfile(next) {
     profile = next;
     records.setProfile(profile);
@@ -90,6 +92,7 @@ function applyProfile(next) {
     ui.updateHUD();
     setPlayerBulletColor(colors.bullets);
     ui.setProfile(profile);
+    town.setProfile(profile);
 }
 applyProfile(profile);
 let profileLoaded = false;
