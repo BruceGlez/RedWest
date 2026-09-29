@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, creditNuggets, refreshJobs, setName, rankBoard, EconomyError } from '../src/profile.js';
+import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, grantProduct, restoreProduct, refreshJobs, setName, rankBoard, EconomyError } from '../src/profile.js';
 import { getProduct } from '../src/products.js';
 import { validateName, isGeneratedName } from '../src/names.js';
 import { AGE_BANDS } from '../src/privacy.js';
@@ -37,7 +37,7 @@ export function verifyStripeSignature(rawBody, header, secret, now = Date.now())
     return signatures.some(signature => safeEqual(signature, expected));
 }
 
-export function createApp({ store, env = {}, now = () => new Date() }) {
+export function createApp({ store, env = {}, now = () => new Date(), fetchImpl = globalThis.fetch }) {
     const stripeLinks = (() => {
         try { return JSON.parse(env.STRIPE_PAYMENT_LINKS || '{}'); } catch { return {}; }
     })();
@@ -84,7 +84,7 @@ export function createApp({ store, env = {}, now = () => new Date() }) {
         const product = getProduct(productId);
         const user = loadUser(userId);
         if(!product || !user) return { ok: false, status: 404, message: 'unknown user or product' };
-        const credited = creditNuggets(user.profile, product.nuggets, transactionId);
+        const credited = grantProduct(user.profile, product, transactionId);
         store.putUser(userId, user);
         store.save();
         return { ok: true, credited };
@@ -201,6 +201,26 @@ export function createApp({ store, env = {}, now = () => new Date() }) {
                     user.nameHidden = false;
                     save();
                     return send(res, 200, { profile: user.profile });
+                }
+                // "Restore purchases" (App Store rule for non-consumables): ask RevenueCat, never the game,
+                // which one-time products this account owns, and give back their items.
+                if(url.pathname === '/api/restore' && req.method === 'POST') {
+                    if(!env.REVENUECAT_SECRET_KEY) return send(res, 503, { message: 'Restoring purchases is not set up yet.' });
+                    const response = await fetchImpl(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(id)}`, {
+                        headers: { Authorization: `Bearer ${env.REVENUECAT_SECRET_KEY}` }
+                    });
+                    if(!response.ok) return send(res, 502, { message: 'The store could not be reached. Try again later.' });
+                    const owned = Object.keys((await response.json()).subscriber?.non_subscriptions || {});
+                    const restored = [];
+                    for(const productId of owned) {
+                        const product = getProduct(productId);
+                        if(product?.oneTime) {
+                            restoreProduct(user.profile, product);
+                            restored.push(product.id);
+                        }
+                    }
+                    save();
+                    return send(res, 200, { restored, profile: user.profile });
                 }
                 if(url.pathname === '/api/privacy' && req.method === 'POST') {
                     if(!AGE_BANDS.includes(body.ageBand)) throw new EconomyError('bad_age', 'Unknown age band.');

@@ -58,6 +58,18 @@ export async function buyProduct(productId, wallet) {
     return { purchased: true };
 }
 
+// App only: "Restore purchases" for the Deputy's Kit on a new device. The store links its purchases to this
+// account, then the server checks with RevenueCat and gives back the kit's items.
+export const canRestore = () => !!nativePurchases() && !!nativeKey() && !!CONFIG.apiBase;
+export async function restorePurchases(wallet) {
+    const plugin = nativePurchases();
+    if(!plugin) throw new Error('Restoring purchases works in the app.');
+    await wallet.load();
+    await ensureConfigured(plugin, wallet.userId);
+    await plugin.restorePurchases();
+    return wallet.restorePurchases();
+}
+
 // After paying, poll the server until the webhook has credited the nuggets (usually seconds).
 export async function waitForCredit(wallet, previousNuggets, timeoutMs = 20000) {
     const deadline = Date.now() + timeoutMs;

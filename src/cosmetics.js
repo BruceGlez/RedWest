@@ -30,12 +30,12 @@ export const COSMETICS = [
     { id: 'hat-black', slot: 'hat', name: 'Outlaw Black', color: 0x1f1f1f, price: 150, currency: 'dollars' },
     { id: 'hat-white', slot: 'hat', name: 'Sheriff White', color: 0xeeeeee, price: 300, currency: 'dollars' },
     { id: 'hat-rose', slot: 'hat', name: 'Desert Rose', color: 0xb71c1c, price: 450, currency: 'dollars' },
-    { id: 'hat-gold', slot: 'hat', name: 'Gold Rush', color: 0xffc107, price: 60, currency: 'nuggets' },
+    { id: 'hat-gold', slot: 'hat', name: 'Gold Rush', color: 0xffc107, price: 100, currency: 'nuggets' },
     { id: 'coat-saddle', slot: 'coat', name: 'Saddle Brown', color: 0xb8662a, price: 0, currency: 'dollars' },
     { id: 'coat-navy', slot: 'coat', name: 'Cavalry Navy', color: 0x283593, price: 200, currency: 'dollars' },
     { id: 'coat-sage', slot: 'coat', name: 'Sagebrush', color: 0x558b2f, price: 250, currency: 'dollars' },
     { id: 'coat-duster', slot: 'coat', name: 'Pale Duster', color: 0xd7ccc8, price: 400, currency: 'dollars' },
-    { id: 'coat-midnight', slot: 'coat', name: 'Midnight Velvet', color: 0x4a148c, price: 80, currency: 'nuggets' },
+    { id: 'coat-midnight', slot: 'coat', name: 'Midnight Velvet', color: 0x4a148c, price: 100, currency: 'nuggets' },
     { id: 'pants-denim', slot: 'pants', name: 'Denim', color: 0x3f5a8a, price: 0, currency: 'dollars' },
     { id: 'pants-black', slot: 'pants', name: 'Black Jeans', color: 0x212121, price: 100, currency: 'dollars' },
     { id: 'pants-chaps', slot: 'pants', name: 'Leather Chaps', color: 0x8d6e63, price: 180, currency: 'dollars' },
@@ -43,7 +43,11 @@ export const COSMETICS = [
     { id: 'bullets-ice', slot: 'bullets', name: 'Ice Blue', color: 0x00e5ff, price: 250, currency: 'dollars' },
     { id: 'bullets-rose', slot: 'bullets', name: 'Hot Pink', color: 0xff4081, price: 250, currency: 'dollars' },
     { id: 'bullets-venom', slot: 'bullets', name: 'Venom Green', color: 0x76ff03, price: 350, currency: 'dollars' },
-    { id: 'bullets-ember', slot: 'bullets', name: 'Ember', color: 0xff6d00, price: 40, currency: 'nuggets' },
+    { id: 'bullets-ember', slot: 'bullets', name: 'Ember', color: 0xff6d00, price: 50, currency: 'nuggets' },
+    // The Deputy's Kit (starter pack, src/products.js): only from that purchase.
+    { id: 'hat-deputy', slot: 'hat', name: 'Deputy Grey', color: 0x5f6368, price: 0, currency: 'dollars', earned: 'purchase' },
+    { id: 'coat-deputy', slot: 'coat', name: 'Deputy Long Coat', color: 0x37474f, price: 0, currency: 'dollars', earned: 'purchase' },
+    { id: 'bullets-deputy', slot: 'bullets', name: 'Tin Star', color: 0xcfd8dc, price: 0, currency: 'dollars', earned: 'purchase' },
     // Weekly event prizes: earned only (src/events.js)
     ...EVENT_COSMETICS
 ];

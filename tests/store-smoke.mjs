@@ -79,6 +79,14 @@ try {
         assert.ok((await page.locator('#shop-preview-img').getAttribute('src'))?.startsWith('data:image/png'), 'outfit preview renders');
         await page.locator('[data-tab="nuggets"]').click();
         assert.equal(await page.locator('[data-product]:not([disabled])').count(), 0, 'real-money packs are off without a server');
+        // The Deputy's Kit lists everything it contains and its real price; no countdown anywhere.
+        const kit = await page.locator('.kit-card').textContent();
+        assert.match(kit, /DEPUTY'S KIT/);
+        assert.match(kit, /Deputy Grey, Deputy Long Coat, Tin Star \+ ◆200/);
+        assert.doesNotMatch(await page.locator('#shop-grid').textContent(), /left|hurry|ends in|only \d/i);
+        // Nugget-priced looks show roughly what they cost in real money.
+        await page.locator('[data-tab="hat"]').click();
+        assert.match(await page.locator('.shop-card', { hasText: 'Gold Rush' }).locator('button').textContent(), /◆100 · \$0\.99/);
         await page.locator('[data-tab="hat"]').click();
         const buy = page.locator('[data-item="hat-black"]');
         await buy.click();

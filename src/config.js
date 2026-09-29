@@ -17,6 +17,7 @@ export const CONFIG = {
     stripeLinks: {
         nuggets_100: env.VITE_STRIPE_LINK_NUGGETS_100 || '',
         nuggets_550: env.VITE_STRIPE_LINK_NUGGETS_550 || '',
-        nuggets_1200: env.VITE_STRIPE_LINK_NUGGETS_1200 || ''
+        nuggets_1200: env.VITE_STRIPE_LINK_NUGGETS_1200 || '',
+        starter_pack: env.VITE_STRIPE_LINK_STARTER_PACK || ''
     }
 };

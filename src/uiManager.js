@@ -6,10 +6,10 @@ import { ENEMY_TYPES, ENEMY_ORDER } from './enemyTypes.js';
 import { SHOP_ITEMS, SLOTS, SLOT_LABELS, getShopItem, loadoutColors } from './cosmetics.js';
 import { getWeapon, defaultWeapon, weaponBars } from './weapons.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
-import { PRODUCTS } from './products.js';
+import { PRODUCTS, nuggetsInMoney } from './products.js';
 import { track } from './analytics.js';
 import { ownsItem } from './profile.js';
-import { purchaseSupport } from './purchases.js';
+import { purchaseSupport, canRestore } from './purchases.js';
 import { arena } from './arena.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 
@@ -277,6 +277,7 @@ export function createUIManager(gameState, playerStats) {
             ? `You rode on and didn't make it: the ${gameState.bounty.amount} bounty and the extra points are lost. You kept ${gameState.score.toLocaleString()}.`
             : detail;
         renderRoadResult(roadResult);
+        renderStarterOffer(result);
         els.resultEarnings.innerHTML = '<p class="earn-title">Counting your earnings...</p>';
         els.gameOver.style.display = 'flex';
         els.finalScore.innerText = gameState.score;
@@ -288,6 +289,23 @@ export function createUIManager(gameState, playerStats) {
         // Start at the top so the stars and result are seen before the long run report.
         const panel = els.gameOver.querySelector('.modal-content');
         if(panel) panel.scrollTop = 0;
+    }
+
+    // The Deputy's Kit is mentioned once, calmly, after the player's first outlaw win (never after a loss,
+    // never with a countdown); after that it simply stays in the shop.
+    const STARTER_OFFERED_KEY = 'redWestStarterOffered';
+    function renderStarterOffer(result) {
+        const box = document.getElementById('result-offer');
+        box.style.display = 'none';
+        const kit = PRODUCTS.find(p => p.id === 'starter_pack');
+        let offered = true;
+        try { offered = !!localStorage.getItem(STARTER_OFFERED_KEY); } catch { /* storage blocked: do not offer */ }
+        if(result === 'died' || offered || childMode || profile?.bought?.includes(kit.id) || !purchaseSupport(kit.id).available) return;
+        try { localStorage.setItem(STARTER_OFFERED_KEY, '1'); } catch { /* fine */ }
+        box.innerHTML = `<p><b>${kit.label}</b>: ${kit.items.map(id => getShopItem(id).name).join(', ')} and &#9670;${kit.nuggets}, ${kit.price}. `
+            + 'One per player; it stays in the shop.</p><button type="button" class="shop-tab" data-see-kit>SEE IT IN THE SHOP</button>';
+        box.style.display = '';
+        box.querySelector('[data-see-kit]').addEventListener('click', () => openShop('nuggets'));
     }
 
     // Spell out both outcomes in points and stars, so the choice needs no rules reading.
@@ -359,7 +377,8 @@ export function createUIManager(gameState, playerStats) {
 
     // ---------- Economy: balances, shop, daily jobs, earnings ----------
     const hexColor = color => `#${color.toString(16).padStart(6, '0')}`;
-    const priceLabel = item => (item.currency === 'nuggets' ? `&#9670;${item.price}` : `$${item.price}`);
+    // Nugget prices always show roughly what they cost in real money.
+    const priceLabel = item => (item.currency === 'nuggets' ? `&#9670;${item.price} &middot; ${nuggetsInMoney(item.price)}` : `$${item.price}`);
     const owns = id => ownsItem(profile, id);
 
     function setProfile(nextProfile) {
@@ -402,12 +421,24 @@ export function createUIManager(gameState, playerStats) {
             els.shopGrid.innerHTML = PRODUCTS.map(product => {
                 const support = purchaseSupport(product.id);
                 const pending = confirmId === product.id;
+                if(product.kind === 'bundle') {
+                    // The Deputy's Kit: everything in it is listed, with the real price. No countdown, ever.
+                    const bought = profile.bought?.includes(product.id);
+                    const items = product.items.map(id => getShopItem(id));
+                    return `<div class="shop-card nugget-card kit-card"><div class="kit-swatches">`
+                        + items.map(item => `<span class="shop-swatch${item.slot === 'bullets' ? ' bullet' : ''}" style="--swatch:${hexColor(item.color)}"></span>`).join('')
+                        + `</div><div class="shop-name">${product.label.toUpperCase()}</div>`
+                        + `<div class="shop-sub">${items.map(item => item.name).join(', ')} + &#9670;${product.nuggets}. One per player.</div>`
+                        + `<button type="button" class="shop-action${pending ? ' confirm' : ''}" data-product="${product.id}"${support.available && !bought ? '' : ' disabled'}>`
+                        + `${bought ? 'OWNED' : pending ? `CONFIRM ${product.price}` : support.available ? product.price : 'SOON'}</button></div>`;
+                }
                 return `<div class="shop-card nugget-card">${product.badge ? `<span class="shop-badge">${product.badge}</span>` : ''}`
                     + `<div class="nugget-icon">&#9670;</div><div class="shop-name">${product.nuggets.toLocaleString()} NUGGETS</div>`
                     + `<div class="shop-sub">${product.label}</div>`
                     + `<button type="button" class="shop-action${pending ? ' confirm' : ''}" data-product="${product.id}"${support.available ? '' : ' disabled'}>`
                     + `${pending ? `CONFIRM ${product.price}` : support.available ? product.price : 'SOON'}</button></div>`;
-            }).join('') + `<p class="shop-fineprint">${purchaseSupport(PRODUCTS[0].id).available
+            }).join('') + (canRestore() ? '<button type="button" class="shop-tab restore-btn" data-restore>RESTORE PURCHASES</button>' : '')
+                + `<p class="shop-fineprint">${purchaseSupport(PRODUCTS[0].id).available
                 ? 'Real money. You will confirm in the App Store / checkout before being charged. Under 18? Ask a parent first.'
                 : purchaseSupport(PRODUCTS[0].id).reason} Gold Nuggets are also earned by finishing all daily jobs.</p>`;
             return;
@@ -462,6 +493,11 @@ export function createUIManager(gameState, playerStats) {
             shopTab = tab.dataset.tab;
             confirmId = null;
             renderShop();
+            return;
+        }
+        if(event.target.closest('[data-restore]')) {
+            shopMessage('Restoring purchases...');
+            await shopHandlers.onRestorePurchases?.();
             return;
         }
         const productButton = event.target.closest('[data-product]');

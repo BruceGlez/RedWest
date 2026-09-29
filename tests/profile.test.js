@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { getShopItem } from '../src/cosmetics.js';
 import assert from 'node:assert/strict';
 import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, creditNuggets, ownsItem, refreshJobs, MAX_DOLLARS_PER_RUN, EconomyError } from '../src/profile.js';
 import { jobsForDay, getJob, JOB_POOL, JOBS_PER_DAY } from '../src/jobs.js';
@@ -39,7 +40,7 @@ test('buying spends the right currency, rejects duplicates and short funds', () 
     assert.ok(ownsItem(p, 'hat-black'));
     assert.throws(() => buyItem(p, 'hat-black'), e => e.code === 'owned');
     assert.throws(() => buyItem(p, 'hat-gold'), e => e.code === 'funds', 'nugget items need nuggets');
-    p.balances.nuggets = 60;
+    p.balances.nuggets = getShopItem('hat-gold').price;
     buyItem(p, 'hat-gold');
     assert.equal(p.balances.nuggets, 0);
 });

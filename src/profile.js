@@ -31,7 +31,8 @@ export function createProfile(now = new Date()) {
         event: createEventProgress(weekKey(now)), // this week's Most Wanted event (src/events.js)
         // Account records, also the source for online leaderboards.
         stats: { runs: 0, bestScore: 0, stageBest: OUTLAWS.map(() => 0), stageStars: OUTLAWS.map(() => 0), weekly: { week: weekKey(now), score: 0 }, kills: 0 },
-        processed: [] // ids of already-credited purchases (idempotency)
+        processed: [], // ids of already-credited purchases (idempotency)
+        bought: [] // one-time products already bought (the starter pack)
     };
 }
 
@@ -48,6 +49,7 @@ export function normalizeProfile(raw, now = new Date()) {
         profile.jobs.bonusPaid = !!raw.jobs.bonusPaid;
     }
     profile.processed = (raw.processed || []).filter(id => typeof id === 'string').slice(-500);
+    profile.bought = [...new Set((raw.bought || []).filter(id => typeof id === 'string'))];
     profile.town = normalizeTown(raw.town, now);
     profile.event = normalizeEventProgress(raw.event, weekKey(now));
     if(raw.name && validateName(raw.name).ok) profile.name = validateName(raw.name).name;
@@ -118,6 +120,7 @@ export function buyItem(profile, id) {
     if(!item) throw new EconomyError('unknown_item', 'That item does not exist.');
     if(ownsItem(profile, id)) throw new EconomyError('owned', 'You already own this.');
     if(item.unlock) throw new EconomyError('earned', 'Earn all three of this outlaw\'s stars to play as them.');
+    if(item.earned === 'purchase') throw new EconomyError('earned', "Comes with the Deputy's Kit.");
     if(item.earned) throw new EconomyError('earned', 'Win this in the weekly Most Wanted event.');
     if(profile.balances[item.currency] < item.price) throw new EconomyError('funds', `Not enough ${CURRENCIES[item.currency].name.toLowerCase()}.`);
     profile.balances[item.currency] -= item.price;
@@ -200,6 +203,25 @@ export function applyRun(profile, summary, now = new Date()) {
     profile.balances.dollars += dollars;
     profile.balances.nuggets += nuggets;
     return { dollars, nuggets, lines, jobsCompleted, ranked };
+}
+
+// A verified store purchase (src/products.js): nuggets and any items. `transactionId` makes repeated webhook
+// deliveries safe; a one-time product pays its nuggets only the first time.
+export function grantProduct(profile, product, transactionId) {
+    if(transactionId && profile.processed.includes(transactionId)) return false;
+    const firstTime = !profile.bought.includes(product.id);
+    if(!product.oneTime || firstTime) profile.balances.nuggets += Math.max(0, Math.floor(product.nuggets || 0));
+    for(const id of product.items || []) if(!profile.owned.includes(id)) profile.owned.push(id);
+    if(product.oneTime && firstTime) profile.bought.push(product.id);
+    if(transactionId) profile.processed.push(transactionId);
+    profile.processed = profile.processed.slice(-500);
+    return true;
+}
+
+// Restoring a one-time purchase on a new device (after the store confirms it): its items, not its nuggets.
+export function restoreProduct(profile, product) {
+    for(const id of product.items || []) if(!profile.owned.includes(id)) profile.owned.push(id);
+    if(!profile.bought.includes(product.id)) profile.bought.push(product.id);
 }
 
 // Paid currency. `transactionId` makes repeated webhook deliveries safe.

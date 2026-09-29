@@ -14,7 +14,7 @@ import { OUTLAWS } from './outlaws.js';
 import { arena } from './arena.js';
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
-import { buyProduct, waitForCredit } from './purchases.js';
+import { buyProduct, waitForCredit, restorePurchases } from './purchases.js';
 import { createPrivacyPanel } from './privacyPanel.js';
 import { createTownPanel } from './townPanel.js';
 import { disableReminders } from './reminders.js';
@@ -238,6 +238,15 @@ ui.bindControlHandlers({
         try {
             applyProfile(await wallet.equip(id));
             ui.shopMessage('');
+        } catch(error) {
+            ui.shopMessage(error.message, true);
+        }
+    },
+    onRestorePurchases: async () => {
+        try {
+            const result = await restorePurchases(wallet);
+            applyProfile(result.profile);
+            ui.shopMessage(result.restored.length ? "Restored: the Deputy's Kit." : 'Nothing to restore on this account.');
         } catch(error) {
             ui.shopMessage(error.message, true);
         }

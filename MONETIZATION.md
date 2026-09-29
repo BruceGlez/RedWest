@@ -59,6 +59,7 @@ Any Node host works (Render, Railway, Fly.io, a VPS). Set these environment vari
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the Stripe webhook endpoint |
 | `STRIPE_PAYMENT_LINKS` | JSON mapping Payment Link ids to products, e.g. `{"plink_abc":"nuggets_100","plink_def":"nuggets_550","plink_ghi":"nuggets_1200"}` |
 | `DATA_FILE` | Path on the persistent disk |
+| `REVENUECAT_SECRET_KEY` | RevenueCat secret API key (`sk_…`), used only by the server for **Restore purchases** of the Deputy's Kit. |
 | `ADMIN_TOKEN` | A long random string for moderation (below). Never put it in a `VITE_*` variable. |
 
 Then point the game at it. In GitHub go to **Settings → Secrets and variables → Actions → Variables** and
@@ -81,7 +82,9 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: applicati
 
 1. Apple Developer Program ($99/yr). In **App Store Connect**, create the app (bundle id
    `com.bruceglez.redwest`). Add three **Consumable** in-app purchases with the product ids
-   `nuggets_100`, `nuggets_550`, `nuggets_1200` and prices ($0.99, $4.99, $9.99). Complete the Paid
+   `nuggets_100`, `nuggets_550`, `nuggets_1200` and prices ($0.99, $4.99, $9.99), and one
+   **Non-Consumable** `starter_pack` ($1.99, the Deputy's Kit: three looks + 200 nuggets, once per player;
+   the shop's RESTORE PURCHASES button gives the looks back on a new device). Complete the Paid
    Applications agreement.
 2. **RevenueCat** (free to start): create a project, add the iOS app, and connect App Store Connect
    (in-app purchase key). Import the three products.
@@ -101,7 +104,8 @@ server credits.
 3. Add a **webhook endpoint** `https://<your server>/webhooks/stripe` for the event
    `checkout.session.completed`. Put its signing secret in `STRIPE_WEBHOOK_SECRET` and the
    `plink_…` → product mapping in `STRIPE_PAYMENT_LINKS`.
-4. Put each link's URL in the GitHub variables `VITE_STRIPE_LINK_NUGGETS_100` / `_550` / `_1200`.
+4. Put each link's URL in the GitHub variables `VITE_STRIPE_LINK_NUGGETS_100` / `_550` / `_1200` and
+   `VITE_STRIPE_LINK_STARTER_PACK` (and map its `plink_…` to `starter_pack` in `STRIPE_PAYMENT_LINKS`).
 5. Test in Stripe **test mode** first (card 4242 4242 4242 4242).
 
 Note: inside the iOS app, Apple requires its own In-App Purchase for digital goods. Links out to web

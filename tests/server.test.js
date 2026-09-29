@@ -270,3 +270,46 @@ test('event runs reach the MOST WANTED board and pay their prizes on the server'
         await s.close();
     }
 });
+
+test('restore asks RevenueCat, never the game, and gives back only one-time items', async () => {
+    const { createProfile } = await import('../src/profile.js');
+    void createProfile;
+    const store = createMemoryStore();
+    const calls = [];
+    const fetchImpl = async (url, options) => {
+        calls.push([url, options.headers.Authorization]);
+        return { ok: true, json: async () => ({ subscriber: { non_subscriptions: { starter_pack: [{ id: 'x' }], nuggets_550: [{ id: 'y' }] } } }) };
+    };
+    const app = createApp({ store, env: { ...ENV, REVENUECAT_SECRET_KEY: 'sk_test' }, fetchImpl });
+    const server = createServer(app);
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+        const account = await (await fetch(`${base}/api/account`, { method: 'POST' })).json();
+        const response = await fetch(`${base}/api/restore`, { method: 'POST', headers: { Authorization: `Bearer ${account.token}`, 'Content-Type': 'application/json' }, body: '{}' });
+        const data = await response.json();
+        assert.deepEqual(data.restored, ['starter_pack'], 'consumable nugget packs are not restored');
+        assert.equal(data.profile.balances.nuggets, 0);
+        assert.ok(data.profile.owned.includes('hat-deputy'));
+        assert.equal(calls[0][0], `https://api.revenuecat.com/v1/subscribers/${account.userId}`);
+        assert.equal(calls[0][1], 'Bearer sk_test');
+    } finally {
+        await new Promise(resolve => server.close(resolve));
+    }
+});
+
+test('a starter pack webhook credits items and nuggets once', async () => {
+    const s = await startServer();
+    try {
+        const { data: account } = await s.call('/api/account');
+        const hook = id => s.call('/webhooks/revenuecat', { headers: { Authorization: 'Bearer rc-secret' }, body: { event: { type: 'NON_RENEWING_PURCHASE', app_user_id: account.userId, product_id: 'starter_pack', transaction_id: id } } });
+        await hook('kit-1');
+        await hook('kit-1');
+        const profile = (await s.call('/api/profile', { token: account.token })).data.profile;
+        assert.equal(profile.balances.nuggets, 200);
+        assert.ok(profile.owned.includes('coat-deputy'));
+        assert.deepEqual(profile.bought, ['starter_pack']);
+    } finally {
+        await s.close();
+    }
+});

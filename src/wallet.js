@@ -81,6 +81,7 @@ export function createLocalWallet() {
         statsSender: null, // offline: statistics are never collected
         async setPrivacy() {},
         async reportName() {},
+        async restorePurchases() { throw new Error('Restoring purchases needs the Red West server.'); },
         async deleteAccount() { clearDeviceData(); },
         async reportRun(summary) {
             const result = applyRun(profile, summary);
@@ -129,6 +130,7 @@ export function createRemoteWallet(apiBase) {
         async setPrivacy(privacy) { await call('/api/privacy', { ageBand: privacy.ageBand, statsConsent: privacy.statsConsent }); },
         statsSender: events => call('/api/events', { events }),
         async reportName(name) { await call('/api/report', { name }); },
+        async restorePurchases() { return call('/api/restore', {}); },
         async deleteAccount() {
             if(account) await call('/api/account/delete', {});
             clearDeviceData();

@@ -963,3 +963,8 @@ body.town-open #start-screen { visibility: hidden; }
     .town-sheet { max-height: calc(100% - 70px); }
     .town-label { font-size: 12px; padding: 2px 8px; }
 }
+.kit-card .kit-swatches { display: flex; gap: 4px; justify-content: center; }
+.kit-card .kit-swatches .shop-swatch { width: 30px; height: 30px; }
+.restore-btn { grid-column: 1 / -1; justify-self: center; }
+.result-offer { margin: 8px auto; max-width: 420px; padding: 8px 12px; border: 2px solid #c8a050; border-radius: 10px; background: rgba(0, 0, 0, 0.3); font-size: 13px; }
+.result-offer p { margin: 0 0 6px; }
