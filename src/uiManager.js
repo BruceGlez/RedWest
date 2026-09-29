@@ -531,7 +531,7 @@ export function createUIManager(gameState, playerStats) {
             els.resultEarnings.innerHTML = `<p class="earn-error">Earnings not saved: ${error}</p>`;
             return;
         }
-        const lines = result.lines.map(line => `<li><span>${line.label}</span><b>${line.nuggets ? `+&#9670;${line.nuggets}` : `+$${line.dollars}`}</b></li>`).join('');
+        const lines = result.lines.map(line => `<li><span>${line.label}</span><b>${line.item ? 'NEW!' : line.nuggets ? `+&#9670;${line.nuggets}` : `+$${line.dollars}`}</b></li>`).join('');
         els.resultEarnings.innerHTML = `<p class="earn-title">EARNED <b>$${result.dollars}</b>${result.nuggets ? ` <b>&#9670;${result.nuggets}</b>` : ''}</p><ul class="earn-lines">${lines}</ul>`;
     }
 
@@ -861,6 +861,7 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         showTown() {
             showPanel(els.panels[6]);
         },
+        hidePanels,
         setChildMode(on) {
             childMode = !!on;
             if(els.panels[4].style.display !== 'none') renderShop();

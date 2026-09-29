@@ -83,7 +83,17 @@ const wallet = createWallet();
 let profile = cachedProfile();
 const records = createRecordsPanel({ wallet, onProfile: next => applyProfile(next), suggestedName: legacyName() });
 document.getElementById('records-btn').addEventListener('click', () => records.open());
-const town = createTownPanel({ wallet, onProfile: next => applyProfile(next), ui });
+const town = createTownPanel({
+    wallet,
+    onProfile: next => applyProfile(next),
+    ui,
+    // Most Wanted: fight this week's event outlaw (its model first), then back to the home screen.
+    onRideOut: event => {
+        ui.hidePanels();
+        gameState.pendingEvent = event;
+        loadOutlawModel(event.outlaw).then(() => { keys.startRequested = true; });
+    }
+});
 function applyProfile(next) {
     profile = next;
     records.setProfile(profile);

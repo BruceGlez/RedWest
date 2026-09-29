@@ -14,8 +14,9 @@ export function heatSpawnMultiplier(level) {
     return 1 + (Math.max(0, Math.min(MAX_HEAT, level)) * 0.18);
 }
 
-export function recordKill(heat) {
-    heat.streak = heat.chainTimer > 0 ? heat.streak + 1 : 1;
+// gain: how much a kill adds to the chain (2 during the "Hot Trail" event twist).
+export function recordKill(heat, gain = 1) {
+    heat.streak = heat.chainTimer > 0 ? heat.streak + gain : gain;
     heat.chainTimer = CHAIN_WINDOW;
     heat.decayTimer = DECAY_INTERVAL;
     // A fresh chain builds from the current (decaying) level instead of resetting it.

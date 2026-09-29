@@ -11,7 +11,7 @@ import { markObstacleGridDirty, getGridStats } from './physics.js';
 import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
 import { buildRunRecord, appendRunRecord } from './runLog.js';
 import { track } from './analytics.js';
-import { getOutlaw, applyOutlawToWave } from './outlaws.js';
+import { getOutlaw, applyOutlawToWave, setEventModifiers } from './outlaws.js';
 import { ENEMY_TYPES, rosterWave, featuredFor, enemyCost } from './enemyTypes.js';
 import { markSeen, recordKills } from './progress.js';
 import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
@@ -113,7 +113,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         if(result === 'died') playerSystem.die();
         ui.hideBountyChoice();
         ui.setRunLog(appendRunRecord(buildRunRecord(gameState, result, sessionRun)));
-        const roadResult = recordRun(progress, gameState.outlawIndex, gameState.bounty, gameState.score);
+        // Event runs do not move the Wanted Road (the event outlaw may not be unlocked yet).
+        const roadResult = gameState.event ? null : recordRun(progress, gameState.outlawIndex, gameState.bounty, gameState.score);
         recordKills(progress, gameState.runStats.kills);
         reportEarnings(roadResult);
         saveProgress(progress);
@@ -137,7 +138,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             // Leaderboard records: the server checks the score is plausible for the run's length.
             seconds: Math.round(gameState.runTime),
             outlawIndex: gameState.outlawIndex,
-            heatAtOutlaw: gameState.bounty.heatAtOffer
+            heatAtOutlaw: gameState.bounty.heatAtOffer,
+            event: gameState.event?.week
         };
         economy.reportRun(summary)
             .then(result => ui.showEarnings(result))
@@ -207,7 +209,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         },
         onEnemyKilled: (type, position) => {
             const levelBefore = gameState.heat.level;
-            const multiplier = recordKill(gameState.heat);
+            const multiplier = recordKill(gameState.heat, gameState.event?.twist.heatGain || 1);
             if(gameState.heat.level > levelBefore) {
                 playSound('heatUp');
                 ui.showHeatEvent('up');
@@ -263,7 +265,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 gameState.waveBudgetRemaining -= enemyCost(type);
             }
             const boss = getOutlaw(gameState.outlawIndex).name;
-            const gang = waveNumber === 1 ? `${boss}${boss.endsWith('S') ? "'" : "'S"} GANG — ` : '';
+            const gang = waveNumber !== 1 ? '' : gameState.event ? `MOST WANTED: ${gameState.event.twist.name} — `
+                : `${boss}${boss.endsWith('S') ? "'" : "'S"} GANG — `;
             ui.showWaveBanner(`${gang}PURSUIT ${waveNumber} / ${FINAL_WAVE}`, waveNumber === 1 ? 2500 : 1800);
         }
     }
@@ -418,6 +421,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
     function resetGame() {
         bountyChoiceAt = 0;
+        gameState.event = null;
+        setEventModifiers([]);
         setMusicTrack('home');
         resetFeedback();
         clearSceneCollections();
@@ -505,7 +510,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 keys.startRequested = false;
                 track('run_start');
                 gameState.isGameStarted = true;
-                gameState.outlawIndex = arena.enabled ? arena.outlaw : progress.selected;
+                // A Most Wanted event run (picked in Frontier Town) fights that week's outlaw with its twist.
+                const event = arena.enabled ? null : gameState.pendingEvent;
+                gameState.pendingEvent = null;
+                gameState.event = event || null;
+                setEventModifiers(event?.twist.modifiers);
+                gameState.outlawIndex = arena.enabled ? arena.outlaw : event ? event.outlaw : progress.selected;
                 sessionRun++;
                 ui.hideStartScreen();
                 camera.position.copy(cameraOffset());

@@ -1,6 +1,7 @@
 import { WEAPONS, WEAPON_SLOTS } from './weapons.js';
 import { OUTLAWS } from './outlaws.js';
 import { OUTLAW_PERKS } from './perks.js';
+import { EVENT_COSMETICS } from './events.js';
 
 // Shop catalog: guns (src/weapons.js) plus cosmetics. Cosmetics never change gameplay; guns do,
 // so they are sold for earned Bounty Dollars only (no pay-to-win). Price 0 = owned by default.
@@ -42,7 +43,9 @@ export const COSMETICS = [
     { id: 'bullets-ice', slot: 'bullets', name: 'Ice Blue', color: 0x00e5ff, price: 250, currency: 'dollars' },
     { id: 'bullets-rose', slot: 'bullets', name: 'Hot Pink', color: 0xff4081, price: 250, currency: 'dollars' },
     { id: 'bullets-venom', slot: 'bullets', name: 'Venom Green', color: 0x76ff03, price: 350, currency: 'dollars' },
-    { id: 'bullets-ember', slot: 'bullets', name: 'Ember', color: 0xff6d00, price: 40, currency: 'nuggets' }
+    { id: 'bullets-ember', slot: 'bullets', name: 'Ember', color: 0xff6d00, price: 40, currency: 'nuggets' },
+    // Weekly event prizes: earned only (src/events.js)
+    ...EVENT_COSMETICS
 ];
 
 export const SHOP_ITEMS = [...CHARACTERS, ...WEAPONS, ...COSMETICS];

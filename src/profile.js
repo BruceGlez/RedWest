@@ -5,6 +5,7 @@ import { OUTLAWS } from './outlaws.js';
 import { starsForRun, starCount } from './progress.js';
 import { EconomyError } from './economyError.js';
 import { createTown, normalizeTown, buildingEffects } from './town.js';
+import { eventForWeek, createEventProgress, normalizeEventProgress, recordEventScore } from './events.js';
 
 // The player's economy profile: balances, owned cosmetics, loadout and daily jobs. These pure
 // functions are shared by the in-browser playtest wallet and the server (server/), so both apply
@@ -27,6 +28,7 @@ export function createProfile(now = new Date()) {
         jobs: { day: dayKey(now), list: jobsForDay(dayKey(now)), bonusPaid: false },
         name: '',
         town: createTown(now), // Frontier Town buildings and the Jail's last collection (src/town.js)
+        event: createEventProgress(weekKey(now)), // this week's Most Wanted event (src/events.js)
         // Account records, also the source for online leaderboards.
         stats: { runs: 0, bestScore: 0, stageBest: OUTLAWS.map(() => 0), stageStars: OUTLAWS.map(() => 0), weekly: { week: weekKey(now), score: 0 }, kills: 0 },
         processed: [] // ids of already-credited purchases (idempotency)
@@ -47,6 +49,7 @@ export function normalizeProfile(raw, now = new Date()) {
     }
     profile.processed = (raw.processed || []).filter(id => typeof id === 'string').slice(-500);
     profile.town = normalizeTown(raw.town, now);
+    profile.event = normalizeEventProgress(raw.event, weekKey(now));
     if(raw.name && validateName(raw.name).ok) profile.name = validateName(raw.name).name;
     const s = raw.stats || {};
     const num = v => Math.max(0, Math.floor(Number(v)) || 0);
@@ -98,6 +101,7 @@ export function ownsItem(profile, id) {
     const item = getShopItem(id);
     if(!item) return false;
     if(item.unlock) return profile.stats.stageStars[item.unlock.outlaw] === 7;
+    if(item.earned) return profile.owned.includes(id); // event prizes
     return item.price === 0 || profile.owned.includes(id);
 }
 
@@ -114,6 +118,7 @@ export function buyItem(profile, id) {
     if(!item) throw new EconomyError('unknown_item', 'That item does not exist.');
     if(ownsItem(profile, id)) throw new EconomyError('owned', 'You already own this.');
     if(item.unlock) throw new EconomyError('earned', 'Earn all three of this outlaw\'s stars to play as them.');
+    if(item.earned) throw new EconomyError('earned', 'Win this in the weekly Most Wanted event.');
     if(profile.balances[item.currency] < item.price) throw new EconomyError('funds', `Not enough ${CURRENCIES[item.currency].name.toLowerCase()}.`);
     profile.balances[item.currency] -= item.price;
     profile.owned.push(id);
@@ -166,7 +171,19 @@ export function applyRun(profile, summary, now = new Date()) {
     const week = weekKey(now);
     if(stats.weekly.week !== week) stats.weekly = { week, score: 0 };
     const stage = Math.floor(Number(summary.outlawIndex));
-    if(ranked) {
+    // A Most Wanted event run: this week's event outlaw, reported during this week. It counts for the
+    // event (and jobs), not for the Wanted Road records or the other leaderboards.
+    const event = eventForWeek(week);
+    const eventRun = summary.event === week && stage === event.outlaw;
+    const eventLines = [];
+    if(ranked && eventRun) {
+        profile.event = normalizeEventProgress(profile.event, week);
+        for(const reward of recordEventScore(profile, event, score)) {
+            eventLines.push({ label: `Most Wanted target ${reward.tier}: ${reward.target.toLocaleString()}`, dollars: reward.dollars });
+            if(reward.item) eventLines.push({ label: `Prize: ${reward.item.name} ${reward.item.slot}`, item: reward.item.id });
+        }
+    }
+    if(ranked && !eventRun) {
         stats.bestScore = Math.max(stats.bestScore, score);
         stats.weekly.score = Math.max(stats.weekly.score, score);
         // Stages unlock in order: a record needs the previous outlaw beaten on this account.
@@ -176,7 +193,10 @@ export function applyRun(profile, summary, now = new Date()) {
         }
     }
 
-    const dollars = Math.min(MAX_DOLLARS_PER_RUN, lines.reduce((sum, line) => sum + (line.dollars || 0), 0));
+    // Event prizes come on top of the per-run cap, so reaching targets never crowds out run earnings.
+    const dollars = Math.min(MAX_DOLLARS_PER_RUN, lines.reduce((sum, line) => sum + (line.dollars || 0), 0))
+        + eventLines.reduce((sum, line) => sum + (line.dollars || 0), 0);
+    lines.push(...eventLines);
     profile.balances.dollars += dollars;
     profile.balances.nuggets += nuggets;
     return { dollars, nuggets, lines, jobsCompleted, ranked };
@@ -209,6 +229,7 @@ export function importProgress(profile, progress) {
 export const BOARDS = {
     weekly: { label: 'THIS WEEK', detail: 'Best single run this week (resets Monday, UTC)' },
     stars: { label: 'WANTED STARS', detail: 'Stars earned across the whole Wanted Road' },
+    event: { label: 'MOST WANTED (EVENT)', detail: 'Best score in this week\'s Most Wanted event' },
     ...Object.fromEntries(OUTLAWS.map((outlaw, i) => [`stage-${i}`, { label: outlaw.name, detail: `Best run against ${outlaw.name}` }]))
 };
 
@@ -216,6 +237,7 @@ export function boardValue(profile, board, now = new Date()) {
     const s = profile.stats;
     if(board === 'weekly') return s.weekly.week === weekKey(now) ? s.weekly.score : 0;
     if(board === 'stars') return s.stageStars.reduce((sum, mask) => sum + starCount(mask), 0);
+    if(board === 'event') return profile.event?.week === weekKey(now) ? profile.event.best : 0;
     const stage = /^stage-(\d+)$/.exec(board)?.[1];
     return stage !== undefined ? (s.stageBest[Number(stage)] || 0) : 0;
 }

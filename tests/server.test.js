@@ -251,3 +251,22 @@ test('the town uses the server clock', async () => {
         await s.close();
     }
 });
+
+test('event runs reach the MOST WANTED board and pay their prizes on the server', async () => {
+    const { eventForWeek } = await import('../src/events.js');
+    const { weekKey } = await import('../src/profile.js');
+    const s = await startAdminServer();
+    try {
+        const week = weekKey(new Date(Date.UTC(2026, 8, 28, 12)));
+        const event = eventForWeek(week);
+        const a = await s.account('EVENT RIDER');
+        const run = await s.call('/api/run', { token: a.token, body: { score: event.targets[0], seconds: 300, outlawIndex: event.outlaw, event: week, kills: {} } });
+        assert.ok(run.data.lines.some(line => line.label === `Most Wanted target 1: ${event.targets[0].toLocaleString()}`));
+        const board = await s.call('/api/leaderboard?board=event', { token: a.token });
+        assert.deepEqual(board.data.entries.map(e => [e.name, e.value]), [['EVENT RIDER', event.targets[0]]]);
+        const weekly = await s.call('/api/leaderboard?board=weekly', { token: a.token });
+        assert.equal(weekly.data.entries.length, 0, 'event scores stay off the normal weekly board');
+    } finally {
+        await s.close();
+    }
+});

@@ -1,10 +1,12 @@
 import { OUTLAWS } from './outlaws.js';
+import { eventForWeek, eventEndsAt, TIER_DOLLARS, EVENT_COSMETICS, ALL_COSMETICS_OWNED_DOLLARS } from './events.js';
+import { weekKey } from './profile.js';
 import { BUILDINGS, buildingEffects, jailedOutlaws, jailRate, jailCapacity, jailStored, hoursUntilFull, upgradeCost } from './town.js';
 import { track } from './analytics.js';
 import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, disableReminders, updateJailReminder } from './reminders.js';
 
 // The Frontier Town screen (src/town.js has the rules) and the badge on the home screen's TOWN button.
-export function createTownPanel({ wallet, onProfile, ui }) {
+export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
     const $ = id => document.getElementById(id);
     const els = {
         button: $('town-btn'),
@@ -27,6 +29,7 @@ export function createTownPanel({ wallet, onProfile, ui }) {
         const total = Math.ceil(hours * 60);
         return total >= 60 ? `${Math.floor(total / 60)}h ${total % 60}m` : `${total}m`;
     };
+    const endsIn = hours => (hours >= 24 ? `${Math.floor(hours / 24)}d ${Math.floor(hours % 24)}h` : duration(hours));
     const isOpen = () => els.screen.style.display !== 'none';
 
     function say(text, error = false) {
@@ -90,6 +93,28 @@ export function createTownPanel({ wallet, onProfile, ui }) {
             + '</div>';
     }
 
+    // The weekly Most Wanted event, on the Sheriff's notice board.
+    function eventCard() {
+        const now = new Date();
+        const event = eventForWeek(weekKey(now));
+        const mine = profile.event?.week === event.week ? profile.event : { best: 0, tiers: 0 };
+        const outlaw = OUTLAWS[event.outlaw];
+        const prize = EVENT_COSMETICS.find(item => !profile.owned.includes(item.id));
+        const targets = event.targets.map((target, i) => {
+            const done = i < mine.tiers;
+            const extra = i === event.targets.length - 1 ? (prize ? ` + ${prize.name} ${prize.slot}` : ` + $${ALL_COSMETICS_OWNED_DOLLARS}`) : '';
+            return `<li class="${done ? 'done' : ''}"><span>${done ? '&#10003;' : '&#9675;'} Score ${target.toLocaleString()}</span><b>$${TIER_DOLLARS[i]}${extra}</b></li>`;
+        }).join('');
+        return `<div class="town-card event-card">`
+            + `<div class="town-sign"><span>MOST WANTED THIS WEEK</span><span class="town-level">ENDS IN ${endsIn((eventEndsAt(now) - now) / 3600000)}</span></div>`
+            + `<p class="town-stat">${outlaw.name} · ${event.twist.name}: ${event.twist.detail}</p>`
+            + `<p class="town-blurb">Free to enter, as often as you like. Reach each score for its prize. `
+            + `Event runs do not move the Wanted Road. Your best this week: <b>${mine.best.toLocaleString()}</b></p>`
+            + `<ol class="event-targets">${targets}</ol>`
+            + '<div class="town-actions"><button type="button" class="shop-action collect" data-ride>RIDE OUT</button></div>'
+            + '</div>';
+    }
+
     function renderBadge() {
         if(!profile) return;
         const stored = jailStored(profile);
@@ -103,7 +128,7 @@ export function createTownPanel({ wallet, onProfile, ui }) {
         renderBadge();
         if(!profile || !isOpen()) return;
         els.dollars.textContent = profile.balances.dollars.toLocaleString();
-        els.grid.innerHTML = BUILDINGS.map(card).join('');
+        els.grid.innerHTML = eventCard() + BUILDINGS.map(card).join('');
     }
 
     async function act(work) {
@@ -146,6 +171,8 @@ export function createTownPanel({ wallet, onProfile, ui }) {
                 track('building_upgrade');
                 say(`${BUILDINGS.find(b => b.id === id).name} upgraded.`);
             });
+        } else if(button.hasAttribute('data-ride')) {
+            onRideOut(eventForWeek(weekKey(new Date())));
         } else if(button.hasAttribute('data-jobs')) {
             ui.openJobs();
         } else if(button.dataset.open) {

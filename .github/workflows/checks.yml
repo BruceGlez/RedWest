@@ -35,3 +35,6 @@ jobs:
       - run: npm run test:characters
         env:
           CHROME_PATH: /usr/bin/google-chrome
+      - run: npm run test:event
+        env:
+          CHROME_PATH: /usr/bin/google-chrome

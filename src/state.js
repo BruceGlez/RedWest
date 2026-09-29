@@ -2,6 +2,8 @@ import { createHeatState } from './heat.js';
 import { createBountyState } from './bounty.js';
 
 export const gameState = {
+    event: null, // this run's Most Wanted event (src/events.js), or null
+    pendingEvent: null, // set by Frontier Town's RIDE OUT; the next run start picks it up
     score: 0,
     isGameOver: false,
     isGameStarted: false,

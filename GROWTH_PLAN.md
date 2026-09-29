@@ -233,6 +233,11 @@ per 20 hours, moved out of 9 pm–9 am, Settings switch, cancelled by *Delete my
 - The Sheriff's Office shows the poster and the time left in the week (a real end date, not a pressure
   timer).
 
+**Built (2026-09-29):** four twists (Wolf Moon, Deadeye Week, Iron Posse, Hot Trail = Heat twice as fast),
+the event card and RIDE OUT in Frontier Town, targets rising 15% per stage, $100 / $200 / $300 plus four
+collectibles in order (then +$300), prizes paid on top of the per-run cap, a MOST WANTED board, and event
+runs kept off the Wanted Road and the other boards. Rank titles are not built. Targets need playtesting.
+
 **Measure:** share of weekly players who enter; runs per entrant; return rate on event weeks vs others.
 **Size:** medium.
 

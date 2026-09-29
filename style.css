@@ -922,3 +922,9 @@ a.round-btn { display: flex; align-items: center; justify-content: center; text-
 }
 .town-reminder span { flex: 1 1 260px; }
 .town-reminder .shop-action { width: auto; padding: 6px 12px; }
+.event-card { grid-column: 1 / -1; background: radial-gradient(ellipse at center, #fff3c4 50%, #f0c96a 100%); border-color: #8b0000; }
+.event-card .town-sign span:first-child { color: #8b0000; }
+.event-targets { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.event-targets li { display: flex; justify-content: space-between; gap: 8px; padding: 3px 8px; border-radius: 6px; background: rgba(59, 36, 18, 0.1); }
+.event-targets li.done { background: rgba(63, 191, 74, 0.25); }
+.event-card .town-actions .shop-action { flex: 0 1 220px; margin: 0 auto; }

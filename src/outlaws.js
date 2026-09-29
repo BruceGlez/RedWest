@@ -65,6 +65,13 @@ export function outlawDifficulty(index) {
     };
 }
 
+// Extra modifiers for this run: the weekly event's twist (src/events.js). Empty outside events.
+let eventModifiers = [];
+export function setEventModifiers(list = []) {
+    eventModifiers = [...list];
+}
+const activeModifiers = outlaw => [...new Set([...outlaw.modifiers, ...eventModifiers])];
+
 // Adjust the wave director's numbers for this outlaw. Returns new objects; inputs are untouched.
 export function applyOutlawToWave(wave, index) {
     const outlaw = getOutlaw(index);
@@ -73,7 +80,7 @@ export function applyOutlawToWave(wave, index) {
     const caps = { ...wave.caps };
     let budget = wave.budget * difficulty.budget;
     let interval = wave.interval * difficulty.spawnInterval;
-    for(const id of outlaw.modifiers) {
+    for(const id of activeModifiers(outlaw)) {
         if(id === 'SWARM') {
             budget *= 1.35; interval *= 0.78;
             weights.bandit *= 1.8; weights.wolf *= 1.4; weights.gunslinger *= 0.65;
@@ -101,13 +108,14 @@ export function applyOutlawToEnemy(type, stats, index) {
         result.speed *= difficulty.enemySpeed;
     }
     const shooter = type === 'gunslinger' || type === 'boss';
-    if(outlaw.modifiers.includes('SHARPSHOOTERS') && shooter) {
+    const modifiers = activeModifiers(outlaw);
+    if(modifiers.includes('SHARPSHOOTERS') && shooter) {
         result.shootCooldown *= 0.72;
         result.projectileSpeed = 52;
         result.aimSpread = 0.8;
     }
-    if(outlaw.modifiers.includes('FAST_WOLVES') && type === 'wolf') result.speed *= 1.35;
-    if(outlaw.modifiers.includes('HEAVY_HITTERS') && shooter) {
+    if(modifiers.includes('FAST_WOLVES') && type === 'wolf') result.speed *= 1.35;
+    if(modifiers.includes('HEAVY_HITTERS') && shooter) {
         result.hp += 1;
         result.projectileSpeed *= 1.1;
     }
