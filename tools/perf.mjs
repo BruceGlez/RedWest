@@ -24,7 +24,10 @@ try {
     await page.route('https://fonts.**', route => route.abort());
     await page.goto(server.resolvedUrls.local[0], { waitUntil: 'commit' });
     await page.locator('canvas').waitFor({ timeout: 90000 });
-    await page.evaluate(async () => { window.S = await import('/src/state.js'); });
+    await page.evaluate(async () => {
+        window.S = await import('/src/state.js');
+        window.__enemyCount = () => window.S.enemies.length;
+    });
 
     // Frame time from requestAnimationFrame, and renderer.info from the last frame.
     // renderer.info normally resets after the shadow pass, so it would miss shadow draw calls: reset it by
@@ -53,6 +56,7 @@ try {
             // Averages, since phones redraw shadows every other frame.
             calls: Math.round(counted.reduce((sum, f) => sum + f.calls, 0) / counted.length),
             triangles: Math.round(counted.reduce((sum, f) => sum + f.triangles, 0) / counted.length),
+            enemies: window.__enemyCount?.() ?? 0,
             geometries: r.info.memory.geometries,
             programs: r.info.programs?.length,
             medianMs: +median(times.slice(1)).toFixed(1),

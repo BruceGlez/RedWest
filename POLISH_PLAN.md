@@ -45,6 +45,31 @@ The phone target from the research is under about 50 draw calls (a first guess),
 enemy's box parts into fewer meshes (`src/meshMerge.js` already does this for the town) or draw the crowd with
 instancing, before adding anything to the world.
 
+**Done 2026-09-29: enemy draw calls.** Every box-built enemy (bandit, gunslinger, the boss figure, all the
+`createHumanoid` types, the snake, the horse with rider and the fallback box wolf) is now baked once, when it is
+built, into **one skinned mesh plus one skinned outline** (`bakeSkinned` in `src/meshMerge.js`, called from
+`src/assets.js`). Colours moved into vertex colours, so one shared material serves every enemy. The nodes that
+`animateCharacter` looks up (`leftLeg`, `rightLeg`, `leftArm`, `rightArm`, `fl`..`br`, the snake's `seg0`..`seg4`)
+became bones with the same names and transforms, so the animation code did not change. The hp bar and aim laser
+stay ordinary meshes; the muzzle marker stays where it was. Ghosts get one see-through baked material of their own,
+which the fade code already expected. Baked geometry and bone textures are freed when an enemy is removed
+(`disposeBaked`). Same seeded map, `node tools/perf.mjs`, three runs each (`enemies` is now printed too):
+
+| Scene | Before (3 runs) | After (3 runs) |
+|---|---|---|
+| Frontier Town, draw calls | 86, 86, 86 | 86, 86, 86 (not touched) |
+| Fight, 15 enemies, draw calls | 122, 184, 285 (middle 184; the crowd size varied) | 94, 72, 73 (middle 73) |
+| Fight, triangles | 27,800 to 30,600 | 28,700 to 30,600 (the same enemies, now with hidden-surface parts no longer culled one by one) |
+| Shader programs | 23 | 24 to 26 (skinned versions of the toon and outline shaders) |
+| Median frame, software rendering | 183 ms | 183 to 217 ms (no change; software rendering is fill bound, so this says nothing about phones) |
+
+A bandit went from 11 body meshes and 5 outlines to 1 body and 1 outline. What is left in a fight is scenery and the
+player: **the world pass below has to bring the 73 down** (under about 50 is the first-guess phone target, still to be
+checked on a real phone). Not done: the imported wolf and outlaw models are separate skinned meshes (one per
+model, plus an outline), which is already few. Test change: `tests/boss-smoke.mjs` looked for the first skinned mesh
+on the outlaw, which is now the box figure's hidden baked body; it looks inside the imported model instead.
+`npm run test:demo` fails the same way on `main` (the ad fetches outlaw models; not touched here).
+
 - **Instance the scenery (M).** `src/world.js` makes about 60 rocks, 15 trees, 15 crates, 20 cacti and 15 fence
   pieces, each its own mesh. Turn each kind into an `InstancedMesh` (or `BatchedMesh`, in three r160) with per-instance
   colour and scale variation. Collision stays as it is (`obstacles` in `src/physics.js`).

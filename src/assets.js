@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { obstacles } from './state.js';
 import { markObstacleGridDirty } from './physics.js';
-import { mergeByMaterial } from './meshMerge.js';
+import { mergeByMaterial, bakeSkinned } from './meshMerge.js';
 
 function addObstacle(obstacle) {
     obstacles.push(obstacle);
@@ -104,6 +104,19 @@ function addOutline(root) {
     }
     return root;
 }
+
+
+// Enemies that swing their legs and arms are baked into one skinned mesh plus one skinned outline (see
+// bakeSkinned). The bones keep the names animation.js looks up. `material` is only for enemies that fade
+// (ghosts), which need a see-through material of their own.
+const BAKED_MAT = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_GRADIENT });
+const HUMANOID_BONES = ['leftLeg', 'rightLeg', 'leftArm', 'rightArm'];
+const QUADRUPED_BONES = ['fl', 'fr', 'bl', 'br'];
+function bakeEnemy(container, boneNames, material = BAKED_MAT) {
+    return bakeSkinned(container, { boneNames, material, outlineMaterial: OUTLINE_MAT, outlineWidth: OUTLINE_WIDTH });
+}
+// The humanoid builders wrap everything in one turned group (children[0]); the bake goes inside it.
+const bakeHumanoid = (group, material) => { bakeEnemy(group.children[0], HUMANOID_BONES, material); return group; };
 
 const mat = {
     // ROUGH TEXTURES (Cloth, Skin, Wood)
@@ -224,7 +237,7 @@ export function createGunslingerMesh() {
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.4), mat.blackHat); hatTop.position.y = 5.0; mesh.add(hatTop);
 
     group.userData = { muzzle: gunGroup.userData.muzzle, type: 'gunslinger' };
-    addOutline(group);
+    bakeHumanoid(group);
     return group;
 }
 
@@ -241,7 +254,7 @@ export function createEnemyMesh() {
     const bandana = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.6, 1.25), mat.red); bandana.position.y = 3.9; mesh.add(bandana);
     const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 2.2), mat.blackHat); hatBrim.position.y = 4.6; mesh.add(hatBrim);
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 1.3), mat.blackHat); hatTop.position.y = 5.0; mesh.add(hatTop);
-    addOutline(group);
+    bakeHumanoid(group);
     return group;
 }
 
@@ -263,7 +276,7 @@ export function createWolfMesh() {
     const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), mat.red); leftEye.position.set(-0.3, 2.7, 2.75); group.add(leftEye);
     const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), mat.red); rightEye.position.set(0.3, 2.7, 2.75); group.add(rightEye);
     group.userData = { type: 'wolf' };
-    addOutline(group);
+    bakeEnemy(group, QUADRUPED_BONES);
     return group;
 }
 
@@ -347,7 +360,7 @@ export function createBossMesh(colors = null) {
     mesh.add(hpGroup);
 
     group.userData = { muzzle: gunReal.userData.muzzle, hpBar: hpFg, type: 'boss' };
-    addOutline(group);
+    bakeHumanoid(group);
     return group;
 }
 
@@ -507,7 +520,9 @@ export function createRattlerMesh() {
     group.add(box(0.12, 0.12, 0.12, colorMat(0xffeb3b), 0.3, 0.55, 1.1));
     group.add(box(0.3, 0.4, 0.4, colorMat(0xe0cfa0), 0, 0.4, -4.1));
     group.userData = { type: 'rattler', segments };
-    addOutline(group);
+    // The segments sway side to side (animation.js): they become bones, and userData points at the bones.
+    bakeEnemy(group, segments.map(seg => seg.name));
+    group.userData.segments = segments.map(seg => group.getObjectByName(seg.name));
     return group;
 }
 
@@ -526,49 +541,43 @@ export function addAimLaser(group, { width = 0.12, height = 2.6 } = {}) {
 export function createRiflemanMesh() {
     const group = createHumanoid({ type: 'rifleman', coat: 0x2f5d8a, hat: 0x3b2a1a, bandana: 0xe0e0e0, weapon: 'rifle', hatStyle: 'bowler' });
     addAimLaser(group);
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createDynamiterMesh() {
     const group = createHumanoid({ type: 'dynamiter', coat: 0x8d6e63, vest: 0xd84315, hat: 0x5d4037, bandana: 0x212121, weapon: 'dynamite', hatStyle: 'bowler' });
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createBruteMesh() {
     const group = createHumanoid({ type: 'brute', coat: 0x5d4037, vest: 0x78909c, hat: 0x3e2723, bandana: 0x8d0000, bulk: 1.45 });
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createKniferMesh() {
     const group = createHumanoid({ type: 'knifer', coat: 0x1b1b1b, vest: 0x8e1b1b, hat: 0x111111, bandana: 0xf5f5f5, weapon: 'knife', hatStyle: 'bowler' });
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createTrooperMesh() {
     const group = createHumanoid({ type: 'trooper', coat: 0x546e7a, hat: 0x37474f, bandana: 0xfbc02d, weapon: 'rifle' });
     addAimLaser(group);
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createDuelistMesh() {
     const group = createHumanoid({ type: 'duelist', coat: 0x4a148c, hat: 0x111111, bandana: 0xffc107, weapon: 'shotgun', hatStyle: 'sombrero' });
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createGhostMesh() {
-    // Each ghost fades independently, so it gets its own transparent materials.
-    const own = hex => new THREE.MeshToonMaterial({ color: hex, gradientMap: TOON_GRADIENT, transparent: true, opacity: 1, emissive: new THREE.Color(hex).multiplyScalar(0.25) });
-    const group = createHumanoid({ type: 'ghost', coat: 0xcfd8dc, hat: 0xeceff1, pants: 0xb0bec5, bandana: 0x6a1b9a, materials: own, skinMat: own(0xe3f2fd), weapon: null, hatStyle: 'hood' });
-    const materials = new Set();
-    group.traverse(o => { if(o.isMesh && o.material.transparent) materials.add(o.material); });
-    group.userData.fadeMaterials = [...materials];
-    addOutline(group);
+    // Each ghost fades independently, so it gets a see-through material of its own. The parts are plain (the
+    // bake reads their colour, and their glow, into vertex colours) and the baked mesh wears the see-through one.
+    const plain = hex => new THREE.MeshToonMaterial({ color: hex, emissive: new THREE.Color(hex).multiplyScalar(0.25) });
+    const group = createHumanoid({ type: 'ghost', coat: 0xcfd8dc, hat: 0xeceff1, pants: 0xb0bec5, bandana: 0x6a1b9a, materials: plain, skinMat: plain(0xe3f2fd), weapon: null, hatStyle: 'hood' });
+    const fade = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_GRADIENT, transparent: true, opacity: 1 });
+    bakeHumanoid(group, fade);
+    group.userData.fadeMaterials = [fade];
     return group;
 }
 
@@ -591,6 +600,6 @@ export function createRiderMesh() {
     rider.position.set(0, 2.1, -0.2);
     group.add(rider);
     group.userData = { type: 'rider', quadruped: true };
-    addOutline(group);
+    bakeEnemy(group, QUADRUPED_BONES); // the rider sits on the horse: only the horse's legs move
     return group;
 }

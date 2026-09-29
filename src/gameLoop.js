@@ -19,6 +19,7 @@ import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFee
 import { recordRun, saveProgress } from './progress.js';
 import { arena } from './arena.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
+import { disposeBaked } from './meshMerge.js';
 
 const FINAL_WAVE = FINAL_PURSUIT;
 // Phones get a closer camera so characters read at small sizes; off-screen arrows cover the rest.
@@ -425,7 +426,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     }
 
     function clearSceneCollections() {
-        for(const e of enemies) scene.remove(e);
+        for(const e of enemies) { scene.remove(e); disposeBaked(e); }
         for(const l of loots) scene.remove(l);
         for(const obs of obstacles) {
             scene.remove(obs.mesh);

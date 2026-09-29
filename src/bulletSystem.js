@@ -5,6 +5,7 @@ import { createExplosion } from './particleSystem.js';
 import { spawnLoot } from './lootSystem.js';
 import { playSound } from './audio.js';
 import { createCrate, createCactus, createDeadTree, createFence, createRock } from './assets.js';
+import { disposeBaked } from './meshMerge.js';
 
 const PLAYER_BULLET_COLOR = new THREE.Color(0xffff00);
 
@@ -265,6 +266,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     createExplosion(scene, e.position, 0x8a0303); 
                     spawnLoot(scene, e.position.x, e.position.z); 
                     scene.remove(e); 
+                    disposeBaked(e);
                     enemies.splice(j,1); 
                     runStats.enemiesKilled++;
                     if(e.userData.type === 'bandit') runStats.banditsKilled++;
