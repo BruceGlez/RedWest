@@ -12,6 +12,7 @@ import { loadCharacterModel, createCharacterInstance } from './characterModels.j
 import { BASE_DASH_TIME, BASE_DASH_COOLDOWN } from './perks.js';
 
 const QUICK_FIRE_WINDOW = 0.4; // seconds of game time a tap stays live, to wait out the gun's cooldown
+const WALK_TURN_RATE = 14; // how fast the body turns to face the walking direction (about 0.2 s for a full turn)
 
 export function createPlayerSystem(scene, camera, gameState, playerStats) {
     const playerGroup = createPlayerMesh();
@@ -97,8 +98,14 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             playerGroup.add(instance.object);
             drifter.visible = false;
             // Shots leave from the character's gun hand instead of the hidden box revolver.
-            playerGroup.add(muzzle);
-            muzzle.position.set(1, 3.1, 1.8);
+            // The flash light rides on the barrel tip of the gun in the hand, so bullets start there.
+            if(instance.muzzle) {
+                instance.muzzle.add(muzzle);
+                muzzle.position.set(0, 0, 0);
+            } else {
+                playerGroup.add(muzzle);
+                muzzle.position.set(1, 3.1, 1.8);
+            }
             character = { id: item.id, instance };
             return true;
         }).catch(() => {
@@ -246,6 +253,16 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
                 faceZ = target.position.z - pos.z;
             }
             if(faceX !== 0 || faceZ !== 0) {
+                if(!touch.aiming && !target) {
+                    // Facing the way you walk: turn smoothly, so thumb wobble on the stick doesn't twitch the body.
+                    const facing = new THREE.Vector3(0, 0, 1).applyQuaternion(playerGroup.quaternion);
+                    const current = Math.atan2(facing.x, facing.z);
+                    const wanted = Math.atan2(faceX, faceZ);
+                    const delta = Math.atan2(Math.sin(wanted - current), Math.cos(wanted - current));
+                    const angle = current + delta * (1 - Math.exp(-WALK_TURN_RATE * dt));
+                    faceX = Math.sin(angle);
+                    faceZ = Math.cos(angle);
+                }
                 playerGroup.lookAt(pos.x + faceX, pos.y, pos.z + faceZ);
             }
             aimLine.visible = touch.aiming;

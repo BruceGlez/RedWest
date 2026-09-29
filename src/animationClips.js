@@ -1,6 +1,7 @@
 // Clean-up for animations exported by AI character tools (Meshy / Mixamo).
 
 export const LOCOMOTION = new Set(['run', 'runShoot', 'runAim']);
+const RUN_BOB = 0.35; // share of the clip's vertical hip bob kept while running
 const cleaned = new WeakMap();
 
 // Looping clips must stay in place: the game moves the character. Some exports (Meshy's Run and
@@ -15,6 +16,14 @@ export function inPlace(clip) {
         for(let i = 3; i < values.length; i += 3) {
             values[i] = values[0];
             values[i + 2] = values[2];
+        }
+        // The run cycle drops the hips by ~8% of body height twice per 0.7 s. Behind a camera that stays put
+        // on the ground point, that reads as a shake, so most of the vertical bob goes and a little stays.
+        if(LOCOMOTION.has(clip.name)) {
+            let mean = 0;
+            for(let i = 1; i < values.length; i += 3) mean += values[i];
+            mean /= values.length / 3;
+            for(let i = 1; i < values.length; i += 3) values[i] = mean + (values[i] - mean) * RUN_BOB;
         }
     }
     cleaned.set(clip, copy);
