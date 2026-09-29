@@ -297,7 +297,7 @@ function attachOutlawModel(enemy, outlaw) {
 // of the box wolf once it has loaded, else the box wolf stays. Its clips are idle and run; the shared
 // enemy update below plays them (no gun, so createCharacterInstance's combat() just picks idle or run).
 export const WOLF_MODEL = 'models/wolf.glb';
-const WOLF_MODEL_HEIGHT = 3.4; // ears to paws; the box wolf is about 3.5 tall
+export const WOLF_MODEL_HEIGHT = 3.4; // ears to paws; the box wolf is about 3.5 tall
 function attachWolfModel(enemy) {
     const gltf = loadedCharacterModel(WOLF_MODEL);
     if(!gltf) return;

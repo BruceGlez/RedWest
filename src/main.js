@@ -9,7 +9,7 @@ import { createPlayerSystem } from './playerSystem.js';
 import { createGameLoop } from './gameLoop.js';
 import { loadRunLog, clearRunLog } from './runLog.js';
 import { loadProgress, saveProgress, isUnlocked } from './progress.js';
-import { renderOutlawPortraits, renderEnemyPortraits, renderPlayerPreview, renderCharacterPortrait } from './portraits.js';
+import { renderOutlawPortraits, renderEnemyPortraits, renderEnemyModelPortrait, renderPlayerPreview, renderCharacterPortrait } from './portraits.js';
 import { OUTLAWS } from './outlaws.js';
 import { arena } from './arena.js';
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
@@ -23,7 +23,7 @@ import { configureAnalytics, track } from './analytics.js';
 import { generatedName } from './names.js';
 import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
-import { WOLF_MODEL } from './enemySystem.js';
+import { WOLF_MODEL, WOLF_MODEL_HEIGHT } from './enemySystem.js';
 import { applyPlayerLoadout } from './assets.js';
 import { applyPerk } from './perks.js';
 import { DEMO, openStore, assetUrl } from './demo.js';
@@ -90,7 +90,18 @@ function loadOutlawModel(index) {
 }
 // The 3D wolf (about 0.6 MB) loads in the background: wolves spawn as the box wolf until it is ready,
 // and stay the box wolf if the file is missing. Not needed in the playable ad.
-if(!DEMO) loadCharacterModel(WOLF_MODEL).catch(() => {});
+// Once loaded, the NEW ENEMY card and the Bounty Book show the 3D wolf instead of the box one.
+if(!DEMO) {
+    loadCharacterModel(WOLF_MODEL).then(gltf => {
+        const instance = createCharacterInstance(gltf, WOLF_MODEL_HEIGHT);
+        instance.mixer.update(0.2);
+        const picture = renderEnemyModelPortrait(renderer, instance.object);
+        if(picture) {
+            enemyPortraits.wolf = picture;
+            ui.setPortraits(outlawPortraits, enemyPortraits);
+        }
+    }).catch(() => {});
+}
 if(arena.enabled) OUTLAWS.forEach((_, i) => loadOutlawModel(i)); // the arena shows them all
 else loadingScreen?.track(loadOutlawModel(progress.selected));
 ui.updateHUD();

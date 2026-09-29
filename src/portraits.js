@@ -139,6 +139,18 @@ export function renderEnemyPortraits(renderer) {
     return portraits;
 }
 
+// Bounty Book / NEW ENEMY picture of an imported enemy model (the 3D wolf): the same three-quarter framing
+// as the box enemies in renderEnemyPortraits.
+export function renderEnemyModelPortrait(renderer, characterModel) {
+    try {
+        previewStudio ??= createStudio(renderer);
+        characterModel.rotation.y = -0.5;
+        return previewStudio.capture(characterModel);
+    } catch {
+        return '';
+    }
+}
+
 // Shop preview: the player in a given outfit. The studio and model are reused between calls.
 let previewStudio = null;
 let previewModel = null;
