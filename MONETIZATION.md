@@ -59,10 +59,23 @@ Any Node host works (Render, Railway, Fly.io, a VPS). Set these environment vari
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the Stripe webhook endpoint |
 | `STRIPE_PAYMENT_LINKS` | JSON mapping Payment Link ids to products, e.g. `{"plink_abc":"nuggets_100","plink_def":"nuggets_550","plink_ghi":"nuggets_1200"}` |
 | `DATA_FILE` | Path on the persistent disk |
+| `ADMIN_TOKEN` | A long random string for moderation (below). Never put it in a `VITE_*` variable. |
 
 Then point the game at it. In GitHub go to **Settings → Secrets and variables → Actions → Variables** and
 add `VITE_API_BASE` = your server URL (e.g. `https://redwest-api.onrender.com`). The next Pages deploy
 picks it up. These `VITE_*` values are public (they ship in the game), so never put secret keys in them.
+
+The server also handles the Phase 0 privacy features ([GROWTH_PLAN.md](GROWTH_PLAN.md)): `/api/privacy`
+(age band and statistics consent), `/api/events` (statistics, only with consent), `/api/report` (name
+reports) and `/api/account/delete`. To review reported names:
+
+```
+curl -H "Authorization: Bearer $ADMIN_TOKEN" https://<server>/admin/reports
+curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: application/json" \
+     -d '{"userId":"rw_...","action":"reset"}' https://<server>/admin/name   # or "keep"
+```
+
+`node tools/retention.mjs /path/to/redwest.json` prints day-1/7/30 return rates from the data file.
 
 ## 2. Apple (iPhone app) with RevenueCat
 

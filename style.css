@@ -167,6 +167,84 @@ canvas {
     max-width: 560px;
 }
 
+.settings-note {
+    color: #ffcc80;
+    font-size: 13px;
+    margin: 0 0 10px 0;
+}
+
+.settings-legal {
+    font-size: 13px;
+    margin: 0 0 12px 0;
+}
+
+.settings-legal a {
+    color: #ffd54f;
+    margin: 0 6px;
+}
+
+.settings-actions button.danger {
+    border-color: #b71c1c;
+    color: #ff8a80;
+}
+
+.welcome-content {
+    max-width: 460px;
+}
+
+.welcome-content form {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 14px;
+}
+
+.welcome-label {
+    font-size: 18px;
+}
+
+#welcome-year {
+    font-family: 'Roboto Mono', monospace;
+    font-size: 18px;
+    padding: 8px 12px;
+    background: #1b0f0b;
+    color: #f5f5f5;
+    border: 1px solid #8d6e63;
+}
+
+.welcome-stats {
+    display: flex;
+    gap: 10px;
+    align-items: flex-start;
+    text-align: left;
+    font-size: 13px;
+    line-height: 1.4;
+    color: #d7ccc8;
+}
+
+.welcome-stats input {
+    width: 20px;
+    height: 20px;
+    flex: none;
+    accent-color: #ffd700;
+}
+
+.play-btn.welcome-continue {
+    font-size: 28px;
+    padding: 10px 30px;
+    animation: none;
+}
+
+#welcome-modal {
+    z-index: 30;
+}
+
+.play-btn.welcome-continue:disabled {
+    opacity: 0.45;
+    animation: none;
+    cursor: default;
+}
+
 .settings-volume {
     display: flex;
     align-items: center;
@@ -781,6 +859,11 @@ body.in-lobby .new-enemy-card { display: none !important; }
 .records-list li.me { background: rgba(255, 204, 51, 0.25); color: #ffd700; font-weight: 700; }
 .records-who { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .records-rank { width: 3.5em; color: #ffcc80; }
+.records-report {
+    margin-left: 8px; padding: 2px 8px; font-family: 'Roboto Mono', monospace; font-size: 12px;
+    background: transparent; color: #bcaaa4; border: 1px solid #6d4c41; border-radius: 4px; cursor: pointer;
+}
+.records-report:disabled { opacity: 0.6; cursor: default; }
 .records-stars { color: #ffcc33; letter-spacing: 1px; }
 .records-value { min-width: 4.5em; text-align: right; }
 .records-empty, .records-gap { justify-content: center; color: #bbb; }

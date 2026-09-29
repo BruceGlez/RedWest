@@ -2,6 +2,7 @@ import { OUTLAWS } from './outlaws.js';
 import { BOARDS } from './profile.js';
 import { starCount } from './progress.js';
 import { NAME_MAX } from './names.js';
+import { track } from './analytics.js';
 
 // Records screen: the account's outlaw name, its personal records, and the online leaderboards.
 // Leaderboards rank accounts (like Brawl Stars trophies), never per-run name entries.
@@ -29,6 +30,9 @@ export function createRecordsPanel({ wallet, onProfile, suggestedName = '' }) {
     let tab = 'mine';
     let board = 'weekly';
     let request = 0;
+    let childMode = false; // under 13: the name is generated, never typed (src/privacy.js)
+    const reported = new Set(); // names reported from this device this session
+    let confirmReport = null;
 
     els.nameInput.maxLength = NAME_MAX;
     els.boardSelect.innerHTML = Object.entries(BOARDS)
@@ -52,9 +56,13 @@ export function createRecordsPanel({ wallet, onProfile, suggestedName = '' }) {
     }
 
     function renderName() {
-        els.nameValue.textContent = profile?.name || 'NO NAME YET';
+        els.nameValue.textContent = profile?.name || (childMode ? 'CHOOSING A NAME...' : 'NO NAME YET');
         els.nameEdit.textContent = profile?.name ? 'EDIT' : 'PICK A NAME';
         els.nameEdit.classList.toggle('active', !profile?.name);
+        els.nameEdit.style.display = childMode ? 'none' : '';
+        if(childMode) els.nameMsg.textContent = 'Your outlaw name was chosen for you.';
+        else if(wallet.nameHidden) els.nameMsg.textContent = 'Other players reported your name, so it is hidden from the leaderboards. Pick a new one to show again.';
+        else if(/chosen for you|reported your name/.test(els.nameMsg.textContent)) els.nameMsg.textContent = '';
     }
 
     function renderMine() {
@@ -86,7 +94,41 @@ export function createRecordsPanel({ wallet, onProfile, suggestedName = '' }) {
         const li = document.createElement('li');
         li.classList.toggle('me', !!entry.me);
         li.append(text('span', `#${entry.rank}`, 'records-rank'), text('span', entry.name, 'records-who'), text('span', entry.value.toLocaleString(), 'records-value'));
+        if(!entry.me) li.append(reportButton(entry.name));
         return li;
+    }
+
+    // Report an offensive name: tap once for REPORT?, again to send. Names reported by several players
+    // are hidden until reviewed (server/app.js).
+    function reportButton(name) {
+        const button = text('button', '', 'records-report');
+        button.type = 'button';
+        const draw = () => {
+            const done = reported.has(name);
+            button.textContent = done ? 'REPORTED' : confirmReport === name ? 'REPORT?' : '⚑';
+            button.disabled = done;
+            button.title = done ? 'Reported' : 'Report this name';
+            button.setAttribute('aria-label', done ? `${name} reported` : `Report the name ${name}`);
+        };
+        button.addEventListener('click', async () => {
+            if(confirmReport !== name) {
+                confirmReport = name;
+                for(const other of els.boardList.querySelectorAll('.records-report')) other.dispatchEvent(new Event('redraw'));
+                return;
+            }
+            confirmReport = null;
+            reported.add(name);
+            draw();
+            try {
+                await wallet.reportName(name);
+            } catch {
+                reported.delete(name);
+                draw();
+            }
+        });
+        button.addEventListener('redraw', draw);
+        draw();
+        return button;
     }
 
     async function renderBoards() {
@@ -150,7 +192,13 @@ export function createRecordsPanel({ wallet, onProfile, suggestedName = '' }) {
             profile = next;
             if(els.screen.style.display !== 'none') render();
         },
+        setChildMode(on) {
+            childMode = !!on;
+            if(childMode) showNameForm(false);
+            if(profile) renderName();
+        },
         open() {
+            track('records_open');
             showNameForm(false);
             els.nameMsg.textContent = '';
             render();

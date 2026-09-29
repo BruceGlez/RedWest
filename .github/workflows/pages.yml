@@ -30,6 +30,9 @@ jobs:
           VITE_STRIPE_LINK_NUGGETS_100: ${{ vars.VITE_STRIPE_LINK_NUGGETS_100 }}
           VITE_STRIPE_LINK_NUGGETS_550: ${{ vars.VITE_STRIPE_LINK_NUGGETS_550 }}
           VITE_STRIPE_LINK_NUGGETS_1200: ${{ vars.VITE_STRIPE_LINK_NUGGETS_1200 }}
+          VITE_PRIVACY_URL: ${{ vars.VITE_PRIVACY_URL }}
+          VITE_TERMS_URL: ${{ vars.VITE_TERMS_URL }}
+          VITE_SUPPORT_EMAIL: ${{ vars.VITE_SUPPORT_EMAIL }}
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:

@@ -136,3 +136,99 @@ test('account names are unique and leaderboards rank named accounts', async () =
         await s.close();
     }
 });
+
+async function startAdminServer() {
+    const store = createMemoryStore();
+    let clock = new Date(Date.UTC(2026, 8, 28, 12)).getTime();
+    const app = createApp({ store, env: { ...ENV, ADMIN_TOKEN: 'admin-secret' }, now: () => new Date(clock) });
+    const server = createServer(app);
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    const call = async (path, { token, body, method } = {}) => {
+        const response = await fetch(base + path, {
+            method: method || (body !== undefined || path === '/api/account' ? 'POST' : 'GET'),
+            headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), 'Content-Type': 'application/json' },
+            body: body !== undefined ? JSON.stringify(body) : undefined
+        });
+        return { status: response.status, data: await response.json() };
+    };
+    const account = async name => {
+        const { data } = await call('/api/account');
+        if(name) assert.equal((await call('/api/name', { token: data.token, body: { name } })).status, 200);
+        return data;
+    };
+    return { store, call, account, advanceDays: days => { clock += days * 86400000; }, close: () => new Promise(r => server.close(r)) };
+}
+
+test('statistics need consent, keep only days and allowed event counts, and go on opt-out', async () => {
+    const s = await startAdminServer();
+    try {
+        const a = await s.account();
+        assert.equal((await s.call('/api/events', { token: a.token, body: { events: ['run_start'] } })).status, 403, 'no consent yet');
+        assert.equal((await s.call('/api/privacy', { token: a.token, body: { ageBand: 'nope' } })).status, 400);
+        assert.equal((await s.call('/api/privacy', { token: a.token, body: { ageBand: 'adult', statsConsent: true } })).data.statsConsent, true);
+        await s.call('/api/events', { token: a.token, body: { events: ['session_start', 'run_start', 'run_start', 'evil_event', { x: 1 }] } });
+        s.advanceDays(1);
+        await s.call('/api/events', { token: a.token, body: { events: ['session_start'] } });
+        const stats = s.store.getUser(a.userId).analytics;
+        assert.deepEqual(stats.days, ['2026-09-28', '2026-09-29']);
+        assert.deepEqual(stats.counts, { session_start: 2, run_start: 2 });
+        await s.call('/api/privacy', { token: a.token, body: { ageBand: 'adult', statsConsent: false } });
+        assert.equal(s.store.getUser(a.userId).analytics, undefined, 'opting out removes the statistics');
+
+        const child = await s.account();
+        const answer = await s.call('/api/privacy', { token: child.token, body: { ageBand: 'under13', statsConsent: true } });
+        assert.equal(answer.data.statsConsent, false, 'children never share statistics');
+        assert.equal((await s.call('/api/events', { token: child.token, body: { events: ['run_start'] } })).status, 403);
+        assert.equal((await s.call('/api/name', { token: child.token, body: { name: 'DUSTY KID' } })).status, 400, 'children cannot type names');
+        assert.equal((await s.call('/api/name', { token: child.token, body: { name: 'RIDER 0042' } })).status, 200);
+    } finally {
+        await s.close();
+    }
+});
+
+test('names reported by three accounts leave the boards until the owner reviews them', async () => {
+    const s = await startAdminServer();
+    try {
+        const target = await s.account('RUDE DUDE');
+        await s.call('/api/run', { token: target.token, body: { score: 900, seconds: 120, outlawIndex: 0, bounty: 'banked', kills: {} } });
+        const reporters = [await s.account('ONE'), await s.account('TWO'), await s.account('THREE')];
+        const onBoard = async () => (await s.call('/api/leaderboard?board=weekly', { token: reporters[0].token })).data.entries.some(e => e.name === 'RUDE DUDE');
+        assert.equal(await onBoard(), true);
+        for(const r of reporters.slice(0, 2)) await s.call('/api/report', { token: r.token, body: { name: 'RUDE DUDE' } });
+        await s.call('/api/report', { token: reporters[0].token, body: { name: 'RUDE DUDE' } }); // repeat reports count once
+        assert.equal(await onBoard(), true, 'two distinct reports are not enough');
+        assert.equal((await s.call('/api/report', { token: reporters[2].token, body: { name: 'NO SUCH NAME' } })).status, 200, 'unknown names answer the same');
+        await s.call('/api/report', { token: reporters[2].token, body: { name: 'RUDE DUDE' } });
+        assert.equal(await onBoard(), false, 'hidden after three');
+        assert.equal((await s.call('/api/profile', { token: target.token })).data.nameHidden, true, 'the player is told');
+
+        assert.equal((await s.call('/admin/reports')).status, 401, 'admin needs the token');
+        assert.equal((await s.call('/admin/reports', { token: target.token })).status, 401, 'a player token is not an admin token');
+        const { data } = await s.call('/admin/reports', { token: 'admin-secret' });
+        assert.deepEqual(data.reported, [{ userId: target.userId, name: 'RUDE DUDE', reports: 3, hidden: true }]);
+        await s.call('/admin/name', { token: 'admin-secret', body: { userId: target.userId, action: 'keep' } });
+        assert.equal(await onBoard(), true, 'kept after review');
+        await s.call('/admin/name', { token: 'admin-secret', body: { userId: target.userId, action: 'reset' } });
+        assert.equal((await s.call('/api/profile', { token: target.token })).data.profile.name, '', 'reset: the player picks a new name');
+    } finally {
+        await s.close();
+    }
+});
+
+test('deleting an account removes the player and keeps only purchase ids', async () => {
+    const s = await startAdminServer();
+    try {
+        const a = await s.account('GONE SOON');
+        s.store.getUser(a.userId).profile.processed.push('rc:tx-1');
+        const other = await s.account('STAYS');
+        await s.call('/api/report', { token: a.token, body: { name: 'STAYS' } });
+        assert.equal((await s.call('/api/account/delete', { token: a.token, body: {} })).data.deleted, true);
+        assert.equal(s.store.getUser(a.userId), null);
+        assert.equal((await s.call('/api/profile', { token: a.token })).status, 401, 'the old token no longer works');
+        assert.deepEqual(s.store.retainedPurchases().map(p => p.transactionId), ['rc:tx-1']);
+        assert.deepEqual(s.store.getUser(other.userId).reportedBy, [], 'their reports are removed too');
+    } finally {
+        await s.close();
+    }
+});

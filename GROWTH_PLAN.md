@@ -1,7 +1,7 @@
 # Red West growth plan: retention, live events and fair monetization
 
 **Prepared:** 2026-09-29
-**Status:** Proposal. Nothing here is built yet.
+**Status:** Decisions made (see the end). Phase 0 in progress.
 **Assumes:** Red West becomes a free-to-play mobile game (iOS app plus the web build), with the paid-desktop
 plan in [REFACTOR_PLAN.md](REFACTOR_PLAN.md) set aside. If it stays a paid game, only the Frontier Town,
 playable outlaws, weekly event and analytics apply.
@@ -117,6 +117,13 @@ Outlaw names are user-generated content shown to everyone. `src/names.js` alread
 - **Refunds:** MONETIZATION.md notes refunded nuggets are not taken back yet. Handle RevenueCat and
   Stripe refund events: remove the refunded nuggets, never letting the balance go below zero (if some
   were already spent, record the debt rather than removing bought items).
+
+**Built (2026-09-29):** age question (0.2), account deletion (0.3), name reports and a larger blocklist
+(0.4), first-party analytics and `tools/retention.mjs` (0.5), [ASSETS.md](ASSETS.md) (0.6), legal links in
+Settings once `VITE_PRIVACY_URL` / `VITE_TERMS_URL` / `VITE_SUPPORT_EMAIL` are set, and the generator
+answers in [docs/POLICY_GENERATOR_ANSWERS.md](docs/POLICY_GENERATOR_ANSWERS.md). **Still to do:** generate
+and publish the policy and terms, trademark search, Stripe Tax, and refund handling (all need your
+accounts or the hosted server).
 
 **Phase 0 done when:** policy, terms and support links are live; age question, account deletion, name
 reports and analytics are working; asset licences are recorded.
@@ -302,13 +309,17 @@ Spend on advertising only after analytics show players coming back (for example 
 roughly 35% and day-7 above roughly 12%; treat these as rough goals, not industry facts). Paying for
 players who do not return wastes the budget.
 
-## Decisions needed from you
+## Decisions (answered 2026-09-29)
 
-1. **Free-to-play mobile** as the direction (this plan assumes it), instead of the $4.99 desktop plan?
-2. **Ads:** include the optional rewarded ads (3.4), or stay ad-free like Whiteout and Kingshot?
-3. **Server hosting:** most of this needs the Red West server live (MONETIZATION.md step 1). Which host?
-4. **Lawyer review:** someone to review Phase 0 documents before the first real-money sale.
-5. **ElevenLabs/Meshy plans:** which plans were used, so the assets can be confirmed for commercial use.
+| Question | Decision | What it changes |
+|---|---|---|
+| Business model | **Free-to-play mobile** (iOS app + web) | The whole plan applies; the $4.99 desktop plan is set aside. |
+| Ads | **No ads for now** | 3.4 is not built. Revisit only if analytics show purchases alone cannot sustain the game. No ad SDK means no consent tool, no App Tracking Transparency prompt and a simpler privacy label. |
+| Server hosting | **Decide later** | Phase 0 is built so it works on the local wallet; the server parts (analytics, account deletion, name reports) switch on when `VITE_API_BASE` is set. Real-money sales and leaderboards still need the server. |
+| Legal review | **Policy generator** (e.g. Termly or iubenda) | Answers for the generator's questionnaire are in [docs/POLICY_GENERATOR_ANSWERS.md](docs/POLICY_GENERATOR_ANSWERS.md). Put the generated URLs in `VITE_PRIVACY_URL` and `VITE_TERMS_URL`. A generator does not replace a lawyer: get a one-off review before spending on marketing or if a complaint arrives. |
+| ElevenLabs plan | **Paid** | Commercial use allowed; recorded in [ASSETS.md](ASSETS.md). |
+| Meshy plan | **Paid** | Commercial use allowed; recorded in [ASSETS.md](ASSETS.md). |
+| First build step | **Phase 0, working offline first** | Age question, analytics, account deletion, name reports and legal links. |
 
 ## Sources
 

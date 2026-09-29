@@ -7,6 +7,7 @@ import { SHOP_ITEMS, SLOTS, SLOT_LABELS, getShopItem, loadoutColors } from './co
 import { getWeapon, defaultWeapon, weaponBars } from './weapons.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { PRODUCTS } from './products.js';
+import { track } from './analytics.js';
 import { purchaseSupport } from './purchases.js';
 import { arena } from './arena.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
@@ -26,6 +27,7 @@ export function createUIManager(gameState, playerStats) {
     const characterThumbs = {};
     let tryOn = null; // item previewed but not equipped
     let confirmId = null;
+    let childMode = false; // under 13 (src/privacy.js): no real-money packs
     let confirmTimeoutId = null;
     let shopHandlers = {};
     const els = {
@@ -390,6 +392,11 @@ export function createUIManager(gameState, playerStats) {
     function renderShop() {
         const tabs = [...SLOTS.map(slot => [slot, SLOT_LABELS[slot]]), ['nuggets', '&#9670; NUGGETS']];
         els.shopTabs.innerHTML = tabs.map(([id, label]) => `<button type="button" class="shop-tab${shopTab === id ? ' active' : ''}" data-tab="${id}">${label}</button>`).join('');
+        if(shopTab === 'nuggets' && childMode) {
+            els.shopGrid.innerHTML = '<p class="shop-fineprint">Gold Nugget packs are not sold to players under 13. '
+                + 'You still earn Gold Nuggets by finishing all your daily jobs.</p>';
+            return;
+        }
         if(shopTab === 'nuggets') {
             els.shopGrid.innerHTML = PRODUCTS.map(product => {
                 const support = purchaseSupport(product.id);
@@ -426,6 +433,7 @@ export function createUIManager(gameState, playerStats) {
     }
 
     function openShop() {
+        track('shop_open');
         tryOn = null;
         confirmId = null;
         shopMessage('');
@@ -840,6 +848,10 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         shopMessage,
         showEarnings,
         openShop,
+        setChildMode(on) {
+            childMode = !!on;
+            if(els.panels[4].style.display !== 'none') renderShop();
+        },
         setPreviewRenderer: fn => { renderPreview = fn; },
         setCharacterThumb: (id, src) => { if(src) characterThumbs[id] = src; },
         refreshShop: () => { if(profile && els.panels[4].style.display !== 'none') { renderShop(); updatePreview(); } },

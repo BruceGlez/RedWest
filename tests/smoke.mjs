@@ -35,6 +35,21 @@ try {
         throw new Error(`Vite page did not create a canvas: ${pageErrors.join('; ')}`);
     }
     await page.evaluate(async () => { window.__rwTestState = await import('/src/state.js'); });
+    // First launch: a neutral birth-year question must be answered before anything starts.
+    await page.locator('#welcome-modal').waitFor({ state: 'visible' });
+    assert.ok(await page.locator('#welcome-continue').isDisabled(), 'no year chosen, no continue');
+    assert.equal(await page.locator('#welcome-stats').isChecked(), false, 'statistics are opt-in');
+    await page.keyboard.press('Space');
+    await page.waitForTimeout(400);
+    assert.equal(await page.evaluate(() => window.__rwTestState.gameState.isGameStarted), false, 'the question blocks starting a run');
+    await page.locator('#welcome-year').selectOption(String(new Date().getFullYear() - 30));
+    await page.locator('#welcome-stats').check();
+    await page.locator('#welcome-continue').click();
+    await page.locator('#welcome-modal').waitFor({ state: 'hidden' });
+    const answers = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestPrivacy.v1')));
+    assert.equal(answers.ageBand, 'adult');
+    assert.equal(answers.statsConsent, true);
+    assert.equal(answers.birthYear, undefined, 'only the age band is kept');
     await page.keyboard.down('Space');
     await page.waitForFunction(() => window.__rwTestState.gameState.isGameStarted);
     await page.keyboard.up('Space');
@@ -224,10 +239,44 @@ try {
     await page.locator('#road-screen').waitFor({ state: 'hidden' });
     assert.match(await page.locator('#home-poster').textContent(), /DUSTY PETE/);
     assert.equal(await page.locator('#run-log-count').textContent(), '3 runs');
+
+    // Settings: statistics can be switched off, and "Delete my data" takes two taps, then starts over.
+    await page.locator('#home-settings-btn').click();
+    await page.locator('#settings-stats-btn').click();
+    assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('redWestPrivacy.v1')).statsConsent), false);
+    const oldAccount = await page.evaluate(() => localStorage.getItem('redWestAccount.v1'));
+    await page.locator('#settings-delete-btn').click();
+    await page.locator('#settings-delete-note').waitFor({ state: 'visible' });
+    assert.ok(await page.evaluate(() => localStorage.getItem('redWestProgress.v1')), 'one tap deletes nothing');
+    await Promise.all([page.waitForEvent('load'), page.locator('#settings-delete-btn').click()]);
+    await page.evaluate(async () => { window.__rwTestState = await import('/src/state.js'); });
+    await page.locator('#welcome-modal').waitFor({ state: 'visible' });
+    // Everything saved is gone; the new session starts a blank profile under a new id.
+    const after = await page.evaluate(() => Object.fromEntries(Object.keys(localStorage).filter(k => k.startsWith('redWest')).map(k => [k, localStorage.getItem(k)])));
+    for(const key of ['redWestProgress.v1', 'redWestRunLog.v1', 'redWestPrivacy.v1']) assert.equal(after[key], undefined, `${key} deleted`);
+    assert.notEqual(after['redWestAccount.v1'], oldAccount, 'a new local id');
+    assert.equal(JSON.parse(after['redWestProfile.v1'] || '{"stats":{"runs":0}}').stats.runs, 0, 'a blank profile');
+
+    // A player under 13: statistics stay off even if ticked, no real-money packs, and a generated name.
+    await page.locator('#welcome-year').selectOption(String(new Date().getFullYear() - 9));
+    await page.locator('#welcome-stats').check();
+    await page.locator('#welcome-continue').click();
+    await page.locator('#welcome-modal').waitFor({ state: 'hidden' });
+    const childAnswers = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestPrivacy.v1')));
+    assert.deepEqual([childAnswers.ageBand, childAnswers.statsConsent], ['under13', false]);
+    await page.locator('#shop-btn').click();
+    await page.locator('#shop-tabs [data-tab="nuggets"]').click();
+    assert.match(await page.locator('#shop-grid').textContent(), /not sold to players under 13/);
+    assert.equal(await page.locator('#shop-grid [data-product]').count(), 0);
+    await page.locator('#shop-screen .panel-back').click();
+    await page.locator('#records-btn').click();
+    await page.waitForFunction(() => /^[A-Z]+ [0-9]{4}$/.test(document.getElementById('records-name-value').textContent));
+    assert.equal(await page.locator('#records-name-edit').isVisible(), false, 'no typed names under 13');
+    await page.locator('#records-screen .panel-back').click();
     await startRun();
 
     assert.deepEqual(relevantErrors(), [], `browser errors: ${pageErrors.join(', ')}`);
-    console.log('Browser smoke passed: start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, run log, restarts.');
+    console.log('Browser smoke passed: first-launch question, start, pause, Heat, outlaw, ride on + escape, bank, ride on + forfeit, run log, restarts, statistics switch, delete my data, under-13 rules.');
 } finally {
     await browser?.close();
     await server.close();

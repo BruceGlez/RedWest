@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 import { findChrome } from './chrome-path.mjs';
+import { answeredPrivacy } from './privacy-seed.mjs';
 
 // Every enemy type: spawn next to the player on the last stage, let its behaviour run
 // (lasers, dynamite, charges, fading), confirm it can hurt the player, then kill it with a
@@ -14,6 +15,7 @@ try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     // All stages unlocked so the last outlaw's full roster is in play.
     await context.addInitScript(() => localStorage.setItem('redWestProgress.v1', JSON.stringify({ selected: 7, stars: [1, 1, 1, 1, 1, 1, 1, 0], best: [0, 0, 0, 0, 0, 0, 0, 0] })));
+    await context.addInitScript(answeredPrivacy);
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
     const errors = [];

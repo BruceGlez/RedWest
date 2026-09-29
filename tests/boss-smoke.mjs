@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 import { findChrome } from './chrome-path.mjs';
+import { answeredPrivacy } from './privacy-seed.mjs';
 
 // Every outlaw's signature attack: spawn each one next to the player, confirm the attack lands
 // (or, for Rattlesnake Rosa, that her howl brings wolves), check Iron Jack's armour only stops
@@ -12,6 +13,7 @@ try {
     await server.listen();
     browser = await chromium.launch({ executablePath: findChrome(), headless: true, args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--no-proxy-server'] });
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    await context.addInitScript(answeredPrivacy);
     const page = await context.newPage();
     page.setDefaultTimeout(30000);
     const errors = [];

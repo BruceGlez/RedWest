@@ -8,6 +8,11 @@ export const CONFIG = {
     // RevenueCat public SDK keys (safe to ship in the app; secret keys stay on the server).
     revenueCatAppleKey: env.VITE_REVENUECAT_APPLE_KEY || '',
     revenueCatGoogleKey: env.VITE_REVENUECAT_GOOGLE_KEY || '',
+    // Privacy policy, terms and support contact (see docs/POLICY_GENERATOR_ANSWERS.md). Shown in Settings
+    // and on the first-launch screen once set.
+    privacyUrl: env.VITE_PRIVACY_URL || '',
+    termsUrl: env.VITE_TERMS_URL || '',
+    supportEmail: env.VITE_SUPPORT_EMAIL || '',
     // Stripe Payment Links for web purchases, one per product id.
     stripeLinks: {
         nuggets_100: env.VITE_STRIPE_LINK_NUGGETS_100 || '',

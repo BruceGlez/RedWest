@@ -15,6 +15,10 @@ import { arena } from './arena.js';
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit } from './purchases.js';
+import { createPrivacyPanel } from './privacyPanel.js';
+import { isChild, canShareStats } from './privacy.js';
+import { configureAnalytics, track } from './analytics.js';
+import { generatedName } from './names.js';
 import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { applyPlayerLoadout } from './assets.js';
@@ -88,7 +92,48 @@ function applyProfile(next) {
     ui.setProfile(profile);
 }
 applyProfile(profile);
-wallet.load().then(applyProfile).catch(error => ui.shopMessage(error.message, true));
+let profileLoaded = false;
+wallet.load().then(next => {
+    profileLoaded = true;
+    applyProfile(next);
+    giveChildAName();
+}).catch(error => ui.shopMessage(error.message, true));
+
+// ---------- Privacy: first-launch age question, statistics consent, delete my data ----------
+// Nothing starts until the first-launch question is answered (gameLoop checks startBlocked).
+const privacyPanel = createPrivacyPanel({
+    onChange: applyPrivacy,
+    onDelete: async () => {
+        await wallet.deleteAccount();
+        location.reload(); // starts again from the first-launch question
+    }
+});
+function applyPrivacy(privacy) {
+    gameState.startBlocked = !privacy;
+    if(!privacy) return;
+    const child = isChild(privacy);
+    ui.setChildMode(child);
+    records.setChildMode(child);
+    configureAnalytics({ allowed: canShareStats(privacy), sender: wallet.statsSender });
+    wallet.setPrivacy(privacy).catch(() => {}); // the server applies the same rules
+    giveChildAName();
+}
+// Players under 13 never type a name: they get a generated one (retrying if it is taken).
+let namingChild = false;
+async function giveChildAName() {
+    if(namingChild || !profileLoaded || profile.name || !isChild(privacyPanel.privacy)) return;
+    namingChild = true;
+    for(let attempt = 0; attempt < 5 && !profile.name; attempt++) {
+        try {
+            applyProfile(await wallet.setName(generatedName()));
+        } catch(error) {
+            if(error.code !== 'name_taken') break;
+        }
+    }
+    namingChild = false;
+}
+applyPrivacy(privacyPanel.privacy);
+privacyPanel.ask().then(() => track('session_start'));
 // Shop preview and character cards: imported characters get their own posed copy once loaded.
 const previewCharacters = new Map();
 function previewCharacter(id) {
@@ -172,6 +217,7 @@ ui.bindControlHandlers({
     },
     onBuyProduct: async productId => {
         try {
+            track('purchase_start');
             const before = profile.balances.nuggets;
             try { sessionStorage.setItem('redWestNuggetsBefore', String(before)); } catch { /* private mode */ }
             const result = await buyProduct(productId, wallet);

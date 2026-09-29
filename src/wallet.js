@@ -6,7 +6,8 @@ import { loadProgress } from './progress.js';
 // Where the economy profile lives:
 // - local: this browser only (playtesting; not secure, only earned currency, no real money).
 // - remote: the Red West server (server/), the source of truth once real purchases are on.
-// Both expose the same async API: load, buy, equip, reportRun, refresh, setName, leaderboard.
+// Both expose the same async API: load, buy, equip, reportRun, refresh, setName, leaderboard,
+// setPrivacy, reportName, deleteAccount; `statsSender` is how statistics reach the server (null offline).
 // Leaderboards rank accounts, so they only exist online; `online` says whether they are available.
 
 const PROFILE_KEY = 'redWestProfile.v1';
@@ -28,6 +29,18 @@ function readJson(key) {
         return JSON.parse(localStorage.getItem(key));
     } catch {
         return null;
+    }
+}
+
+// Everything Red West keeps in this browser (all keys start with "redWest"): progress, wallet, account,
+// settings, run log and the privacy answers. Used by "Delete my data".
+export function clearDeviceData() {
+    try {
+        for(const key of Object.keys(localStorage)) {
+            if(key.startsWith('redWest')) localStorage.removeItem(key);
+        }
+    } catch {
+        // Storage blocked: nothing was saved.
     }
 }
 
@@ -61,6 +74,11 @@ export function createLocalWallet() {
         async equip(id) { equipItem(profile, id); persist(); return snapshot(); },
         async setName(name) { setName(profile, name); persist(); return snapshot(); },
         async leaderboard() { throw new Error('Leaderboards need the Red West server. Your records are saved on this device.'); },
+        nameHidden: false,
+        statsSender: null, // offline: statistics are never collected
+        async setPrivacy() {},
+        async reportName() {},
+        async deleteAccount() { clearDeviceData(); },
         async reportRun(summary) {
             const result = applyRun(profile, summary);
             persist();
@@ -98,10 +116,19 @@ export function createRemoteWallet(apiBase) {
         kind: 'remote',
         online: true,
         get userId() { return account?.userId; },
+        nameHidden: false,
         async load() {
             const data = await call('/api/profile');
+            this.nameHidden = !!data.nameHidden;
             writeJson(PROFILE_KEY, data.profile); // offline display cache only
             return data.profile;
+        },
+        async setPrivacy(privacy) { await call('/api/privacy', { ageBand: privacy.ageBand, statsConsent: privacy.statsConsent }); },
+        statsSender: events => call('/api/events', { events }),
+        async reportName(name) { await call('/api/report', { name }); },
+        async deleteAccount() {
+            if(account) await call('/api/account/delete', {});
+            clearDeviceData();
         },
         async refresh() { return this.load(); },
         async buy(id) { return (await call('/api/buy', { itemId: id })).profile; },

@@ -1,7 +1,9 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
 import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, creditNuggets, refreshJobs, setName, rankBoard, EconomyError } from '../src/profile.js';
 import { getProduct } from '../src/products.js';
-import { validateName } from '../src/names.js';
+import { validateName, isGeneratedName } from '../src/names.js';
+import { AGE_BANDS } from '../src/privacy.js';
+import { ANALYTICS_EVENTS } from '../src/analytics.js';
 
 // Red West economy server. The game talks to /api/*; the stores talk to /webhooks/*.
 // Paid Gold Nuggets are only ever credited from a verified store webhook, never by the client.
@@ -9,6 +11,10 @@ import { validateName } from '../src/names.js';
 const MIN_SECONDS_BETWEEN_RUNS = 20; // a real run takes minutes; faster reports are rejected
 const STRIPE_TOLERANCE_SECONDS = 300;
 const PURCHASE_EVENTS = new Set(['INITIAL_PURCHASE', 'NON_RENEWING_PURCHASE']);
+const REPORTS_TO_HIDE = 3; // distinct accounts reporting a name before it is hidden from leaderboards
+const MAX_ACTIVE_DAYS = 400;
+const ALLOWED_EVENTS = new Set(ANALYTICS_EVENTS);
+const dayOf = date => date.toISOString().slice(0, 10); // UTC day
 
 const sha256 = text => createHash('sha256').update(text).digest('hex');
 
@@ -122,6 +128,34 @@ export function createApp({ store, env = {}, now = () => new Date() }) {
                 return send(res, result.ok ? 200 : result.status, result);
             }
 
+            // ---- Moderation (ADMIN_TOKEN, for the owner only) ----
+            if(url.pathname.startsWith('/admin/')) {
+                if(!env.ADMIN_TOKEN || !safeEqual(req.headers.authorization || '', `Bearer ${env.ADMIN_TOKEN}`)) {
+                    return send(res, 401, { message: 'bad admin token' });
+                }
+                if(url.pathname === '/admin/reports' && req.method === 'GET') {
+                    const reported = store.listUsers()
+                        .filter(entry => entry.user.reportedBy?.length)
+                        .map(entry => ({ userId: entry.id, name: entry.user.profile?.name || '', reports: entry.user.reportedBy.length, hidden: !!entry.user.nameHidden }))
+                        .sort((a, b) => b.reports - a.reports);
+                    return send(res, 200, { reported });
+                }
+                if(url.pathname === '/admin/name' && req.method === 'POST') {
+                    const body = JSON.parse((await readBody(req)) || '{}');
+                    const user = store.getUser(body.userId);
+                    if(!user) return send(res, 404, { message: 'unknown user' });
+                    // keep: the name is fine, clear the reports. reset: remove the name; the player picks another.
+                    if(body.action === 'reset') user.profile.name = '';
+                    else if(body.action !== 'keep') return send(res, 400, { message: 'action must be keep or reset' });
+                    user.reportedBy = [];
+                    user.nameHidden = false;
+                    store.putUser(body.userId, user);
+                    store.save();
+                    return send(res, 200, { ok: true });
+                }
+                return send(res, 404, { message: 'not found' });
+            }
+
             // ---- Game API (authenticated) ----
             if(url.pathname.startsWith('/api/')) {
                 const auth = authenticate(req);
@@ -131,14 +165,17 @@ export function createApp({ store, env = {}, now = () => new Date() }) {
 
                 if(url.pathname === '/api/leaderboard' && req.method === 'GET') {
                     // Account boards: every named player's best, ranked server-side from reported runs.
-                    const accounts = store.listUsers().map(entry => ({ id: entry.id, profile: normalizeProfile(entry.user.profile, now()) }));
+                    // Names hidden after reports stay off the boards until reviewed or changed.
+                    const accounts = store.listUsers()
+                        .filter(entry => !entry.user.nameHidden)
+                        .map(entry => ({ id: entry.id, profile: normalizeProfile(entry.user.profile, now()) }));
                     const board = rankBoard(accounts, url.searchParams.get('board') || 'weekly', id, 50, now());
                     return send(res, 200, board);
                 }
                 if(url.pathname === '/api/profile' && req.method === 'GET') {
                     refreshJobs(user.profile, now());
                     save();
-                    return send(res, 200, { userId: id, profile: user.profile });
+                    return send(res, 200, { userId: id, profile: user.profile, nameHidden: !!user.nameHidden });
                 }
                 const body = JSON.parse((await readBody(req)) || '{}');
                 if(url.pathname === '/api/run' && req.method === 'POST') {
@@ -152,13 +189,62 @@ export function createApp({ store, env = {}, now = () => new Date() }) {
                 if(url.pathname === '/api/name' && req.method === 'POST') {
                     const wanted = validateName(body.name);
                     if(!wanted.ok) throw new EconomyError('bad_name', wanted.error);
+                    // Players under 13 never choose a name; the game gives them a generated one.
+                    if(user.ageBand === 'under13' && !isGeneratedName(wanted.name)) throw new EconomyError('bad_name', 'Names are chosen for you.');
                     // Names are unique so a leaderboard row always means one player.
                     if(store.listUsers().some(entry => entry.id !== id && entry.user.profile?.name === wanted.name)) {
                         return send(res, 409, { code: 'name_taken', message: 'That name is taken. Try another.' });
                     }
                     setName(user.profile, wanted.name);
+                    user.reportedBy = [];
+                    user.nameHidden = false;
                     save();
                     return send(res, 200, { profile: user.profile });
+                }
+                if(url.pathname === '/api/privacy' && req.method === 'POST') {
+                    if(!AGE_BANDS.includes(body.ageBand)) throw new EconomyError('bad_age', 'Unknown age band.');
+                    user.ageBand = body.ageBand;
+                    user.statsConsent = body.ageBand !== 'under13' && body.statsConsent === true;
+                    if(!user.statsConsent) delete user.analytics; // opting out also removes what was collected
+                    save();
+                    return send(res, 200, { ageBand: user.ageBand, statsConsent: user.statsConsent });
+                }
+                if(url.pathname === '/api/events' && req.method === 'POST') {
+                    if(!user.statsConsent) return send(res, 403, { message: 'Statistics are switched off.' });
+                    const names = Array.isArray(body.events) ? body.events.slice(0, 100) : [];
+                    const today = dayOf(now());
+                    const stats = user.analytics ??= { firstDay: today, days: [], counts: {} };
+                    if(stats.days.at(-1) !== today) stats.days = [...stats.days, today].slice(-MAX_ACTIVE_DAYS);
+                    for(const name of names) {
+                        if(ALLOWED_EVENTS.has(name)) stats.counts[name] = (stats.counts[name] || 0) + 1;
+                    }
+                    save();
+                    return send(res, 200, { ok: true });
+                }
+                if(url.pathname === '/api/report' && req.method === 'POST') {
+                    const name = String(body.name || '');
+                    const target = store.listUsers().find(entry => entry.id !== id && name && entry.user.profile?.name === name);
+                    if(target && !target.user.reportedBy?.includes(id)) {
+                        target.user.reportedBy = [...(target.user.reportedBy || []), id];
+                        if(target.user.reportedBy.length >= REPORTS_TO_HIDE) target.user.nameHidden = true;
+                        store.putUser(target.id, target.user);
+                        store.save();
+                    }
+                    // The same answer either way, so reports cannot be used to probe accounts.
+                    return send(res, 200, { ok: true });
+                }
+                if(url.pathname === '/api/account/delete' && req.method === 'POST') {
+                    // Keep only purchase transaction ids (tax, refunds, fraud), with no link to the player.
+                    const deletedAt = now().toISOString();
+                    store.retainPurchases((user.profile.processed || []).map(transactionId => ({ transactionId, deletedAt })));
+                    for(const entry of store.listUsers()) {
+                        if(!entry.user.reportedBy?.includes(id)) continue;
+                        entry.user.reportedBy = entry.user.reportedBy.filter(reporter => reporter !== id);
+                        store.putUser(entry.id, entry.user);
+                    }
+                    store.deleteUser(id);
+                    store.save();
+                    return send(res, 200, { deleted: true });
                 }
                 if(url.pathname === '/api/buy' && req.method === 'POST') {
                     buyItem(user.profile, body.itemId);

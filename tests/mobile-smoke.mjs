@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 import { findChrome } from './chrome-path.mjs';
+import { answeredPrivacy } from './privacy-seed.mjs';
 
 // Phone emulation (landscape, touch, coarse pointer): tap to start, drive both sticks, use the
 // touch buttons, and restart by tapping. Pointer events are dispatched with pointerType "touch".
@@ -12,6 +13,7 @@ try {
     await server.listen();
     browser = await chromium.launch({ executablePath: findChrome(), headless: true, args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--no-proxy-server'] });
     const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    await context.addInitScript(answeredPrivacy);
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
     const errors = [];

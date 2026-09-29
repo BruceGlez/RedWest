@@ -5,6 +5,7 @@ import { extname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { chromium } from 'playwright-core';
 import { findChrome } from './chrome-path.mjs';
+import { answeredPrivacy } from './privacy-seed.mjs';
 
 const root = resolve(fileURLToPath(new URL('..', import.meta.url)));
 const chromePath = findChrome();
@@ -34,6 +35,7 @@ try {
     await new Promise(resolveListen => server.listen(0, '127.0.0.1', resolveListen));
     browser = await chromium.launch({ executablePath: chromePath, headless: true, args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--no-proxy-server'] });
     const page = await browser.newPage({ viewport: { width: 1280, height: 720 } });
+    await page.addInitScript(answeredPrivacy);
     page.setDefaultTimeout(15000);
     const errors = [];
     page.on('pageerror', error => errors.push(error.message));

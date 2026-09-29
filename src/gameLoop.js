@@ -10,6 +10,7 @@ import { updateParticles, clearParticles, getParticlePoolStats } from './particl
 import { markObstacleGridDirty, getGridStats } from './physics.js';
 import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
 import { buildRunRecord, appendRunRecord } from './runLog.js';
+import { track } from './analytics.js';
 import { getOutlaw, applyOutlawToWave } from './outlaws.js';
 import { ENEMY_TYPES, rosterWave, featuredFor, enemyCost } from './enemyTypes.js';
 import { markSeen, recordKills } from './progress.js';
@@ -88,6 +89,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     // result: 'died' | 'banked' | 'escaped'
     function finishRun(result) {
         if(gameState.isGameOver) return;
+        track('run_end');
         setMusicTrack('home');
         if(result === 'banked' || result === 'escaped') {
             playSound('bounty');
@@ -178,6 +180,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         onGameOver: () => finishRun('died'),
         onBossDefeated: () => {
             if(bountyChoiceAt) return;
+            track('outlaw_win');
             playSound('outlaw-down');
             playVoice('announce-outlaw-down');
             addShake(0.9);
@@ -497,8 +500,10 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             camera.lookAt(playerSystem.playerGroup.position);
             renderer.render(scene, camera);
             emitDebug(realDt);
-            if(keys.space || keys.startRequested) {
+            if(gameState.startBlocked) keys.startRequested = false; // first-launch question still open
+            else if(keys.space || keys.startRequested) {
                 keys.startRequested = false;
+                track('run_start');
                 gameState.isGameStarted = true;
                 gameState.outlawIndex = arena.enabled ? arena.outlaw : progress.selected;
                 sessionRun++;

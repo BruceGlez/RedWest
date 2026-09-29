@@ -3,6 +3,7 @@ import { createServer as createHttpServer } from 'node:http';
 import { chromium } from 'playwright-core';
 import { createServer } from 'vite';
 import { findChrome } from './chrome-path.mjs';
+import { answeredPrivacy } from './privacy-seed.mjs';
 import { createApp } from '../server/app.js';
 import { createMemoryStore } from '../server/store.js';
 
@@ -34,6 +35,7 @@ async function playOneRunAndDie(page) {
 
 async function openPage(browser, url, seed) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
+    await context.addInitScript(answeredPrivacy);
     if(seed) await context.addInitScript(seed);
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
@@ -145,6 +147,8 @@ try {
         const earned = await playOneRunAndDie(page);
         const serverDollars = store.getUser(userId).profile.balances.dollars;
         assert.equal(serverDollars, earned, 'the server, not the browser, holds the balance');
+        assert.equal(store.getUser(userId).ageBand, 'adult', 'the first-launch answer reaches the server');
+        assert.equal(store.getUser(userId).statsConsent, false);
 
         // Online leaderboards rank accounts; my row is highlighted once I have a name.
         await page.locator('#records-btn').click();
@@ -158,8 +162,22 @@ try {
         assert.equal(store.getUser(userId).profile.name, 'SMOKE KID');
         await page.locator('[data-tab="boards"]').click();
         await page.locator('#records-board-list li.me').waitFor();
-        const rows = await page.locator('#records-board-list li').allTextContents();
+        const rows = await page.locator('#records-board-list li').evaluateAll(items => items.map(li =>
+            [...li.querySelectorAll('span')].map(span => span.textContent).join('')));
         assert.deepEqual(rows, ['#1RIVAL ROSA2,000', '#2SMOKE KID480']);
+        // Other players' names can be reported (two taps); my own row has no report button.
+        assert.equal(await page.locator('#records-board-list li.me .records-report').count(), 0);
+        const report = page.locator('#records-board-list li', { hasText: 'RIVAL ROSA' }).locator('.records-report');
+        await report.click();
+        assert.equal(await report.textContent(), 'REPORT?');
+        assert.deepEqual(store.getUser(rival.userId).reportedBy ?? [], [], 'one tap sends nothing');
+        const [reportResponse] = await Promise.all([
+            page.waitForResponse(response => response.url().endsWith('/api/report')),
+            report.click()
+        ]);
+        assert.equal(reportResponse.status(), 200);
+        assert.equal(await report.textContent(), 'REPORTED');
+        assert.deepEqual(store.getUser(rival.userId).reportedBy, [userId]);
         await page.locator('#records-board').selectOption('stars');
         await page.locator('#records-board-list li').getByText('RIVAL ROSA').waitFor();
         assert.equal(await page.locator('#records-board-list li.me').count(), 0, 'no stars yet, so not on the stars board');
