@@ -187,6 +187,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                 runStats.obstaclesDestroyed++;
                 playSound('break'); 
                 scene.remove(hitObs.mesh);
+                hitObs.mesh.traverse(o => { if(o.isMesh) o.geometry.dispose(); });
                 
                 // Remove from obstacles array
                 const idx = obstacles.indexOf(hitObs); 

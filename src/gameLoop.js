@@ -427,7 +427,10 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     function clearSceneCollections() {
         for(const e of enemies) scene.remove(e);
         for(const l of loots) scene.remove(l);
-        for(const obs of obstacles) scene.remove(obs.mesh);
+        for(const obs of obstacles) {
+            scene.remove(obs.mesh);
+            obs.mesh.traverse(o => { if(o.isMesh) o.geometry.dispose(); }); // each prop has its own geometry
+        }
         clearBullets(scene);
         clearPendingRespawns();
         clearHazards(scene);
@@ -500,8 +503,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         gameState.enemySpawnTimer = interval / heatSpawnMultiplier(gameState.heat.level);
     }
 
+    let shadowFrame = 0;
     function tick(time) {
         requestAnimationFrame(tick);
+        // Phones (src/main.js turns off autoUpdate): the sun's shadow map is redrawn every other frame.
+        if(!renderer.shadowMap.autoUpdate) renderer.shadowMap.needsUpdate = (++shadowFrame & 1) === 0;
         const realDt = Math.min((time - lastTime) / 1000, 0.1);
         lastTime = time;
         // Hit-stop slows gameplay for a beat; the camera and UI keep real time.

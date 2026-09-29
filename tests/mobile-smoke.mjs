@@ -171,6 +171,14 @@ try {
         await tall.locator(`${screen} .panel-back`).first().tap();
         await tall.locator('#start-screen').waitFor({ state: 'visible' });
     }
+    // Performance guard (tools/perf.mjs has the details): the merged town stays around 90 draw calls, was 230.
+    await tall.locator('#town-btn').tap();
+    await tall.locator('#town-screen').waitFor({ state: 'visible' });
+    await tall.waitForTimeout(1500);
+    const townCalls = await tall.evaluate(() => window.__redWestRenderer.info.render.calls);
+    assert.ok(townCalls > 20 && townCalls < 130, `the town draws in few calls (${townCalls})`);
+    await tall.locator('#town-screen .panel-back').first().tap();
+    await tall.locator('#start-screen').waitFor({ state: 'visible' });
     await tall.locator('#play-btn').tap({ force: true });
     await tall.waitForFunction(() => S.gameState.isGameStarted);
     await tall.evaluate(() => { S.playerStats.hp = 99; });
@@ -199,7 +207,7 @@ try {
     }
     await upright.close();
     assert.deepEqual(tallErrors, []);
-    console.log('Mobile smoke passed: touch mode, tap start, move + aim/fire sticks, edge arrows, tap quick-fire auto-aim, auto-fire setting, swap, pause, tap restart, upright screens and play.');
+    console.log('Mobile smoke passed: touch mode, tap start, move + aim/fire sticks, edge arrows, tap quick-fire auto-aim, auto-fire setting, swap, pause, tap restart, upright screens and play, town draw calls.');
 } finally {
     await browser?.close();
     await server.close();

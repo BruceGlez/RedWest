@@ -36,12 +36,17 @@ renderer.setSize(window.innerWidth, window.innerHeight);
 const isTouch = setupTouchControls();
 // Sharper on phones without paying for full 3x device-pixel rendering.
 if(isTouch) renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
+// Phones also redraw shadows every other frame (src/gameLoop.js): half the shadow draw calls, and a moving
+// shadow trails its owner by one frame, too little to see.
+if(isTouch) renderer.shadowMap.autoUpdate = false;
 renderer.shadowMap.enabled = true;
 renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 // Filmic tone mapping keeps the bright desert colours rich instead of washed out.
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.05;
 document.body.appendChild(renderer.domElement);
+// Dev builds only: lets tests and tools/perf.mjs read draw calls (renderer.info).
+if(import.meta.env?.DEV) Object.assign(window, { __redWestRenderer: renderer, __redWestCamera: camera });
 
 setupScene(scene, camera, renderer);
 generateMap(scene);

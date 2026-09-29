@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { mergeByMaterial } from './meshMerge.js';
 
 // Frontier Town as a small 3D diorama at dusk (look "A" in art/town/dusk-gang-town.jpg): gaslit brick and
 // timber, chimney smoke, fog, a steam train at the depot, townsfolk in flat caps and long coats.
@@ -303,12 +304,14 @@ export function createTownScene() {
     glow.position.set(0, 10, -110);
     scene.add(glow);
 
+    // Everything that never moves and is not tappable goes in `scenery`, merged into a few meshes below.
+    const scenery = new THREE.Group();
     const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), mat(C.ground));
     ground.rotation.x = -Math.PI / 2;
-    scene.add(ground);
+    scenery.add(ground);
     for(const [w, d, x, z] of [[70, 9, 0, -4], [9, 50, -7, -4], [9, 50, 7.5, -4], [70, 6, 0, 13]]) {
         const street = box(w, 0.05, d, C.street, x, 0.03, z);
-        scene.add(street);
+        scenery.add(street);
     }
 
     // Buildings, tappable: every mesh knows its building id.
@@ -321,17 +324,17 @@ export function createTownScene() {
         const old = buildings.get(spot.id);
         if(old) {
             scene.remove(old.group);
-            old.group.traverse(o => { if(o.isMesh) hitMeshes.splice(hitMeshes.indexOf(o), 1); });
+            old.group.traverse(o => {
+                if(!o.isMesh) return;
+                hitMeshes.splice(hitMeshes.indexOf(o), 1);
+                o.geometry.dispose();
+            });
         }
-        const group = BUILDERS[spot.id](level, extras[spot.id] || 0);
+        // Built from dozens of boxes, drawn as one mesh per material (every mesh knows its building id).
+        const group = mergeByMaterial(BUILDERS[spot.id](level, extras[spot.id] || 0), { building: spot.id });
         group.position.set(spot.x, 0, spot.z);
         group.rotation.y = spot.rotation || 0;
-        group.traverse(o => {
-            if(o.isMesh) {
-                o.userData.building = spot.id;
-                hitMeshes.push(o);
-            }
-        });
+        group.traverse(o => { if(o.isMesh) hitMeshes.push(o); });
         scene.add(group);
         group.updateMatrixWorld(true);
         const box3 = new THREE.Box3().setFromObject(group);
@@ -355,35 +358,30 @@ export function createTownScene() {
         stable.add(horse);
     }
     stable.position.set(-32, 0, -14);
-    scene.add(stable);
+    scenery.add(stable);
     const undertaker = new THREE.Group();
     undertaker.add(box(5, 4.5, 5, C.timberDark, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
     const undertakerSign = sign('UNDERTAKER', 4.4);
     undertakerSign.position.set(0, 3.6, 2.6);
     undertaker.add(undertakerSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
     undertaker.position.set(-31, 0, 6);
-    scene.add(undertaker);
+    scenery.add(undertaker);
 
     // A foundry chimney on the skyline.
     const foundry = new THREE.Group();
     foundry.add(box(12, 7, 8, C.brickDark, 0, 3.5, 0), box(2, 18, 2, C.brick, 4, 9, -1));
     foundry.position.set(26, 0, -32);
-    scene.add(foundry);
+    scenery.add(foundry);
     smokeSources.push({ id: 'foundry', at: new THREE.Vector3(30, 18.5, -33) });
 
-    // Props: lamps (with a few real lights), barrels, crates, a wagon, telegraph poles.
-    for(const [x, z] of [[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]]) scene.add(lamp(x, z));
-    for(const [x, z] of [[-8, 1.5], [8, -9], [8, 0.8], [-8, -9]]) {
-        const light = new THREE.PointLight(0xffa040, 60, 20, 1.6);
-        light.position.set(x, 4.5, z);
-        scene.add(light);
-    }
+    // Props: lamps, barrels, crates, a wagon, telegraph poles.
+    for(const [x, z] of [[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]]) scenery.add(lamp(x, z));
     for(const [x, z] of [[-5, 9], [-4.2, 9.6], [18, 9], [-21, -9]]) {
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.4, 10), mat(C.timber));
         barrel.position.set(x, 0.7, z);
-        scene.add(barrel);
+        scenery.add(barrel);
     }
-    for(const [x, z] of [[17, 10], [17.8, 11], [-23, 10]]) scene.add(box(1.3, 1.3, 1.3, C.timberDark, x, 0.65, z));
+    for(const [x, z] of [[17, 10], [17.8, 11], [-23, 10]]) scenery.add(box(1.3, 1.3, 1.3, C.timberDark, x, 0.65, z));
     const wagon = new THREE.Group();
     wagon.add(box(4, 1, 2.2, C.timber, 0, 1.3, 0));
     const cover = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 4, 12, 1, false, 0, Math.PI), mat(0xd8cbb0));
@@ -398,26 +396,53 @@ export function createTownScene() {
     }
     wagon.position.set(-26, 0, -4);
     wagon.rotation.y = 0.3;
-    scene.add(wagon);
-    for(const x of [-34, -12, 10]) scene.add(box(0.3, 9, 0.3, C.timberDark, x, 4.5, -24), box(2.4, 0.2, 0.2, C.timberDark, x, 8.4, -24));
+    scenery.add(wagon);
+    for(const x of [-34, -12, 10]) scenery.add(box(0.3, 9, 0.3, C.timberDark, x, 4.5, -24), box(2.4, 0.2, 0.2, C.timberDark, x, 8.4, -24));
 
-    // Smoke puffs rising and fading.
+    scene.add(mergeByMaterial(scenery));
+    // Two real lamp lights on the main street (each light costs every lit pixel on a phone); the other lamps glow.
+    for(const [x, z] of [[-8, 1.5], [8, -9]]) {
+        const light = new THREE.PointLight(0xffa040, 75, 26, 1.6);
+        light.position.set(x, 4.5, z);
+        scene.add(light);
+    }
+
+    // Smoke puffs rising and fading: one instanced mesh for every puff (a single draw call), reused in a ring.
+    // Each puff fades on its own through a per-instance alpha added to the Lambert shader.
+    const PUFF_LIFE = 4;
+    const PUFF_EVERY = 0.35;
+    const MAX_PUFFS = 96;
     const puffGeometry = new THREE.SphereGeometry(1, 8, 6);
-    const puffs = [];
+    const puffAlpha = new THREE.InstancedBufferAttribute(new Float32Array(MAX_PUFFS), 1);
+    puffAlpha.setUsage(THREE.DynamicDrawUsage);
+    puffGeometry.setAttribute('puffAlpha', puffAlpha);
+    const puffMaterial = new THREE.MeshLambertMaterial({ color: C.smoke, transparent: true, depthWrite: false });
+    puffMaterial.onBeforeCompile = shader => {
+        shader.vertexShader = 'attribute float puffAlpha;\nvarying float vPuffAlpha;\n'
+            + shader.vertexShader.replace('#include <begin_vertex>', '#include <begin_vertex>\n\tvPuffAlpha = puffAlpha;');
+        shader.fragmentShader = 'varying float vPuffAlpha;\n'
+            + shader.fragmentShader.replace('#include <dithering_fragment>', '#include <dithering_fragment>\n\tgl_FragColor.a *= vPuffAlpha;');
+    };
+    const smoke = new THREE.InstancedMesh(puffGeometry, puffMaterial, MAX_PUFFS);
+    smoke.instanceMatrix.setUsage(THREE.DynamicDrawUsage);
+    smoke.frustumCulled = false; // instances drift away from the mesh's own bounds
+    smoke.count = 0;
+    const puffs = Array.from({ length: MAX_PUFFS }, () => ({ at: new THREE.Vector3(), age: PUFF_LIFE }));
+    let nextPuff = 0;
+    const puffMatrix = new THREE.Matrix4();
+    scene.add(smoke);
     function puff(at) {
-        const m = new THREE.Mesh(puffGeometry, new THREE.MeshLambertMaterial({ color: C.smoke, transparent: true, opacity: 0.55 }));
-        m.position.copy(at);
-        m.userData.age = 0;
-        m.scale.setScalar(0.8);
-        scene.add(m);
-        puffs.push(m);
+        const p = puffs[nextPuff];
+        nextPuff = (nextPuff + 1) % MAX_PUFFS;
+        p.at.copy(at);
+        p.age = 0;
     }
 
     // Townsfolk walking up and down the streets.
     const walkers = [];
     const paths = [[-26, -4, 26, -4], [26, -3, -26, -3], [-7, 12, -7, -20], [7.5, -20, 7.5, 12], [-20, 13, 20, 13], [20, 14, -20, 14]];
     paths.forEach((path, i) => {
-        const person = townsperson(i);
+        const person = mergeByMaterial(townsperson(i)); // six parts, three or four draw calls
         person.userData = { path, t: (i * 0.37) % 1, speed: 0.025 + (i % 3) * 0.006 };
         scene.add(person);
         walkers.push(person);
@@ -443,22 +468,25 @@ export function createTownScene() {
         elapsed += dt;
         smokeTimer -= dt;
         if(smokeTimer <= 0) {
-            smokeTimer = 0.35;
+            smokeTimer = PUFF_EVERY;
             for(const source of smokeSources) puff(source.at);
         }
-        for(let i = puffs.length - 1; i >= 0; i--) {
-            const p = puffs[i];
-            p.userData.age += dt;
-            p.position.y += dt * 2.2;
-            p.position.x += dt * 0.8;
-            p.scale.setScalar(0.8 + p.userData.age * 0.9);
-            p.material.opacity = Math.max(0, 0.55 - p.userData.age * 0.14);
-            if(p.userData.age > 4) {
-                scene.remove(p);
-                p.material.dispose();
-                puffs.splice(i, 1);
-            }
+        // Live puffs are packed at the front, and only those are drawn (smoke.count).
+        let live = 0;
+        for(const p of puffs) {
+            if(p.age >= PUFF_LIFE) continue;
+            p.age += dt;
+            if(p.age >= PUFF_LIFE) continue;
+            p.at.y += dt * 2.2;
+            p.at.x += dt * 0.8;
+            const size = 0.8 + p.age * 0.9;
+            smoke.setMatrixAt(live, puffMatrix.makeScale(size, size, size).setPosition(p.at));
+            puffAlpha.array[live] = Math.max(0, 0.55 - p.age * 0.14); // as the separate puffs used to fade
+            live++;
         }
+        smoke.count = live;
+        smoke.instanceMatrix.needsUpdate = true;
+        puffAlpha.needsUpdate = true;
         for(const person of walkers) {
             const u = person.userData;
             u.t = (u.t + dt * u.speed) % 1;

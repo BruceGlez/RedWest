@@ -1,10 +1,20 @@
 import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { obstacles } from './state.js';
 import { markObstacleGridDirty } from './physics.js';
+import { mergeByMaterial } from './meshMerge.js';
 
 function addObstacle(obstacle) {
     obstacles.push(obstacle);
     markObstacleGridDirty();
+}
+
+// Props built from several boxes are drawn as one mesh per material (fewer draw calls on phones).
+function placeProp(scene, group, obstacle) {
+    const prop = mergeByMaterial(group);
+    prop.traverse(o => { if(o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
+    scene.add(prop);
+    addObstacle({ ...obstacle, mesh: prop });
 }
 
 
@@ -35,7 +45,9 @@ const OUTLINE_MAT = new THREE.MeshBasicMaterial({ color: 0x1a0d05, side: THREE.B
 const OUTLINE_WIDTH = 0.05;
 
 // Inverted-hull outlines: a slightly larger back-face copy of each part, drawn in dark brown.
-// Tiny parts (eyes, gun details) are skipped to save draw calls on phones.
+// Tiny parts (eyes, gun details) are skipped to save draw calls on phones. Parts that never move on their
+// own (everything but named limbs and parts the builder keeps in userData, see animation.js) share one
+// merged outline per parent: a bandit draws 5 outlines instead of 11.
 function addOutline(root) {
     const meshes = [];
     (function collect(object) {
@@ -43,23 +55,52 @@ function addOutline(root) {
         if(object.isMesh && !object.userData.isOutline) meshes.push(object);
         for(const child of object.children) collect(child);
     })(root);
+    const moving = new Set();
+    const note = value => {
+        if(value?.isObject3D) moving.add(value);
+        else if(Array.isArray(value)) value.forEach(note);
+    };
+    Object.values(root.userData).forEach(note);
+    root.updateMatrixWorld(true);
     const size = new THREE.Vector3();
     const center = new THREE.Vector3();
+    const shared = new Map(); // parent -> outline geometries in the parent's space
     for(const mesh of meshes) {
         const geometry = mesh.geometry;
         if(!geometry.boundingBox) geometry.computeBoundingBox();
         geometry.boundingBox.getSize(size);
         if(Math.max(size.x, size.y, size.z) < 0.25) continue;
         geometry.boundingBox.getCenter(center);
-        const outline = new THREE.Mesh(geometry, OUTLINE_MAT);
+        const scale = new THREE.Vector3(
+            1 + (2 * OUTLINE_WIDTH / Math.max(size.x, 0.05)),
+            1 + (2 * OUTLINE_WIDTH / Math.max(size.y, 0.05)),
+            1 + (2 * OUTLINE_WIDTH / Math.max(size.z, 0.05))
+        );
+        const offset = new THREE.Vector3(center.x * (1 - scale.x), center.y * (1 - scale.y), center.z * (1 - scale.z));
+        if(mesh.name || moving.has(mesh) || !mesh.parent) {
+            const outline = new THREE.Mesh(geometry, OUTLINE_MAT);
+            outline.userData.isOutline = true;
+            outline.raycast = () => {};
+            outline.scale.copy(scale);
+            outline.position.copy(offset);
+            mesh.add(outline);
+            continue;
+        }
+        const baked = geometry.index ? geometry.toNonIndexed() : geometry.clone();
+        for(const name of Object.keys(baked.attributes)) if(name !== 'position') baked.deleteAttribute(name);
+        baked.morphAttributes = {};
+        baked.clearGroups();
+        baked.applyMatrix4(new THREE.Matrix4().compose(offset, new THREE.Quaternion(), scale));
+        baked.applyMatrix4(mesh.matrix);
+        if(!shared.has(mesh.parent)) shared.set(mesh.parent, []);
+        shared.get(mesh.parent).push(baked);
+    }
+    for(const [parent, geometries] of shared) {
+        const outline = new THREE.Mesh(mergeGeometries(geometries, false), OUTLINE_MAT);
+        for(const g of geometries) g.dispose();
         outline.userData.isOutline = true;
         outline.raycast = () => {};
-        const sx = 1 + (2 * OUTLINE_WIDTH / Math.max(size.x, 0.05));
-        const sy = 1 + (2 * OUTLINE_WIDTH / Math.max(size.y, 0.05));
-        const sz = 1 + (2 * OUTLINE_WIDTH / Math.max(size.z, 0.05));
-        outline.scale.set(sx, sy, sz);
-        outline.position.set(center.x * (1 - sx), center.y * (1 - sy), center.z * (1 - sz));
-        mesh.add(outline);
+        parent.add(outline);
     }
     return root;
 }
@@ -254,8 +295,7 @@ export function createCrate(scene, x, z) {
     group.add(detail2);
 
     group.position.set(x, 0, z);
-    scene.add(group);
-    addObstacle({ mesh: group, x: x, z: z, radius: size * 0.7, destructible: true, type: 'crate' });
+    placeProp(scene, group, { x, z, radius: size * 0.7, destructible: true, type: 'crate' });
 }
 
 
@@ -264,8 +304,8 @@ export function createCactus(scene, x, z) {
     const trunk = new THREE.Mesh(new THREE.BoxGeometry(2, 6, 2), mat.green); trunk.position.y = 3; trunk.castShadow = true; group.add(trunk);
     const arm = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 1), mat.green); arm.position.set(1, 4, 0); group.add(arm);
     const armUp = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat.green); armUp.position.set(2, 5, 0); group.add(armUp);
-    group.position.set(x, 0, z); scene.add(group);
-    addObstacle({ mesh: group, x: x, z: z, radius: 1.5, destructible: true, type: 'cactus' });
+    group.position.set(x, 0, z);
+    placeProp(scene, group, { x, z, radius: 1.5, destructible: true, type: 'cactus' });
 }
 
 export function createAmmoMesh() {
@@ -336,8 +376,8 @@ export function createDeadTree(scene, x, z) {
         branch.rotation.z = Math.PI / 3 + Math.random() * 0.5; branch.translateOnAxis(new THREE.Vector3(0,1,0), len/2);
         group.add(branch);
     }
-    group.position.set(x, 0, z); scene.add(group);
-    addObstacle({ mesh: group, x: x, z: z, radius: 1.0, destructible: true, type: 'tree' });
+    group.position.set(x, 0, z);
+    placeProp(scene, group, { x, z, radius: 1.0, destructible: true, type: 'tree' });
 }
 
 // [DESTRUCTIBLE] Fence
@@ -349,8 +389,8 @@ export function createFence(scene, x, z, angle) {
     const railGeo = new THREE.BoxGeometry(3.4, 0.2, 0.1);
     const r1 = new THREE.Mesh(railGeo, mat.wood); r1.position.set(0, 1.8, 0); r1.rotation.z = (Math.random()-0.5)*0.1; group.add(r1);
     const r2 = new THREE.Mesh(railGeo, mat.wood); r2.position.set(0, 1.0, 0); r2.rotation.z = (Math.random()-0.5)*0.1; group.add(r2);
-    group.position.set(x, 0, z); group.rotation.y = angle; scene.add(group);
-    addObstacle({ mesh: group, x: x, z: z, radius: 1.5, destructible: true, type: 'fence' });
+    group.position.set(x, 0, z); group.rotation.y = angle;
+    placeProp(scene, group, { x, z, radius: 1.5, destructible: true, type: 'fence' });
 }
 
 // Recolour the player's outfit. colors: { hat, coat, pants } hex values (see cosmetics.js).
