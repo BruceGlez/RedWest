@@ -608,6 +608,7 @@ export function createUIManager(gameState, playerStats) {
             const status = defeated ? 'DEFEATED' : unlocked ? 'AT LARGE' : 'LOCKED';
             return `<div class="book-card outlaw${unlocked ? '' : ' locked'}">${portraitHtml(outlaw)}<div class="book-info">`
                 + `<h4>${unlocked ? outlaw.name : '???'}</h4><p class="book-from">${unlocked ? outlaw.title : `Stage ${i + 1}`}</p>`
+                + (unlocked ? `<p class="book-story"><b>${outlaw.home}</b> ${outlaw.bio}</p>` : '')
                 + (unlocked ? `<p class="book-tip"><b>${outlaw.signature.move}:</b> ${outlaw.signature.detail}</p>` : '')
                 + `<p class="book-status ${defeated ? 'done' : ''}">${status}</p>`
                 + `<p class="poster-stars">${starsHtml(progress.stars[i])}</p></div></div>`;

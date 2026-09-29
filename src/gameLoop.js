@@ -263,7 +263,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             setMusicTrack('showdown');
             playVoice(outlaw.id);
             // The banner teaches the outlaw's signature move.
-            ui.showWaveBanner(`${outlaw.name} RIDE${count > 1 ? '' : 'S'} IN — ${outlaw.signature.tip}`, 3200);
+            ui.showWaveBanner(`${outlaw.name} RIDE${count > 1 ? '' : 'S'} IN\n\u201C${outlaw.taunt}\u201D\n${outlaw.signature.tip}`, 4600);
         } else if(waveNumber === BONUS_WAVE) {
             setMusicTrack('fight');
             const featured = featuredFor(gameState.outlawIndex);

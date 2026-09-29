@@ -1,16 +1,18 @@
 # Red West story bible
 
-Written 2026-09-29. A **proposal for the owner to approve or change**: nothing here is in the game yet, and every
-name, place and plot point can be swapped. It is built on what already exists in the code (the ten outlaws in
+Written 2026-09-29, updated the same day with the owner's answers (section 10). Names, places and plot points can
+still be swapped. **In the game so far:** each outlaw's home ground, ride-in line and short bio (`home`, `taunt`,
+`bio` in `src/outlaws.js`, shown in the ride-in banner and the Bounty Book). Everything else is proposed. It is built on what already exists in the code (the ten outlaws in
 `src/outlaws.js`, their picture prompts in `tools/character-prompts.mjs`, the enemy roster in `src/enemyTypes.js`,
 the Frontier Town buildings in `src/town.js`, the perks in `src/perks.js`), so the story fits the game as it plays.
 Research sources are at the end.
 
 ## 1. The rules for the writing
 
-- **Tone: a Saturday-morning Western.** Big personalities, dry humour, real stakes, no gore. The art is chunky and
-  toy-like, and the game has an under-13 mode (`src/privacy.js`), so the story stays fit for everyone: fights are
-  stylised, nobody is shown dying, loss is told, not shown.
+- **Tone: serious (owner's decision).** Plain, weighty, spare lines: a Western about debt, water, land and
+  second chances, not a comedy. The art is chunky and toy-like and the game has an under-13 mode
+  (`src/privacy.js`), so it stays fit for everyone: fights are stylised, nobody is shown dying, and loss is told,
+  not shown. Serious does not mean grim: the outlaws are people with reasons, and the story is hopeful.
 - **Every outlaw is a person first.** Each wants something understandable. That is what makes "beat them, jail
   them, and later play as them" (the game's existing loop) feel earned, not arbitrary.
 - **Original only.** No characters, places, plots or names from other games, films or real people (the rule in
@@ -39,7 +41,9 @@ Reed rides into Red West to bring in ten wanted outlaws. Along the way he learns
 each was pushed, paid or cornered by the Company, which wanted the territory lawless so it could sell "order".
 Every outlaw he beats pays a bounty, then (the game's existing rule) works off their sentence in Lantern Rock's
 jail, and the ones he wins over become allies he can play. By the tenth, the ten pages of the Company's secret
-ledger are in his hands, and the last outlaw is the man who taught him to ride.
+ledger are in his hands, and the last outlaw is the man who taught him to ride. **The story is open-ended by
+design** (section 4b): ten stages is chapter one, the Company turns out to be a front for a bigger power, and
+Flint's father is alive.
 
 ## 4. The hero: Marshal Flint Reed
 
@@ -52,8 +56,9 @@ and slightly too proud of his aim.
   His father, **Wick Reed**, was a wagon-master; his mother, **Ada**, taught the settlement's children to read.
 - When Flint was fourteen, a fire swept Cinder Creek in the middle of the night. The Company's report called it
   a bandit raid. The settlement was gone by morning and the water rights to its creek changed hands the next
-  week. Wick, out on the trail with a wagon train, never came back. **What happened to him is left open** so the
-  finale, or a sequel, can pay it off (see the open questions).
+  week. Wick, out on the trail with a wagon train, never came back. **He is alive** (owner's decision): the Company kept
+  him as a guide, the only man who knew every crossing in the territory, and he has been working for them under
+  threat ever since. Flint does not know this until the end of chapter one (section 4b).
 - A cavalry colonel, **August Crane**, found the boy on the trail, took him in at **Fort Pell** and raised him as
   a scout. Flint learned to ride, track and shoot from the man who would become the tenth outlaw.
 - At twenty-two, Flint was ordered to help clear settlers from a valley for the Company. He refused, was called
@@ -65,22 +70,45 @@ and slightly too proud of his aim.
 **His flaw.** He believes law is a line, and that people stay on their side of it.
 **His arc.** He starts by hunting outlaws for the bounty. He ends by asking each one what they were paid, and
 what they were promised, and finding out the answer is the same every time.
-**His voice.** Short, warm, understated. "Evening, Pete." "I don't shoot people who ask nicely. You didn't."
+**His voice.** Short, level, understated; he asks before he shoots. "Who paid you?" "I'm not here to hurt you, Pete. I'm here to find out what you were told."
 
 **His people (all already in the game):**
 - **Deputy June Holloway** (a hired hand, `src/perks.js`): a young sharpshooter with an auburn bob and a silver
-  star. Runs the Sheriff's Office in Lantern Rock and posts the daily jobs. Cheerful, sharp, keeps a tally of
-  everything Flint breaks. She joins him from the start.
+  star. Runs the Sheriff's Office in Lantern Rock and posts the daily jobs. Direct, sharp, keeps the case board of ledger
+  pages. She joins him from the start.
 - **Ezra Stone** (a hired hand): the town blacksmith, big and gentle, turned gunsmith. Runs the gunsmith's shop.
   Knows metal, which matters at Iron Jack's foundry.
 - **The jail's guests:** every outlaw Flint beats.
+
+## 4b. Chapters: an ending that stays open
+
+The game has ten stages today and will get more (`src/outlaws.js`: new stages are added at the end so saved stars keep
+their places). So the story is built in **chapters**, and chapter one is written to end on a question, not a full stop.
+
+- **Chapter one, "The Ledger" (stages 1 to 10, the game today).** Ten outlaws, ten ledger pages, one arrest.
+  It resolves the Cinder Creek fire and the Company's hold on Red West, and it ends on three open threads:
+  1. **The Compass.** Every ledger page carries the same embossed **eight-point compass seal**. Thorne, the Company's
+     president, was a front: the orders came from **the Compass Board**, a group of distant financiers who want
+     the whole railroad and every water right from the mountains to the sea. It is named only at the very end.
+  2. **Wick Reed is alive.** He is guiding a Company survey camp far to the north.
+  3. **The last poster.** A new Wanted poster on the sheriff's wall, with a face and a compass rose but no name.
+- **Chapter two, "The Compass" (stages 11 and up, not written).** Flint follows the pages north, beyond Red West:
+  mountain passes, a border river, a coastal port, the northern rail. Each new region brings new outlaws with the
+  same shape as chapter one: a person first, wronged or paid by the Board, with a home ground, three story cards
+  and a page (now a **compass fragment**) of the Board's map. The chapter ends on Wick.
+- **Rules for adding stages, so the story never has to be rewritten:**
+  - A new stage is one new outlaw with a home ground, a ride-in line, a bio, and three story cards. Nothing else
+    is required; no stage may depend on a later one.
+  - Every chapter has one arc, one reveal, and one unresolved thread that the next chapter picks up.
+  - Beaten outlaws always end in the jail and, if unlocked, the shop, so the town keeps growing.
+  - The compass seal appears on every page in every chapter. When a player sees it, they know who is behind it.
 
 ## 5. The ten outlaws and their worlds
 
 Each stage is a place with its own light, sound and props, an enemy that belongs to it, and three story beats
 that unlock with the three stars (`STAR_GOALS` in `src/outlaws.js`):
 
-- **Star 1, "Defeat the outlaw":** their *Wanted card*: who they are and what the world says about them.
+- **Star 1, "Defeat the outlaw":** their *bio card*: who they are and what the world says about them (the short `bio` in the game today is its first line).
 - **Star 2, "Collect the bounty at Heat 2+":** their *confession*: what the Company paid or promised them, and
   one **ledger page** as proof.
 - **Star 3, "Ride on and escape":** their *epilogue*: they take the jail's work sentence and, for the ones who
@@ -106,81 +134,81 @@ The pages are *evidence*: each records a payment, a promise or an order from the
 - **Who:** a burly, scruffy brawler with a bushy brown beard and a crooked grin, the Company's muscle for
   collecting "rent" on the miners' claims. Loud, dented, secretly sentimental.
 - **Wants:** to keep his saloon, The Tin Cup, and its piano, out of the Company's hands.
-- **Wanted card:** "Breaks chairs for a living. Has never once paid for one."
+- **Home ground and bio (in the game):** Copper Bit. Muscle for the Company's rent collectors in Copper Bit. He breaks what will not sell, and keeps every receipt.
 - **Confession (page 1):** the Company gave him a small payment for every claim he "convinced" to sell. Page one
   is a receipt: *For rough work, $50.* He hadn't noticed it was the same rate as a fence post.
 - **Epilogue:** he takes the jail's work sentence, mends the town's benches, and becomes Lantern Rock's bouncer.
   As a hero: *Barroom Brawler* (long dashes).
-- **Line:** "Marshal! You come to hit me or drink with me? Either way, sidestep."
+- **Ride-in line (in the game):** “I was paid to break what would not sell. Today that is you.”
 
 ### 2. Rattlesnake Rosa: "Runs With Wolves" (Whisper Wash)
 - **Who:** a fierce outlaw with a long braid, a green coat and a grey wolf-fur mantle, a wolf-fang necklace on her
   neck. Calls the wolves with a howl. Her "pets" are rattlers (the Rattler enemy).
 - **Wants:** the wolves and the wash to be left alone. The Company poisoned the last clean waterhole to force
   homesteaders out, and the wolves came down from the hills looking for water, so she raised the pups.
-- **Wanted card:** "Not a wolf herself, but they'll do what she asks."
+- **Home ground and bio (in the game):** Whisper Wash. Raised the wolf pups when the Company poisoned the wells of Whisper Wash. She has forgiven no one who wears a star.
 - **Confession (page 2):** an order for **poison salts for the Whisper Wash wells**, signed by a Company agent.
 - **Epilogue:** she leads the pack out of the wash to the safe land beyond Lantern Rock. As a hero: *Fast As A
   Snake* (fast, but fragile).
-- **Line:** "You smell like the Company. You smell like their ink."
+- **Ride-in line (in the game):** “They poisoned this wash. I will not let you finish the job.”
 
 ### 3. Deacon Graves: "The Preacher Gun" (Hollow Hill Chapel)
 - **Who:** a gaunt, pale preacher in black with a purple sash and a small black Bible on his belt, who fires
   triple shots from the bell tower.
 - **Wants:** to finish judging those who burned his church. He believes the Company set the blaze at Cinder
   Creek, and is the first to say so out loud.
-- **Wanted card:** "Preaches on Sundays. Shoots on the other six days."
+- **Home ground and bio (in the game):** Hollow Hill Chapel. Lost his church and his flock. He holds the bell tower at Hollow Hill and judges every rider who climbs it.
 - **Confession (page 3):** the Company bought his chapel's mortgage the week before the fire, and the deed is
   stamped with **the Cinder Creek water claim**: the first thread that ties the fire to the Company's ledger.
 - **Epilogue:** he holds a service for the jail's guests, which none of them can leave. As a hero: *Holy Trinity*.
-- **Line:** "I do not seek vengeance, Marshal. I seek an audience. Kneel, or dodge."
+- **Ride-in line (in the game):** “Someone bought this hill before it burned. Pray it was not you.”
 
 ### 4. The Calloways: "Brothers By The Dozen" (Twin Forks)
 - **Who:** a rowdy family of young brothers: freckles, ginger hair, striped ponchos, blue bandanas. They throw
   dynamite (the Dynamiter enemy) because their father's sticks are the only thing on the farm that isn't mortgaged.
 - **Wants:** to keep the family farm. The Company holds their mortgage and keeps raising the rate.
-- **Wanted card:** "Four brothers. One horse. Three opinions."
+- **Home ground and bio (in the game):** Twin Forks. A family of brothers holding Twin Forks against a loan that can never be repaid. They do not fight for money.
 - **Confession (page 4):** the Company's **loan agreement**, with a clause hidden in the small print that makes
   any late payment the Company's right to seize the land. They robbed the bank because the bank was the Company.
-- **Epilogue:** they repair the fences outside Lantern Rock, badly, and argue about it. As a hero: *Thick
+- **Epilogue:** they rebuild the fences outside Lantern Rock and stay on to farm. As a hero: *Thick
   Skinned* (tough, slow).
-- **Line:** "You can't arrest a whole family, Marshal." "I'll start with the loudest one."
+- **Ride-in line (in the game):** “We lost the farm to a paper. We will keep it with powder.”
 
 ### 5. Iron Jack Harlan: "Bulletproof, They Say" (Slagtown)
 - **Who:** a huge, scarred, bearded man in riveted iron plate, tank-like, who charges. His guards, the Brutes,
   wear the same iron.
 - **Wants:** to take the armour off. The Company made it as an *experiment*, riveted it on him for a "test",
   and never came back with the key. Everyone thinks he is bulletproof. He is just stuck.
-- **Wanted card:** "Bullets bounce off him. So, apparently, do questions."
+- **Home ground and bio (in the game):** Slagtown. Riveted into Company armour at the Slagtown foundry and left there. The world calls him bulletproof. He is only trapped.
 - **Confession (page 5):** a **foundry work order** for "one suit of proof armour, one man, do not remove".
   **Ezra Stone**, who knows metal, is the one who spots the hidden bolt on the back.
-- **Epilogue:** Ezra opens the armour; Jack cries a little; then he asks if the smithy has a job. As a hero:
+- **Epilogue:** Ezra opens the armour; Jack asks if the smithy has work for a man his size. As a hero:
   *Iron Hide* (very tough, very slow).
-- **Line:** "Shoot me from the front, I'll thank you. Shoot me from behind and I'll finally feel something."
+- **Ride-in line (in the game):** “They bolted this iron on me. Break it, if you can.”
 
 ### 6. Mad Mesa Morgan: "Queen Of The Badlands" (Redstone Mesa)
 - **Who:** a wild bandit queen with curly hair, a magenta hat and red feather, crossed bandoliers of dynamite
   sticks. Rides with wild riders. Grins a lot.
 - **Wants:** to stop the railroad's blasting through the mesa. She was a quarry foreman; the Company
   dynamited a tunnel through the mesa's water source and called it progress.
-- **Wanted card:** "Never met a fuse she didn't like."
-- **Confession (page 6):** a **blasting permit** signed against the mesa's spring. She takes the marshal along the
+- **Home ground and bio (in the game):** Redstone Mesa. A quarry foreman who watched the Company blast through the spring at Redstone Mesa. She kept the dynamite.
+- **Confession (page 6):** a **blasting permit** signed against the mesa's spring. She takes the marshal across the
   rope bridge and shows him the dry channel.
 - **Epilogue:** she leads the Lantern Rock volunteer fire crew (dynamite for controlled burns). As a hero:
   *Big Bang* (huge bullets, short range).
-- **Line:** "You climbed all the way up here? Cute. Let's see you climb back down."
+- **Ride-in line (in the game):** “They blasted my mesa dry. I will show you how they did it.”
 
 ### 7. Silas Vane: "Six-Gun Silas" (Vane's Crossing)
 - **Who:** a cold, elegant gunfighter in royal blue with a thin moustache, two ivory-handled revolvers, silver
   spurs. Fans the hammer for six fast shots. His men, the Duelists, carry sawn-off shotguns.
 - **Wants:** one last worthy duel. He has never been beaten, and it has emptied his life: the town around his
   crossing has died because nobody will cross it.
-- **Wanted card:** "Never lost a duel. Never won a game of solitaire either."
+- **Home ground and bio (in the game):** Vane's Crossing. Paid by the Company to keep Vane's Crossing closed, so the only road west is the railroad. Never beaten, and it shows.
 - **Confession (page 7):** the Company paid him a **standing fee to keep the Crossing closed**, so no wagon
   trains could use it, so the only route was the Company's railroad.
 - **Epilogue:** after he loses to the marshal, the Crossing reopens and he opens a small shooting gallery on
   Lantern Rock's main street. As a hero: *Fan The Hammer* (fast, reload pause).
-- **Line:** "Twelve paces, Marshal? I'd rather five. Let's talk in gunsmoke."
+- **Ride-in line (in the game):** “I have never lost a duel, Marshal. It has cost me everything else.”
 
 ### 8. El Espectro: "The Ghost Of Red West" (Tres Ríos)
 - **Who:** a ghostly figure in a white sombrero and a long white coat, pale bluish skin, glowing eyes and a
@@ -190,26 +218,26 @@ The pages are *evidence*: each records a payment, a promise or an order from the
   death and let the legend of a ghost keep the Company's men away. His "riders" are the ranch hands, families
   and neighbours who have nowhere else to go.
 - **Wants:** his land, and his people safe.
-- **Wanted card:** "Has been dead for six years. Has not been told."
+- **Home ground and bio (in the game):** Tres Rios. A ghost story told across Red West. The people of Tres Rios know a man lives behind it, and what he lost.
 - **Confession (page 8):** the **real land grant**, plus a Company letter admitting the forgery. Here, and only
   here, he tells Flint what he saw the night Cinder Creek burned: the Company's own men, carrying lamps.
 - **Big turn of the story:** this is the moment Flint learns the Company started the fire, and that *the outlaws
   he has been jailing were never the problem*.
 - **Epilogue:** he doesn't take a cell; he takes the jail's front-porch chair. Flint restores his name in the
   town records. As a hero: *Ghost Step* (a moment of invisibility after each dash).
-- **Line:** "They call me a ghost, Marshal. Ghosts don't have anything left to lose."
+- **Ride-in line (in the game):** “They say I died. Let the dead teach you something.”
 
 ### 9. Lucky Lou: "The Riverboat Card Sharp" (The Silver Belle)
 - **Who:** a smug riverboat gambler in a red waistcoat with a bowler hat and a card tucked in the band. Deals
   razor-edged cards in a fan. Her crew, the Knife Throwers, are her deck hands.
 - **Wants:** to keep winning. She launders the Company's money through her tables, and she knows exactly how much
   it is.
-- **Wanted card:** "Has never lost a hand. Has never played one fair."
+- **Home ground and bio (in the game):** The Silver Belle. Runs the Silver Belle, where the Company's money goes in dirty and comes out clean. She knows every name on its payroll.
 - **Confession (page 9):** the Company's **casino ledger**, the proof of every payment to every outlaw before her.
   She will trade it, but only for a game: win the duel, and the ledger is yours.
-- **Epilogue:** she deals cards at the Lantern Rock saloon and keeps a very slightly honest table. As a hero:
+- **Epilogue:** she deals cards at the Lantern Rock saloon, and the table is honest. As a hero:
   *Stacked Deck* (fast fire, short range).
-- **Line:** "Fifty-fifty odds, Marshal. That's my favourite kind: I can always adjust them."
+- **Ride-in line (in the game):** “Every payment the Company made is in my books. Win them.”
 
 ### 10. Colonel Crane: "The Gatling Colonel" (Fort Pell)
 - **Who:** a stern, grey-haired colonel with a monocle, mutton-chop sideburns and a faded cavalry coat. Sweeps
@@ -218,14 +246,19 @@ The pages are *evidence*: each records a payment, a promise or an order from the
   discharged in disgrace. The Company then bought his fort's debts and his loyalty, and gave him back the
   regiment he had been robbed of, on the condition that he serve them.
 - **Wants:** his regiment back, and to believe he did right. He tells himself the Company is the law now.
-- **Wanted card:** "Taught the marshal everything. Has stopped being proud of it."
+- **Home ground and bio (in the game):** Fort Pell. The renegade colonel of Fort Pell. He raised the marshal, then chose the Company. His gatling has not lost a field.
 - **Confession (page 10):** the **original order** to clear the valley, signed by the Company's president,
-  **Ambrose Thorne**. With ten pages, the evidence is complete.
-- **Finale:** Crane is beaten, not killed. Flint brings him in, without cuffs, and asks him to testify. He does.
-- **Epilogue:** the pages go to the territorial court. Thorne's arrest is told in a short closing scene, and a last
-  poster is pinned to the sheriff's wall: an unnamed face for a possible sequel.
+  **Ambrose Thorne**, and stamped with the same eight-point compass seal as every other page. Below it, a line
+  in the Company's staff list: *W. Reed, guide, retained.* Flint's father is alive, and the Colonel has known for
+  years. He promised Wick he would keep Flint out of it.
+- **Finale:** Crane is beaten, not killed. Flint brings him in, without cuffs, and asks him to testify. He does,
+  and tells Flint where the survey camp is that his father guides for.
+- **Epilogue (chapter one ends here):** the pages go to the territorial court and Thorne is arrested. But every
+  page carries the same compass seal, and Thorne says one thing before he is taken: he was never the one giving
+  the orders. A last poster is pinned to the sheriff's wall: an unnamed face and a compass rose. The Wanted Road
+  is not finished.
 - **As a hero:** *Gatling Drill* (a triple shot every third shot, but slow).
-- **Line:** "You were the best scout I ever trained, Flint. That's the only reason you got this far."
+- **Ride-in line (in the game):** “I taught you to read a trail, Flint. I never taught you when to turn back.”
 
 ## 6. The town's cast and how it grows
 
@@ -236,8 +269,8 @@ Lantern Rock's buildings (`src/town.js`) each get a voice, so the town itself te
 | Sheriff's Office | **Deputy June Holloway** | Posts the daily jobs, reads new rumours from the Road, keeps the case board of ledger pages |
 | Gunsmith | **Ezra Stone** | Sells guns, knows metal, unlocks Iron Jack's story |
 | Jail | the beaten outlaws | Each one sits in it, chats through the bars, pays a bounty per hour (the rule that exists today) |
-| Bank | **Mr. Ollie Pruitt** | Nervous, honest, the only banker in the territory who won't take the Company's money |
-| Stable / Undertaker | **Old Gil** / **Mr. Grimsby** | Comic relief, and rumours about who is coming to town |
+| Bank | **Mr. Ollie Pruitt** | Careful and honest, the only banker in the territory who will not take the Company's money |
+| Stable / Undertaker | **Old Gil** / **Mr. Grimsby** | The town's ears: rumours about who is coming, and who is not coming back |
 | Saloon (Pass) | run by Dusty Pete once he is jailed and released | The place for the season-pass storyline |
 
 **How the town changes with progress:** every beaten outlaw adds something visible. Pete's piano, Rosa's wolf
@@ -249,8 +282,9 @@ the people who once tried to kill them, which is the story's point.
 
 Nothing here needs new game modes. Each item is a piece of text or a picture on a screen that already exists.
 
-1. **Ride-in banner** (exists, shows a tip): add one line of dialogue, the outlaw's own words.
-2. **Wanted poster and Bounty Book** (exist): add the "Wanted card" line and a short bio (2 to 3 sentences).
+1. **Ride-in banner** (**done**): the outlaw's name, their own line (`taunt`), then the tip.
+2. **Bounty Book** (**done**): each unlocked outlaw shows their home ground and a short bio (`home`, `bio`). The
+   Wanted poster itself is unchanged; it is small, and adding text there would crowd the picture.
 3. **Three story cards per outlaw** (new, one screen): a picture and 2 to 3 lines, unlocked by the three stars.
    These are the confession and epilogue beats above.
 4. **The Case File** (new): ten empty ledger-page slots on the Bounty Book screen, filled as pages are earned.
@@ -264,36 +298,48 @@ Nothing here needs new game modes. Each item is a piece of text or a picture on 
 
 ## 8. What this asks of the game and of the plan
 
-- **Data:** extend each entry in `src/outlaws.js` with `home` (name, sky, fog, sun, palette, prop kit), `bio`,
-  `taunt`, `defeat`, `cards[3]` and `page`. A small `src/story.js` holds the opening, ending and town barks.
+- **Data:** each entry in `src/outlaws.js` now has `home` (the place name), `taunt` and `bio`. Still to add: the
+  look of the home ground (`sky`, `fog`, `sun`, palette, prop kit), `defeat`, `cards[3]` and `page`. A small
+  `src/story.js` would hold the opening, ending and town barks.
 - **UI:** a story-card screen, a Case File panel in the Bounty Book, and a one-line bark in each town building.
 - **World work:** the per-stage atmosphere and props in `POLISH_PLAN.md` become each outlaw's *home ground*, so the
   world work and the story work are the same work.
 - **Writing volume:** about 4 lines per outlaw for the first pass, and about 200 to 300 words per outlaw for the
   full pass. Ten outlaws, a hero, and a handful of townsfolk: about 4,000 words in all.
-- **A note found while reading the code:** `index.html` still says "STAGE 1 / 8" and "eight outlaws" while the
-  game has ten. The road button may be updated in script, but the Wanted Road text should be checked.
+- **Fixed while doing the first pass:** `index.html` and the README still said "eight outlaws"; they now say ten (and
+  the road button text no longer hard-codes a count).
 
 ## 9. Suggested order
 
-1. **First pass (small):** one ride-in line, one poster line and a bio per outlaw; the opening and ending text.
+1. **First pass (small): done for the ride-in line, the home ground and the bio** (2026-09-29). Not done: the
+   opening and ending text.
 2. **Story cards and the Case File** (medium): the three cards per outlaw and the ledger page collectible.
 3. **Home grounds** (with the world and props work): sky, fog, sun and props per stage.
 4. **Town barks and visible changes** (medium): each beaten outlaw appears in Lantern Rock.
 5. **Comics and voice** (medium): the opening and ending panels, and re-recorded taunts.
 
-## 10. Open questions for the owner
+## 10. Decisions (owner's answers, 2026-09-29) and what is still open
 
-1. **Tone:** comedic like Brawl Stars, or more serious? This document leans light with real stakes.
-2. **Flint's father, Wick:** alive (found in Fort Pell's cells, or at Tres Ríos) or gone for good?
-3. **The Company's boss:** is Ambrose Thorne the final villain, or a front for someone bigger (a sequel)?
-4. **The Drifter and custom heroes:** the shop's colourful cowboy is not Flint. Is the Drifter "you", a separate
-   traveller, or Flint in disguise?
-5. **Playable heroes and canon:** unlocked outlaws are playable in the shop. Should their story cards change if
-   you play as them (for example, Pete jokes with June)?
-6. **El Espectro:** are you comfortable with his story as written (a rancher who faked his death)? It is written
-   with respect (see the "Respect" rule in section 1).
-7. **Names:** all places and people here are invented. They still need a trademark check before release.
+| Question | Answer | What it changed |
+|---|---|---|
+| Tone | **Serious voice** | Every line in the game and here was rewritten plain and weighty; the comic touches in the town cast were removed. |
+| Length | **Ten stages now, more later, so open-ended** | Section 4b: story in chapters, with new stages added at the end. |
+| Flint's father, Wick | **Alive** | The Company kept him as a guide; the last ledger page lists him; Crane has known for years. |
+| The Company's boss | **A front for someone bigger** | The Compass Board, named only at the end of chapter one; the compass seal is on every page. |
+| El Espectro | **Approved** | Kept as written, with the respect rule in section 1. |
+| The Drifter | **Not decided; my default below** | See below. |
+
+**The Drifter (a default to confirm).** In the shop the Drifter is the plain, colour-your-own cowboy. Proposed: the
+Drifter is **a nameless rider who works the Wanted Road beside the marshal**, a blank slate so a player can dress
+up as themselves. The story cards always tell the story in the marshal's voice, so the Drifter needs no backstory
+and no separate lines. If you prefer, the Drifter can be Flint in disguise, or a named ally: say so and this changes.
+
+**Still open:**
+1. **Who is on the Compass Board?** One face, or a name only? Leave it unwritten until chapter two is planned.
+2. **What does the game call the story?** For example: "Red West: The Wanted Road, Chapter One: The Ledger".
+3. **Playable heroes:** when a player uses an unlocked outlaw, should the ride-in banner or a story card acknowledge
+   it (for example Pete meeting his own poster)? Not needed for chapter one.
+4. **Names:** all places and people are invented. They still need a trademark check before release.
 
 ## Sources
 

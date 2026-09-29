@@ -58,3 +58,13 @@ test('difficulty climbs every stage, and the last outlaws are much tougher than 
     const stats = { speed: 5, hp: 1, shootCooldown: 2.5, projectileSpeed: 40, aimSpread: 2 };
     assert.ok(applyOutlawToEnemy('boss', stats, OUTLAWS.length - 1).shootCooldown < applyOutlawToEnemy('boss', stats, 0).shootCooldown);
 });
+
+test('every outlaw has a home ground, a ride-in line and a short bio that fit the banner and the Bounty Book', () => {
+    for(const outlaw of OUTLAWS) {
+        assert.ok(outlaw.home && outlaw.home.length <= 24, `${outlaw.id} home`);
+        assert.ok(outlaw.taunt && outlaw.taunt.length <= 75, `${outlaw.id} taunt: ${outlaw.taunt?.length}`);
+        assert.ok(outlaw.bio && outlaw.bio.length <= 160, `${outlaw.id} bio: ${outlaw.bio?.length}`);
+        assert.ok(!/[<>&"]/.test(outlaw.home + outlaw.taunt + outlaw.bio), `${outlaw.id} has characters that need escaping in HTML`);
+    }
+    assert.equal(new Set(OUTLAWS.map(o => o.home)).size, OUTLAWS.length, 'every outlaw has their own home ground');
+});

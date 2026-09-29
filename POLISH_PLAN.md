@@ -28,8 +28,22 @@ Each item lists what to build and where. Sizes: S = a day or less, M = a few day
 
 ### 1. World and props (next; decided 2026-09-29)
 
-Do the baseline first: run `node tools/perf.mjs` and write the draw-call and frame-time numbers here, so every
-change below can be checked against them. Phone target from the research: under about 50 draw calls (first guess).
+First, cut the enemy draw calls (see the baseline below); then build the world around a fixed budget.
+
+**Baseline (measured 2026-09-29, `node tools/perf.mjs`, an 844x390 phone-sized screen, software rendering).** Frame
+times in software rendering are far slower than a phone: only compare before and after.
+
+| Scene | Draw calls | Triangles | Shader programs | Median frame |
+|---|---|---|---|---|
+| Frontier Town | 85 to 86 | about 5,700 | 23 | 50 ms |
+| A fight, paused, 15+ enemies | 176 in one run, 336 in another | about 29,000 to 31,000 | 23 | 83 to 117 ms |
+
+The fight number moves between runs because it depends on how many enemies had spawned. Run the tool three
+times and take the middle value. The `--detail` run counted 165 body meshes and 75 outlines for the bandits alone,
+against 16 scenery-type meshes, so **in a fight the enemies, not the scenery, use most of the draw calls.**
+The phone target from the research is under about 50 draw calls (a first guess), so the first job is to merge each
+enemy's box parts into fewer meshes (`src/meshMerge.js` already does this for the town) or draw the crowd with
+instancing, before adding anything to the world.
 
 - **Instance the scenery (M).** `src/world.js` makes about 60 rocks, 15 trees, 15 crates, 20 cacti and 15 fence
   pieces, each its own mesh. Turn each kind into an `InstancedMesh` (or `BatchedMesh`, in three r160) with per-instance
