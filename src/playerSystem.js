@@ -97,8 +97,14 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             playerGroup.add(instance.object);
             drifter.visible = false;
             // Shots leave from the character's gun hand instead of the hidden box revolver.
-            playerGroup.add(muzzle);
-            muzzle.position.set(1, 3.1, 1.8);
+            // The flash light rides on the barrel tip of the gun in the hand, so bullets start there.
+            if(instance.muzzle) {
+                instance.muzzle.add(muzzle);
+                muzzle.position.set(0, 0, 0);
+            } else {
+                playerGroup.add(muzzle);
+                muzzle.position.set(1, 3.1, 1.8);
+            }
             character = { id: item.id, instance };
             return true;
         }).catch(() => {
