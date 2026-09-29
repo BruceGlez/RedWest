@@ -139,7 +139,9 @@ const mat = {
     hpGreen: new THREE.MeshBasicMaterial({ color: 0x00ff00 })
 };
 
-function createRevolverMesh() {
+// Only the player's gun gets a real flash light: every light is paid by every lit pixel, and a new one
+// appearing mid-fight makes phones recompile shaders. Enemy muzzles are plain markers.
+function createRevolverMesh(flashLight = false) {
     const gunGroup = new THREE.Group();
     const grip = new THREE.Mesh(new THREE.BoxGeometry(0.25, 0.7, 0.35), mat.wood); grip.position.set(0, -0.3, 0.2); grip.rotation.x = -0.4; gunGroup.add(grip);
     const frame = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.35, 0.5), mat.gunMetal); frame.position.set(0, 0.1, -0.2); gunGroup.add(frame);
@@ -147,7 +149,7 @@ function createRevolverMesh() {
     const barrel = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 1.4), mat.gunMetal); barrel.position.set(0, 0.18, -1.1); gunGroup.add(barrel);
     const hammer = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.2, 0.2), mat.darkGrey); hammer.position.set(0, 0.35, 0.1); hammer.rotation.x = 0.3; gunGroup.add(hammer);
     const sight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.15, 0.1), mat.darkGrey); sight.position.set(0, 0.28, -1.75); gunGroup.add(sight);
-    const muzzleLight = new THREE.PointLight(0xffaa00, 0, 10); muzzleLight.position.set(0, 0.2, -1.9); gunGroup.add(muzzleLight);
+    const muzzleLight = flashLight ? new THREE.PointLight(0xffaa00, 0, 10) : new THREE.Object3D(); muzzleLight.position.set(0, 0.2, -1.9); gunGroup.add(muzzleLight);
     gunGroup.userData = { muzzle: muzzleLight };
     return gunGroup;
 }
@@ -169,7 +171,7 @@ export function createPlayerMesh() {
     const rightArmMesh = new THREE.Mesh(new THREE.BoxGeometry(0.5, 1.5, 0.5), mat.coat); rightArmMesh.position.set(0, -0.75, 0); rightArmMesh.userData.slot = 'coat'; rightArmPivot.add(rightArmMesh);
     const rightHand = new THREE.Mesh(new THREE.BoxGeometry(0.4, 0.4, 0.4), mat.skin); rightHand.position.set(0, -1.5, 0); rightArmPivot.add(rightHand);
 
-    const gunGroup = createRevolverMesh(); gunGroup.position.set(0, -0.2, 0.2); gunGroup.rotation.set(-Math.PI / 2, 0, 0); rightHand.add(gunGroup); 
+    const gunGroup = createRevolverMesh(true); gunGroup.position.set(0, -0.2, 0.2); gunGroup.rotation.set(-Math.PI / 2, 0, 0); rightHand.add(gunGroup);
 
     // Head
     const headGroup = new THREE.Group(); headGroup.position.y = 4.1; mesh.add(headGroup);

@@ -88,3 +88,5 @@ npm run test:demo
 ```
 
 The browser smoke tests look for an installed Chrome or Chromium in the usual location for Windows, macOS, or Linux. Set `CHROME_PATH` to use a different Chromium executable. Player feel, balance, and frame pacing still require hands-on playtesting.
+
+`node tools/perf.mjs` prints draw calls, triangles and frame times for Frontier Town and a 15-enemy fight on a phone-sized screen (same map every time, so before/after numbers compare). Add `--detail` for what the fight draws by kind of object.
