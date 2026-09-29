@@ -166,7 +166,7 @@ export function setupTouchControls() {
 function enterAppMode() {
     const root = document.documentElement;
     if(document.fullscreenElement || !root.requestFullscreen) return;
+    // No orientation lock: the game plays upright or sideways.
     root.requestFullscreen({ navigationUI: 'hide' })
-        .then(() => screen.orientation?.lock?.('landscape'))
         .catch(() => { /* iOS Safari and some browsers refuse; the home-screen app is fullscreen anyway. */ });
 }

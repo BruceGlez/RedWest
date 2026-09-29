@@ -1016,3 +1016,5 @@ body.demo #start-screen, body.demo #welcome-modal { display: none !important; }
 .settings-actions .apple-btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; background: #000; color: #fff; border-color: #000; }
 .apple-btn svg { width: 16px; height: 16px; margin-top: -2px; }
 .settings-actions .apple-btn:disabled { opacity: 1; background: #000; color: #fff; cursor: default; }
+
+.settings-build { margin: 4px 0 0; font-size: 11px; color: #8d6e63; text-align: center; }

@@ -127,6 +127,8 @@ wallet.load().then(next => {
     renderApple();
 }).catch(error => ui.shopMessage(error.message, true));
 
+document.getElementById('settings-build').textContent = `Build ${typeof __RW_BUILD__ === 'string' ? __RW_BUILD__ : 'dev'}`;
+
 // ---------- Sign in with Apple (optional): keeps the save when changing phones ----------
 const appleBtn = document.getElementById('settings-apple-btn');
 const appleLabel = document.getElementById('settings-apple-label');
