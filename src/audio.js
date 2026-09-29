@@ -175,13 +175,17 @@ function playRecordedSfx(key) {
 let musicTrack = 'home';
 let musicSource = null;
 let musicSourceTrack = null;
+const switchPending = new Set(); // tracks that will replace the synth loop once loaded
 
+// Only one music source ever exists. Each step is guarded on its own so a failing stop()
+// (seen on iPhone) still disconnects the old loop instead of leaving it playing untracked.
 function stopRecordedMusic() {
-    if(!musicSource) return;
-    try { musicSource.stop(); } catch { /* already stopped */ }
-    musicSource.disconnect();
+    const source = musicSource;
     musicSource = null;
     musicSourceTrack = null;
+    if(!source) return;
+    try { source.stop(); } catch { /* already stopped */ }
+    try { source.disconnect(); } catch { /* already disconnected */ }
 }
 
 function startBackgroundTrack() {
@@ -191,20 +195,27 @@ function startBackgroundTrack() {
         stopSynthTrack();
         if(musicSourceTrack === musicTrack) return;
         stopRecordedMusic();
-        musicSource = audioCtx.createBufferSource();
-        musicSource.buffer = buffer;
-        musicSource.loop = true;
-        musicSource.connect(fileMusicGain);
-        musicSource.start();
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.loop = true;
+        source.connect(fileMusicGain);
+        musicSource = source;
         musicSourceTrack = musicTrack;
+        try {
+            source.start();
+        } catch {
+            stopRecordedMusic();
+        }
         return;
     }
     // Not loaded (yet): keep the synth loop going, then switch once the file arrives.
     stopRecordedMusic();
     startSynthTrack();
-    if(!loading.has(id)) {
+    if(!buffers.has(id) && !switchPending.has(id)) {
+        switchPending.add(id);
         const wanted = musicTrack;
         loadBuffer('music', wanted).then(loaded => {
+            switchPending.delete(id);
             if(loaded && musicEnabled && musicTrack === wanted) startBackgroundTrack();
         });
     }
@@ -218,9 +229,10 @@ function stopBackgroundTrack() {
 loadAudioSettings();
 applyAudioSettings();
 
+// Called on every tap and key press: unlocks audio, and starts the music only if none is playing.
 export function resumeAudio() {
-    if(audioCtx.state === 'suspended') audioCtx.resume();
-    if(musicEnabled) startBackgroundTrack();
+    if(audioCtx.state !== 'running' && audioCtx.state !== 'closed') audioCtx.resume().catch(() => {});
+    if(musicEnabled && !musicSource && musicIntervalId === null) startBackgroundTrack();
 }
 
 // Plays a sound by its key in src/audioManifest.js (or an old name like 'shoot').
