@@ -4,7 +4,7 @@ import { checkCollision, getObstacleAt, getNearbyEnemies, markObstacleGridDirty,
 import { createExplosion } from './particleSystem.js';
 import { spawnLoot } from './lootSystem.js';
 import { playSound } from './audio.js';
-import { createCrate, createCactus, createDeadTree, createFence, createRock } from './assets.js';
+import { createCrate, createCactus, createDeadTree, createFence, createRock } from './scenery.js';
 import { disposeBaked } from './meshMerge.js';
 
 const PLAYER_BULLET_COLOR = new THREE.Color(0xffff00);

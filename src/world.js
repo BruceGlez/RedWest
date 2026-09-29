@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { createRock, createDeadTree, createCrate, createCactus, createFence } from './assets.js';
+import { createRock, createDeadTree, createCrate, createCactus, createFence } from './scenery.js';
 import { createDesertGroundTexture, createSkyTexture } from './textures.js';
 
 let sunLight = null;
