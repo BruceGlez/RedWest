@@ -175,6 +175,7 @@ try {
         assert.deepEqual(rows, ['#1RIVAL ROSA2,000', '#2SMOKE KID480']);
         // Other players' names can be reported (two taps); my own row has no report button.
         assert.equal(await page.locator('#records-board-list li.me .records-report').count(), 0);
+        store.getUser(userId).profile.stats.runs = 3; // only players with a few runs can report
         const report = page.locator('#records-board-list li', { hasText: 'RIVAL ROSA' }).locator('.records-report');
         await report.click();
         assert.equal(await report.textContent(), 'REPORT?');

@@ -6,7 +6,7 @@ import { starsForRun, starCount } from './progress.js';
 import { EconomyError } from './economyError.js';
 import { createTown, normalizeTown, buildingEffects } from './town.js';
 import { eventForWeek, createEventProgress, normalizeEventProgress, recordEventScore } from './events.js';
-import { createPass, normalizePass, payPassRewards, pointsForRun } from './pass.js';
+import { createPass, normalizePass, payPassRewards, pointsForRun, tierReward } from './pass.js';
 
 // The player's economy profile: balances, owned cosmetics, loadout and daily jobs. These pure
 // functions are shared by the in-browser playtest wallet and the server (server/), so both apply
@@ -34,7 +34,10 @@ export function createProfile(now = new Date()) {
         // Account records, also the source for online leaderboards.
         stats: { runs: 0, bestScore: 0, stageBest: OUTLAWS.map(() => 0), stageStars: OUTLAWS.map(() => 0), weekly: { week: weekKey(now), score: 0 }, kills: 0 },
         processed: [], // ids of already-credited purchases (idempotency)
-        bought: [] // one-time products already bought (the starter pack)
+        bought: [], // one-time products already bought (the starter pack)
+        purchases: [], // what each purchase gave, so a refund can take exactly that back
+        refunded: [], // transaction ids already reversed
+        nuggetDebt: 0 // refunded nuggets that had already been spent; paid from the next nuggets earned
     };
 }
 
@@ -52,6 +55,9 @@ export function normalizeProfile(raw, now = new Date()) {
     }
     profile.processed = (raw.processed || []).filter(id => typeof id === 'string').slice(-500);
     profile.bought = [...new Set((raw.bought || []).filter(id => typeof id === 'string'))];
+    profile.purchases = (Array.isArray(raw.purchases) ? raw.purchases : []).filter(p => p && typeof p.tx === 'string').slice(-200);
+    profile.refunded = (raw.refunded || []).filter(id => typeof id === 'string').slice(-200);
+    profile.nuggetDebt = Math.max(0, Math.floor(Number(raw.nuggetDebt)) || 0);
     profile.town = normalizeTown(raw.town, now);
     profile.event = normalizeEventProgress(raw.event, weekKey(now));
     profile.pass = normalizePass(raw.pass, now);
@@ -219,25 +225,82 @@ export function applyRun(profile, summary, now = new Date()) {
         else if(reward.nuggets) { lines.push({ label, nuggets: reward.nuggets }); nuggets += reward.nuggets; }
         else { lines.push({ label, dollars: reward.dollars }); dollars += reward.dollars; }
     }
+    settleNuggetDebt(profile);
     return { dollars, nuggets, lines, jobsCompleted, ranked };
 }
 
 // A verified store purchase (src/products.js): nuggets and any items. `transactionId` makes repeated webhook
 // deliveries safe; a one-time product pays its nuggets only the first time.
-export function grantProduct(profile, product, transactionId, now = new Date()) {
+// extra: { paymentIntent } for Stripe, to match a later refund.
+export function grantProduct(profile, product, transactionId, now = new Date(), extra = {}) {
     if(transactionId && profile.processed.includes(transactionId)) return false;
+    const record = { tx: transactionId || '', product: product.id, nuggets: 0, items: [], at: now.toISOString(), ...extra };
+    const nuggetsBefore = profile.balances.nuggets;
     if(product.kind === 'pass') {
         // This season's pass: the paid track opens and every tier already reached pays at once.
         profile.pass = normalizePass(profile.pass, now);
         profile.pass.premium = true;
-        payPassRewards(profile);
+        record.season = profile.pass.season;
+        for(const reward of payPassRewards(profile)) if(reward.item) record.items.push(reward.item);
     }
     const firstTime = !profile.bought.includes(product.id);
     if(!product.oneTime || firstTime) profile.balances.nuggets += Math.max(0, Math.floor(product.nuggets || 0));
-    for(const id of product.items || []) if(!profile.owned.includes(id)) profile.owned.push(id);
-    if(product.oneTime && firstTime) profile.bought.push(product.id);
+    for(const id of product.items || []) {
+        if(!profile.owned.includes(id)) {
+            profile.owned.push(id);
+            record.items.push(id);
+        }
+    }
+    if(product.oneTime && firstTime) {
+        profile.bought.push(product.id);
+        record.firstTime = true;
+    }
+    record.nuggets = profile.balances.nuggets - nuggetsBefore;
     if(transactionId) profile.processed.push(transactionId);
     profile.processed = profile.processed.slice(-500);
+    profile.purchases = [...profile.purchases, record].slice(-200);
+    settleNuggetDebt(profile);
+    return true;
+}
+
+// Nuggets taken back by a refund after they were spent are owed, and paid from the next nuggets credited.
+export function settleNuggetDebt(profile) {
+    const pay = Math.min(profile.nuggetDebt || 0, profile.balances.nuggets);
+    profile.balances.nuggets -= pay;
+    profile.nuggetDebt = (profile.nuggetDebt || 0) - pay;
+}
+
+// A refund (store or Stripe): take back what that purchase gave. Nuggets already spent become a debt instead
+// of a negative balance; looks are removed (and unequipped); a refunded pass closes this season's paid track
+// and takes back what it paid. Returns false if the transaction is unknown or already reversed.
+export function revokePurchase(profile, transactionId, now = new Date()) {
+    if(!transactionId || profile.refunded.includes(transactionId)) return false;
+    const record = profile.purchases.find(p => p.tx === transactionId);
+    if(!record) return false;
+    let nuggets = record.nuggets;
+    const items = [...record.items];
+    if(record.season) {
+        profile.pass = normalizePass(profile.pass, now);
+        if(profile.pass.season === record.season && profile.pass.premium) {
+            // Everything the paid track paid this season, including tiers reached after buying.
+            for(let tier = 1; tier <= profile.pass.premiumClaimed; tier++) {
+                const reward = tierReward(record.season, tier, 'premium');
+                if(reward.item && !items.includes(reward.item)) items.push(reward.item);
+            }
+            nuggets = 0;
+            for(let tier = 1; tier <= profile.pass.premiumClaimed; tier++) nuggets += tierReward(record.season, tier, 'premium').nuggets || 0;
+            profile.pass.premium = false;
+            profile.pass.premiumClaimed = 0;
+        }
+    }
+    const left = profile.balances.nuggets - nuggets;
+    profile.balances.nuggets = Math.max(0, left);
+    if(left < 0) profile.nuggetDebt = (profile.nuggetDebt || 0) - left;
+    profile.owned = profile.owned.filter(id => !items.includes(id));
+    const fallback = defaultLoadout();
+    for(const [slot, id] of Object.entries(profile.loadout)) if(items.includes(id)) profile.loadout[slot] = fallback[slot];
+    if(record.firstTime) profile.bought = profile.bought.filter(id => id !== record.product);
+    profile.refunded = [...profile.refunded, transactionId].slice(-200);
     return true;
 }
 

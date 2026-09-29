@@ -1,0 +1,35 @@
+# Render Blueprint for the Red West server (server/). In Render: New > Blueprint, pick this repository,
+# fill the secret values it asks for, and deploy. Then put the service URL in the GitHub Actions variable
+# VITE_API_BASE (see MONETIZATION.md).
+services:
+  - type: web
+    name: red-west-server
+    runtime: node
+    plan: starter # a paid instance: the persistent disk below needs one
+    region: oregon
+    buildCommand: node --version # the server has no dependencies to install
+    startCommand: node server/index.js
+    healthCheckPath: /health
+    disk:
+      name: red-west-data
+      mountPath: /var/data
+      sizeGB: 1
+    envVars:
+      - key: NODE_VERSION
+        value: "22"
+      - key: DATA_FILE
+        value: /var/data/redwest.json
+      - key: TRUST_PROXY # Render sits in front of the server, so the caller address is in X-Forwarded-For
+        value: "1"
+      - key: ALLOWED_ORIGIN # the web game and the iPhone app
+        value: https://bruceglez.github.io,capacitor://localhost
+      - key: ADMIN_TOKEN
+        generateValue: true
+      - key: REVENUECAT_WEBHOOK_AUTH
+        sync: false
+      - key: REVENUECAT_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: STRIPE_PAYMENT_LINKS
+        sync: false

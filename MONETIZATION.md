@@ -50,11 +50,16 @@ The server is plain Node 20+ with no dependencies: `npm run server` (listens on 
 It stores data in one JSON file (`DATA_FILE`, default `./data/redwest.json`). Use a persistent disk, and
 move to a real database before many players join.
 
+**Quickest: Render.** The repository has a Blueprint, [`render.yaml`](render.yaml): in Render choose
+New > Blueprint, pick this repository, fill in the secret values it asks for, and deploy. It sets up the
+persistent disk, the health check, `TRUST_PROXY`, `ALLOWED_ORIGIN` and a generated `ADMIN_TOKEN` for you.
+
 Any Node host works (Render, Railway, Fly.io, a VPS). Set these environment variables:
 
 | Variable | Value |
 |---|---|
-| `ALLOWED_ORIGIN` | `https://bruceglez.github.io` (the game's origin) |
+| `ALLOWED_ORIGIN` | `https://bruceglez.github.io,capacitor://localhost` (the web game and the iPhone app; comma-separated) |
+| `TRUST_PROXY` | `1` when a proxy sits in front of the server (Render, Fly, a load balancer), so rate limits see the real caller |
 | `REVENUECAT_WEBHOOK_AUTH` | A long random string, e.g. `Bearer 7f3c…`. The same value goes in RevenueCat's webhook "Authorization header". |
 | `STRIPE_WEBHOOK_SECRET` | `whsec_…` from the Stripe webhook endpoint |
 | `STRIPE_PAYMENT_LINKS` | JSON mapping Payment Link ids to products, e.g. `{"plink_abc":"nuggets_100","plink_def":"nuggets_550","plink_ghi":"nuggets_1200"}` |
@@ -120,11 +125,22 @@ commission. The game uses RevenueCat whenever it runs as the native app.
 The same RevenueCat plugin covers Google Play: add an Android app in RevenueCat, create the same product
 ids in Play Console, and set `VITE_REVENUECAT_GOOGLE_KEY`. Building the Android app is a separate step.
 
+## Refunds
+
+Refunds are handled automatically: a RevenueCat `CANCELLATION` event for one of our products, or a Stripe
+`charge.refunded` event for a full refund (add that event to the Stripe webhook endpoint), takes back what
+that purchase gave. Nuggets already spent become a small debt that the next nuggets pay off (the balance
+never goes negative); the Deputy's Kit looks are removed; a refunded pass closes this season's paid track and
+takes back what it paid. Partial Stripe refunds change nothing in the game.
+
+## Abuse limits
+
+The server rate-limits new accounts (200 an hour per address), name changes, reports and restores, and only
+counts name reports from players with at least 3 runs, so throwaway accounts cannot hide a name.
+
 ## Before the first real sale
 
 - A **privacy policy** URL (accounts, purchases) and a support contact, for both stores.
-- Apple and Google refunds reach RevenueCat as events. This server does not claw back refunded
-  nuggets yet; decide a policy and add it before scale.
 - Keep the server's data file backed up. It holds everyone's paid balances.
 
 ## Testing

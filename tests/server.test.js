@@ -195,6 +195,13 @@ test('names reported by three accounts leave the boards until the owner reviews 
         const reporters = [await s.account('ONE'), await s.account('TWO'), await s.account('THREE')];
         const onBoard = async () => (await s.call('/api/leaderboard?board=weekly', { token: reporters[0].token })).data.entries.some(e => e.name === 'RUDE DUDE');
         assert.equal(await onBoard(), true);
+        // Brand-new accounts' reports do not count (no ganging up with throwaway accounts).
+        for(const r of reporters) await s.call('/api/report', { token: r.token, body: { name: 'RUDE DUDE' } });
+        assert.deepEqual(s.store.getUser(target.userId).reportedBy ?? [], []);
+        for(let run = 0; run < 3; run++) {
+            s.advanceDays(1 / 24);
+            for(const r of reporters) await s.call('/api/run', { token: r.token, body: { score: 50, seconds: 60, kills: {} } });
+        }
         for(const r of reporters.slice(0, 2)) await s.call('/api/report', { token: r.token, body: { name: 'RUDE DUDE' } });
         await s.call('/api/report', { token: reporters[0].token, body: { name: 'RUDE DUDE' } }); // repeat reports count once
         assert.equal(await onBoard(), true, 'two distinct reports are not enough');
@@ -312,5 +319,60 @@ test('a starter pack webhook credits items and nuggets once', async () => {
         assert.deepEqual(profile.bought, ['starter_pack']);
     } finally {
         await s.close();
+    }
+});
+
+test('store refunds reverse purchases: RevenueCat cancellations and full Stripe refunds', async () => {
+    const s = await startServer();
+    try {
+        const { data: account } = await s.call('/api/account');
+        const rc = event => s.call('/webhooks/revenuecat', { headers: { Authorization: 'Bearer rc-secret' }, body: { event } });
+        await rc({ type: 'NON_RENEWING_PURCHASE', app_user_id: account.userId, product_id: 'nuggets_550', transaction_id: 'r1' });
+        assert.equal((await s.call('/api/profile', { token: account.token })).data.profile.balances.nuggets, 550);
+        const refund = await rc({ type: 'CANCELLATION', app_user_id: account.userId, product_id: 'nuggets_550', transaction_id: 'r1', cancel_reason: 'CUSTOMER_SUPPORT' });
+        assert.equal(refund.data.reversed, true);
+        assert.equal((await s.call('/api/profile', { token: account.token })).data.profile.balances.nuggets, 0);
+
+        // Stripe: the checkout's payment intent links the later refund to the purchase.
+        const signed = payload => {
+            const raw = JSON.stringify(payload);
+            const t = Math.floor(new Date(2026, 8, 28, 12).getTime() / 1000);
+            const v1 = createHmac('sha256', 'whsec_test').update(`${t}.${raw}`).digest('hex');
+            return s.call('/webhooks/stripe', { raw, headers: { 'stripe-signature': `t=${t},v1=${v1}` } });
+        };
+        await signed({ type: 'checkout.session.completed', data: { object: { id: 'cs_1', payment_status: 'paid', payment_link: 'plink_550', client_reference_id: account.userId, payment_intent: 'pi_1' } } });
+        assert.equal((await s.call('/api/profile', { token: account.token })).data.profile.balances.nuggets, 550);
+        assert.equal((await signed({ type: 'charge.refunded', data: { object: { payment_intent: 'pi_1', amount: 499, amount_refunded: 100 } } })).data.ignored, 'partial refund');
+        assert.equal((await signed({ type: 'charge.refunded', data: { object: { payment_intent: 'pi_1', amount: 499, amount_refunded: 499 } } })).data.reversed, true);
+        assert.equal((await s.call('/api/profile', { token: account.token })).data.profile.balances.nuggets, 0);
+    } finally {
+        await s.close();
+    }
+});
+
+test('rate limits: account creation per address', async () => {
+    const s = await startServer();
+    try {
+        const statuses = [];
+        for(let i = 0; i < 201; i++) statuses.push((await s.call('/api/account')).status);
+        assert.equal(statuses.filter(code => code === 201).length, 200);
+        assert.equal(statuses.at(-1), 429);
+    } finally {
+        await s.close();
+    }
+});
+
+test('CORS answers the web game and the iPhone app from one ALLOWED_ORIGIN list', async () => {
+    const app = createApp({ store: createMemoryStore(), env: { ALLOWED_ORIGIN: 'https://bruceglez.github.io, capacitor://localhost' } });
+    const server = createServer(app);
+    await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+    const base = `http://127.0.0.1:${server.address().port}`;
+    try {
+        const allowed = async origin => (await fetch(`${base}/health`, { headers: { Origin: origin } })).headers.get('access-control-allow-origin');
+        assert.equal(await allowed('capacitor://localhost'), 'capacitor://localhost');
+        assert.equal(await allowed('https://bruceglez.github.io'), 'https://bruceglez.github.io');
+        assert.equal(await allowed('https://evil.example'), 'https://bruceglez.github.io', 'other sites are not echoed');
+    } finally {
+        await new Promise(resolve => server.close(resolve));
     }
 });

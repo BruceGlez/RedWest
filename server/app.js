@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, grantProduct, restoreProduct, refreshJobs, setName, rankBoard, EconomyError } from '../src/profile.js';
+import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, grantProduct, restoreProduct, revokePurchase, refreshJobs, setName, rankBoard, EconomyError } from '../src/profile.js';
 import { getProduct } from '../src/products.js';
 import { validateName, isGeneratedName } from '../src/names.js';
 import { AGE_BANDS } from '../src/privacy.js';
@@ -13,6 +13,16 @@ const MIN_SECONDS_BETWEEN_RUNS = 20; // a real run takes minutes; faster reports
 const STRIPE_TOLERANCE_SECONDS = 300;
 const PURCHASE_EVENTS = new Set(['INITIAL_PURCHASE', 'NON_RENEWING_PURCHASE']);
 const REPORTS_TO_HIDE = 3; // distinct accounts reporting a name before it is hidden from leaderboards
+const REPORTER_MIN_RUNS = 3; // brand-new accounts cannot report, so throwaway accounts cannot hide a name
+// Requests allowed per window, per caller (IP for new accounts, account id otherwise).
+const LIMITS = {
+    // Generous: phones on the same mobile carrier often share one address. Still stops a flood.
+    account: { max: 200, windowMs: 60 * 60 * 1000 },
+    report: { max: 30, windowMs: 24 * 60 * 60 * 1000 },
+    restore: { max: 5, windowMs: 10 * 60 * 1000 },
+    name: { max: 20, windowMs: 60 * 60 * 1000 }
+};
+const REFUND_EVENTS = new Set(['CANCELLATION']); // RevenueCat reports a refunded one-off purchase this way
 const MAX_ACTIVE_DAYS = 400;
 const ALLOWED_EVENTS = new Set(ANALYTICS_EVENTS);
 const dayOf = date => date.toISOString().slice(0, 10); // UTC day
@@ -37,15 +47,48 @@ export function verifyStripeSignature(rawBody, header, secret, now = Date.now())
     return signatures.some(signature => safeEqual(signature, expected));
 }
 
+// A small in-memory limiter: enough for one server process. Resets on restart.
+export function createRateLimiter(now = () => Date.now()) {
+    const hits = new Map();
+    return (kind, who) => {
+        const { max, windowMs } = LIMITS[kind];
+        const key = `${kind}:${who}`;
+        const t = now();
+        const recent = (hits.get(key) || []).filter(at => t - at < windowMs);
+        if(recent.length >= max) {
+            hits.set(key, recent);
+            return false;
+        }
+        recent.push(t);
+        hits.set(key, recent);
+        if(hits.size > 50000) hits.clear(); // never let the limiter itself grow without bound
+        return true;
+    };
+}
+
 export function createApp({ store, env = {}, now = () => new Date(), fetchImpl = globalThis.fetch }) {
+    const allow = createRateLimiter(() => now().getTime());
+    // Behind a proxy (Render, Fly, ...) set TRUST_PROXY=1 so the caller's address comes from X-Forwarded-For.
+    const callerIp = req => (env.TRUST_PROXY === '1' && String(req.headers['x-forwarded-for'] || '').split(',')[0].trim())
+        || req.socket?.remoteAddress || 'unknown';
+    const tooMany = res => send(res, 429, { code: 'rate_limited', message: 'Too many requests. Try again later.' });
     const stripeLinks = (() => {
         try { return JSON.parse(env.STRIPE_PAYMENT_LINKS || '{}'); } catch { return {}; }
     })();
 
+    // ALLOWED_ORIGIN: one origin or a comma-separated list (the web game and the iPhone app,
+    // capacitor://localhost). The matching one is echoed back; unset means any origin.
+    const allowedOrigins = String(env.ALLOWED_ORIGIN || '*').split(',').map(o => o.trim()).filter(Boolean);
+    function corsOrigin(requestOrigin) {
+        if(allowedOrigins.includes('*')) return '*';
+        return allowedOrigins.includes(requestOrigin) ? requestOrigin : allowedOrigins[0];
+    }
+
     function send(res, status, body) {
         res.writeHead(status, {
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': env.ALLOWED_ORIGIN || '*',
+            'Access-Control-Allow-Origin': corsOrigin(res.requestOrigin),
+            Vary: 'Origin',
             'Access-Control-Allow-Headers': 'Authorization, Content-Type',
             'Access-Control-Allow-Methods': 'GET, POST, OPTIONS'
         });
@@ -80,23 +123,25 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
         return id ? { id, user: loadUser(id) } : null;
     }
 
-    function creditPurchase(userId, productId, transactionId) {
+    function creditPurchase(userId, productId, transactionId, extra = {}) {
         const product = getProduct(productId);
         const user = loadUser(userId);
         if(!product || !user) return { ok: false, status: 404, message: 'unknown user or product' };
-        const credited = grantProduct(user.profile, product, transactionId, now());
+        const credited = grantProduct(user.profile, product, transactionId, now(), extra);
         store.putUser(userId, user);
         store.save();
         return { ok: true, credited };
     }
 
     return async function handle(req, res) {
+        res.requestOrigin = req.headers.origin;
         try {
             const url = new URL(req.url, 'http://localhost');
             if(req.method === 'OPTIONS') return send(res, 204, {});
             if(url.pathname === '/health') return send(res, 200, { ok: true });
 
             if(url.pathname === '/api/account' && req.method === 'POST') {
+                if(!allow('account', callerIp(req))) return tooMany(res);
                 const userId = `rw_${randomBytes(9).toString('hex')}`;
                 const token = randomBytes(32).toString('hex');
                 store.putUser(userId, { tokenHash: sha256(token), profile: createProfile(now()), lastRunAt: 0, createdAt: now().toISOString() });
@@ -110,6 +155,14 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     return send(res, 401, { message: 'bad webhook auth' });
                 }
                 const event = JSON.parse(await readBody(req)).event || {};
+                if(REFUND_EVENTS.has(event.type) && getProduct(event.product_id)) {
+                    const user = loadUser(event.app_user_id);
+                    if(!user) return send(res, 404, { message: 'unknown user' });
+                    const reversed = revokePurchase(user.profile, `rc:${event.transaction_id || event.id}`, now());
+                    store.putUser(event.app_user_id, user);
+                    store.save();
+                    return send(res, 200, { reversed });
+                }
                 if(!PURCHASE_EVENTS.has(event.type)) return send(res, 200, { ignored: event.type || 'unknown' });
                 const result = creditPurchase(event.app_user_id, event.product_id, `rc:${event.transaction_id || event.id}`);
                 return send(res, result.ok ? 200 : result.status, result);
@@ -121,11 +174,25 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     return send(res, 400, { message: 'bad signature' });
                 }
                 const event = JSON.parse(raw);
+                if(event.type === 'charge.refunded') {
+                    // Full refunds only; a partial refund is a goodwill gesture and changes nothing in the game.
+                    const charge = event.data?.object || {};
+                    if(!charge.payment_intent || charge.amount_refunded < charge.amount) return send(res, 200, { ignored: 'partial refund' });
+                    const owner = store.listUsers().find(entry => entry.user.profile?.purchases?.some(p => p.paymentIntent === charge.payment_intent));
+                    if(!owner) return send(res, 200, { ignored: 'unknown payment' });
+                    const user = loadUser(owner.id);
+                    const record = user.profile.purchases.find(p => p.paymentIntent === charge.payment_intent);
+                    const reversed = revokePurchase(user.profile, record.tx, now());
+                    store.putUser(owner.id, user);
+                    store.save();
+                    return send(res, 200, { reversed });
+                }
                 if(event.type !== 'checkout.session.completed') return send(res, 200, { ignored: event.type });
                 const session = event.data?.object || {};
                 if(session.payment_status !== 'paid') return send(res, 200, { ignored: 'unpaid' });
                 const productId = stripeLinks[session.payment_link];
-                const result = creditPurchase(session.client_reference_id, productId, `stripe:${session.id}`);
+                const result = creditPurchase(session.client_reference_id, productId, `stripe:${session.id}`,
+                    session.payment_intent ? { paymentIntent: session.payment_intent } : {});
                 return send(res, result.ok ? 200 : result.status, result);
             }
 
@@ -188,6 +255,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     return send(res, 200, { ...result, profile: user.profile });
                 }
                 if(url.pathname === '/api/name' && req.method === 'POST') {
+                    if(!allow('name', id)) return tooMany(res);
                     const wanted = validateName(body.name);
                     if(!wanted.ok) throw new EconomyError('bad_name', wanted.error);
                     // Players under 13 never choose a name; the game gives them a generated one.
@@ -205,6 +273,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 // "Restore purchases" (App Store rule for non-consumables): ask RevenueCat, never the game,
                 // which one-time products this account owns, and give back their items.
                 if(url.pathname === '/api/restore' && req.method === 'POST') {
+                    if(!allow('restore', id)) return tooMany(res);
                     if(!env.REVENUECAT_SECRET_KEY) return send(res, 503, { message: 'Restoring purchases is not set up yet.' });
                     const response = await fetchImpl(`https://api.revenuecat.com/v1/subscribers/${encodeURIComponent(id)}`, {
                         headers: { Authorization: `Bearer ${env.REVENUECAT_SECRET_KEY}` }
@@ -243,6 +312,9 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     return send(res, 200, { ok: true });
                 }
                 if(url.pathname === '/api/report' && req.method === 'POST') {
+                    if(!allow('report', id)) return tooMany(res);
+                    // Only players with a few runs behind them count, so fresh throwaway accounts cannot gang up.
+                    if((user.profile.stats?.runs || 0) < REPORTER_MIN_RUNS) return send(res, 200, { ok: true });
                     const name = String(body.name || '');
                     const target = store.listUsers().find(entry => entry.id !== id && name && entry.user.profile?.name === name);
                     if(target && !target.user.reportedBy?.includes(id)) {

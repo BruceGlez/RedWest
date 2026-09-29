@@ -122,8 +122,8 @@ Outlaw names are user-generated content shown to everyone. `src/names.js` alread
 (0.4), first-party analytics and `tools/retention.mjs` (0.5), [ASSETS.md](ASSETS.md) (0.6), legal links in
 Settings once `VITE_PRIVACY_URL` / `VITE_TERMS_URL` / `VITE_SUPPORT_EMAIL` are set, and the generator
 answers in [docs/POLICY_GENERATOR_ANSWERS.md](docs/POLICY_GENERATOR_ANSWERS.md). **Still to do:** generate
-and publish the policy and terms, trademark search, Stripe Tax, and refund handling (all need your
-accounts or the hosted server).
+and publish the policy and terms, trademark search, Stripe Tax (need your accounts). Refund handling was
+built on 2026-09-29 (MONETIZATION.md, Refunds).
 
 **Phase 0 done when:** policy, terms and support links are live; age question, account deletion, name
 reports and analytics are working; asset licences are recorded.
