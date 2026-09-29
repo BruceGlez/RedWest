@@ -84,8 +84,10 @@ curl -X POST -H "Authorization: Bearer $ADMIN_TOKEN" -H "Content-Type: applicati
    `com.bruceglez.redwest`). Add three **Consumable** in-app purchases with the product ids
    `nuggets_100`, `nuggets_550`, `nuggets_1200` and prices ($0.99, $4.99, $9.99), and one
    **Non-Consumable** `starter_pack` ($1.99, the Deputy's Kit: three looks + 200 nuggets, once per player;
-   the shop's RESTORE PURCHASES button gives the looks back on a new device). Complete the Paid
-   Applications agreement.
+   the shop's RESTORE PURCHASES button gives the looks back on a new device), and one **Consumable**
+   `season_pass` ($4.99, the Wanted Poster Pass in the Frontier Town saloon: the server opens this season's
+   paid track; the game hides the button once the season is owned; nothing renews, so no subscription
+   rules apply). Complete the Paid Applications agreement.
 2. **RevenueCat** (free to start): create a project, add the iOS app, and connect App Store Connect
    (in-app purchase key). Import the three products.
 3. RevenueCat → Integrations → **Webhooks**: URL `https://<your server>/webhooks/revenuecat`,
@@ -105,7 +107,8 @@ server credits.
    `checkout.session.completed`. Put its signing secret in `STRIPE_WEBHOOK_SECRET` and the
    `plink_…` → product mapping in `STRIPE_PAYMENT_LINKS`.
 4. Put each link's URL in the GitHub variables `VITE_STRIPE_LINK_NUGGETS_100` / `_550` / `_1200` and
-   `VITE_STRIPE_LINK_STARTER_PACK` (and map its `plink_…` to `starter_pack` in `STRIPE_PAYMENT_LINKS`).
+   `VITE_STRIPE_LINK_STARTER_PACK` and `VITE_STRIPE_LINK_SEASON_PASS` (and map their `plink_…` ids to
+   `starter_pack` and `season_pass` in `STRIPE_PAYMENT_LINKS`).
 5. Test in Stripe **test mode** first (card 4242 4242 4242 4242).
 
 Note: inside the iOS app, Apple requires its own In-App Purchase for digital goods. Links out to web

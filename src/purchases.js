@@ -70,12 +70,16 @@ export async function restorePurchases(wallet) {
     return wallet.restorePurchases();
 }
 
-// After paying, poll the server until the webhook has credited the nuggets (usually seconds).
-export async function waitForCredit(wallet, previousNuggets, timeoutMs = 20000) {
+// A marker for "which purchases has the server credited so far": the last credited transaction id.
+export const lastCredit = profile => profile?.processed?.at(-1) ?? '';
+
+// After paying, poll the server until the webhook has credited the purchase (usually seconds). Works for
+// every product, including the pass, which may add no nuggets at all.
+export async function waitForCredit(wallet, previousCredit, timeoutMs = 20000) {
     const deadline = Date.now() + timeoutMs;
     while(Date.now() < deadline) {
         const profile = await wallet.refresh();
-        if(profile.balances.nuggets > previousNuggets) return profile;
+        if(lastCredit(profile) !== previousCredit) return profile;
         await new Promise(resolve => setTimeout(resolve, 1500));
     }
     return null;

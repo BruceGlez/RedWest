@@ -6,6 +6,7 @@ import { starsForRun, starCount } from './progress.js';
 import { EconomyError } from './economyError.js';
 import { createTown, normalizeTown, buildingEffects } from './town.js';
 import { eventForWeek, createEventProgress, normalizeEventProgress, recordEventScore } from './events.js';
+import { createPass, normalizePass, payPassRewards, pointsForRun } from './pass.js';
 
 // The player's economy profile: balances, owned cosmetics, loadout and daily jobs. These pure
 // functions are shared by the in-browser playtest wallet and the server (server/), so both apply
@@ -29,6 +30,7 @@ export function createProfile(now = new Date()) {
         name: '',
         town: createTown(now), // Frontier Town buildings and the Jail's last collection (src/town.js)
         event: createEventProgress(weekKey(now)), // this week's Most Wanted event (src/events.js)
+        pass: createPass(now), // this season's Wanted Poster Pass (src/pass.js)
         // Account records, also the source for online leaderboards.
         stats: { runs: 0, bestScore: 0, stageBest: OUTLAWS.map(() => 0), stageStars: OUTLAWS.map(() => 0), weekly: { week: weekKey(now), score: 0 }, kills: 0 },
         processed: [], // ids of already-credited purchases (idempotency)
@@ -52,6 +54,7 @@ export function normalizeProfile(raw, now = new Date()) {
     profile.bought = [...new Set((raw.bought || []).filter(id => typeof id === 'string'))];
     profile.town = normalizeTown(raw.town, now);
     profile.event = normalizeEventProgress(raw.event, weekKey(now));
+    profile.pass = normalizePass(raw.pass, now);
     if(raw.name && validateName(raw.name).ok) profile.name = validateName(raw.name).name;
     const s = raw.stats || {};
     const num = v => Math.max(0, Math.floor(Number(v)) || 0);
@@ -196,19 +199,37 @@ export function applyRun(profile, summary, now = new Date()) {
         }
     }
 
-    // Event prizes come on top of the per-run cap, so reaching targets never crowds out run earnings.
-    const dollars = Math.min(MAX_DOLLARS_PER_RUN, lines.reduce((sum, line) => sum + (line.dollars || 0), 0))
+    // Run and event dollars (event prizes come on top of the per-run cap, so reaching targets never crowds
+    // out run earnings).
+    const runDollars = Math.min(MAX_DOLLARS_PER_RUN, lines.reduce((sum, line) => sum + (line.dollars || 0), 0))
         + eventLines.reduce((sum, line) => sum + (line.dollars || 0), 0);
-    lines.push(...eventLines);
-    profile.balances.dollars += dollars;
+    profile.balances.dollars += runDollars;
     profile.balances.nuggets += nuggets;
+    lines.push(...eventLines);
+
+    // Season pass: points for this run; newly reached tiers pay straight into the wallet (src/pass.js).
+    profile.pass = normalizePass(profile.pass, now);
+    profile.pass.points += pointsForRun({ bounty: run.bounty, jobsCompleted: jobsCompleted.length, eventTargets: eventLines.filter(line => line.dollars).length });
+    let dollars = runDollars;
+    for(const reward of payPassRewards(profile)) {
+        const label = `Pass tier ${reward.tier}${reward.track === 'premium' ? ' (pass)' : ''}`;
+        if(reward.item) lines.push({ label, item: reward.item });
+        else if(reward.nuggets) { lines.push({ label, nuggets: reward.nuggets }); nuggets += reward.nuggets; }
+        else { lines.push({ label, dollars: reward.dollars }); dollars += reward.dollars; }
+    }
     return { dollars, nuggets, lines, jobsCompleted, ranked };
 }
 
 // A verified store purchase (src/products.js): nuggets and any items. `transactionId` makes repeated webhook
 // deliveries safe; a one-time product pays its nuggets only the first time.
-export function grantProduct(profile, product, transactionId) {
+export function grantProduct(profile, product, transactionId, now = new Date()) {
     if(transactionId && profile.processed.includes(transactionId)) return false;
+    if(product.kind === 'pass') {
+        // This season's pass: the paid track opens and every tier already reached pays at once.
+        profile.pass = normalizePass(profile.pass, now);
+        profile.pass.premium = true;
+        payPassRewards(profile);
+    }
     const firstTime = !profile.bought.includes(product.id);
     if(!product.oneTime || firstTime) profile.balances.nuggets += Math.max(0, Math.floor(product.nuggets || 0));
     for(const id of product.items || []) if(!profile.owned.includes(id)) profile.owned.push(id);

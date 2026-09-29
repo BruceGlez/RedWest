@@ -227,7 +227,7 @@ const BUILDERS = {
 
 // Where each building stands (x, z). All face the camera (+z); the depot's railway ends main street.
 export const TOWN_LAYOUT = [
-    { id: 'saloon', x: -15, z: -14, label: 'SALOON', soon: 'Opens with the season pass' },
+    { id: 'saloon', x: -15, z: -14, label: 'SALOON' },
     { id: 'sheriff', x: 0, z: -13, label: "SHERIFF'S OFFICE" },
     { id: 'bank', x: 14, z: -13, label: 'BANK', soon: 'Coming later' },
     { id: 'jail', x: -16, z: 5, label: 'JAIL' },

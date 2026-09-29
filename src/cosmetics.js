@@ -2,6 +2,7 @@ import { WEAPONS, WEAPON_SLOTS } from './weapons.js';
 import { OUTLAWS } from './outlaws.js';
 import { OUTLAW_PERKS } from './perks.js';
 import { EVENT_COSMETICS } from './events.js';
+import { PASS_COSMETICS } from './pass.js';
 
 // Shop catalog: guns (src/weapons.js) plus cosmetics. Cosmetics never change gameplay; guns do,
 // so they are sold for earned Bounty Dollars only (no pay-to-win). Price 0 = owned by default.
@@ -48,8 +49,9 @@ export const COSMETICS = [
     { id: 'hat-deputy', slot: 'hat', name: 'Deputy Grey', color: 0x5f6368, price: 0, currency: 'dollars', earned: 'purchase' },
     { id: 'coat-deputy', slot: 'coat', name: 'Deputy Long Coat', color: 0x37474f, price: 0, currency: 'dollars', earned: 'purchase' },
     { id: 'bullets-deputy', slot: 'bullets', name: 'Tin Star', color: 0xcfd8dc, price: 0, currency: 'dollars', earned: 'purchase' },
-    // Weekly event prizes: earned only (src/events.js)
-    ...EVENT_COSMETICS
+    // Weekly event prizes and season pass looks: earned only (src/events.js, src/pass.js)
+    ...EVENT_COSMETICS,
+    ...PASS_COSMETICS
 ];
 
 export const SHOP_ITEMS = [...CHARACTERS, ...WEAPONS, ...COSMETICS];

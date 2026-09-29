@@ -84,7 +84,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
         const product = getProduct(productId);
         const user = loadUser(userId);
         if(!product || !user) return { ok: false, status: 404, message: 'unknown user or product' };
-        const credited = grantProduct(user.profile, product, transactionId);
+        const credited = grantProduct(user.profile, product, transactionId, now());
         store.putUser(userId, user);
         store.save();
         return { ok: true, credited };

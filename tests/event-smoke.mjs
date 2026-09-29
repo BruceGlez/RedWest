@@ -79,8 +79,19 @@ try {
     await page.locator('#town-btn').click();
     await page.locator('[data-open-building="depot"]').click();
     assert.equal(await page.locator('.event-targets li.done').count(), 3);
+    // The saloon sells the Wanted Poster Pass: the event run earned points (20 + 3 targets x 50).
+    await page.locator('#town-sheet-close').click();
+    await page.locator('[data-open-building="saloon"]').click();
+    const pass = page.locator('.pass-card');
+    await pass.waitFor();
+    const passText = await pass.textContent();
+    assert.match(passText, /WANTED POSTER PASS/);
+    assert.match(passText, /Tier 0 \/ 30 · 80 points to the next/);
+    assert.match(passText, /never renews/);
+    assert.equal(await pass.locator('.pass-tier').count(), 30);
+    assert.ok(await pass.locator('[data-buy-pass]').isDisabled(), 'no real-money sales without the server and store');
     assert.deepEqual(errors, [], `browser errors: ${errors.join(', ')}`);
-    console.log(`Event smoke passed: ${event.name} (${event.twist.name}) from Frontier Town, all three targets and the first prize, no Wanted Road change.`);
+    console.log(`Event smoke passed: ${event.name} (${event.twist.name}) from Frontier Town, all three targets and the first prize, no Wanted Road change, season pass points in the saloon.`);
 } finally {
     await browser?.close();
     await server.close();

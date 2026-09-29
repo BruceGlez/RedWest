@@ -31,6 +31,14 @@ The **TOWN** button (next to SHOP) opens the town between runs: a 3D frontier to
 
 In the iPhone app, the first jail collect offers a **reminder when the jail is full** (local notifications, no server): at most one a day, never between 9 pm and 9 am, only about the jail, and switchable in Settings. Earning **all three stars** on an outlaw unlocks them as a **playable character** in the shop's CHARACTERS tab, each with one perk and one drawback (for example Silas Vane fires 30% faster but reloads after six shots; Iron Jack has two extra hearts but moves slower). They are earned only, never sold (unit tests check that every perk has a drawback and that none can be bought). Perks live in `src/perks.js`.
 
+### Deputy's Kit and the Wanted Poster Pass
+
+Real-money items, all showing "SOON" until the server and stores are connected ([MONETIZATION.md](MONETIZATION.md)), and all hidden for players under 13:
+
+- **Deputy's Kit** ($1.99, once per player, in SHOP → NUGGETS): three looks only it gives plus 200 Gold Nuggets, contents and price listed in full, no countdown. It is mentioned once on the result screen after the first outlaw win. RESTORE PURCHASES (app) gives the looks back on a new device.
+- **Wanted Poster Pass** (in the Frontier Town **saloon**): 30-day seasons, 30 tiers earned by playing (finish a run +20, collect a bounty +10, each daily job +30, each Most Wanted target +50). The free track pays Bounty Dollars, nuggets and a season look; the $4.99 pass adds the season's four looks and nuggets. It never pays Bounty Dollars (they buy guns), never renews, and buying late pays every tier already reached. Rules in `src/pass.js`.
+- Every nugget price shows roughly what it costs in real money, and nugget items are priced so the packs divide into them.
+
 ### Weekly Most Wanted event
 
 Every week (Monday to Sunday, UTC) one outlaw is **Most Wanted** with a twist (Wolf Moon, Deadeye Week, Iron Posse or Hot Trail), shown at the top of Frontier Town. **RIDE OUT** fights them with the twist, even before they are unlocked on the Wanted Road; event runs do not move the road. It is free to enter as often as you like. Prizes come from your own best score reaching three targets (Bounty Dollars, and at the top a collectible hat, bullet colour, coat or pants, in order), never from rank, and have no cash value; the event prizes can never be bought. With the server connected there is also a MOST WANTED leaderboard. Rules in `src/events.js`.

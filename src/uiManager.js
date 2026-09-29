@@ -418,7 +418,8 @@ export function createUIManager(gameState, playerStats) {
             return;
         }
         if(shopTab === 'nuggets') {
-            els.shopGrid.innerHTML = PRODUCTS.map(product => {
+            // The season pass is sold in the Frontier Town saloon, not here.
+            els.shopGrid.innerHTML = PRODUCTS.filter(product => product.kind !== 'pass').map(product => {
                 const support = purchaseSupport(product.id);
                 const pending = confirmId === product.id;
                 if(product.kind === 'bundle') {

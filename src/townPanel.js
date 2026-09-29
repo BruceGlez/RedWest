@@ -5,10 +5,13 @@ import { BUILDINGS, buildingEffects, jailedOutlaws, jailRate, jailCapacity, jail
 import { track } from './analytics.js';
 import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, disableReminders, updateJailReminder } from './reminders.js';
 import { createTownScene, TOWN_LAYOUT } from './townScene.js';
+import { normalizePass, seasonEndsAt, themeFor, tierFor, tierReward, TIERS, POINTS_PER_TIER, POINTS } from './pass.js';
+import { getShopItem } from './cosmetics.js';
+import { purchaseSupport } from './purchases.js';
 
 // The Frontier Town screen (src/town.js has the rules): a 3D town at dusk (src/townScene.js) with a label over
 // each building; tapping a building or its label opens its card in a sheet. Also the TOWN button's badge.
-export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
+export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, isChild = () => false }) {
     const $ = id => document.getElementById(id);
     const els = {
         button: $('town-btn'),
@@ -29,6 +32,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
     let profile = null;
     let town3d = null; // built the first time the town opens
     let openId = null; // the building whose card is showing
+    let headerBottom = 0; // measured once the town is on screen (reset on resize)
     let confirmUpgrade = null; // building id armed for a second tap
     let busy = false;
 
@@ -129,8 +133,49 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
             + `<p class="town-blurb">${spot.soon}.</p></div>`;
     }
 
+    // The Wanted Poster Pass, in the saloon (rules in src/pass.js).
+    function rewardText(reward) {
+        if(reward.item) return getShopItem(reward.item)?.name ?? 'Look';
+        if(reward.nuggets) return `&#9670;${reward.nuggets}`;
+        return `$${reward.dollars}`;
+    }
+    function passCard() {
+        const now = new Date();
+        const pass = normalizePass(profile.pass, now);
+        const tier = tierFor(pass.points);
+        const intoTier = pass.points - (tier * POINTS_PER_TIER);
+        const theme = themeFor(pass.season);
+        const armed = confirmUpgrade === 'pass';
+        const support = purchaseSupport('season_pass');
+        const tiers = Array.from({ length: TIERS }, (_, i) => {
+            const t = i + 1;
+            const reached = t <= tier;
+            return `<li class="pass-tier${reached ? ' reached' : ''}"><b>${t}</b>`
+                + `<span class="pass-free">${rewardText(tierReward(pass.season, t, 'free'))}</span>`
+                + `<span class="pass-premium${pass.premium ? '' : ' locked'}">${rewardText(tierReward(pass.season, t, 'premium'))}</span></li>`;
+        }).join('');
+        let buy;
+        if(isChild()) buy = '<p class="town-blurb">The pass is not sold to players under 13. The free track is all yours.</p>';
+        else if(pass.premium) buy = '<p class="town-stat">&#10003; Pass owned for this season.</p>';
+        else {
+            buy = `<div class="town-actions"><button type="button" class="shop-action upgrade${armed ? ' confirm' : ''}" data-buy-pass${support.available ? '' : ' disabled'}>`
+                + `${armed ? 'CONFIRM $4.99' : support.available ? 'GET THE PASS $4.99' : 'PASS: SOON'}</button></div>`;
+        }
+        return `<div class="town-card pass-card" data-building="saloon">`
+            + `<div class="town-sign"><span>WANTED POSTER PASS</span><span class="town-level">ENDS IN ${endsIn((seasonEndsAt(pass.season) - now) / 3600000)}</span></div>`
+            + `<p class="town-stat">Season ${pass.season}: ${theme.name} · Tier ${tier} / ${TIERS}${tier < TIERS ? ` · ${POINTS_PER_TIER - intoTier} points to the next` : ''}</p>`
+            + `<div class="job-bar"><div class="job-fill" style="width:${tier >= TIERS ? 100 : Math.round((intoTier / POINTS_PER_TIER) * 100)}%"></div></div>`
+            + `<p class="town-blurb">Points: finish a run +${POINTS.run}, collect a bounty +${POINTS.collected}, each daily job +${POINTS.job}, `
+            + `each Most Wanted target +${POINTS.eventTarget}. Rewards are paid as soon as a tier is reached. Top row free, bottom row with the pass.</p>`
+            + `<ol class="pass-track">${tiers}</ol>${buy}`
+            + '<p class="town-next">The pass holds looks and Gold Nuggets only, never anything that changes a fight. '
+            + 'One-time purchase for this season; it never renews. Buying later still pays every tier already reached.</p>'
+            + '</div>';
+    }
+
     function sheetHtml(id) {
         if(id === 'depot') return eventCard();
+        if(id === 'saloon') return passCard();
         const building = BUILDINGS.find(b => b.id === id);
         if(building) return card(building);
         const spot = TOWN_LAYOUT.find(s => s.id === id);
@@ -157,6 +202,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
             if(building && building.levels.length > 1) extra = `<small>LV ${profile.town.levels[spot.id]}</small>`;
             if(spot.id === 'jail' && stored > 0) extra += `<span class="town-bubble${full ? ' full' : ''}">${full ? 'FULL ' : ''}${money(stored)}</span>`;
             if(spot.id === 'depot') extra = `<small>${OUTLAWS[eventForWeek(weekKey(new Date())).outlaw].name}</small>`;
+            if(spot.id === 'saloon') extra = `<small>PASS TIER ${tierFor(normalizePass(profile.pass).points)}</small>`;
             label.innerHTML = `<span>${spot.label}</span>${extra}`;
         }
     }
@@ -227,6 +273,15 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
                 track('building_upgrade');
                 say(`${BUILDINGS.find(b => b.id === id).name} upgraded.`);
             });
+        } else if(button.hasAttribute('data-buy-pass')) {
+            if(confirmUpgrade !== 'pass') {
+                confirmUpgrade = 'pass'; // two taps to spend, like every purchase
+                render();
+                return;
+            }
+            confirmUpgrade = null;
+            render();
+            onBuyPass?.();
         } else if(button.hasAttribute('data-ride')) {
             onRideOut(eventForWeek(weekKey(new Date())));
         } else if(button.hasAttribute('data-jobs')) {
@@ -237,7 +292,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
     });
     // A tap anywhere else cancels an armed upgrade.
     document.addEventListener('click', event => {
-        if(confirmUpgrade && !event.target.closest?.('[data-upgrade]')) {
+        if(confirmUpgrade && !event.target.closest?.('[data-upgrade], [data-buy-pass]')) {
             confirmUpgrade = null;
             render();
         }
@@ -260,7 +315,10 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
         openId = null;
         render();
     });
-    window.addEventListener('resize', () => town3d?.resize(window.innerWidth, window.innerHeight));
+    window.addEventListener('resize', () => {
+        headerBottom = 0;
+        town3d?.resize(window.innerWidth, window.innerHeight);
+    });
 
     // ---------- Looking around: drag to pan, pinch or scroll to zoom, tap a building ----------
     const pointers = new Map();
@@ -365,10 +423,12 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut }) {
             renderer.render(town3d.scene, town3d.camera);
             const w = window.innerWidth;
             const h = window.innerHeight;
+            // Signs never slide under the header, where they could not be tapped.
+            const minTop = (headerBottom ||= els.screen.querySelector('.panel-header').getBoundingClientRect().bottom) + 48;
             for(const [id, p] of Object.entries(town3d.labelPositions())) {
                 const label = labelEls.get(id);
                 label.style.left = `${Math.round(p.x * w)}px`;
-                label.style.top = `${Math.round(p.y * h)}px`;
+                label.style.top = `${Math.max(minTop, Math.round(p.y * h))}px`;
                 label.style.visibility = p.visible ? '' : 'hidden';
             }
         }

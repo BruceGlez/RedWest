@@ -968,3 +968,15 @@ body.town-open #start-screen { visibility: hidden; }
 .restore-btn { grid-column: 1 / -1; justify-self: center; }
 .result-offer { margin: 8px auto; max-width: 420px; padding: 8px 12px; border: 2px solid #c8a050; border-radius: 10px; background: rgba(0, 0, 0, 0.3); font-size: 13px; }
 .result-offer p { margin: 0 0 6px; }
+/* Season pass track in the saloon */
+.pass-track { list-style: none; margin: 0; padding: 2px 0 6px; display: flex; gap: 4px; overflow-x: auto; }
+.pass-tier { flex: 0 0 64px; display: flex; flex-direction: column; gap: 3px; align-items: stretch; text-align: center; font-size: 10px; }
+.pass-tier b { font-family: 'Rye', serif; font-size: 13px; }
+.pass-tier span { padding: 3px 2px; border-radius: 5px; min-height: 26px; display: flex; align-items: center; justify-content: center; line-height: 1.1; }
+.pass-free { background: rgba(59, 36, 18, 0.12); }
+.pass-premium { background: rgba(200, 160, 80, 0.35); }
+.pass-premium.locked { opacity: 0.55; }
+.pass-tier.reached span { outline: 2px solid #3fbf4a; }
+.town-screen .panel-header { pointer-events: none; }
+.town-screen .panel-header > * { pointer-events: auto; }
+.shop-action.upgrade:disabled { background: #bca68a; color: #5d4037; border-color: #8d6e63; box-shadow: none; cursor: default; }

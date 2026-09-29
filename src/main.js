@@ -14,7 +14,7 @@ import { OUTLAWS } from './outlaws.js';
 import { arena } from './arena.js';
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
-import { buyProduct, waitForCredit, restorePurchases } from './purchases.js';
+import { buyProduct, waitForCredit, restorePurchases, lastCredit } from './purchases.js';
 import { createPrivacyPanel } from './privacyPanel.js';
 import { createTownPanel } from './townPanel.js';
 import { disableReminders } from './reminders.js';
@@ -87,6 +87,8 @@ const town = createTownPanel({
     wallet,
     onProfile: next => applyProfile(next),
     ui,
+    onBuyPass: () => buyRealMoneyProduct('season_pass'),
+    isChild: () => isChild(privacyPanel.privacy),
     // Most Wanted: fight this week's event outlaw (its model first), then back to the home screen.
     onRideOut: event => {
         ui.hidePanels();
@@ -185,13 +187,29 @@ function syncOutlawThumbs() {
 syncOutlawThumbs();
 
 async function afterPayment(before) {
-    ui.shopMessage('Payment received. Your nuggets are on the way...');
+    ui.shopMessage('Payment received. Adding it to your account...');
+    const nuggetsBefore = profile.balances.nuggets;
     const credited = await waitForCredit(wallet, before);
     if(credited) {
         applyProfile(credited);
-        ui.shopMessage(`+${credited.balances.nuggets - before} Gold Nuggets added. Thank you!`);
+        const added = credited.balances.nuggets - nuggetsBefore;
+        ui.shopMessage(`Purchase added${added > 0 ? `: +${added} Gold Nuggets` : ''}. Thank you!`);
     } else {
-        ui.shopMessage('Still processing. Your nuggets will appear shortly; reopen the store to refresh.');
+        ui.shopMessage('Still processing. It will appear shortly; reopen the store to refresh.');
+    }
+}
+
+// Real-money purchases (nugget packs, the Deputy's Kit, the season pass).
+async function buyRealMoneyProduct(productId) {
+    try {
+        track('purchase_start');
+        const before = lastCredit(profile);
+        try { sessionStorage.setItem('redWestCreditBefore', before); } catch { /* private mode */ }
+        const result = await buyProduct(productId, wallet);
+        if(result.purchased) await afterPayment(before);
+    } catch(error) {
+        // A cancelled store sheet is not an error worth shouting about.
+        ui.shopMessage(/cancel/i.test(error.message) ? 'Purchase cancelled.' : error.message, !/cancel/i.test(error.message));
     }
 }
 
@@ -199,8 +217,8 @@ async function afterPayment(before) {
 if(new URLSearchParams(location.search).get('purchase') === 'success') {
     history.replaceState(null, '', location.pathname);
     ui.openShop();
-    let before = 0;
-    try { before = Number(sessionStorage.getItem('redWestNuggetsBefore')) || 0; } catch { /* private mode */ }
+    let before = '';
+    try { before = sessionStorage.getItem('redWestCreditBefore') || ''; } catch { /* private mode */ }
     afterPayment(before).catch(() => {});
 }
 
@@ -251,18 +269,7 @@ ui.bindControlHandlers({
             ui.shopMessage(error.message, true);
         }
     },
-    onBuyProduct: async productId => {
-        try {
-            track('purchase_start');
-            const before = profile.balances.nuggets;
-            try { sessionStorage.setItem('redWestNuggetsBefore', String(before)); } catch { /* private mode */ }
-            const result = await buyProduct(productId, wallet);
-            if(result.purchased) await afterPayment(before);
-        } catch(error) {
-            // A cancelled store sheet is not an error worth shouting about.
-            ui.shopMessage(/cancel/i.test(error.message) ? 'Purchase cancelled.' : error.message, !/cancel/i.test(error.message));
-        }
-    },
+    onBuyProduct: productId => buyRealMoneyProduct(productId),
     onSelectOutlaw: index => {
         if(!isUnlocked(progress, index)) return;
         progress.selected = index;
