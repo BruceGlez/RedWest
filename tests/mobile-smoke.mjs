@@ -141,7 +141,65 @@ try {
     await page.locator('#start-screen').waitFor({ state: 'visible' });
 
     assert.deepEqual(errors, []);
-    console.log('Mobile smoke passed: touch mode, tap start, move + aim/fire sticks, edge arrows, tap quick-fire auto-aim, auto-fire setting, swap, pause, tap restart.');
+
+    // Upright phone: every screen fits the width (no sideways scroll), the panels open, and the game plays.
+    await context.close();
+    const upright = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
+    await upright.addInitScript(answeredPrivacy);
+    const tall = await upright.newPage();
+    tall.setDefaultTimeout(15000);
+    const tallErrors = [];
+    tall.on('pageerror', error => tallErrors.push(error.message));
+    await tall.route('https://fonts.googleapis.com/**', route => route.abort());
+    await tall.route('https://fonts.gstatic.com/**', route => route.abort());
+    await tall.goto(server.resolvedUrls.local[0], { waitUntil: 'commit', timeout: 30000 });
+    await tall.locator('canvas').waitFor({ timeout: 30000 });
+    await tall.evaluate(async () => { window.S = await import('/src/state.js'); });
+    const fits = async what => {
+        const overflow = await tall.evaluate(() => [...document.querySelectorAll('button, .panel-screen, .wanted-poster')]
+            .filter(el => el.offsetParent && el.getBoundingClientRect().width > 0)
+            .map(el => ({ id: el.id || el.className, right: Math.round(el.getBoundingClientRect().right) }))
+            .filter(el => el.right > window.innerWidth + 1));
+        assert.deepEqual(overflow, [], `${what}: nothing runs off the right edge`);
+    };
+    assert.equal(await tall.locator('#play-btn').isVisible(), true, 'upright home shows PLAY');
+    await fits('home');
+    for(const [button, screen] of [['#road-btn', '#road-screen'], ['#records-btn', '#records-screen'], ['#jobs-btn', '#jobs-screen'], ['#shop-btn', '#shop-screen']]) {
+        await tall.locator(button).tap();
+        await tall.locator(screen).waitFor({ state: 'visible' });
+        await fits(screen);
+        await tall.locator(`${screen} .panel-back`).first().tap();
+        await tall.locator('#start-screen').waitFor({ state: 'visible' });
+    }
+    await tall.locator('#play-btn').tap({ force: true });
+    await tall.waitForFunction(() => S.gameState.isGameStarted);
+    await tall.evaluate(() => { S.playerStats.hp = 99; });
+    const tallPlayer = () => tall.evaluate(() => {
+        const p = S.enemies[0].parent.children.find(o => o.userData.type === 'player');
+        return { x: p.position.x, z: p.position.z };
+    });
+    const tallBefore = await tallPlayer();
+    await tall.locator('#stick-move').evaluate(zone => {
+        const fire = (type, x, y) => zone.dispatchEvent(new PointerEvent(type, { pointerId: 3, pointerType: 'touch', clientX: x, clientY: y, bubbles: true, cancelable: true, isPrimary: true }));
+        fire('pointerdown', 90, 700);
+        fire('pointermove', 90, 640);
+        window.__release = () => fire('pointerup', 90, 640);
+    });
+    await tall.evaluate(async () => {
+        const start = S.gameState.runTime;
+        const deadline = Date.now() + 30000;
+        while(S.gameState.runTime - start < 0.6 && Date.now() < deadline) await new Promise(r => setTimeout(r, 50));
+        window.__release();
+    });
+    const tallAfter = await tallPlayer();
+    assert.ok(tallBefore.z - tallAfter.z > 2, `upright, the left stick moves the player up the screen: ${JSON.stringify({ tallBefore, tallAfter })}`);
+    for(const id of ['#btn-pause', '#btn-dash', '#btn-swap']) {
+        const box = await tall.locator(id).boundingBox();
+        assert.ok(box && box.x >= 0 && box.x + box.width <= 390 && box.y + box.height <= 844, `${id} is on screen upright`);
+    }
+    await upright.close();
+    assert.deepEqual(tallErrors, []);
+    console.log('Mobile smoke passed: touch mode, tap start, move + aim/fire sticks, edge arrows, tap quick-fire auto-aim, auto-fire setting, swap, pause, tap restart, upright screens and play.');
 } finally {
     await browser?.close();
     await server.close();

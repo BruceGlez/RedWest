@@ -316,7 +316,15 @@ ui.bindControlHandlers({
 ui.updateAudioControls(getAudioSettings());
 gameLoop.start();
 
+// Upright screens get a wider view (with the camera further back, src/gameLoop.js) to see enough arena.
+function fitCamera() {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.fov = window.innerHeight > window.innerWidth ? 68 : 60;
+    camera.updateProjectionMatrix();
+}
+fitCamera();
 window.addEventListener('resize', () => {
+    fitCamera();
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);

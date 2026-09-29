@@ -290,7 +290,7 @@ export function createTownScene() {
     scene.background = new THREE.Color(C.sky);
     scene.fog = new THREE.Fog(C.sky, 85, 150);
     const camera = new THREE.PerspectiveCamera(38, 1, 1, 300);
-    const view = { target: new THREE.Vector3(3, 0, -12), distance: 70, minDistance: 36, maxDistance: 95 };
+    const view = { target: new THREE.Vector3(3, 0, -12), distance: 70, minDistance: 36, maxDistance: 95, pitch: 0.72 };
 
     // Dusk: cool teal sky light, a low amber sun, warm lamps.
     scene.add(new THREE.HemisphereLight(0x8fc3cf, 0x5a3a24, 2.4));
@@ -424,7 +424,10 @@ export function createTownScene() {
     });
 
     function placeCamera() {
-        const angle = { yaw: 0.52, pitch: 0.72 };
+        const angle = { yaw: 0.52, pitch: view.pitch };
+        // Fog starts just beyond the town, wherever the camera stands.
+        scene.fog.near = view.distance + 15;
+        scene.fog.far = view.distance + 90;
         camera.position.set(
             view.target.x + Math.sin(angle.yaw) * Math.cos(angle.pitch) * view.distance,
             view.target.y + Math.sin(angle.pitch) * view.distance,
@@ -484,8 +487,12 @@ export function createTownScene() {
         },
         resize(width, height) {
             camera.aspect = width / height;
-            // Narrow screens see the whole town by standing further back.
-            view.distance = Math.min(view.maxDistance, Math.max(view.distance, width < height ? 90 : view.distance));
+            // Upright screens see the whole town by standing further back with a wider view.
+            const upright = width < height;
+            camera.fov = upright ? 50 : 38;
+            view.pitch = upright ? 0.95 : 0.72; // look further down, so the tall screen is town rather than sky
+            view.maxDistance = upright ? 150 : 95;
+            view.distance = upright ? Math.max(view.distance, 125) : Math.min(view.distance, view.maxDistance);
             camera.updateProjectionMatrix();
             placeCamera();
         },

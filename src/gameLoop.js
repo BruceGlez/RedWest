@@ -77,7 +77,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     let sessionRun = 0;
     let bountyChoiceAt = 0; // slow-motion beat after the outlaw falls, then the choice opens
     let lobbyView = null; // another scene to draw on the home screen (Frontier Town), when active
-    const cameraOffset = () => (touch.enabled ? CAMERA_OFFSET_PHONE : CAMERA_OFFSET_DESKTOP);
+    // Held upright, the screen shows a narrow slice of the arena, so the camera stands further back.
+    const cameraOffset = () => {
+        const base = touch.enabled ? CAMERA_OFFSET_PHONE : CAMERA_OFFSET_DESKTOP;
+        return window.innerHeight > window.innerWidth ? base.clone().multiplyScalar(1.6) : base;
+    };
 
     // Spawn and record first sightings for the Bounty Book (with a NEW ENEMY card in play).
     function spawn(type) {
