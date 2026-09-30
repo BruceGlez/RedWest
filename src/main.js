@@ -113,6 +113,7 @@ const records = createRecordsPanel({ wallet, onProfile: next => applyProfile(nex
 document.getElementById('records-btn').addEventListener('click', () => records.open());
 const town = createTownPanel({
     wallet,
+    getProgress: () => progress,
     onProfile: next => applyProfile(next),
     ui,
     onBuyPass: () => buyRealMoneyProduct('season_pass'),

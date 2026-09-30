@@ -1,5 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { HEROES } from '../src/heroProps.js';
 import { ATMOSPHERES, DEFAULT_ATMOSPHERE, KIT_CAPACITY, atmosphereFor } from '../src/atmosphere.js';
 import { OUTLAWS } from '../src/outlaws.js';
 
@@ -55,4 +56,23 @@ test('every stage has its own ground, its own props, and no two stages look alik
         seen.add(JSON.stringify([terrain.base, kit]));
     }
     assert.equal(seen.size, Object.keys(ATMOSPHERES).length + 1, 'every stage has a different ground and prop mix');
+});
+
+test('every stage has a skyline', () => {
+    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
+        assert.ok(['mesa', 'peaks', 'hills', 'stacks', 'flat'].includes(look.horizon.style), `${id}: known skyline`);
+        assert.ok(look.horizon.height > 0 && look.horizon.height <= 2 && look.horizon.strength >= 0 && look.horizon.strength <= 1, `${id}: skyline numbers`);
+    }
+});
+
+test('every stage has a landmark that exists, stands clear of the start, and does not block the arena', () => {
+    const seen = new Set();
+    for(const [id, look] of Object.entries(ATMOSPHERES)) {
+        assert.ok(look.hero && HEROES[look.hero.id], `${id}: a known landmark`);
+        const [x, z] = look.hero.at;
+        assert.ok(Math.hypot(x, z) >= 26 && Math.hypot(x, z) <= 45, `${id}: a walk from the start, inside the map`);
+        for(const circle of HEROES[look.hero.id].blocks) assert.ok(circle.r > 0 && circle.r <= 4, `${id}: a reasonable blocker`);
+        seen.add(look.hero.id);
+    }
+    assert.equal(seen.size, Object.keys(ATMOSPHERES).length, 'every stage has a different landmark');
 });

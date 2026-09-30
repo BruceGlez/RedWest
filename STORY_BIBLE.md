@@ -317,14 +317,22 @@ result screen names a new card when a run earns a star. `tests/story.test.js` ch
 graphic appears; `npm run test:story` drives the screens. Not built: opening and ending comic panels, town barks, the home
 grounds' story props, re-recorded voice lines, an acknowledgement when a beaten outlaw is played as a hero.
 
+**Built 2026-09-30 (barks, opening and ending).** `src/barks.js`: one line from Deputy June, Ezra, Mr. Pruitt, the barkeep, the
+tailor, the station master and the jail, chosen from progress and shown on each building's card. `src/story.js` now also holds
+the **opening** (four panels: Red West with the Drifter as a rumour, Cinder Creek, the star, Lantern Rock) and the **ending**
+(three panels: the court, the seal, the poster). Both read from the Case File in the Bounty Book (the opening is marked NEW
+until read; the ending opens with all ten pages). They are text panels: the picture panels ("comics", made with
+`tools/character-picture.mjs`) still need an image API key and are open. Not built: barks for the stable and the undertaker (scenery,
+not tappable), re-recorded voice lines.
+
 ## 9. Suggested order
 
 1. **First pass (small): done for the ride-in line, the home ground and the bio** (2026-09-29). Not done: the
    opening and ending text.
 2. **Story cards and the Case File** (medium): **done** (2026-09-29), see above.
 3. **Home grounds** (with the world and props work): sky, fog, sun and tint per stage **done**; story props per stage still open.
-4. **Town barks and visible changes** (medium): each beaten outlaw appears in Lantern Rock.
-5. **Comics and voice** (medium): the opening and ending panels, and re-recorded taunts.
+4. **Town barks and visible changes** (medium): barks **done** (2026-09-30); each beaten outlaw appearing in Lantern Rock still open.
+5. **Comics and voice** (medium): the opening and ending as text panels **done**; pictures and re-recorded taunts still open.
 
 ## 10. Decisions (owner's answers, 2026-09-29) and what is still open
 

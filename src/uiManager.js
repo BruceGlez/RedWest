@@ -12,7 +12,7 @@ import { ownsItem } from './profile.js';
 import { purchaseSupport, canRestore } from './purchases.js';
 import { arena } from './arena.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
-import { CHAPTER_ONE_END, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
+import { CHAPTER_ONE_END, OPENING, ENDING, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
 
 export function createUIManager(gameState, playerStats) {
     let waveBannerTimeoutId = null;
@@ -644,7 +644,12 @@ export function createUIManager(gameState, playerStats) {
         const end = done
             ? `<div class="book-card ledger-page case-end">${SEAL}<div class="book-info"><p class="ledger-no">CHAPTER ONE</p><h4>${CHAPTER_ONE_END.title}</h4><p class="ledger-text">${CHAPTER_ONE_END.text}</p></div></div>`
             : `<div class="book-card ledger-page locked case-end">${SEAL}<div class="book-info"><p class="ledger-no">CHAPTER ONE</p><h4>???</h4><p class="book-from">Find all ${OUTLAWS.length} pages.</p></div></div>`;
-        els.bookCase.innerHTML = pages + end;
+        const reads = `<div class="book-card ledger-page case-end case-reads">${SEAL}<div class="book-info"><p class="ledger-no">CHAPTER ONE &middot; THE LEDGER</p>`
+            + `<button type="button" class="story-btn" data-seq="opening">THE OPENING${openingSeen() ? '' : ' &middot; NEW'}</button> `
+            + (done ? '<button type="button" class="story-btn" data-seq="ending">THE ENDING</button>' : '<span class="book-from">The ending opens with all ten pages.</span>')
+            + '</div></div>';
+        els.bookCase.innerHTML = reads + pages + end;
+        els.bookBtn?.classList.toggle('has-new', !openingSeen());
     }
 
     // One story card in a small overlay: earlier and later cards of the same outlaw are a tap away, and a card
@@ -668,6 +673,32 @@ export function createUIManager(gameState, playerStats) {
 
     function hideStory() {
         if(els.storyModal) els.storyModal.style.display = 'none';
+    }
+
+    // The opening and the ending: a few panels one after another, with a way out at every step. Reading the opening
+    // is remembered, so the Bounty Book stops marking it new.
+    const SEEN_KEY = 'redWestIntroSeen.v1';
+    const openingSeen = () => { try { return localStorage.getItem(SEEN_KEY) === '1'; } catch { return true; } };
+    const SEQUENCES = { opening: OPENING, ending: ENDING };
+
+    function showSequence(kind, index = 0) {
+        const panels = SEQUENCES[kind];
+        if(!panels) return;
+        index = Math.max(0, Math.min(panels.length - 1, index));
+        const panel = panels[index];
+        const last = index === panels.length - 1;
+        els.storyContent.innerHTML = `<div class="story-head">${SEAL}<div><div class="story-kicker">${kind === 'opening' ? 'THE OPENING' : 'THE ENDING'} &middot; ${index + 1} OF ${panels.length}</div>`
+            + `<h3>${panel.title}</h3></div></div><p>${panel.text}</p>`
+            + `<div class="story-nav"><button type="button" class="story-btn" data-seq-nav="${index - 1}" ${index === 0 ? 'disabled' : ''}>&#8249; BACK</button>`
+            + `<button type="button" class="story-btn" data-close>${last ? 'DONE' : 'SKIP'}</button>`
+            + `<button type="button" class="story-btn" data-seq-nav="${index + 1}" ${last ? 'disabled' : ''}>NEXT &#8250;</button></div>`;
+        els.storyContent.dataset.seq = kind;
+        delete els.storyContent.dataset.outlaw;
+        els.storyModal.style.display = 'flex';
+        if(kind === 'opening') {
+            try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* fine */ }
+            els.bookBtn?.classList.remove('has-new');
+        }
     }
 
     // New story cards earned by this run, for the result screen.
@@ -891,8 +922,13 @@ export function createUIManager(gameState, playerStats) {
             if(button) showStory(Number(button.dataset.story), Number(button.dataset.card ?? 0));
         };
         els.bookOutlaws.addEventListener('click', openStory);
-        els.bookCase.addEventListener('click', openStory);
+        els.bookCase.addEventListener('click', event => {
+            const seq = event.target.closest('[data-seq]');
+            if(seq) showSequence(seq.dataset.seq); else openStory(event);
+        });
         els.storyModal.addEventListener('click', event => {
+            const seqNav = event.target.closest('[data-seq-nav]');
+            if(seqNav && !seqNav.disabled) { showSequence(els.storyContent.dataset.seq, Number(seqNav.dataset.seqNav)); return; }
             const nav = event.target.closest('[data-nav]');
             if(nav && !nav.disabled) showStory(Number(els.storyContent.dataset.outlaw), Number(nav.dataset.nav));
             else if(event.target === els.storyModal || event.target.closest('[data-close]')) hideStory();

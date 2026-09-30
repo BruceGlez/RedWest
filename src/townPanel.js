@@ -1,3 +1,4 @@
+import { barkFor } from './barks.js';
 import { OUTLAWS } from './outlaws.js';
 import { eventForWeek, eventEndsAt, TIER_DOLLARS, EVENT_COSMETICS, ALL_COSMETICS_OWNED_DOLLARS } from './events.js';
 import { weekKey } from './profile.js';
@@ -11,7 +12,7 @@ import { purchaseSupport } from './purchases.js';
 
 // The Frontier Town screen (src/town.js has the rules): a 3D town at dusk (src/townScene.js) with a label over
 // each building; tapping a building or its label opens its card in a sheet. Also the TOWN button's badge.
-export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, isChild = () => false }) {
+export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, isChild = () => false, getProgress = () => null }) {
     const $ = id => document.getElementById(id);
     const els = {
         button: $('town-btn'),
@@ -79,6 +80,13 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
         return '';
     }
 
+    // One quiet line from whoever runs the building, chosen from the marshal's progress (src/barks.js).
+    function barkHtml(id) {
+        const progress = getProgress();
+        const bark = progress ? barkFor(id, progress) : null;
+        return bark ? `<p class="town-bark">&ldquo;${bark.text}&rdquo; <span>${bark.speaker}</span></p>` : '';
+    }
+
     function card(building) {
         const level = profile.town.levels[building.id];
         const cost = upgradeCost(profile, building.id);
@@ -103,7 +111,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
         const levels = building.levels.length;
         return `<div class="town-card" data-building="${building.id}">`
             + `<div class="town-sign"><span>${building.name}</span>${levels > 1 ? `<span class="town-level">LV ${level} / ${levels}</span>` : ''}</div>`
-            + `<p class="town-blurb">${building.blurb}</p>${body}`
+            + `<p class="town-blurb">${building.blurb}</p>${barkHtml(building.id)}${body}`
             + (levels > 1 ? `<p class="town-next">${nextLevelText(building)}</p>` : '')
             + (actions.length ? `<div class="town-actions">${actions.join('')}</div>` : '')
             + '</div>';
@@ -126,6 +134,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
             + `<p class="town-stat">${outlaw.name} · ${event.twist.name}: ${event.twist.detail}</p>`
             + `<p class="town-blurb">Free to enter, as often as you like. Reach each score for its prize. `
             + `Event runs do not move the Wanted Road. Your best this week: <b>${mine.best.toLocaleString()}</b></p>`
+            + barkHtml('depot')
             + `<ol class="event-targets">${targets}</ol>`
             + '<div class="town-actions"><button type="button" class="shop-action collect" data-ride>RIDE OUT</button></div>'
             + '</div>';
@@ -169,6 +178,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
             + `<div class="town-sign"><span>WANTED POSTER PASS</span><span class="town-level">ENDS IN ${endsIn((seasonEndsAt(pass.season) - now) / 3600000)}</span></div>`
             + `<p class="town-stat">Season ${pass.season}: ${theme.name} · Tier ${tier} / ${TIERS}${tier < TIERS ? ` · ${POINTS_PER_TIER - intoTier} points to the next` : ''}</p>`
             + `<div class="job-bar"><div class="job-fill" style="width:${tier >= TIERS ? 100 : Math.round((intoTier / POINTS_PER_TIER) * 100)}%"></div></div>`
+            + barkHtml('saloon')
             + `<p class="town-blurb">Points: finish a run +${POINTS.run}, collect a bounty +${POINTS.collected}, each daily job +${POINTS.job}, `
             + `each Most Wanted target +${POINTS.eventTarget}. Rewards are paid as soon as a tier is reached. Top row free, bottom row with the pass.</p>`
             + `<ol class="pass-track">${tiers}</ol>${buy}`

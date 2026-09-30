@@ -1068,3 +1068,10 @@ body.demo #start-screen, body.demo #welcome-modal { display: none !important; }
 .story-nav .story-btn:disabled { opacity: 0.35; cursor: default; }
 .result-road .story-note { font-size: 12px; margin: 4px 0; color: #7b1f1f; font-weight: 700; }
 #story-modal { z-index: 40; }
+
+/* Town barks: one line from whoever runs the building. */
+.town-bark { margin: 6px 0; font-size: 12px; font-style: italic; opacity: 0.9; }
+.town-bark span { display: block; font-style: normal; font-size: 10px; letter-spacing: 1px; text-transform: uppercase; opacity: 0.75; margin-top: 2px; }
+
+.case-reads .story-btn { margin: 4px 6px 0 0; }
+#book-btn.has-new small::after { content: ' \00b7 NEW STORY'; color: #ffd54f; font-weight: 700; }

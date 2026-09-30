@@ -141,6 +141,25 @@ bursts stay cheap: dust puffs, footsteps, smoke.
 - **Not done:** footprints and scorch decals, and a feel check on a real phone (flash length 0.09 s, kick sizes and fall
   length are first guesses). No screen shows an enemy dying: the fall is a tumble and a puff, as the under-13 rule needs.
 
+**Done 2026-09-30: polish round two** (one branch, one commit per item).
+- **Footprints and scorch marks** (`src/decals.js`, `src/steps.js`): the marshal leaves footprints (left, right, every 1.7 units) and
+  dynamite leaves a scorch mark; one instanced layer, 160 slots, each shrinks away (7 s and 30 s), tinted from the stage's ground.
+- **A skyline for every stage** (`src/horizon.js`): mesas, peaks, hills, chimney stacks or river banks in a ring beyond the fog, one
+  merged mesh, coloured from the stage's haze. The play camera looks steeply down, so the skyline shows on the start screen, whose
+  orbit now tilts up to show the stage's sky and skyline; it will also show on any camera that looks toward the horizon.
+- **A landmark for every stage** (`src/heroProps.js`): Pete's piano, the well at Whisper Wash, the Hollow Hill bell tower, the
+  Calloways' barn and silo, the Slagtown furnace, the Redstone rope bridge, Vane's clock tower, the Tres Rios arch, the Silver Belle's
+  paddlewheel, Fort Pell's flagpole and watchtower. One merged mesh each, 26 to 45 units from the start, blocking like a rock.
+- **Place sounds** (`src/soundscape.js`, `src/audio.js`), all made from noise and tones, so no new downloads: a bed under each stage
+  (wind at the stage's strength; crickets, a far bell, birds, a furnace hum, mist, or water lapping), footsteps that depend on the
+  ground (sand, gravel, grass, soil, cinder, rock, planks, snow), a tone variation on every gunshot (pitch and brightness), and a
+  limiter on the whole mix so many shots and an explosion together cannot clip. Effects switch off the beds and footsteps too.
+- **Town barks** (`src/barks.js`): one line on each building's card from whoever runs it, chosen from the marshal's progress.
+- **Numbers:** fight, 15 enemies: 38 draw calls, 38 shader programs, about 52,700 triangles (three runs of `node tools/perf.mjs`).
+- **Still open here:** a listening check on a real phone (the bed and footstep levels are first guesses; also on the release
+  checklist), music layers that follow Heat and more gunshot variants need recorded files (`tools/elevenlabs.mjs`, an API key);
+  the stable and the undertaker are scenery, so they have no barks; the horizon is only seen from a tilted camera.
+
 ### 3. Post-processing with a quality switch (M)
 
 Half-resolution bloom (about 75% fewer pixels for a blur that hides the loss), a vignette and a light colour
