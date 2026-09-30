@@ -331,8 +331,8 @@ not tappable), re-recorded voice lines.
    opening and ending text.
 2. **Story cards and the Case File** (medium): **done** (2026-09-29), see above.
 3. **Home grounds** (with the world and props work): sky, fog, sun and tint per stage **done**; story props per stage still open.
-4. **Town barks and visible changes** (medium): barks **done** (2026-09-30); each beaten outlaw appearing in Lantern Rock still open.
-5. **Comics and voice** (medium): the opening and ending as text panels **done**; pictures and re-recorded taunts still open.
+4. **Town barks and visible changes** (medium): **done** (2026-09-30): barks, and each beaten outlaw adds a thing to Lantern Rock (`GUESTS` in `src/townScene.js`).
+5. **Comics and voice** (medium): **done** (2026-09-30): the opening and ending have pictures, and each outlaw's voice line is their new taunt. A quiet start-here hint points new players to the opening.
 
 ## 10. Decisions (owner's answers, 2026-09-29) and what is still open
 

@@ -161,6 +161,25 @@ bursts stay cheap: dust puffs, footsteps, smoke.
   checklist), music layers that follow Heat and more gunshot variants need recorded files (`tools/elevenlabs.mjs`; the key is set in the cloud environment, so this is possible next);
   the stable and the undertaker are scenery, so they have no barks; the horizon is only seen from a tilted camera.
 
+**Done 2026-09-30: recorded audio, town guests, story hint** (ElevenLabs and OpenAI keys are set in the cloud environment).
+- **Gunshot and hit variants:** a second recording for every gun (and a third for the revolver) and two more for the enemy hit
+  (`tools/elevenlabs.mjs sfx`, keys `shot-revolver-2`, `hit-2`...). The game picks one at random each time (`pickVariant` in
+  `src/audio.js`), on top of the pitch and tone variation already there.
+- **Music that follows Heat:** a hotter fight loop, `fight-hot` (45 s, 528 KB). From Heat 3 the fight music switches to it, and back
+  below Heat 2 (a gap, so it does not flip). The home and showdown loops are untouched. It restarts the loop at the switch (no
+  crossfade yet).
+- **Outlaw voice lines:** each of the ten outlaws now says their ride-in taunt, so the voice matches the banner
+  (`src/audioManifest.js` builds the lines from `src/outlaws.js`; Lucky Lou and Colonel Crane had no voice before). `tests/audioManifest.test.js`
+  checks every manifest entry has its file and every taunt matches.
+- **The playable ad** is now 4.63 MB (the limit is 5 MB): it carries every effect, so each new effect variant adds to it.
+- **Town guests:** each beaten outlaw adds something to Lantern Rock (`GUESTS` in `src/townScene.js`): Pete's piano, Rosa's wolf pups,
+  the Deacon's chapel, the Calloways' fence, Jack's anvil and armour, Morgan's fire-crew cart, Silas's shooting gallery, Espectro's
+  porch chair, Lou's card table, Crane's flagpole. Merged into a few meshes; built when the list of beaten outlaws changes.
+- **A quiet start-here hint:** a pulsing "NEW HERE? READ THE STORY" button under PLAY for a player who has not played and has not
+  read the opening; it opens the opening and goes away. It never covers anything or interrupts.
+- **Still open:** a listening check of the new recordings and the music switch on a real phone; a crossfade for the hot loop; the
+  stable and the undertaker still have no barks (scenery, not tappable); snake and horse rigging needs Blender on the owner's machine.
+
 ### 3. Post-processing with a quality switch (M)
 
 Half-resolution bloom (about 75% fewer pixels for a blur that hides the loss), a vignette and a light colour

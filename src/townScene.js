@@ -286,6 +286,69 @@ function townsperson(seed) {
     return g;
 }
 
+// The beaten outlaws make themselves at home (STORY_BIBLE.md section 6): each one adds something to Lantern Rock once
+// they are in the jail. Small, merged into a few meshes, and placed in the open ground between the buildings.
+// Each entry: where it stands ([x, z]) and how to build it (parts around its own origin).
+export const GUESTS = {
+    'dusty-pete': { at: [-13.5, -7.5], turn: 0.3, parts: () => [ // the Tin Cup's piano, dragged into the street
+        box(3, 1.4, 1.3, 0x2f1d14, 0, 1.3, 0), box(3, 0.12, 0.6, 0xf2ead8, 0, 2.05, 0.8), box(2.8, 0.1, 1.2, 0x241510, 0, 2.6, -0.4),
+        box(0.2, 0.9, 0.2, 0x241510, -1.3, 0.45, 0.4), box(0.2, 0.9, 0.2, 0x241510, 1.3, 0.45, 0.4), box(1.4, 0.7, 0.8, 0x5a3d2b, 0, 0.35, 1.6)
+    ] },
+    'rattlesnake-rosa': { at: [-14, 8.5], turn: 0, parts: () => [ // two wolf pups on the jail porch
+        box(0.9, 0.5, 0.5, 0x8a8f99, 0, 0.4, 0), box(0.4, 0.4, 0.4, 0x8a8f99, 0.6, 0.65, 0), box(0.15, 0.2, 0.1, 0x6f747d, 0.6, 0.95, -0.1),
+        box(0.9, 0.5, 0.5, 0x7a7f88, 1.6, 0.4, 0.9), box(0.4, 0.4, 0.4, 0x7a7f88, 2.2, 0.65, 0.9), box(0.15, 0.2, 0.1, 0x5f646c, 2.2, 0.95, 0.8)
+    ] },
+    'deacon-graves': { at: [-33, -8], turn: 0.2, parts: () => [ // a small chapel at the edge of town
+        box(5, 3.2, 4, 0xe8e0cf, 0, 1.6, 0), box(5.4, 0.4, 4.4, 0x3b2a20, 0, 3.4, 0), box(1.4, 4.4, 1.4, 0xe8e0cf, -1.8, 2.2, 2.2), box(0.25, 1.4, 0.25, 0x2a1d15, -1.8, 5.2, 2.2),
+        box(0.9, 0.25, 0.25, 0x2a1d15, -1.8, 5.4, 2.2), box(1, 1.7, 0.2, 0x2a1d15, 0, 0.85, 2.05)
+    ] },
+    'calloway-gang': { at: [9, -7.5], turn: 0, parts: () => { // the brothers' fence, rebuilt outside the bank
+        const out = [box(9, 0.2, 0.15, 0x6b4a2e, 2.25, 1.6, 0), box(9, 0.2, 0.15, 0x6b4a2e, 2.25, 0.9, 0)];
+        for(let i = 0; i < 4; i++) out.push(box(0.25, 1.9, 0.25, 0x6b4a2e, i * 3, 0.95, 0));
+        return out;
+    } },
+    'iron-jack': { at: [4.2, 8.6], turn: 0, parts: () => [ // an anvil, and the armour Ezra cut him out of, on a stand
+        box(1.6, 0.6, 0.8, 0x2b2b2e, 0, 0.9, 0), box(0.8, 0.9, 0.6, 0x3a3a3e, 0, 0.45, 0), box(2.2, 0.15, 1.2, 0x3a3a3e, 0, 0.1, 0),
+        box(1.3, 1.6, 0.8, 0x7d858c, 2.8, 1.8, 0), box(0.6, 0.5, 0.6, 0x7d858c, 2.8, 2.9, 0), box(0.25, 2.2, 0.25, 0x5a3d2b, 2.8, 1.1, 0)
+    ] },
+    'mesa-morgan': { at: [3.4, -8], turn: 0.4, parts: () => [ // the volunteer fire crew's water cart
+        box(2.6, 0.8, 1.4, 0xa23a2c, 0, 1.2, 0), box(1.6, 1.1, 1.1, 0x5a3d2b, 0, 2.15, 0), box(0.2, 1.2, 0.2, 0x2b2b2e, 1.6, 1.2, 0),
+        box(0.8, 0.8, 0.15, 0x2b2b2e, -1, 0.6, 0.8), box(0.8, 0.8, 0.15, 0x2b2b2e, -1, 0.6, -0.8), box(0.8, 0.8, 0.15, 0x2b2b2e, 1, 0.6, 0.8), box(0.8, 0.8, 0.15, 0x2b2b2e, 1, 0.6, -0.8)
+    ] },
+    'silas-vane': { at: [13.5, 8.5], turn: 0, parts: () => [ // a shooting gallery: a board of targets
+        box(4, 2.4, 0.2, 0x5a3d2b, 0, 2, 0), box(0.25, 2, 0.25, 0x3b2a20, -1.8, 1, 0.3), box(0.25, 2, 0.25, 0x3b2a20, 1.8, 1, 0.3),
+        box(0.8, 0.8, 0.1, 0xf2ead8, -1.1, 2.2, 0.15), box(0.4, 0.4, 0.12, 0xb02a2a, -1.1, 2.2, 0.2), box(0.8, 0.8, 0.1, 0xf2ead8, 0, 2.5, 0.15),
+        box(0.4, 0.4, 0.12, 0xb02a2a, 0, 2.5, 0.2), box(0.8, 0.8, 0.1, 0xf2ead8, 1.1, 2.2, 0.15), box(0.4, 0.4, 0.12, 0xb02a2a, 1.1, 2.2, 0.2)
+    ] },
+    'el-espectro': { at: [-18.8, 8.4], turn: 0.3, parts: () => [ // the chair on the jail's front porch
+        box(1.1, 0.2, 1.1, 0xe8e0cf, 0, 0.9, 0), box(1.1, 1.3, 0.2, 0xe8e0cf, 0, 1.6, -0.45), box(0.15, 0.9, 0.15, 0xe8e0cf, -0.45, 0.45, 0.45),
+        box(0.15, 0.9, 0.15, 0xe8e0cf, 0.45, 0.45, 0.45), box(0.15, 0.9, 0.15, 0xe8e0cf, -0.45, 0.45, -0.45), box(0.15, 0.9, 0.15, 0xe8e0cf, 0.45, 0.45, -0.45),
+        box(0.8, 0.12, 0.6, 0x6a1b9a, 0, 1.05, 0.05)
+    ] },
+    'lucky-lou': { at: [-18.5, -8], turn: 0, parts: () => [ // her card table under a lantern
+        box(2.4, 0.15, 1.6, 0x2f6b3a, 0, 1.6, 0), box(0.25, 1.5, 0.25, 0x3b2a20, 0, 0.75, 0), box(1.4, 0.15, 0.9, 0x3b2a20, 0, 0.1, 0),
+        box(0.5, 0.6, 0.5, 0x3b2a20, -1.7, 0.4, 0), box(0.5, 0.6, 0.5, 0x3b2a20, 1.7, 0.4, 0), box(0.4, 0.05, 0.3, 0xf2ead8, -0.4, 1.7, 0.1, 0), box(0.4, 0.05, 0.3, 0xf2ead8, 0.4, 1.7, -0.1, 0),
+        box(0.3, 0.4, 0.3, C.glow, 0, 2.05, 0, 0.9)
+    ] },
+    'colonel-crane': { at: [29.5, -7.5], turn: 0, parts: () => [ // a flagpole by the depot
+        box(0.2, 9, 0.2, 0xd8d8dc, 0, 4.5, 0), box(2.2, 1.4, 0.08, 0xb02a2a, 1.2, 8, 0), box(2.2, 0.45, 0.1, 0xf4f0e6, 1.2, 8.3, 0), box(1.2, 0.3, 1.2, 0x6b6258, 0, 0.15, 0)
+    ] }
+};
+
+function guestsGroup(ids) {
+    const group = new THREE.Group();
+    for(const id of ids) {
+        const def = GUESTS[id];
+        if(!def) continue;
+        const prop = new THREE.Group();
+        for(const part of def.parts()) prop.add(part);
+        prop.position.set(def.at[0], 0, def.at[1]);
+        prop.rotation.y = def.turn;
+        group.add(prop);
+    }
+    return group.children.length ? mergeByMaterial(group) : group;
+}
+
 export function createTownScene() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(C.sky);
@@ -498,6 +561,8 @@ export function createTownScene() {
 
     const raycaster = new THREE.Raycaster();
     const projected = new THREE.Vector3();
+    let guests = null; // the beaten outlaws' things, rebuilt when the list changes
+    let guestsKey = '';
     return {
         scene,
         camera,
@@ -512,6 +577,18 @@ export function createTownScene() {
                 const level = levels?.[spot.id] || 1;
                 if(buildings.get(spot.id)?.key !== builtKey(spot.id, level)) placeBuilding(spot, level);
             }
+        },
+        // ids: the outlaws in the jail (OUTLAWS ids): each adds its own thing to the town.
+        setGuests(ids) {
+            const key = ids.join(',');
+            if(key === guestsKey) return;
+            guestsKey = key;
+            if(guests) {
+                scene.remove(guests);
+                guests.traverse(o => { if(o.isMesh) o.geometry.dispose(); });
+            }
+            guests = guestsGroup(ids);
+            scene.add(guests);
         },
         resize(width, height) {
             camera.aspect = width / height;

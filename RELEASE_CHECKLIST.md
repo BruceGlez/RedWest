@@ -33,3 +33,4 @@
 - [ ] Build marked candidate for release
 
 - [ ] Listening check on a real phone, with headphones and the speaker: gunshots, the stage beds (wind, crickets, hum, water) and footsteps are quiet enough under a fight, and nothing clips.
+- [ ] Listen to the new voice lines (ten outlaws), the gunshot variants and the hot fight loop on a real phone: the lines are clear over the fight, the switch to the hot loop at Heat 3 is not jarring, nothing clips.

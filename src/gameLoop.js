@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { keys, touch } from './input.js';
-import { resumeAudio, playSound, playVoice, setMusicTrack, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
+import { resumeAudio, playSound, playVoice, setMusicTrack, setFightIntensity, getAudioSettings, toggleMusicEnabled, toggleSfxEnabled } from './audio.js';
 import { gameState, playerStats, obstacles, enemies, loots, resetGameState, resetPlayerStats, clearDynamicState } from './state.js';
 import { generateMap, updateSun, setAtmosphere } from './world.js';
 import { updateAmbience } from './ambience.js';
@@ -445,7 +445,10 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         markObstacleGridDirty();
     }
 
+    let hotMusic = false;
+
     function resetGame() {
+        hotMusic = false;
         bountyChoiceAt = 0;
         gameState.event = null;
         setEventModifiers([]);
@@ -608,6 +611,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         advanceHeat(gameState.heat, dt);
         updateParticles(dt, scene);
         updateDecals(dt);
+        // The fight music heats up with the marshal's Heat (with a gap between going up and cooling, so it does not flip).
+        if(gameState.heat.level >= 3) hotMusic = true; else if(gameState.heat.level < 2) hotMusic = false;
+        setFightIntensity(hotMusic);
         updateCombatFx(dt);
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();
         // Sub-step bullets on slow frames so fast shots cannot skip past a target between frames.
