@@ -18,6 +18,7 @@ import { loadCharacterModel, createCharacterInstance } from './characterModels.j
 import { BASE_DASH_TIME, BASE_DASH_COOLDOWN } from './perks.js';
 
 const QUICK_FIRE_WINDOW = 0.4; // seconds of game time a tap stays live, to wait out the gun's cooldown
+const SHOT_CONVERGE_DISTANCE = 30; // shots leave the gun and meet the aim line this far out: nearly parallel, never crooked
 const AIM_DISTANCE = 30; // with nothing to snap to, shots meet the aim line this far ahead
 const WALK_TURN_RATE = 14; // how fast the body turns to face the walking direction (about 0.2 s for a full turn)
 
@@ -104,17 +105,22 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         const gunPos = new THREE.Vector3();
         playerGroup.userData.muzzle.getWorldPosition(gunPos);
 
-        // Bullets leave from the body's aim line (the one the aim guide is drawn along), out at the gun's
-        // distance, not from the swaying hand to one side, so they fly exactly where the character points.
+        // Bullets leave from the gun's steadied spot (not the swaying hand), and head for a point far down the
+        // aim line, so they look like they come from the gun yet fly almost parallel to where the character points.
         const facing = facingOf(playerGroup);
         if(!steadyOffset) trackMuzzle(0);
-        const steady = steadyMuzzle(playerGroup.position, facing, { forward: steadyOffset.forward, side: 0 });
+        const steady = steadyMuzzle(playerGroup.position, facing, steadyOffset);
         const shotOrigin = new THREE.Vector3(steady.x, gunPos.y, steady.z);
+        const body = playerGroup.position;
+        const aimDir = (aimPoint && directionTo(body, aimPoint, 0.01)) || facing;
+        const aimDistance = aimPoint ? Math.hypot(aimPoint.x - body.x, aimPoint.z - body.z) : 0;
+        const meet = Math.max(aimDistance, SHOT_CONVERGE_DISTANCE);
+        const converge = { x: body.x + aimDir.x * meet, z: body.z + aimDir.z * meet };
 
         for(const volleyOffset of volleyOffsets) {
             for(let i = 0; i < pelletsPerVolley; i++) {
                 const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(playerGroup.quaternion);
-                const toAim = aimPoint && directionTo(steady, aimPoint);
+                const toAim = directionTo(steady, converge);
                 if(toAim) dir.set(toAim.x, 0, toAim.z);
                 let pelletOffset = 0;
                 if(pelletsPerVolley > 1) {
