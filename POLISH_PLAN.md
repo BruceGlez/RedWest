@@ -104,6 +104,8 @@ on the outlaw, which is now the box figure's hidden baked body; it looks inside 
 
 ### 2. Combat feel (M)
 
+**Done 2026-09-30: aim.** Shots left the character's gun hand but were aimed along the body, so they passed to one side of the target, and they went to where an enemy stood, not where it would be. Now every shot goes from the muzzle to the aim point, quick-fire and drag-aim lead a moving enemy by its speed (`leadPoint` in `src/aimAssist.js`, capped at 0.6 s), and the drag snap cone is 20 degrees instead of 14. Unit tests cover both; the feel on a real phone still needs a check, and the numbers (cone, lead cap) are first guesses.
+
 Add a 60 to 100 ms white hit flash on enemies, muzzle flash sprites, impact particles (dust or sparks by surface),
 shell casings, a camera kick per weapon (a pistol does not shake like a shotgun), and death reactions: play the
 `dead` clip, or a short tumble, before the enemy is removed. The particle system moves to instanced sprites so
@@ -158,7 +160,7 @@ These are not polish; they were found while checking the docs on 2026-09-29.
   rewarded ads (decided against for now). Event targets need playtesting.
 - iPhone app: signing, device testing and App Store submission need a Mac; App Review expects a complete game.
 
-**Assets** (`ASSETS.md`): confirm the wolf model was made on the paid Meshy plan.
+**Assets** (`ASSETS.md`): the wolf model was confirmed as made on the paid Meshy plan (2026-09-30).
 
 ## Sources
 

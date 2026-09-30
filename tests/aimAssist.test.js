@@ -26,3 +26,22 @@ test('edge arrows sit inside the screen margin and point at the target', () => {
     assert.equal(top.y, 20);
     assert.ok(Math.abs(top.angle + Math.PI / 2) < 1e-9, 'points up');
 });
+
+test('a shot leads a moving target by the time the bullet takes', async () => {
+    const { leadPoint } = await import('../src/aimAssist.js');
+    // 30 units away, walking sideways at 10 units/s, bullet at 60 units/s: about half a second, so 5 units ahead.
+    const lead = leadPoint({ x: 0, z: 0 }, { x: 30, z: 0 }, { x: 0, z: 10 }, 60);
+    assert.equal(lead.x, 30);
+    assert.ok(Math.abs(lead.z - 5.07) < 0.2, `leads by about 5 units (got ${lead.z})`);
+    // A target standing still is aimed at directly, and the lead is capped for a wild velocity.
+    assert.deepEqual(leadPoint({ x: 0, z: 0 }, { x: 30, z: 0 }, { x: 0, z: 0 }, 60), { x: 30, z: 0 });
+    assert.ok(leadPoint({ x: 0, z: 0 }, { x: 30, z: 0 }, { x: 0, z: 500 }, 60).z <= 500 * 0.6 + 1e-6);
+});
+
+test('shots go from the gun to the aim point, not along the body line', async () => {
+    const { directionTo } = await import('../src/aimAssist.js');
+    // The muzzle is 1 unit to the right of the body; the target is straight ahead of the body at 20.
+    const dir = directionTo({ x: 1, z: 1.8 }, { x: 0, z: 20 });
+    assert.ok(dir.x < 0 && Math.abs(dir.x * 18.2 - -1) < 0.1, 'angled back toward the body line');
+    assert.equal(directionTo({ x: 0, z: 0 }, { x: 0.5, z: 0.5 }), null, 'too close for a direction');
+});
