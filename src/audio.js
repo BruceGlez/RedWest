@@ -189,8 +189,15 @@ export const SFX_MIX = {
 };
 const REPEAT_GAPS = { 'enemy-shot': 0.08 };
 
+// Some effects come in several recordings (shot-revolver, shot-revolver-2, ...): one is picked at random each time
+// from those that have loaded, so rapid fire and a crowd of hits do not repeat one sample.
+function pickVariant(key) {
+    const loaded = [key, `${key}-2`, `${key}-3`].filter(name => buffers.get(`sfx/${name}`));
+    return loaded.length ? loaded[Math.floor(Math.random() * loaded.length)] : key;
+}
+
 function playRecordedSfx(key) {
-    const buffer = buffers.get(`sfx/${key}`);
+    const buffer = buffers.get(`sfx/${pickVariant(key)}`);
     if(!buffer) return false;
     const now = audioCtx.currentTime;
     if(now - (lastPlayedAt.get(key) ?? -1) < (REPEAT_GAPS[key] ?? REPEAT_GAP)) return true;
@@ -211,7 +218,7 @@ function playRecordedSfx(key) {
         level.connect(sfxGain);
         source.start();
     } else {
-        playBuffer(buffer, sfxGain, SFX_MIX[key] ?? 1, 1);
+        playBuffer(buffer, sfxGain, SFX_MIX[key] ?? 1, key === 'hit' ? 0.94 + Math.random() * 0.12 : 1);
     }
     return true;
 }
@@ -274,7 +281,6 @@ function stopBackgroundTrack() {
 loadAudioSettings();
 applyAudioSettings();
 
-// Called on every tap and key press: unlocks audio, and starts the music only if none is playing.
 // ---------- Place sounds, made from noise and tones (no files): the bed under the fight, and footsteps ----------
 const noiseBuffer = (() => {
     const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
@@ -409,6 +415,7 @@ export function playFootstep(surface, left) {
     }
 }
 
+// Called on every tap and key press: unlocks audio, and starts the music only if none is playing.
 export function resumeAudio() {
     if(audioCtx.state !== 'running' && audioCtx.state !== 'closed') audioCtx.resume().catch(() => {});
     if(musicEnabled && !musicSource && musicIntervalId === null) startBackgroundTrack();
@@ -538,6 +545,13 @@ export function setMusicTrack(track) {
     if(!MUSIC[track] || track === musicTrack) return;
     musicTrack = track;
     if(musicEnabled && (musicIntervalId !== null || musicSource)) startBackgroundTrack();
+}
+
+// While the marshal's Heat is high the fight loop gives way to the hotter one, and back again when it cools. Only
+// the fight music switches: the home and showdown loops stay as they are.
+export function setFightIntensity(hot) {
+    if(musicTrack !== 'fight' && musicTrack !== 'fight-hot') return;
+    setMusicTrack(hot ? 'fight-hot' : 'fight');
 }
 
 // Voice lines load when first needed. One line at a time; a line that takes over
