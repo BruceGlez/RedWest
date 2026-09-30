@@ -104,10 +104,11 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         const gunPos = new THREE.Vector3();
         playerGroup.userData.muzzle.getWorldPosition(gunPos);
 
-        // Bullets leave from the steadied muzzle point, not the swaying hand, so the line stays straight.
+        // Bullets leave from the body's aim line (the one the aim guide is drawn along), out at the gun's
+        // distance, not from the swaying hand to one side, so they fly exactly where the character points.
         const facing = facingOf(playerGroup);
         if(!steadyOffset) trackMuzzle(0);
-        const steady = steadyMuzzle(playerGroup.position, facing, steadyOffset);
+        const steady = steadyMuzzle(playerGroup.position, facing, { forward: steadyOffset.forward, side: 0 });
         const shotOrigin = new THREE.Vector3(steady.x, gunPos.y, steady.z);
 
         for(const volleyOffset of volleyOffsets) {
