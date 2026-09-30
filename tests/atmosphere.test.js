@@ -56,3 +56,10 @@ test('every stage has its own ground, its own props, and no two stages look alik
     }
     assert.equal(seen.size, Object.keys(ATMOSPHERES).length + 1, 'every stage has a different ground and prop mix');
 });
+
+test('every stage has a skyline', () => {
+    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
+        assert.ok(['mesa', 'peaks', 'hills', 'stacks', 'flat'].includes(look.horizon.style), `${id}: known skyline`);
+        assert.ok(look.horizon.height > 0 && look.horizon.height <= 2 && look.horizon.strength >= 0 && look.horizon.strength <= 1, `${id}: skyline numbers`);
+    }
+});

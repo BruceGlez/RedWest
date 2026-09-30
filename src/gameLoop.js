@@ -535,8 +535,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             // The desert behind the start screen wears the look of the outlaw the player is about to face.
             setAtmosphere(scene, getOutlaw(arena.enabled ? arena.outlaw : progress.selected).id);
             updateAmbience(realDt, timeInSeconds, playerSystem.playerGroup.position);
-            camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 20, Math.cos(timeInSeconds * 0.5) * 30);
-            camera.lookAt(playerSystem.playerGroup.position);
+            // Slow orbit, tilted up enough to show the stage's sky and skyline behind the start screen.
+            camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 11, Math.cos(timeInSeconds * 0.5) * 30);
+            camera.lookAt(playerSystem.playerGroup.position.x, 7, playerSystem.playerGroup.position.z);
             renderer.render(scene, camera);
             emitDebug(realDt);
             // Entry screen still up, or the first-launch question still open.
