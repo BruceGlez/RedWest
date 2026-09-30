@@ -246,6 +246,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
             gunsmith: profile.owned.filter(id => id.startsWith('gun-')).length,
             tailor: profile.owned.filter(id => /^(hat|coat|pants|bullets)-/.test(id)).length
         });
+        const progress = getProgress();
+        if(progress) town3d?.setGuests(OUTLAWS.filter((outlaw, i) => (progress.stars[i] & 1) !== 0).map(outlaw => outlaw.id));
         els.sheet.style.display = openId ? '' : 'none';
         if(openId) els.grid.innerHTML = sheetHtml(openId);
     }

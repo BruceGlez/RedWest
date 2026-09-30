@@ -63,6 +63,18 @@ try {
         assert.deepEqual(errors, []);
         await context.close();
     }
+    // A player who has not played yet sees a quiet hint under PLAY; tapping it opens the opening, and it goes away.
+    {
+        const { page, errors, context } = await open(Array(10).fill(0));
+        await page.locator('#book-screen .panel-back').click();
+        await page.locator('#story-hint').waitFor({ state: 'visible' });
+        await page.locator('#story-hint').click();
+        await page.locator('#story-content h3', { hasText: 'Red West' }).waitFor();
+        await page.locator('[data-close]').click();
+        await page.locator('#story-hint').waitFor({ state: 'hidden' });
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
     // All ten pages: the ending opens.
     {
         const { page, errors, context } = await open(Array(10).fill(7));

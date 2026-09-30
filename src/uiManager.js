@@ -651,6 +651,7 @@ export function createUIManager(gameState, playerStats) {
             + '</div></div>';
         els.bookCase.innerHTML = reads + pages + end;
         els.bookBtn?.classList.toggle('has-new', !openingSeen());
+        updateStoryHint();
     }
 
     // One story card in a small overlay: earlier and later cards of the same outlaw are a tap away, and a card
@@ -683,6 +684,15 @@ export function createUIManager(gameState, playerStats) {
     const openingSeen = () => { try { return localStorage.getItem(SEEN_KEY) === '1'; } catch { return true; } };
     const SEQUENCES = { opening: OPENING, ending: ENDING };
 
+    // A quiet button under PLAY for a player who has not read the opening and has not played yet. It never covers
+    // anything or interrupts: it opens the opening, and goes away once that has been read.
+    function updateStoryHint() {
+        const hint = document.getElementById('story-hint');
+        if(!hint || !progress) return;
+        const fresh = progress.stars.every(mask => mask === 0) && progress.best.every(score => score === 0);
+        hint.style.display = fresh && !openingSeen() ? '' : 'none';
+    }
+
     function showSequence(kind, index = 0) {
         const panels = SEQUENCES[kind];
         if(!panels) return;
@@ -703,6 +713,7 @@ export function createUIManager(gameState, playerStats) {
         if(kind === 'opening') {
             try { localStorage.setItem(SEEN_KEY, '1'); } catch { /* fine */ }
             els.bookBtn?.classList.remove('has-new');
+            updateStoryHint();
         }
     }
 
@@ -922,6 +933,7 @@ export function createUIManager(gameState, playerStats) {
         els.recordsBtn.addEventListener('click', () => showPanel(els.panels[1]));
         els.howtoBtn.addEventListener('click', () => showPanel(els.panels[2]));
         els.bookBtn.addEventListener('click', () => showPanel(els.panels[3]));
+        document.getElementById('story-hint')?.addEventListener('click', () => showSequence('opening'));
         const openStory = event => {
             const button = event.target.closest('[data-story]');
             if(button) showStory(Number(button.dataset.story), Number(button.dataset.card ?? 0));
