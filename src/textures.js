@@ -13,17 +13,20 @@ function seededRandom(seed) {
     };
 }
 
-// Sun-baked desert ground: warm sand with darker patches, pebbles, dry cracks and scrub.
-export function createDesertGroundTexture(size = 1024) {
+// Ground for one stage (style: the `terrain` of an atmosphere in atmosphere.js). The default is the sun-baked desert:
+// warm sand with darker patches, pebbles, dry cracks and scrub. Other stages change the colours and counts, and
+// some add a pattern of their own: wheel ruts, furrows, deck planks or dirty snow patches. 1024 px, drawn once
+// per stage (the previous stage's texture is freed), so the ground costs one texture at a time.
+export function createGroundTexture(style, size = 1024) {
     const canvas = document.createElement('canvas');
     canvas.width = canvas.height = size;
     const ctx = canvas.getContext('2d');
     const rand = seededRandom(1851);
 
-    ctx.fillStyle = '#e3b877';
+    ctx.fillStyle = style.base;
     ctx.fillRect(0, 0, size, size);
 
-    // Soft light and dark sand patches (drawn with wrap-around so the texture tiles seamlessly).
+    // Soft light and dark patches (drawn with wrap-around so the texture tiles seamlessly).
     const blob = (x, y, r, color) => {
         for(const dx of [-size, 0, size]) {
             for(const dy of [-size, 0, size]) {
@@ -35,21 +38,38 @@ export function createDesertGroundTexture(size = 1024) {
             }
         }
     };
-    for(let i = 0; i < 26; i++) blob(rand() * size, rand() * size, 60 + rand() * 160, 'rgba(200, 140, 80, 0.2)');
-    for(let i = 0; i < 18; i++) blob(rand() * size, rand() * size, 50 + rand() * 120, 'rgba(250, 215, 150, 0.4)');
-    for(let i = 0; i < 8; i++) blob(rand() * size, rand() * size, 40 + rand() * 70, 'rgba(180, 120, 65, 0.15)');
+    for(let i = 0; i < 26; i++) blob(rand() * size, rand() * size, 60 + rand() * 160, style.blotchDark);
+    for(let i = 0; i < 18; i++) blob(rand() * size, rand() * size, 50 + rand() * 120, style.blotchLight);
+    for(let i = 0; i < 8; i++) blob(rand() * size, rand() * size, 40 + rand() * 70, style.blotchDark);
+
+    // A pattern of the stage's own. Every one tiles: bands run the full width, planks and furrows divide the size evenly.
+    if(style.extra === 'ruts') {
+        for(const y of [0.28, 0.36, 0.72, 0.8]) { ctx.fillStyle = style.extraColor; ctx.fillRect(0, size * y, size, size * 0.035); }
+    } else if(style.extra === 'furrows') {
+        for(let x = 0; x < size; x += 64) { ctx.fillStyle = style.extraColor; ctx.fillRect(x, 0, 18, size); }
+    } else if(style.extra === 'planks') {
+        for(let row = 0; row < size / 64; row++) {
+            ctx.fillStyle = row % 2 ? 'rgba(255, 220, 170, 0.1)' : 'rgba(40, 20, 10, 0.1)';
+            ctx.fillRect(0, row * 64, size, 64);
+            ctx.fillStyle = style.extraColor;
+            ctx.fillRect(0, row * 64, size, 3);
+            const shift = ((row * 5) % 8) * 128;
+            for(let x = shift; x < size + shift; x += 512) ctx.fillRect(x % size, row * 64, 3, 64);
+        }
+    } else if(style.extra === 'patches') {
+        for(let i = 0; i < 14; i++) blob(rand() * size, rand() * size, 40 + rand() * 80, style.extraColor);
+    }
 
     // Fine grain.
     for(let i = 0; i < 9000; i++) {
-        const shade = rand() < 0.5 ? 'rgba(120, 80, 40, 0.18)' : 'rgba(255, 235, 190, 0.22)';
-        ctx.fillStyle = shade;
+        ctx.fillStyle = rand() < 0.5 ? style.grain[0] : style.grain[1];
         ctx.fillRect(rand() * size, rand() * size, 1 + rand() * 2, 1 + rand() * 2);
     }
 
-    // Dry cracks.
-    ctx.strokeStyle = 'rgba(120, 75, 35, 0.35)';
+    // Cracks.
+    ctx.strokeStyle = style.crack;
     ctx.lineCap = 'round';
-    for(let i = 0; i < 16; i++) {
+    for(let i = 0; i < style.cracks; i++) {
         let x = rand() * size;
         let y = rand() * size;
         let angle = rand() * Math.PI * 2;
@@ -66,21 +86,21 @@ export function createDesertGroundTexture(size = 1024) {
     }
 
     // Pebbles with a highlight.
-    for(let i = 0; i < 260; i++) {
+    for(let i = 0; i < style.pebbles; i++) {
         const x = rand() * size;
         const y = rand() * size;
         const r = 1.5 + rand() * 3.5;
-        ctx.fillStyle = 'rgba(110, 80, 55, 0.7)';
+        ctx.fillStyle = style.pebble;
         ctx.beginPath(); ctx.ellipse(x, y, r * 1.3, r, rand() * Math.PI, 0, Math.PI * 2); ctx.fill();
-        ctx.fillStyle = 'rgba(255, 240, 210, 0.5)';
+        ctx.fillStyle = style.pebbleHi;
         ctx.beginPath(); ctx.ellipse(x - r * 0.3, y - r * 0.3, r * 0.5, r * 0.35, 0, 0, Math.PI * 2); ctx.fill();
     }
 
-    // Dry scrub tufts.
-    for(let i = 0; i < 70; i++) {
+    // Dry scrub or grass tufts.
+    for(let i = 0; i < (style.scrub ? style.scrubs : 0); i++) {
         const x = rand() * size;
         const y = rand() * size;
-        ctx.strokeStyle = rand() < 0.5 ? 'rgba(128, 120, 50, 0.75)' : 'rgba(150, 110, 50, 0.75)';
+        ctx.strokeStyle = rand() < 0.5 ? style.scrub[0] : style.scrub[1];
         ctx.lineWidth = 1.5;
         for(let b = 0; b < 7; b++) {
             const a = -Math.PI / 2 + (rand() - 0.5) * 2.2;

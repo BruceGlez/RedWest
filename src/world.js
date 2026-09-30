@@ -1,7 +1,7 @@
 import * as THREE from 'three';
-import { createRock, createDeadTree, createCrate, createCactus, createFence } from './scenery.js';
-import { createDesertGroundTexture, createSkyTexture } from './textures.js';
-import { atmosphereFor } from './atmosphere.js';
+import { createRock, createDeadTree, createCrate, createCactus, createFence, createBarrel, createTombstone, createHaystack, createSpire, createWall, clearScenery } from './scenery.js';
+import { createGroundTexture, createSkyTexture } from './textures.js';
+import { atmosphereFor, DEFAULT_ATMOSPHERE, FENCE_GROUP } from './atmosphere.js';
 import { setSceneryTint } from './scenery.js';
 import { setupAmbience, setAmbienceLook } from './ambience.js';
 
@@ -9,6 +9,7 @@ let sunLight = null;
 let hemiLight = null;
 let groundMaterial = null;
 let appliedAtmosphere = null;
+let currentKit = DEFAULT_ATMOSPHERE.kit; // what generateMap builds: the current stage's props
 const SUN_OFFSET = new THREE.Vector3(-26, 44, -18);
 
 export function setupScene(scene, camera, renderer) {
@@ -34,9 +35,7 @@ export function setupScene(scene, camera, renderer) {
     scene.add(sunLight);
     scene.add(sunLight.target);
 
-    const groundTexture = createDesertGroundTexture();
-    groundTexture.repeat.set(9, 9);
-    groundMaterial = new THREE.MeshLambertMaterial({ map: groundTexture });
+    groundMaterial = new THREE.MeshLambertMaterial({ map: groundTextureFor(DEFAULT_ATMOSPHERE.terrain) });
     const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), groundMaterial);
     groundMesh.rotation.x = -Math.PI / 2;
     groundMesh.receiveShadow = true;
@@ -46,6 +45,12 @@ export function setupScene(scene, camera, renderer) {
 
 // The look of one stage (src/atmosphere.js): sky, fog, light, sand and scenery tint. Cheap to call every frame:
 // nothing happens unless the outlaw changed. Only colours and numbers change, so no shader is rebuilt.
+function groundTextureFor(terrain) {
+    const texture = createGroundTexture(terrain);
+    texture.repeat.set(9, 9);
+    return texture;
+}
+
 export function setAtmosphere(scene, outlawId) {
     if(appliedAtmosphere === outlawId || !sunLight) return;
     appliedAtmosphere = outlawId;
@@ -62,8 +67,15 @@ export function setAtmosphere(scene, outlawId) {
     sunLight.intensity = look.sun.intensity;
     SUN_OFFSET.set(...look.sun.offset);
     groundMaterial.color.setHex(look.ground);
-    setSceneryTint(look.props);
+    groundMaterial.map.dispose(); // one ground texture at a time
+    groundMaterial.map = groundTextureFor(look.terrain);
+    groundMaterial.needsUpdate = true;
+    setSceneryTint(look.props, look.palette);
     setAmbienceLook(look);
+    // A new home ground gets its own map of props. This only happens on the start screen, never mid-run.
+    currentKit = look.kit;
+    clearScenery(scene);
+    generateMap(scene);
 }
 
 export function updateSun(focus) {
@@ -81,17 +93,24 @@ function getRandomPos(minDist) {
     return { x, z };
 }
 
+// The map for the current stage: how many of each prop (its `kit` in atmosphere.js), scattered over 240 x 240.
 export function generateMap(scene) {
-    for(let i=0; i<60; i++) { const p = getRandomPos(5); createRock(scene, p.x, p.z); }
-    for(let i=0; i<15; i++) { const p = getRandomPos(15); createDeadTree(scene, p.x, p.z); }
-    for(let i=0; i<15; i++) { const p = getRandomPos(10); createCrate(scene, p.x, p.z); }
-    for(let i=0; i<20; i++) { const p = getRandomPos(10); createCactus(scene, p.x, p.z); }
-    for(let i=0; i<5; i++) {
+    const kit = currentKit;
+    const scatter = (count, minDist, create) => { for(let i = 0; i < count; i++) { const p = getRandomPos(minDist); create(scene, p.x, p.z); } };
+    scatter(kit.rock, 5, createRock);
+    scatter(kit.tree, 15, createDeadTree);
+    scatter(kit.crate, 10, createCrate);
+    scatter(kit.cactus, 10, createCactus);
+    scatter(kit.barrel, 8, createBarrel);
+    scatter(kit.tombstone, 12, createTombstone);
+    scatter(kit.haystack, 12, createHaystack);
+    scatter(kit.spire, 20, createSpire);
+    scatter(kit.wall, 12, createWall);
+    // Fences and walls stand in lines: kit.fence is a count of pieces, laid out in lines of FENCE_GROUP.
+    for(let i = 0; i < Math.round(kit.fence / FENCE_GROUP); i++) {
         const p = getRandomPos(20); const angle = Math.random() * Math.PI;
-        for(let j=0; j<3; j++) {
-            const offsetX = Math.cos(angle) * (j * 3.2); 
-            const offsetZ = Math.sin(angle) * (j * 3.2);
-            createFence(scene, p.x + offsetX, p.z + offsetZ, angle);
+        for(let j = 0; j < FENCE_GROUP; j++) {
+            createFence(scene, p.x + Math.cos(angle) * (j * 3.2), p.z + Math.sin(angle) * (j * 3.2), angle);
         }
     }
 }

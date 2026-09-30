@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ATMOSPHERES, DEFAULT_ATMOSPHERE, atmosphereFor } from '../src/atmosphere.js';
+import { ATMOSPHERES, DEFAULT_ATMOSPHERE, KIT_CAPACITY, atmosphereFor } from '../src/atmosphere.js';
 import { OUTLAWS } from '../src/outlaws.js';
 
 const isHex = value => Number.isInteger(value) && value >= 0 && value <= 0xffffff;
@@ -33,4 +33,26 @@ test('atmospheres are complete, and the fight stays readable', () => {
 
 test('a stage without an atmosphere falls back to the default', () => {
     assert.equal(atmosphereFor('a-future-outlaw'), DEFAULT_ATMOSPHERE);
+});
+
+test('every stage has its own ground, its own props, and no two stages look alike', () => {
+    const seen = new Set();
+    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
+        const { terrain, kit, palette } = look;
+        assert.ok(/^#[0-9a-f]{6}$/i.test(terrain.base), `${id}: ground base colour`);
+        assert.ok(terrain.grain.length === 2 && terrain.cracks >= 0 && terrain.pebbles >= 0 && terrain.scrubs >= 0, `${id}: ground counts`);
+        assert.ok([null, 'ruts', 'furrows', 'planks', 'patches'].includes(terrain.extra), `${id}: known ground pattern`);
+        if(terrain.extra) assert.ok(terrain.extraColor, `${id}: pattern colour`);
+        assert.deepEqual(Object.keys(kit).sort(), Object.keys(KIT_CAPACITY).sort(), `${id}: a count for every kind of prop`);
+        let total = 0;
+        for(const [kind, count] of Object.entries(kit)) {
+            assert.ok(Number.isInteger(count) && count >= 0, `${id}: ${kind} count`);
+            assert.ok(count + 4 <= KIT_CAPACITY[kind], `${id}: ${kind} leaves room to respawn`);
+            total += count;
+        }
+        assert.ok(total >= 60 && total <= 150, `${id}: ${total} props keeps the arena playable and cheap`);
+        assert.equal(palette.rock.length, 2, `${id}: two rock colours`);
+        seen.add(JSON.stringify([terrain.base, kit]));
+    }
+    assert.equal(seen.size, Object.keys(ATMOSPHERES).length + 1, 'every stage has a different ground and prop mix');
 });

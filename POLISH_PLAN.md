@@ -83,9 +83,16 @@ on the outlaw, which is now the box figure's hidden baked body; it looks inside 
 - **Wind and life** (`src/ambience.js`): 700 grass tufts that sway in the wind, up to four tumbleweeds, and drifting motes
   (dust, ash, embers, mist, snow per stage). Three draw calls in all. The shader count went from 23 to about 30 (skinned and
   instanced variants), which makes a cold load in software rendering slower; not measured on a phone.
-- **Not done:** dirt-patch ground texture, footprints and scorch decals, sway for cacti and dead trees, modelled props
-  (barrels, wagon wheels, bones, signs), stage-specific props (Pete's piano, the stopped clock), the horizon ring of mesas,
-  and a real-phone check of the colours (red ground under red-coated enemies) and of frame pacing.
+- **Done 2026-09-30: every world is its own.** Each stage now has its own ground (`terrain` in `src/atmosphere.js`, drawn by
+  `createGroundTexture`: wheel ruts at Copper Bit, dried gravel and mud at Whisper Wash, graveyard grass, furrowed farmland,
+  glowing cinder at Slagtown, red rock, bleached hardpan, overgrown ruins, deck planks on the Silver Belle, dirty snow at
+  Fort Pell), its own prop mix (`kit`: new barrels, tombstones, haystacks, mesa spires and wall lengths beside the rocks,
+  trees, crates, cacti and fences) and its own prop colours (`palette`). The map is rebuilt when the stage changes on the
+  start screen; a prop kind nobody uses draws nothing. Only one ground texture lives at a time. Cost: a fight with 15
+  enemies is now 45 to 51 draw calls (was 30 to 40), about 53,000 triangles, 36 shader programs: at the edge of the
+  first-guess budget, so check frame pacing on a phone before adding more.
+- **Not done:** footprints and scorch decals, sway for cacti and dead trees, modelled props (wagon wheels, bones, signs),
+  hero props per stage (Pete's piano, the stopped clock), the horizon ring of mesas, and a real-phone check of the colours (red ground under red-coated enemies) and of frame pacing.
 
 - **Instance the scenery (M).** `src/world.js` makes about 60 rocks, 15 trees, 15 crates, 20 cacti and 15 fence
   pieces, each its own mesh. Turn each kind into an `InstancedMesh` (or `BatchedMesh`, in three r160) with per-instance
