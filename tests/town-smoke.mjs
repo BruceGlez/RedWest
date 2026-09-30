@@ -136,6 +136,93 @@ try {
         await context.close();
     }
 
+    // Step B: districts open with a star. Shut, the gate holds the marshal back and says which outlaw opens it.
+    {
+        const { page, errors, context } = await open();
+        assert.equal(await page.evaluate(() => window.__redWestTown.town3d.walkMap().areas.length), 1, 'only the town is open');
+        await goTo(page, 'gate-foundry');
+        await page.locator('.walk-prompt').filter({ hasText: 'FOUNDRY YARD: SHUT' }).waitFor({ state: 'visible' });
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /Beat IRON JACK HARLAN/);
+        const z = await page.evaluate(() => { window.__redWestTown.walk.place(16, -27.4); return window.__redWestTown.walk.position.z; });
+        assert.ok(z > -21, `a shut district cannot be entered (z = ${z})`);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // Beaten: the Calloways, Iron Jack and Mesa Morgan open the farm, the foundry yard and the channel.
+        const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 0, 0, 0, 0] } }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        assert.equal(await page.evaluate(() => window.__redWestTown.town3d.walkMap().areas.length), 4, 'the town and three districts');
+        const at = (id) => page.evaluate(id => {
+            const door = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
+            window.__redWestTown.walk.place(door.x, door.z);
+            return window.__redWestTown.walk.position;
+        }, id);
+        for(const [id, pattern] of [['furnace', /Ezra Stone opened the armour/], ['channel', /no blasting after dark/], ['kennel', /one dog more than they can feed/]]) {
+            const p = await at(id);
+            assert.ok(p.x !== 0 || p.z !== 0);
+            await page.locator('.walk-prompt').waitFor({ state: 'visible' });
+            await page.keyboard.press('e');
+            await page.locator('#town-sheet').waitFor({ state: 'visible' });
+            assert.match(await page.locator('#town-grid').textContent(), pattern);
+            if(id === 'kennel') {
+                // The dog: take it, it comes along and is remembered; send it home.
+                assert.equal(await page.evaluate(() => window.__redWestTown.walk.hasDog), false);
+                await page.locator('[data-companion]').click();
+                assert.match(await page.locator('[data-companion]').textContent(), /SEND THE DOG HOME/);
+                assert.equal(await page.evaluate(() => window.__redWestTown.walk.hasDog), true, 'the dog is in the town');
+                assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('redWestCompanion.v1')).following), true, 'remembered on the device');
+                await page.locator('[data-companion]').click();
+                assert.match(await page.locator('[data-companion]').textContent(), /CALL THE DOG/);
+                assert.equal(await page.evaluate(() => window.__redWestTown.walk.hasDog), false);
+                await page.locator('[data-companion]').click();
+            }
+            await page.locator('#town-sheet-close').click();
+        }
+        // In a district the marshal can stand; the dog follows him there.
+        const pos = await page.evaluate(() => { window.__redWestTown.walk.place(-50, 0); return window.__redWestTown.walk.position; });
+        assert.ok(pos.x < -40, 'the farm is open ground');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // Step C: townsfolk follow routes that never cut through a wall, and the marshal can stop one for a word.
+        const { page, errors, context } = await open();
+        const bad = await page.evaluate(() => {
+            const t = window.__redWestTown.town3d;
+            const map = t.walkMap();
+            const problems = [];
+            for(const f of t.folk) {
+                const r = f.walker.route;
+                for(let i = 0; i < r.length; i++) {
+                    const [x1, z1] = r[i], [x2, z2] = r[(i + 1) % r.length];
+                    for(let k = 0; k <= 40; k++) {
+                        const x = x1 + (x2 - x1) * k / 40, z = z1 + (z2 - z1) * k / 40;
+                        if(map.boxes.some(b => x > b.minX - 0.5 && x < b.maxX + 0.5 && z > b.minZ - 0.5 && z < b.maxZ + 0.5)) { problems.push(`${f.id} segment ${i} at ${x.toFixed(1)}, ${z.toFixed(1)}`); break; }
+                    }
+                }
+            }
+            return problems;
+        });
+        assert.deepEqual(bad, [], 'no townsperson walks through a building');
+        const person = await page.evaluate(() => {
+            const f = window.__redWestTown.town3d.folk[0];
+            window.__redWestTown.walk.place(f.walker.x + 1.6, f.walker.z);
+            return { id: f.id, name: f.name };
+        });
+        await page.locator('.walk-bubble').waitFor({ state: 'visible' });
+        assert.ok((await page.locator('.walk-bubble').textContent()).includes(person.name), 'the bubble names who is speaking');
+        const frozen = await page.evaluate(() => window.__redWestTown.town3d.folk[0].walker.talking);
+        assert.equal(frozen, true, 'the one being spoken to stands still');
+        await page.evaluate(() => window.__redWestTown.walk.place(0, 13));
+        await page.locator('.walk-bubble').waitFor({ state: 'hidden' });
+        assert.equal(await page.evaluate(() => window.__redWestTown.town3d.folk.some(f => f.walker.talking)), false, 'and goes on when the marshal leaves');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+
     // Each off on its own from the URL.
     {
         const { page, errors, context } = await open('?walk=off');

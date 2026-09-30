@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { moveInTown, pushOutOfBox, stepFromInput, nearestDoor, turnToward, PLAYER_RADIUS, WALK_SPEED, DOOR_REACH } from '../src/townWalkLogic.js';
+import { moveInTown, clampToAreas, pushOutOfBox, stepFromInput, nearestDoor, turnToward, PLAYER_RADIUS, WALK_SPEED, DOOR_REACH } from '../src/townWalkLogic.js';
 
 const map = {
     bounds: { minX: -20, maxX: 20, minZ: -20, maxZ: 20 },
@@ -61,4 +61,34 @@ test('turning takes the short way round', () => {
     const next = turnToward(Math.PI - 0.1, -Math.PI + 0.1, 1);
     assert.ok(Math.abs(next - (Math.PI + 0.1)) < 1e-9, 'across the +-pi seam, not the long way');
     assert.equal(turnToward(0, 1, 0), 0);
+});
+
+test('the ground can be several areas: a marshal crosses where they overlap and is held in at the far edge', () => {
+    const town = { minX: -20, maxX: 20, minZ: -20, maxZ: 20 };
+    const yard = { minX: 17, maxX: 50, minZ: -5, maxZ: 5 }; // reaches 3 units into the town
+    const two = { areas: [town, yard], boxes: [], doors: [] };
+    let x = 10, z = 0;
+    for(let i = 0; i < 60; i++) [x, z] = moveInTown(two, x, z, 1, 0);
+    assert.ok(x > 45, `walked on into the yard, x = ${x}`);
+    assert.ok(x <= 50 - PLAYER_RADIUS + 1e-6, 'held in at the yard end');
+    // The yard is narrower than the town: stepping sideways out of it is stopped, but the town is still open.
+    [x, z] = moveInTown(two, 40, 0, 0, 30);
+    assert.ok(z <= 5 - PLAYER_RADIUS + 1e-6, `held in by the yard's side, z = ${z}`);
+    [x, z] = moveInTown(two, 0, 0, 0, 30);
+    assert.ok(z > 10, 'the town itself is wider');
+});
+
+test('a shut district is simply not an area: the fence line holds', () => {
+    const town = { minX: -20, maxX: 20, minZ: -20, maxZ: 20 };
+    const shut = { areas: [town], boxes: [], doors: [] };
+    const [x] = moveInTown(shut, 18, 0, 10, 0);
+    assert.ok(x <= 20 - PLAYER_RADIUS + 1e-6);
+});
+
+test('clampToAreas leaves a point that is already on the ground, and finds the nearest ground otherwise', () => {
+    const areas = [{ minX: 0, maxX: 10, minZ: 0, maxZ: 10 }, { minX: 20, maxX: 30, minZ: 0, maxZ: 10 }];
+    assert.deepEqual(clampToAreas(areas, 5, 5, 0.6), [5, 5]);
+    assert.deepEqual(clampToAreas(areas, 25, -4, 0.6), [25, 0.6]);
+    const [x] = clampToAreas(areas, 17, 5, 0.6); // nearer the second area
+    assert.ok(x > 19);
 });

@@ -1,6 +1,8 @@
 // The rules of walking around Frontier Town, with no rendering in them so they can be unit tested.
 // The town is flat: everything is on the x / z plane. A "map" is what townScene.walkMap() hands over:
-//   { bounds: { minX, maxX, minZ, maxZ }, boxes: [{ minX, maxX, minZ, maxZ }], doors: [{ id, label, x, z }] }
+//   { areas: [{ minX, maxX, minZ, maxZ }], boxes: [{ minX, maxX, minZ, maxZ }], doors: [{ id, label, x, z }] }
+// `areas` is the ground you may stand on: the town plus each open district (src/townDistricts.js). Areas overlap by
+// more than a marshal's width where they meet. A map with a single `bounds` rectangle still works.
 
 export const WALK_SPEED = 7.5; // town units a second (a street is about 9 wide, the whole town about 70)
 export const PLAYER_RADIUS = 0.6;
@@ -28,6 +30,25 @@ export function pushOutOfBox(x, z, radius, box) {
     return [x, box.maxZ + radius];
 }
 
+const areasOf = map => map.areas ?? [map.bounds];
+
+// The nearest point to (x, z) that a circle of this radius can stand on inside the union of the areas.
+export function clampToAreas(areas, x, z, radius) {
+    let best = null;
+    let bestDistance = Infinity;
+    for(const a of areas) {
+        const cx = Math.max(a.minX + radius, Math.min(x, a.maxX - radius));
+        const cz = Math.max(a.minZ + radius, Math.min(z, a.maxZ - radius));
+        const distance = Math.hypot(cx - x, cz - z);
+        if(distance < bestDistance) {
+            best = [cx, cz];
+            bestDistance = distance;
+            if(distance === 0) break;
+        }
+    }
+    return best ?? [x, z];
+}
+
 // Where the player ends up after moving by (dx, dz): stays inside the town bounds and out of every box.
 export function moveInTown(map, x, z, dx, dz, radius = PLAYER_RADIUS) {
     const length = Math.hypot(dx, dz);
@@ -40,9 +61,7 @@ export function moveInTown(map, x, z, dx, dz, radius = PLAYER_RADIUS) {
         for(let pass = 0; pass < 2; pass++) {
             for(const box of map.boxes) [px, pz] = pushOutOfBox(px, pz, radius, box);
         }
-        const { minX, maxX, minZ, maxZ } = map.bounds;
-        px = Math.max(minX + radius, Math.min(px, maxX - radius));
-        pz = Math.max(minZ + radius, Math.min(pz, maxZ - radius));
+        [px, pz] = clampToAreas(areasOf(map), px, pz, radius);
     }
     return [px, pz];
 }

@@ -9,6 +9,9 @@ import { createTownScene, TOWN_LAYOUT } from './townScene.js';
 import { createTownLook } from './townLook.js';
 import { createTownWalk } from './townWalk.js';
 import { spotLabel, getSpot, jobsLeft } from './townSpots.js';
+import { unlockedDistricts, doorLabel, districtOf, lockedHint } from './townDistricts.js';
+import { getFolk, folkLine } from './townFolk.js';
+import { loadCompanion, saveCompanion } from './townCompanion.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { featureOn, rememberFeature } from './townFeatures.js';
 import { normalizePass, seasonEndsAt, themeFor, tierFor, tierReward, TIERS, POINTS_PER_TIER, POINTS } from './pass.js';
@@ -42,6 +45,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     let town3d = null; // built the first time the town opens
     let look = null; // the art direction pass (src/townLook.js), an independent switch
     let walk = null; // the walkable town (src/townWalk.js), an independent switch
+    let companion = loadCompanion(); // the dog from the Calloway farm: { adopted, following }, kept on this device
     let openId = null; // the building whose card is showing
     let headerBottom = 0; // measured once the town is on screen (reset on resize)
     let confirmUpgrade = null; // building id armed for a second tap
@@ -217,7 +221,26 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             + `<div class="town-actions"><button type="button" class="shop-action" data-jobs>DAILY JOBS</button></div></div>`;
     }
 
+    // A district's place (plaque or kennel) or its shut gate.
+    function districtCard(id) {
+        const d = districtOf(id);
+        if(!d) return '';
+        const open = profile && unlockedDistricts(profile.stats.stageStars).includes(d.id);
+        if(!open) {
+            return `<div class="town-card" data-building="${id}"><div class="town-sign"><span>${d.name}</span><span class="town-level">SHUT</span></div>`
+                + `<p class="town-blurb">${lockedHint(d)}</p></div>`;
+        }
+        let action = '';
+        if(id === 'kennel') {
+            const label = !companion.adopted ? 'TAKE THE DOG' : companion.following ? 'SEND THE DOG HOME' : 'CALL THE DOG';
+            action = `<div class="town-actions"><button type="button" class="shop-action collect" data-companion>${label}</button></div>`;
+        }
+        return `<div class="town-card" data-building="${id}"><div class="town-sign"><span>${d.card.title}</span></div>`
+            + `<p class="town-blurb">${d.card.text}</p>${action}</div>`;
+    }
+
     function sheetHtml(id) {
+        if(districtOf(id)) return districtCard(id);
         if(id === 'board') return boardCard();
         if(id === 'depot') return eventCard();
         if(id === 'saloon') return passCard();
@@ -277,6 +300,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             gunsmith: profile.owned.filter(id => id.startsWith('gun-')).length,
             tailor: profile.owned.filter(id => /^(hat|coat|pants|bullets)-/.test(id)).length
         });
+        town3d?.setDistricts(unlockedDistricts(profile.stats.stageStars));
         town3d?.setJailCash(jailStored(profile), jailCapacity(profile));
         town3d?.setBoardNotes(jobsLeft(profile));
         const progress = getProgress();
@@ -323,7 +347,16 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             openBuilding(id); // a building's door, or the board
         }
     }
+    // What a townsperson says: one line for how far the marshal has got (src/townFolk.js).
+    function personLine(id) {
+        const progress = getProgress();
+        const beaten = progress ? progress.stars.filter(mask => (mask & 1) !== 0).length : 0;
+        const person = getFolk(id);
+        return person ? folkLine(person, beaten) : '';
+    }
     const describeSpot = door => {
+        const named = doorLabel(door.id);
+        if(named) return named;
         if(!getSpot(door.id)) return door.label;
         const selected = getProgress()?.selected ?? 0;
         return spotLabel(door.id, {
@@ -337,7 +370,13 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     els.grid.addEventListener('click', event => {
         const button = event.target.closest('button');
         if(!button || button.disabled) return;
-        if(button.hasAttribute('data-collect')) {
+        if(button.hasAttribute('data-companion')) {
+            companion = { adopted: true, following: !(companion.adopted && companion.following) };
+            saveCompanion(companion);
+            walk?.setCompanion(companion.following);
+            track(companion.following ? 'companion_on' : 'companion_off');
+            render();
+        } else if(button.hasAttribute('data-collect')) {
             confirmUpgrade = null;
             collectJail();
         } else if(button.dataset.upgrade) {
@@ -385,12 +424,13 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         say('');
         if(!town3d) {
             town3d = createTownScene();
-            walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot });
+            walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot, lineFor: personLine });
             // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
-            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d };
+            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; } };
         }
         town3d.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
+        walk.setCompanion(companion.following);
         if(featureOn('walk')) walk.enter();
         syncTools();
         ui.showTown();

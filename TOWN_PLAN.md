@@ -27,8 +27,8 @@ reacts. If a feature could just as well be a button, it does not belong here.
 | Step | What | Size | Status |
 |---|---|---|---|
 | **A** | A reason to walk: the train is the gate to the hunt, the jail's cash box shows and pays the income, a bounty board in the square shows the day's jobs | small to medium | **built 2026-09-30** (below) |
-| **B** | A second district (the foundry yard) that opens with a star, with its own mood and a few new walkable places | medium | planned |
-| **C** | Townsfolk with routines and proximity barks, plus a companion that follows the marshal | medium | planned |
+| **B** | Districts beyond the town's edge that open with a star, each with its own mood and a place to use | medium | **built 2026-09-30** (below) |
+| **C** | Townsfolk with routines and proximity barks, plus a companion that follows the marshal | medium | **built 2026-09-30** (below) |
 | **D** | Art pass for the new districts: modelled buildings, painted textures (`POLISH_PLAN.md`, section 6) | large | parked on purpose |
 
 ### Step A, as built
@@ -46,20 +46,34 @@ All three are interaction spots in `src/townSpots.js` (positions, verbs, the wor
 
 Rules kept: income and jobs use the existing wallet and profile; nothing here touches combat.
 
-### Step B, planned
+### Step B, as built
 
-- Districts unlock by stars, never by money: the **foundry yard** after Iron Jack (Slagtown), then the canal and
-  warehouses, then the ranch after the Calloways. A locked district is fenced off and says which star opens it.
-- Each district has its own light and one thing to do (for example the foundry yard: an anvil where Ezra Stone shows
-  the guns you own). Walking in is the only way to reach it.
-- `walkMap()` already returns boxes, doors and bounds; a district is more boxes, doors and a bounds extension.
+Three districts, each opened by beating an outlaw (the first star, the rule the jail uses) and never by money. Rules and
+data are in `src/townDistricts.js`; they are drawn in `src/townScene.js`.
 
-### Step C, planned
+| District | Opens with | What is there |
+|---|---|---|
+| **Calloway Farm** (west) | The Calloways | A barn, hay, a fence line, and the **kennel** (the dog, step C) |
+| **Foundry Yard** (north-east) | Iron Jack Harlan | Jack's glowing furnace with smoke, an anvil, slag, crates, and a card about it |
+| **Morgan's Channel** (south) | Mad Mesa Morgan | Water across the ground, a footbridge (the only way over), a warehouse, buckets, and the channel log |
 
-- Townsfolk follow a short routine between two or three stops (work, saloon, home), at most three stops a day of the
-  game clock, and say their bark (`src/barks.js`) when the marshal stands near.
-- A companion dog follows the marshal (cosmetic first; a perk later only if it cannot touch combat rules).
-- Beaten outlaws move in as people, not only props (`GUESTS` in `src/townScene.js` is the place).
+- While a district is shut it is **seen but fenced**: a fence across the way in and a LOCKED sign. Standing at the fence
+  shows `<DISTRICT>: SHUT` and the card says which outlaw opens it. When it opens the fence becomes a gate with its name.
+- The walkable ground is now a list of areas (`map.areas` in `src/townWalkLogic.js`): the town plus each open district.
+  Each area reaches 3 units into the town so crossing the edge never lands in a gap.
+- The text on each place's card comes from `STORY_BIBLE.md` (the Calloways rebuild their fences outside town, Jack goes to
+  work at the smithy, Morgan's dry channel gets water).
+
+### Step C, as built
+
+- **Townsfolk with routines** (`src/townFolk.js`): six people, each walking a short route of two to four stops and
+  waiting at each (Old Gil, Mr. Grimsby, Mr. Pruitt, the barkeep, a miner, the station master). Routes follow the streets;
+  `npm run test:town` walks every segment against the real walls.
+- **Proximity barks**: stand within about three steps and they stop and a speech bubble shows one line for how far you have
+  got (nothing beaten, a few, five or more). After a few seconds they go on until you leave and come back.
+- **The dog** (`src/townCompanion.js`): meet it at the kennel on Calloway Farm, and it trots after the marshal and wags. The
+  kennel button takes it, sends it home and calls it back. It is kept on the device, and is only a companion: nothing
+  about it touches fights or the wallet.
 
 ### Step D, parked
 
@@ -68,8 +82,10 @@ when its art is replaced.
 
 ## How we know it works
 
-- `tests/townSpots.test.js`: spots sit inside the town, clear of buildings, with wording and rules covered.
-- `npm run test:town`: each spot can be reached and used in a real browser (the train starts a run, the cash box pays,
-  the board opens).
+- Unit tests: `townSpots`, `townDistricts`, `townFolk`, `townCompanion` and `townWalkLogic` cover positions, unlock rules, routines,
+  barks, the dog's following and the walking rules.
+- `npm run test:town`: in a real browser, each place can be reached and used (the train starts a run, the cash box pays, the
+  board opens), shut districts hold the marshal back, open ones can be entered, no townsperson walks through a wall, and the
+  dog comes and goes.
 - The mobile draw-call guard (`tests/mobile-smoke.mjs`) still holds, so the town stays cheap on phones.
 - Play it and answer one question per step: did I walk somewhere because I wanted to, or because I had to?
