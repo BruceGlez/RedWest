@@ -6,11 +6,13 @@ import { setSceneryTint } from './scenery.js';
 import { setupAmbience, setAmbienceLook } from './ambience.js';
 import { setDecalColor } from './decals.js';
 import { setHorizon, updateHorizon } from './horizon.js';
+import { createHero } from './heroProps.js';
 
 let sunLight = null;
 let hemiLight = null;
 let groundMaterial = null;
 let appliedAtmosphere = null;
+let currentHero = DEFAULT_ATMOSPHERE.hero;
 let currentKit = DEFAULT_ATMOSPHERE.kit; // what generateMap builds: the current stage's props
 const SUN_OFFSET = new THREE.Vector3(-26, 44, -18);
 
@@ -78,6 +80,7 @@ export function setAtmosphere(scene, outlawId) {
     setDecalColor(new THREE.Color(look.terrain.base).multiplyScalar(0.45).getHex());
     // A new home ground gets its own map of props. This only happens on the start screen, never mid-run.
     currentKit = look.kit;
+    currentHero = look.hero;
     clearScenery(scene);
     generateMap(scene);
 }
@@ -101,6 +104,7 @@ function getRandomPos(minDist) {
 // The map for the current stage: how many of each prop (its `kit` in atmosphere.js), scattered over 240 x 240.
 export function generateMap(scene) {
     const kit = currentKit;
+    if(currentHero) createHero(scene, currentHero.id, ...currentHero.at);
     const scatter = (count, minDist, create) => { for(let i = 0; i < count; i++) { const p = getRandomPos(minDist); create(scene, p.x, p.z); } };
     scatter(kit.rock, 5, createRock);
     scatter(kit.tree, 15, createDeadTree);
