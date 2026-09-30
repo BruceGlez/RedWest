@@ -4,6 +4,7 @@ import { obstacles } from './state.js';
 import { markObstacleGridDirty } from './physics.js';
 import { toonVertexColorMaterial } from './assets.js';
 import { KIT_CAPACITY, DEFAULT_ATMOSPHERE } from './atmosphere.js';
+import { windUniforms } from './wind.js';
 
 // The arena's props (rocks, dead trees, crates, cacti, fences) are drawn as one InstancedMesh per kind:
 // five draw calls for about 125 props, where each used to be a mesh (or several) of its own. Each prop is
@@ -35,6 +36,12 @@ function paint(geometry, hex) {
     return geometry;
 }
 
+// Marks a shape as one that sways in the wind: every vertex gets a sway weight of 1 (other shapes have none, so 0).
+const swaying = geometry => {
+    geometry.setAttribute('sway', new THREE.Float32BufferAttribute(new Float32Array(geometry.attributes.position.count).fill(1), 1));
+    return geometry;
+};
+
 const merged = parts => mergeGeometries(parts.map(g => (g.index ? g.toNonIndexed() : g)), false);
 
 // One shape per kind. Room for each kind is KIT_CAPACITY in atmosphere.js (the largest map any stage asks for, plus
@@ -44,7 +51,7 @@ const SHAPES = {
     rock: { geometry: () => paint(new THREE.DodecahedronGeometry(1, 0), 0xffffff) },
     // A dead trunk with three bare branches; each tree turns and stretches a little.
     tree: {
-        geometry: () => merged([
+        geometry: () => swaying(merged([
             box(0.6, 5, 0.6, COLORS.deadWood, 0, 2.5, 0),
             // Branches leave the trunk at three heights, leaning out about 65 degrees.
             ...[[0.45, 0.5, 1.5], [0.7, 2.6, 2.0], [0.88, 4.7, 1.4]].map(([height, angle, length]) => {
@@ -55,7 +62,7 @@ const SHAPES = {
                 branch.translate(0, 5 * height, 0);
                 return paint(branch, COLORS.deadWood);
             })
-        ])
+        ]))
     },
     crate: {
         geometry: () => merged([
@@ -65,11 +72,11 @@ const SHAPES = {
         ])
     },
     cactus: {
-        geometry: () => merged([
+        geometry: () => swaying(merged([
             box(2, 6, 2, COLORS.cactus, 0, 3, 0),
             box(3, 1, 1, COLORS.cactus, 1, 4, 0),
             box(1, 2, 1, COLORS.cactus, 2, 5, 0)
-        ])
+        ]))
     },
     fence: {
         geometry: () => merged([
@@ -123,6 +130,17 @@ let current = null; // { scene, kinds: { rock: kind, ... } }, built lazily, one 
 const scratch = { matrix: new THREE.Matrix4(), position: new THREE.Vector3(), quaternion: new THREE.Quaternion(), scale: new THREE.Vector3(), euler: new THREE.Euler(), color: new THREE.Color() };
 const HIDDEN = new THREE.Matrix4().makeScale(0, 0, 0);
 const material = toonVertexColorMaterial();
+// Cacti and dead trees lean with the wind, more toward the top (position.y), out of step by where each stands.
+material.onBeforeCompile = shader => {
+    shader.uniforms.uTime = windUniforms.uTime;
+    shader.uniforms.uWind = windUniforms.uWind;
+    shader.vertexShader = shader.vertexShader
+        .replace('#include <common>', '#include <common>\nattribute float sway;\nuniform float uTime;\nuniform float uWind;')
+        .replace('#include <begin_vertex>', `#include <begin_vertex>
+        float lean = sin(uTime * 1.3 + instanceMatrix[3].x * 0.21 + instanceMatrix[3].z * 0.17) + 0.4 * sin(uTime * 3.1 + instanceMatrix[3].z * 0.5);
+        transformed.x += lean * uWind * 0.03 * sway * position.y;
+        transformed.z += lean * uWind * 0.012 * sway * position.y;`);
+};
 let palette = DEFAULT_ATMOSPHERE.palette; // the stage's colour multipliers per kind (atmosphere.js)
 
 // The stage's tint over every prop (white leaves them alone), and its colours per kind; see atmosphere.js.

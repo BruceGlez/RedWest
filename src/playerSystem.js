@@ -5,6 +5,9 @@ import { checkCollision } from './physics.js';
 import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
+import { createMuzzleFlash, createShellCasing } from './particleSystem.js';
+import { addKick } from './feedback.js';
+import { weaponKick, muzzleFlash } from './combatMath.js';
 import { enemies } from './state.js';
 import { pickTarget, leadPoint, directionTo } from './aimAssist.js';
 import { getWeapon, defaultWeapon } from './weapons.js';
@@ -98,6 +101,12 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             }
         }
         gameState.runStats.shotsFired += volleyOffsets.length * pelletsPerVolley;
+
+        // The flash at the muzzle, a casing from the ejection side, and a shove of the camera against the shot.
+        const shotDir = new THREE.Vector3(0, 0, 1).applyQuaternion(playerGroup.quaternion).setY(0).normalize();
+        createMuzzleFlash(scene, gunPos, shotDir, muzzleFlash(weaponCfg));
+        createShellCasing(scene, gunPos, new THREE.Vector3(shotDir.z, 0, -shotDir.x));
+        addKick(-shotDir.x, -shotDir.z, weaponKick(weaponCfg));
 
         playerGroup.userData.muzzle.intensity = 5;
         setTimeout(() => playerGroup.userData.muzzle.intensity = 0, 50);

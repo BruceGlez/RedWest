@@ -118,6 +118,29 @@ shell casings, a camera kick per weapon (a pistol does not shake like a shotgun)
 `dead` clip, or a short tumble, before the enemy is removed. The particle system moves to instanced sprites so
 bursts stay cheap: dust puffs, footsteps, smoke.
 
+**Done 2026-09-30: combat feel, first pass.**
+- **Hit flash.** A shot enemy flashes white for 0.09 s. A baked enemy writes white into its own colour buffer and writes the
+  colours back, so no material is cloned; an imported model flashes through its own material's glow (`src/combatFx.js`).
+- **Impacts by surface.** Bullets throw what the target is made of: stone chips from rocks, walls and tombstones, splinters
+  from crates, fences, trees and barrels, leaves from cacti, straw from haystacks, sparks off an iron front, an orange burst
+  on a hit, a cartoon puff where an enemy falls (`IMPACTS` in `src/combatMath.js`). These are silent; the old per-hit boom is gone
+  (the hit and break sounds remain), the boom stays for dynamite and the player being hit.
+- **Falls instead of vanishing.** A defeated enemy leaves `enemies` at once (so it cannot be hit, aimed at, counted or shoot;
+  kills, loot and score are unchanged) and plays a fall: the wolf and imported outlaws play their own `dead` clip (capped at
+  1.1 s), box-built enemies tip over, hop once, and pop away (0.6 s). Then their geometry is freed.
+- **Muzzle flash, casings, recoil.** One flash block and two sparks at the muzzle, a brass casing thrown out to the side, and a
+  camera shove against the shot, sized from the gun's numbers (`weaponKick`, `muzzleFlash`): a pistol barely moves the view, a
+  shotgun or buffalo gun shoves it.
+- **One draw call for every particle.** `src/particleSystem.js` is now a single `InstancedMesh` (220 slots) instead of a mesh
+  per particle, so a fight full of bursts no longer adds draw calls. Fight, 15 enemies: 43 to 49 draw calls, 36 programs (same
+  as before this work).
+- **Wind sway** for cacti and dead trees (a vertex shader change on the shared prop material, weighted by height and by where
+  each one stands, driven by the stage's wind: `src/wind.js`).
+- Tests: `tests/combatMath.test.js` (impacts, fall pose and length, kick and flash per gun). Screenshots checked for the fall,
+  the puff and the flash.
+- **Not done:** footprints and scorch decals, and a feel check on a real phone (flash length 0.09 s, kick sizes and fall
+  length are first guesses). No screen shows an enemy dying: the fall is a tumble and a puff, as the under-13 rule needs.
+
 ### 3. Post-processing with a quality switch (M)
 
 Half-resolution bloom (about 75% fewer pixels for a blur that hides the loss), a vignette and a light colour

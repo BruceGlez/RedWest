@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { toonVertexColorMaterial } from './assets.js';
 import { DEFAULT_ATMOSPHERE } from './atmosphere.js';
+import { windUniforms as uniforms } from './wind.js';
 
 // Life in the desert: dry grass tufts that sway in the wind, tumbleweeds that roll through, and motes in the air
 // (dust, ash, embers, mist or snow, chosen per stage in atmosphere.js). Three draw calls in all: one instanced
@@ -13,7 +14,6 @@ const WEED_RADIUS = 0.9;
 const WEED_RANGE = 70; // weeds and motes wrap around the player inside this distance
 const MOTES = 120;
 
-const uniforms = { uTime: { value: 0 }, uWind: { value: 0.3 } };
 let tufts = null;
 let weeds = null;
 let motes = null;
