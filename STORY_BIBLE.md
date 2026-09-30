@@ -335,12 +335,16 @@ grounds' story props, re-recorded voice lines, an acknowledgement when a beaten 
 | Flint's father, Wick | **Alive** | The Company kept him as a guide; the last ledger page lists him; Crane has known for years. |
 | The Company's boss | **A front for someone bigger** | The Compass Board, named only at the end of chapter one; the compass seal is on every page. |
 | El Espectro | **Approved** | Kept as written, with the respect rule in section 1. |
-| The Drifter | **Not decided; my default below** | See below. |
+| The Drifter | **A legend, an immortal man** | See below; the shop blurb says it, and chapter two can use it. |
 
-**The Drifter (a default to confirm).** In the shop the Drifter is the plain, colour-your-own cowboy. Proposed: the
-Drifter is **a nameless rider who works the Wanted Road beside the marshal**, a blank slate so a player can dress
-up as themselves. The story cards always tell the story in the marshal's voice, so the Drifter needs no backstory
-and no separate lines. If you prefer, the Drifter can be Flint in disguise, or a named ally: say so and this changes.
+**The Drifter (decided 2026-09-30 by the owner): a legend, an immortal man.** In the shop the Drifter is the plain,
+colour-your-own cowboy. He is the legend of the Wanted Road: a rider who has walked it in every age, and whom people
+say cannot die. He needs no backstory of his own, so any player can dress him as themselves, and the story cards still
+tell the story in the marshal's voice. Rules for using him, so the story never contradicts itself: he is never shown
+fighting or dying (the game has an under-13 mode, and immortal means the question never comes up); the Marshal's
+story stands as written (Flint is the hero of chapter one, the Drifter is a rumour on the road that Flint hears,
+never a rival for the star); and his link to the Compass Board (a friend, a former member, the thing they fear) is left
+open for chapter two. Only the shop blurb says it so far.
 
 **Still open:**
 1. **Who is on the Compass Board?** One face, or a name only? Leave it unwritten until chapter two is planned.

@@ -17,7 +17,7 @@ export const CHARACTERS = [
     { id: 'char-marshal', slot: 'character', name: 'Marshal Flint Reed', model: 'models/marshal.glb', price: 0, currency: 'dollars',
         blurb: 'Fully animated lawman.' },
     { id: 'char-drifter', slot: 'character', name: 'The Drifter', model: null, price: 0, currency: 'dollars',
-        blurb: 'The classic cowboy. Wears your shop hat, coat and pants colours.' },
+        blurb: 'A legend of the Wanted Road, some say an immortal one. Wears your shop hat, coat and pants colours.' },
     // Hired hands: bought with earned Bounty Dollars only, each with a side-grade perk (src/perks.js).
     ...[
         ['june-holloway', 'Deputy June Holloway', 1500],

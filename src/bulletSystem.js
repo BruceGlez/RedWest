@@ -4,7 +4,7 @@ import { checkCollision, getObstacleAt, getNearbyEnemies, markObstacleGridDirty,
 import { createExplosion } from './particleSystem.js';
 import { spawnLoot } from './lootSystem.js';
 import { playSound } from './audio.js';
-import { createCrate, createCactus, createDeadTree, createFence, createRock } from './scenery.js';
+import { createCrate, createCactus, createDeadTree, createFence, createRock, createBarrel, createTombstone, createHaystack, createSpire, createWall } from './scenery.js';
 import { disposeBaked } from './meshMerge.js';
 
 const PLAYER_BULLET_COLOR = new THREE.Color(0xffff00);
@@ -15,7 +15,7 @@ export function setPlayerBulletColor(hex) {
 }
 const ENEMY_BULLET_COLOR = new THREE.Color(0xff3b1f);
 const WHITE = new THREE.Color(0xffffff);
-const RESPAWN_RADIUS = { crate: 2.6, cactus: 1.5, tree: 1.0, fence: 1.5, rock: 1.2 };
+const RESPAWN_RADIUS = { crate: 2.6, cactus: 1.5, tree: 1.0, fence: 1.5, rock: 1.2, barrel: 1.2, tombstone: 1.0, haystack: 2.2, spire: 2.4, wall: 2.0 };
 const bulletPool = [];
 const respawnTimeouts = new Set();
 
@@ -146,6 +146,11 @@ function respawnObstacle(scene, type, playerGroup) {
         else if(type === 'fence') createFence(scene, x, z, Math.random() * Math.PI);
         // Rocks don't usually destruct in your code, but added for safety
         else if(type === 'rock') createRock(scene, x, z);
+        else if(type === 'barrel') createBarrel(scene, x, z);
+        else if(type === 'tombstone') createTombstone(scene, x, z);
+        else if(type === 'haystack') createHaystack(scene, x, z);
+        else if(type === 'spire') createSpire(scene, x, z);
+        else if(type === 'wall') createWall(scene, x, z);
         respawnTimeouts.delete(timeoutId);
     }, 10000);
     respawnTimeouts.add(timeoutId);
