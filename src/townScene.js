@@ -401,7 +401,7 @@ export function createTownScene() {
         scene.add(group);
         group.updateMatrixWorld(true);
         const box3 = new THREE.Box3().setFromObject(group);
-        buildings.set(spot.id, { group, key: builtKey(spot.id, level), level, top: new THREE.Vector3((box3.min.x + box3.max.x) / 2, box3.max.y + 1.2, (box3.min.z + box3.max.z) / 2) });
+        buildings.set(spot.id, { group, key: builtKey(spot.id, level), level, box: box3, top: new THREE.Vector3((box3.min.x + box3.max.x) / 2, box3.max.y + 1.2, (box3.min.z + box3.max.z) / 2) });
         const smoke = smokeSources.findIndex(s => s.id === spot.id);
         if(smoke >= 0) smokeSources.splice(smoke, 1);
         if(group.userData.smoke) smokeSources.push({ id: spot.id, at: group.localToWorld(group.userData.smoke.clone()) });
@@ -463,6 +463,15 @@ export function createTownScene() {
     for(const x of [-34, -12, 10]) scenery.add(box(0.3, 9, 0.3, C.timberDark, x, 4.5, -24), box(2.4, 0.2, 0.2, C.timberDark, x, 8.4, -24));
 
     scene.add(mergeByMaterial(scenery));
+    // What the walkable town (src/townWalk.js) cannot walk through, besides the buildings: the scenery above,
+    // as boxes on the ground plane.
+    const at = (x, z, hx, hz) => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+    const walkBoxes = [
+        at(-32, -14, 4.2, 3.2), at(-31, 6, 2.8, 2.8), at(26, -32, 6.2, 4.2), at(-26, -4, 2.4, 1.7),
+        ...[[-5, 9], [-4.2, 9.6], [18, 9], [-21, -9]].map(([x, z]) => at(x, z, 0.7, 0.7)),
+        ...[[17, 10], [17.8, 11], [-23, 10]].map(([x, z]) => at(x, z, 0.75, 0.75)),
+        ...[[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]].map(([x, z]) => at(x, z, 0.3, 0.3))
+    ];
     // Two real lamp lights on the main street (each light costs every lit pixel on a phone); the other lamps glow.
     for(const [x, z] of [[-8, 1.5], [8, -9]]) {
         const light = new THREE.PointLight(0xffa040, 75, 26, 1.6);
@@ -511,6 +520,7 @@ export function createTownScene() {
         walkers.push(person);
     });
 
+    let viewSize = [window.innerWidth, window.innerHeight];
     function placeCamera() {
         const angle = { yaw: 0.52, pitch: view.pitch };
         // Fog starts just beyond the town, wherever the camera stands.
@@ -591,6 +601,7 @@ export function createTownScene() {
             scene.add(guests);
         },
         resize(width, height) {
+            viewSize = [width, height];
             camera.aspect = width / height;
             // Upright screens see the whole town by standing further back with a wider view.
             const upright = width < height;
@@ -611,6 +622,38 @@ export function createTownScene() {
             placeCamera();
         },
         get distance() { return view.distance; },
+        // Walkable town: plain data for src/townWalkLogic.js. Boxes are on the ground plane; each building's door
+        // is on its front (+z) side, centred.
+        walkMap() {
+            const boxes = [...walkBoxes];
+            const doors = [];
+            for(const spot of TOWN_LAYOUT) {
+                const b = buildings.get(spot.id)?.box;
+                if(!b) continue;
+                if(spot.id === 'depot') {
+                    // Only the station house blocks the way; the railway yard in front of it is open ground.
+                    boxes.push(at(spot.x, spot.z, 3.2, 2.7));
+                    doors.push({ id: spot.id, label: spot.label, x: spot.x - 2, z: spot.z + 6.4 });
+                    continue;
+                }
+                boxes.push({ minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z });
+                doors.push({ id: spot.id, label: spot.label, x: (b.min.x + b.max.x) / 2, z: b.max.z + 1.3 });
+            }
+            return { bounds: { minX: -38, maxX: 40, minZ: -21, maxZ: 19 }, boxes, doors };
+        },
+        // Third-person view that follows a point (the walking marshal); overview() goes back to the whole town.
+        follow(x, z) {
+            const upright = viewSize[0] < viewSize[1];
+            // High enough to see over the roofs in front, so a building never hides the marshal.
+            view.pitch = upright ? 1.1 : 0.98;
+            view.distance = upright ? 46 : 34;
+            view.target.set(x, 1.2, z);
+            placeCamera();
+        },
+        overview() {
+            view.target.set(3, 0, -12);
+            this.resize(...viewSize);
+        },
         // Building id under a screen point (normalized device coordinates), or null.
         pick(ndcX, ndcY) {
             raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);

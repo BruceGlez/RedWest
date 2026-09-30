@@ -6,6 +6,9 @@ import { BUILDINGS, buildingEffects, jailedOutlaws, jailRate, jailCapacity, jail
 import { track } from './analytics.js';
 import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, disableReminders, updateJailReminder } from './reminders.js';
 import { createTownScene, TOWN_LAYOUT } from './townScene.js';
+import { createTownLook } from './townLook.js';
+import { createTownWalk } from './townWalk.js';
+import { featureOn, rememberFeature } from './townFeatures.js';
 import { normalizePass, seasonEndsAt, themeFor, tierFor, tierReward, TIERS, POINTS_PER_TIER, POINTS } from './pass.js';
 import { getShopItem } from './cosmetics.js';
 import { purchaseSupport } from './purchases.js';
@@ -22,6 +25,9 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
         sheet: $('town-sheet'),
         sheetClose: $('town-sheet-close'),
         touch: $('town-touch'),
+        walkButton: $('town-walk-btn'),
+        lookButton: $('town-look-btn'),
+        hint: $('town-hint'),
         labels: $('town-labels'),
         dollars: $('town-dollars'),
         message: $('town-message'),
@@ -32,6 +38,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
     };
     let profile = null;
     let town3d = null; // built the first time the town opens
+    let look = null; // the art direction pass (src/townLook.js), an independent switch
+    let walk = null; // the walkable town (src/townWalk.js), an independent switch
     let openId = null; // the building whose card is showing
     let headerBottom = 0; // measured once the town is on screen (reset on resize)
     let confirmUpgrade = null; // building id armed for a second tap
@@ -321,10 +329,39 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
         confirmUpgrade = null;
         openId = null;
         say('');
-        if(!town3d) town3d = createTownScene();
+        if(!town3d) {
+            town3d = createTownScene();
+            walk = createTownWalk({ town3d, host: els.screen, onOpen: openBuilding, blocked: () => !!openId });
+            // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
+            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d };
+        }
         town3d.resize(window.innerWidth, window.innerHeight);
+        look?.resize(window.innerWidth, window.innerHeight);
+        if(featureOn('walk')) walk.enter();
+        syncTools();
         ui.showTown();
         render();
+    });
+    // WALK and LOOK are separate switches: either can be on without the other.
+    function syncTools() {
+        const walking = !!walk?.active;
+        els.walkButton.setAttribute('aria-pressed', String(walking));
+        els.lookButton.setAttribute('aria-pressed', String(!!look?.enabled));
+        els.hint.textContent = walking
+            ? ('ontouchstart' in window ? 'Stick to walk. Tap a door to go in.' : 'WASD to walk. E at a door to go in.')
+            : 'Drag to look around. Tap a building.';
+    }
+    els.walkButton.addEventListener('click', () => {
+        if(!walk) return;
+        if(walk.active) walk.exit(); else walk.enter();
+        rememberFeature('walk', walk.active);
+        syncTools();
+    });
+    els.lookButton.addEventListener('click', () => {
+        if(!look) return;
+        look.setEnabled(!look.enabled);
+        rememberFeature('look', look.enabled);
+        syncTools();
     });
     els.labels.addEventListener('click', event => {
         const label = event.target.closest('[data-open-building]');
@@ -337,6 +374,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
     window.addEventListener('resize', () => {
         headerBottom = 0;
         town3d?.resize(window.innerWidth, window.innerHeight);
+        look?.resize(window.innerWidth, window.innerHeight);
     });
 
     // ---------- Looking around: drag to pan, pinch or scroll to zoom, tap a building ----------
@@ -355,7 +393,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
     });
     els.touch.addEventListener('pointermove', event => {
         const last = pointers.get(event.pointerId);
-        if(!last || !town3d) return;
+        if(!last || !town3d || walk?.active) return;
         const dx = event.clientX - last.x;
         const dy = event.clientY - last.y;
         last.x = event.clientX;
@@ -388,7 +426,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
     els.touch.addEventListener('pointercancel', release);
     els.touch.addEventListener('wheel', event => {
         event.preventDefault();
-        town3d?.zoom(event.deltaY > 0 ? 1.1 : 0.9);
+        if(!walk?.active) town3d?.zoom(event.deltaY > 0 ? 1.1 : 0.9);
     }, { passive: false });
     // Keep the jail's numbers and the badge ticking while the game is open.
     setInterval(render, 30000);
@@ -438,8 +476,14 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
             return open;
         },
         frame(renderer, dt) {
+            if(!look) { // needs the renderer, which only the loop hands over
+                look = createTownLook(renderer, town3d.scene, town3d.camera, { enabled: featureOn('look') });
+                look.resize(window.innerWidth, window.innerHeight);
+                syncTools();
+            }
             town3d.update(dt);
-            renderer.render(town3d.scene, town3d.camera);
+            walk?.update(dt);
+            look.render(dt);
             const w = window.innerWidth;
             const h = window.innerHeight;
             // Signs never slide under the header, where they could not be tapped.

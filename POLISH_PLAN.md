@@ -186,6 +186,12 @@ Half-resolution bloom (about 75% fewer pixels for a blur that hides the loss), a
 grade, in one pass if possible. Fall back automatically on a slow device (watch the smoothed frame rate that
 `src/gameLoop.js` already keeps). Keep the pixel-ratio cap.
 
+**Started for Frontier Town only (2026-09-30):** `src/townLook.js` already does bloom, a colour grade, a vignette, a dusk
+sky and painted shading on the town screen, behind its own LOOK switch (see README, "Walking the town, and the town's
+look"). What is left: the quality switch and automatic fall-back on slow devices, half-resolution bloom (it is full
+resolution now), and the same pass for the desert and the arena. The draw-call guard in `tests/mobile-smoke.mjs` counts
+the whole frame, post passes included.
+
 ### 4. Audio pass (M)
 
 Ambient beds (wind, insects, a distant howl), footsteps, three or four variants per gunshot with a random pitch,
@@ -201,6 +207,23 @@ accessibility options (text size, reduced motion, colour-blind aim line).
 
 A one-page style guide (palette, outline width, proportions), then re-generate or retouch the characters and props
 that do not match. The snake and the horse with rider still need rigging (`tools/blender/README.md`).
+
+**Parked on purpose (2026-09-30): the Township-style art for Frontier Town.** The owner chose to leave art for now
+and judge the walkable town first. The plan, in order, when it comes back:
+
+1. Write the one-page style guide above first (chunky toy-like proportions, a fixed palette of about a dozen colours,
+   warm dust and haze), so every new piece matches.
+2. Replace the town's boxes with modelled buildings (saloon, bank, jail, sheriff, gunsmith, depot first), low-poly,
+   baked ambient occlusion, hand-painted textures; exported as GLB through the Blender pipeline the wolf used
+   (`tools/blender/`, `tools/optimize-model.mjs`). Kits and generated models need a licence check and a row in
+   `ASSETS.md` the same day.
+3. Hand-painted tileable textures (wood, brick, sandstone, shingles, dirt) in place of the procedural grain in
+   `src/townLook.js`; toon or stylised materials; chunky, glossy UI and icon set with bounce and coin-pop feedback.
+4. Restyle the characters and townsfolk to the same guide, so models and town belong together.
+5. Budget: keep the town near 90 draw calls and check on a real phone before and after.
+
+The walkable town (`src/townWalk.js`) does not depend on any of this: new buildings only need to keep
+`walkMap()` (their footprint and a door) correct.
 
 ### 7. Tech health (as needed)
 
