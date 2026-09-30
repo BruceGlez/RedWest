@@ -31,3 +31,5 @@
 - [ ] Play test complete (3 full runs)
 - [ ] Known issues list captured
 - [ ] Build marked candidate for release
+
+- [ ] Listening check on a real phone, with headphones and the speaker: gunshots, the stage beds (wind, crickets, hum, water) and footsteps are quiet enough under a fight, and nothing clips.

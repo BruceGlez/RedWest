@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { STORY, CHAPTER_ONE_END, CARD_MAX, PAGE_MAX, CARD_STARS, storyFor, unlockedCards, hasPage, pagesHeld, caseComplete } from '../src/story.js';
+import { STORY, OPENING, ENDING, CHAPTER_ONE_END, CARD_MAX, PAGE_MAX, CARD_STARS, storyFor, unlockedCards, hasPage, pagesHeld, caseComplete } from '../src/story.js';
 import { OUTLAWS } from '../src/outlaws.js';
 import { createProgress, STAR_DEFEATED, STAR_HOT_BOUNTY, STAR_ESCAPED } from '../src/progress.js';
 
@@ -55,4 +55,15 @@ test('the case file completes only when all pages are held', () => {
 
 test('a future outlaw without a story falls back to nothing', () => {
     assert.equal(storyFor('a-future-outlaw'), null);
+});
+
+test('the opening and the ending are short panels, fit for every age', () => {
+    const banned = /\b(kill|kills|killed|die|dies|died|dead|death|blood|corpse|murder)\b/i;
+    assert.equal(OPENING.length, 4);
+    assert.equal(ENDING.length, 3);
+    for(const panel of [...OPENING, ...ENDING]) {
+        assert.ok(panel.title.length <= 32 && panel.text.length > 40 && panel.text.length <= CARD_MAX, `"${panel.title}": ${panel.text.length} characters`);
+        assert.ok(!banned.test(panel.text), `"${panel.title}": nothing graphic`);
+    }
+    assert.match(OPENING[0].text, /grow old/, 'the Drifter is a rumour on the road');
 });

@@ -31,7 +31,7 @@ try {
     {
         const { page, errors, context } = await open([7, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
         assert.equal((await page.locator('#case-count').textContent()).trim(), '1 / 10 PAGES');
-        assert.equal(await page.locator('#book-case .ledger-page:not(.locked)').count(), 1);
+        assert.equal(await page.locator('#book-case .ledger-page:not(.locked):not(.case-end)').count(), 1);
         assert.equal(await page.locator('#book-case .case-end.locked').count(), 1, 'the chapter ending waits for all ten pages');
         await page.locator('[data-story="0"]').first().click();
         await page.locator('#story-content h3', { hasText: 'The Tin Cup' }).waitFor();
@@ -46,11 +46,31 @@ try {
         assert.deepEqual(errors, []);
         await context.close();
     }
+    // The opening reads in four panels and is remembered, so the Bounty Book stops calling it new.
+    {
+        const { page, errors, context } = await open([7, 1, 0, 0, 0, 0, 0, 0, 0, 0]);
+        await page.locator('#book-case [data-seq="opening"]').getByText('NEW').waitFor();
+        await page.locator('#book-case [data-seq="opening"]').click();
+        await page.locator('#story-content h3', { hasText: 'Red West' }).waitFor();
+        for(const title of ['Cinder Creek', 'The Star', 'Lantern Rock']) {
+            await page.locator('[data-seq-nav]').last().click();
+            await page.locator('#story-content h3', { hasText: title }).waitFor();
+        }
+        await page.locator('[data-close]').getByText('DONE').click();
+        await page.locator('#story-modal').waitFor({ state: 'hidden' });
+        assert.equal(await page.evaluate(() => localStorage.getItem('redWestIntroSeen.v1')), '1');
+        assert.equal(await page.locator('#book-case [data-seq="ending"]').count(), 0, 'the ending waits for all ten pages');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
     // All ten pages: the ending opens.
     {
         const { page, errors, context } = await open(Array(10).fill(7));
         assert.equal((await page.locator('#case-count').textContent()).trim(), '10 / 10 PAGES');
         await page.locator('#book-case .case-end').getByText('The Ledger, Complete').waitFor();
+        await page.locator('#book-case [data-seq="ending"]').click();
+        await page.locator('#story-content h3', { hasText: 'The Court' }).waitFor();
+        await page.locator('[data-close]').click();
         assert.deepEqual(errors, []);
         await context.close();
     }
