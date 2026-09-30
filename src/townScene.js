@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { mergeByMaterial } from './meshMerge.js';
+import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
 
 // Frontier Town as a small 3D diorama at dusk (look "A" in art/town/dusk-gang-town.jpg): gaslit brick and
 // timber, chimney smoke, fog, a steam train at the depot, townsfolk in flat caps and long coats.
@@ -462,7 +463,67 @@ export function createTownScene() {
     scenery.add(wagon);
     for(const x of [-34, -12, 10]) scenery.add(box(0.3, 9, 0.3, C.timberDark, x, 4.5, -24), box(2.4, 0.2, 0.2, C.timberDark, x, 8.4, -24));
 
+    // Places you walk up to and use (src/townSpots.js): the bounty board, the jail's cash box, the train out.
+    // The wood and iron are scenery; the coins and the notes change, so they are separate small groups.
+    const boardAt = getSpot('board').object;
+    const boardProp = new THREE.Group();
+    boardProp.add(box(0.25, 3.2, 0.25, C.timberDark, -1.35, 1.6, 0), box(0.25, 3.2, 0.25, C.timberDark, 1.35, 1.6, 0),
+        box(3.0, 1.9, 0.18, C.timber, 0, 2.35, 0), box(3.4, 0.22, 0.34, C.timberDark, 0, 3.4, 0));
+    const boardSign = sign('BOUNTIES', 3);
+    boardSign.position.set(0, 4.05, 0.05);
+    boardProp.add(boardSign);
+    boardProp.position.set(boardAt.x, 0, boardAt.z);
+    scenery.add(boardProp);
+    const cashAt = getSpot('cashbox').object;
+    const cashProp = new THREE.Group();
+    cashProp.add(box(2.4, 1.2, 1.6, C.iron, 0, 0.6, 0), box(2.46, 0.18, 1.66, C.brass, 0, 0.8, 0), box(2.4, 0.28, 1.6, C.stoneDark, 0, 1.34, 0),
+        box(0.4, 0.4, 0.12, C.brass, 0, 0.8, 0.84));
+    const cashSign = sign('CASH', 1.8);
+    cashSign.position.set(0, 0.42, 0.83);
+    cashProp.add(cashSign);
+    cashProp.position.set(cashAt.x, 0, cashAt.z);
+    scenery.add(cashProp);
+    const trainSign = sign('RIDE OUT', 3.6);
+    trainSign.position.set(34.5, 4, -3.3);
+    scenery.add(box(0.25, 3.6, 0.25, C.timberDark, 34.5, 1.8, -3.4), trainSign);
     scene.add(mergeByMaterial(scenery));
+    // Notes on the board: one for each job left today. Coins in the cash box: what the jail has earned.
+    const notes = new THREE.Group();
+    notes.position.set(boardAt.x, 0, boardAt.z);
+    for(let i = 0; i < BOARD_NOTES; i++) {
+        const note = new THREE.Group();
+        note.add(box(0.75, 1.0, 0.05, 0xe8d9b0, 0, 0, 0), box(0.55, 0.14, 0.06, 0x7a2a1f, 0, 0.3, 0), box(0.55, 0.08, 0.06, 0x3b2a20, 0, 0.02, 0), box(0.45, 0.08, 0.06, 0x3b2a20, 0, -0.18, 0));
+        note.position.set(-0.95 + i * 0.95, 2.35, 0.13);
+        note.rotation.z = (i - 1) * 0.06;
+        notes.add(note);
+    }
+    scene.add(notes);
+    const coins = new THREE.Group();
+    coins.position.set(cashAt.x, 1.5, cashAt.z);
+    scene.add(coins);
+    const coinGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.1, 12);
+    let coinKey = '';
+    function setJailCash(stored, capacity) {
+        const count = coinCount(stored, capacity);
+        const full = cashBoxFull(stored, capacity);
+        const key = `${count}|${full}`;
+        if(key === coinKey) return;
+        coinKey = key;
+        coins.clear();
+        for(let i = 0; i < count; i++) {
+            const coin = new THREE.Mesh(coinGeometry, mat(0xd9a520, full ? 0.9 : 0.25));
+            coin.position.set(-0.75 + (i % 4) * 0.5, 0.05 + (i > 3 ? 0.1 : 0), (i % 2 ? 0.25 : -0.25));
+            coins.add(coin);
+        }
+        // A full box shows a lamp on top, and its gold glows (bloom picks it up with LOOK on).
+        if(full) coins.add(box(0.36, 0.36, 0.36, C.glow, 0, 0.45, 0, 1.6));
+    }
+    function setBoardNotes(jobsLeft) {
+        const shown = boardNotes(jobsLeft);
+        notes.children.forEach((note, i) => { note.visible = i < shown; });
+    }
+    setJailCash(0, 1);
+    setBoardNotes(BOARD_NOTES);
     // What the walkable town (src/townWalk.js) cannot walk through, besides the buildings: the scenery above,
     // as boxes on the ground plane.
     const at = (x, z, hx, hz) => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
@@ -470,7 +531,11 @@ export function createTownScene() {
         at(-32, -14, 4.2, 3.2), at(-31, 6, 2.8, 2.8), at(26, -32, 6.2, 4.2), at(-26, -4, 2.4, 1.7),
         ...[[-5, 9], [-4.2, 9.6], [18, 9], [-21, -9]].map(([x, z]) => at(x, z, 0.7, 0.7)),
         ...[[17, 10], [17.8, 11], [-23, 10]].map(([x, z]) => at(x, z, 0.75, 0.75)),
-        ...[[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]].map(([x, z]) => at(x, z, 0.3, 0.3))
+        ...[[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]].map(([x, z]) => at(x, z, 0.3, 0.3)),
+        // The locomotive on the depot's rails (the depot builder puts it at (-5, 8.7) from the station), the sign post
+        // beside it, and the props of src/townSpots.js.
+        { minX: 25.4, maxX: 32.7, minZ: -7.8, maxZ: -4.8 }, at(34.5, -3.4, 0.3, 0.3),
+        ...SPOTS.filter(spot => spot.object).map(({ object: o }) => at(o.x, o.z, o.hx, o.hz))
     ];
     // Two real lamp lights on the main street (each light costs every lit pixel on a phone); the other lamps glow.
     for(const [x, z] of [[-8, 1.5], [8, -9]]) {
@@ -633,12 +698,13 @@ export function createTownScene() {
                 if(spot.id === 'depot') {
                     // Only the station house blocks the way; the railway yard in front of it is open ground.
                     boxes.push(at(spot.x, spot.z, 3.2, 2.7));
-                    doors.push({ id: spot.id, label: spot.label, x: spot.x - 2, z: spot.z + 6.4 });
+                    doors.push({ id: spot.id, label: spot.label, verb: 'ENTER', x: spot.x - 2, z: spot.z + 6.4 });
                     continue;
                 }
                 boxes.push({ minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z });
-                doors.push({ id: spot.id, label: spot.label, x: (b.min.x + b.max.x) / 2, z: b.max.z + 1.3 });
+                doors.push({ id: spot.id, label: spot.label, verb: 'ENTER', x: (b.min.x + b.max.x) / 2, z: b.max.z + 1.3 });
             }
+            for(const spot of SPOTS) doors.push({ id: spot.id, label: spot.id.toUpperCase(), verb: spot.verb, x: spot.stand[0], z: spot.stand[1] });
             return { bounds: { minX: -38, maxX: 40, minZ: -21, maxZ: 19 }, boxes, doors };
         },
         // Third-person view that follows a point (the walking marshal); overview() goes back to the whole town.
@@ -659,6 +725,9 @@ export function createTownScene() {
             raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
             return raycaster.intersectObjects(hitMeshes, false)[0]?.object.userData.building ?? null;
         },
+        // What the jail has earned (the coins in the cash box) and the jobs left today (notes on the board).
+        setJailCash,
+        setBoardNotes,
         // Screen positions (0..1) above each building, for the name labels.
         labelPositions() {
             const out = {};

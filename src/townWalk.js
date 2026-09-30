@@ -12,6 +12,7 @@ import { moveInTown, stepFromInput, nearestDoor, turnToward, PLAYER_RADIUS } fro
 //   host     the town screen element (the stick and the door prompt are added to it)
 //   onOpen   (buildingId) => void: a door was used
 //   blocked  () => boolean: true while a card or dialog is open, so the marshal stands still
+//   describe (door) => string: the prompt's wording for a door or spot (the train names the next outlaw, the cash box the money)
 
 const YAW = 0.52; // the town camera's heading (src/townScene.js)
 const HEIGHT = 3.4; // the marshal's height in town units (townsfolk are about 3.2)
@@ -33,7 +34,7 @@ function placeholderFigure() {
     return g;
 }
 
-export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) {
+export function createTownWalk({ town3d, host, onOpen, blocked = () => false, describe = door => door.label }) {
     const avatar = new THREE.Group();
     const figure = placeholderFigure();
     avatar.add(figure);
@@ -122,16 +123,20 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) 
     }
 
     function showPrompt(next) {
-        if(next?.id === door?.id) return;
         door = next;
         promptEl.style.display = door ? '' : 'none';
-        if(door) promptEl.textContent = `${door.label}  ·  ${'ontouchstart' in window ? 'TAP' : 'E'} TO ENTER`;
+        if(!door) return;
+        // Worded every frame: the money in the cash box and the outlaw on the train change while you stand there.
+        const text = `${describe(door)}  ·  ${'ontouchstart' in window ? 'TAP' : 'E'} TO ${door.verb || 'ENTER'}`;
+        if(promptEl.textContent !== text) promptEl.textContent = text;
     }
 
     return {
         get active() { return active; },
         // Start walking: the marshal stands on main street and the camera drops in behind.
         enter() {
+            held.clear(); // a key let go while the town was closed must not keep walking
+            stick.x = stick.y = 0;
             if(active) return;
             active = true;
             map = town3d.walkMap();

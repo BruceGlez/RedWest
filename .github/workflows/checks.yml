@@ -38,6 +38,9 @@ jobs:
       - run: npm run test:event
         env:
           CHROME_PATH: /usr/bin/google-chrome
+      - run: npm run test:town
+        env:
+          CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:demo
         env:
           CHROME_PATH: /usr/bin/google-chrome

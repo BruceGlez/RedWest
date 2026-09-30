@@ -8,6 +8,8 @@ import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, 
 import { createTownScene, TOWN_LAYOUT } from './townScene.js';
 import { createTownLook } from './townLook.js';
 import { createTownWalk } from './townWalk.js';
+import { spotLabel, getSpot, jobsLeft } from './townSpots.js';
+import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { featureOn, rememberFeature } from './townFeatures.js';
 import { normalizePass, seasonEndsAt, themeFor, tierFor, tierReward, TIERS, POINTS_PER_TIER, POINTS } from './pass.js';
 import { getShopItem } from './cosmetics.js';
@@ -15,7 +17,7 @@ import { purchaseSupport } from './purchases.js';
 
 // The Frontier Town screen (src/town.js has the rules): a 3D town at dusk (src/townScene.js) with a label over
 // each building; tapping a building or its label opens its card in a sheet. Also the TOWN button's badge.
-export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, isChild = () => false, getProgress = () => null }) {
+export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onBuyPass, isChild = () => false, getProgress = () => null }) {
     const $ = id => document.getElementById(id);
     const els = {
         button: $('town-btn'),
@@ -195,7 +197,28 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
             + '</div>';
     }
 
+    // The bounty board in the square: the day's three jobs and how far along each is.
+    function boardCard() {
+        const list = profile.jobs?.list ?? [];
+        const rows = list.map(entry => {
+            const job = getJob(entry.id);
+            if(!job) return '';
+            const pct = Math.min(100, Math.round((entry.progress / job.goal) * 100));
+            return `<div class="job-card${entry.done ? ' done' : ''}"><div class="job-text">${job.text}</div>`
+                + `<div class="job-bar"><div class="job-fill" style="width:${pct}%"></div></div>`
+                + `<div class="job-meta"><span>${Math.min(entry.progress, job.goal)} / ${job.goal}</span><span class="job-reward">${entry.done ? 'PAID' : `+$${job.reward}`}</span></div></div>`;
+        }).join('');
+        const bonus = profile.jobs?.bonusPaid
+            ? `All jobs done today: <b>+&#9670;${ALL_JOBS_BONUS_NUGGETS} paid</b>.`
+            : `Finish all three for <b>&#9670;${ALL_JOBS_BONUS_NUGGETS} Gold Nuggets</b>.`;
+        return `<div class="town-card" data-building="board"><div class="town-sign"><span>BOUNTY BOARD</span></div>`
+            + `<p class="town-blurb">Today's jobs, pinned by the Sheriff. They reset at midnight.</p>${rows}`
+            + `<p class="town-stat">${bonus}</p>`
+            + `<div class="town-actions"><button type="button" class="shop-action" data-jobs>DAILY JOBS</button></div></div>`;
+    }
+
     function sheetHtml(id) {
+        if(id === 'board') return boardCard();
         if(id === 'depot') return eventCard();
         if(id === 'saloon') return passCard();
         const building = BUILDINGS.find(b => b.id === id);
@@ -254,6 +277,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
             gunsmith: profile.owned.filter(id => id.startsWith('gun-')).length,
             tailor: profile.owned.filter(id => /^(hat|coat|pants|bullets)-/.test(id)).length
         });
+        town3d?.setJailCash(jailStored(profile), jailCapacity(profile));
+        town3d?.setBoardNotes(jobsLeft(profile));
         const progress = getProgress();
         if(progress) town3d?.setGuests(OUTLAWS.filter((outlaw, i) => (progress.stars[i] & 1) !== 0).map(outlaw => outlaw.id));
         els.sheet.style.display = openId ? '' : 'none';
@@ -273,19 +298,48 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
         }
     }
 
+    function collectJail() {
+        return act(async () => {
+            const result = await wallet.collectJail();
+            onProfile(result.profile);
+            track('town_collect');
+            say(result.collected ? `Collected ${money(result.collected)} in bounties.` : 'Nothing to collect yet.');
+            // The first collect is the moment to offer reminders (never at launch).
+            if(result.collected && remindersSupported() && !remindersAsked()) els.reminder.style.display = 'flex';
+        });
+    }
+
+    // Walking up to a door or a place (src/townWalk.js). The places of src/townSpots.js are not buildings:
+    // the train starts the next hunt, the cash box pays the jail's money at once, the board shows the day's jobs.
+    function useSpot(id) {
+        if(id === 'train') {
+            track('train_ride');
+            onBoardTrain();
+        } else if(id === 'cashbox') {
+            track('town_collect_box');
+            openBuilding('jail'); // the result shows on the jail's card
+            collectJail();
+        } else {
+            openBuilding(id); // a building's door, or the board
+        }
+    }
+    const describeSpot = door => {
+        if(!getSpot(door.id)) return door.label;
+        const selected = getProgress()?.selected ?? 0;
+        return spotLabel(door.id, {
+            outlawName: OUTLAWS[selected]?.name,
+            stored: profile ? jailStored(profile) : 0,
+            capacity: profile ? jailCapacity(profile) : 0,
+            jobsLeft: jobsLeft(profile)
+        });
+    };
+
     els.grid.addEventListener('click', event => {
         const button = event.target.closest('button');
         if(!button || button.disabled) return;
         if(button.hasAttribute('data-collect')) {
             confirmUpgrade = null;
-            act(async () => {
-                const result = await wallet.collectJail();
-                onProfile(result.profile);
-                track('town_collect');
-                say(result.collected ? `Collected ${money(result.collected)} in bounties.` : 'Nothing to collect yet.');
-                // The first collect is the moment to offer reminders (never at launch).
-                if(result.collected && remindersSupported() && !remindersAsked()) els.reminder.style.display = 'flex';
-            });
+            collectJail();
         } else if(button.dataset.upgrade) {
             const id = button.dataset.upgrade;
             if(confirmUpgrade !== id) {
@@ -331,7 +385,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBuyPass, i
         say('');
         if(!town3d) {
             town3d = createTownScene();
-            walk = createTownWalk({ town3d, host: els.screen, onOpen: openBuilding, blocked: () => !!openId });
+            walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot });
             // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
             if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d };
         }

@@ -120,6 +120,11 @@ const town = createTownPanel({
     onBuyPass: () => buyRealMoneyProduct('season_pass'),
     isChild: () => isChild(privacyPanel.privacy),
     // Most Wanted: fight this week's event outlaw (its model first), then back to the home screen.
+    // The train at the depot: the same hunt as PLAY, for the outlaw the Wanted Road has selected.
+    onBoardTrain: () => {
+        ui.hidePanels();
+        loadOutlawModel(progress.selected).then(() => { keys.startRequested = true; });
+    },
     onRideOut: event => {
         ui.hidePanels();
         gameState.pendingEvent = event;
