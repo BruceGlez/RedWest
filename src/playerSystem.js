@@ -7,6 +7,8 @@ import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
 import { createMuzzleFlash, createShellCasing } from './particleSystem.js';
 import { addKick } from './feedback.js';
+import { addFootprint } from './decals.js';
+import { createStepper, advanceStepper } from './steps.js';
 import { weaponKick, muzzleFlash } from './combatMath.js';
 import { enemies } from './state.js';
 import { pickTarget, leadPoint, directionTo } from './aimAssist.js';
@@ -51,6 +53,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
 
     // Where the shot is aimed on the ground (set every frame from the aim), and how fast each enemy is moving,
     // so shots go from the gun to the aim point and lead a moving target.
+    const stepper = createStepper();
     let aimPoint = null;
     function trackEnemyVelocity(dt) {
         if(dt <= 0) return;
@@ -224,6 +227,11 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             if(!checkCollision(playerGroup.position.x, nextZ, 1.5)) playerGroup.position.z = nextZ;
         }
         const movedDistance = playerGroup.position.distanceTo(beforePos);
+        // Footprints: every stride a foot lands, a little behind the walker along the line of travel.
+        for(const step of advanceStepper(stepper, movedDistance)) {
+            const heading = Math.atan2(playerGroup.position.x - beforePos.x, playerGroup.position.z - beforePos.z);
+            addFootprint(scene, playerGroup.position.x, playerGroup.position.z, heading, step.left);
+        }
         if(move.length() > 0 && movedDistance < 0.001) {
             playerGroup.userData.blockedFrames++;
             if(playerGroup.userData.blockedFrames > 8) {

@@ -4,6 +4,7 @@ import { createGroundTexture, createSkyTexture } from './textures.js';
 import { atmosphereFor, DEFAULT_ATMOSPHERE, FENCE_GROUP } from './atmosphere.js';
 import { setSceneryTint } from './scenery.js';
 import { setupAmbience, setAmbienceLook } from './ambience.js';
+import { setDecalColor } from './decals.js';
 
 let sunLight = null;
 let hemiLight = null;
@@ -72,6 +73,7 @@ export function setAtmosphere(scene, outlawId) {
     groundMaterial.needsUpdate = true;
     setSceneryTint(look.props, look.palette);
     setAmbienceLook(look);
+    setDecalColor(new THREE.Color(look.terrain.base).multiplyScalar(0.45).getHex());
     // A new home ground gets its own map of props. This only happens on the start screen, never mid-run.
     currentKit = look.kit;
     clearScenery(scene);

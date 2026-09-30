@@ -8,6 +8,7 @@ import { spawnEnemy, updateEnemies, updateHazards, clearHazards } from './enemyS
 import { updateLoots } from './lootSystem.js';
 import { updateBullets, clearBullets, clearPendingRespawns, getBulletPoolStats } from './bulletSystem.js';
 import { updateParticles, clearParticles, getParticlePoolStats } from './particleSystem.js';
+import { updateDecals, clearDecals } from './decals.js';
 import { markObstacleGridDirty, getGridStats } from './physics.js';
 import { advanceHeat, heatSpawnMultiplier, recordDamage, recordKill, recordMiss } from './heat.js';
 import { buildRunRecord, appendRunRecord } from './runLog.js';
@@ -439,6 +440,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         clearPendingRespawns();
         clearHazards(scene);
         clearParticles(scene);
+        clearDecals();
         clearDynamicState();
         markObstacleGridDirty();
     }
@@ -604,6 +606,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         }
         advanceHeat(gameState.heat, dt);
         updateParticles(dt, scene);
+        updateDecals(dt);
         updateCombatFx(dt);
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();
         // Sub-step bullets on slow frames so fast shots cannot skip past a target between frames.

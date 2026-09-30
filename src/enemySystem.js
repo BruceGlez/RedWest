@@ -3,6 +3,7 @@ import { createBossMesh, createWolfMesh, createGunslingerMesh, createEnemyMesh, 
     createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh, createKniferMesh, createTrooperMesh, addAimLaser } from './assets.js';
 import { ENEMY_TYPES } from './enemyTypes.js';
 import { createExplosion } from './particleSystem.js';
+import { addScorch } from './decals.js';
 import { addShake, haptic } from './feedback.js';
 import { gameState, enemies, playerStats } from './state.js';
 import { checkCollision } from './physics.js';
@@ -238,6 +239,7 @@ export function updateHazards(dt, scene, playerGroup, callbacks) {
         if(k < 1) continue;
         createExplosion(scene, h.to, 0xff6f00);
         createExplosion(scene, h.to.clone().setY(1), 0xffd54f);
+        addScorch(scene, h.to.x, h.to.z);
         playSound('boom');
         if(h.to.distanceTo(playerGroup.position) < 25) addShake(0.3);
         const dx = playerGroup.position.x - h.to.x;
