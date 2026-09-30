@@ -67,3 +67,22 @@ export function directionTo(muzzle, point, minDistance = 1.5) {
     const length = Math.hypot(dx, dz);
     return length < minDistance ? null : { x: dx / length, z: dz / length };
 }
+
+// Where the shot really leaves the character: the muzzle's sideways/forward offset from the body, smoothed over
+// frames. The hand swings while walking, so the raw muzzle wobbles off to either side; its average doesn't, and
+// that keeps the bullet's path straight and steady. body: {x, z}; facing: unit {x, z}; offset: {side, forward}.
+export function steadyMuzzle(body, facing, offset) {
+    const rightX = -facing.z;
+    const rightZ = facing.x;
+    return {
+        x: body.x + facing.x * offset.forward + rightX * offset.side,
+        z: body.z + facing.z * offset.forward + rightZ * offset.side,
+    };
+}
+
+// The muzzle's offset from the body in the body's own frame (side = to the right of where it faces).
+export function muzzleOffset(body, facing, muzzle) {
+    const dx = muzzle.x - body.x;
+    const dz = muzzle.z - body.z;
+    return { forward: dx * facing.x + dz * facing.z, side: dx * -facing.z + dz * facing.x };
+}

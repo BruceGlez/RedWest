@@ -12,7 +12,7 @@ import { groundSurface } from './world.js';
 import { createStepper, advanceStepper } from './steps.js';
 import { weaponKick, muzzleFlash } from './combatMath.js';
 import { enemies } from './state.js';
-import { pickTarget, leadPoint, directionTo } from './aimAssist.js';
+import { pickTarget, leadPoint, directionTo, steadyMuzzle, muzzleOffset } from './aimAssist.js';
 import { getWeapon, defaultWeapon } from './weapons.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { BASE_DASH_TIME, BASE_DASH_COOLDOWN } from './perks.js';
@@ -56,6 +56,23 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     // so shots go from the gun to the aim point and lead a moving target.
     const stepper = createStepper();
     let aimPoint = null;
+    // The muzzle's average place in the body's frame. The walking hand sways, so shots leave from this steady
+    // point instead of the raw muzzle, which keeps them straight while moving.
+    let steadyOffset = null;
+    function facingOf(group) {
+        const f = new THREE.Vector3(0, 0, 1).applyQuaternion(group.quaternion);
+        const length = Math.hypot(f.x, f.z) || 1;
+        return { x: f.x / length, z: f.z / length };
+    }
+    function trackMuzzle(dt) {
+        const muzzleWorld = new THREE.Vector3();
+        playerGroup.userData.muzzle.getWorldPosition(muzzleWorld);
+        const raw = muzzleOffset(playerGroup.position, facingOf(playerGroup), muzzleWorld);
+        if(!steadyOffset || dt <= 0) { steadyOffset = raw; return; }
+        const t = 1 - Math.exp(-8 * dt);
+        steadyOffset.side += (raw.side - steadyOffset.side) * t;
+        steadyOffset.forward += (raw.forward - steadyOffset.forward) * t;
+    }
     function trackEnemyVelocity(dt) {
         if(dt <= 0) return;
         for(const e of enemies) {
@@ -87,10 +104,16 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         const gunPos = new THREE.Vector3();
         playerGroup.userData.muzzle.getWorldPosition(gunPos);
 
+        // Bullets leave from the steadied muzzle point, not the swaying hand, so the line stays straight.
+        const facing = facingOf(playerGroup);
+        if(!steadyOffset) trackMuzzle(0);
+        const steady = steadyMuzzle(playerGroup.position, facing, steadyOffset);
+        const shotOrigin = new THREE.Vector3(steady.x, gunPos.y, steady.z);
+
         for(const volleyOffset of volleyOffsets) {
             for(let i = 0; i < pelletsPerVolley; i++) {
                 const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(playerGroup.quaternion);
-                const toAim = aimPoint && directionTo(gunPos, aimPoint);
+                const toAim = aimPoint && directionTo(steady, aimPoint);
                 if(toAim) dir.set(toAim.x, 0, toAim.z);
                 let pelletOffset = 0;
                 if(pelletsPerVolley > 1) {
@@ -100,7 +123,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
                     pelletOffset = (Math.random() - 0.5) * weaponCfg.spread; // a single shot that wanders
                 }
                 dir.applyAxisAngle(new THREE.Vector3(0, 1, 0), volleyOffset + pelletOffset);
-                spawnBullet(scene, 'player', gunPos, dir.multiplyScalar(weaponCfg.speed), volley,
+                spawnBullet(scene, 'player', shotOrigin, dir.multiplyScalar(weaponCfg.speed), volley,
                     { damage: weaponCfg.damage, pierce: weaponCfg.pierce, range: weaponCfg.range * (perk.range || 1), size: weaponCfg.size * (perk.bulletSize || 1) });
             }
         }
@@ -327,6 +350,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             }
         }
 
+        trackMuzzle(dt);
         const gunGroup = playerGroup.userData.gunMesh;
         if(gunGroup) gunGroup.position.z = THREE.MathUtils.lerp(gunGroup.position.z, 0.2, dt * 10);
 

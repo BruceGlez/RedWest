@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { pickTarget, edgeIndicator } from '../src/aimAssist.js';
+import { pickTarget, edgeIndicator, steadyMuzzle, muzzleOffset } from '../src/aimAssist.js';
 
 const at = (x, z, id) => ({ id, position: { x, z } });
 const origin = { x: 0, z: 0 };
@@ -44,4 +44,13 @@ test('shots go from the gun to the aim point, not along the body line', async ()
     const dir = directionTo({ x: 1, z: 1.8 }, { x: 0, z: 20 });
     assert.ok(dir.x < 0 && Math.abs(dir.x * 18.2 - -1) < 0.1, 'angled back toward the body line');
     assert.equal(directionTo({ x: 0, z: 0 }, { x: 0.5, z: 0.5 }), null, 'too close for a direction');
+});
+
+test('the steady muzzle sits at the same place in the body frame however the body faces', () => {
+    const body = { x: 10, z: 5 };
+    const facing = { x: 1, z: 0 };
+    const offset = muzzleOffset(body, facing, { x: 12, z: 6 });
+    assert.deepEqual(offset, { forward: 2, side: 1 });
+    const turned = steadyMuzzle(body, { x: 0, z: 1 }, offset);
+    assert.ok(Math.abs(turned.x - 9) < 1e-9 && Math.abs(turned.z - 7) < 1e-9);
 });
