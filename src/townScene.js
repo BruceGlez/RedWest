@@ -601,8 +601,9 @@ export function createTownScene() {
     const gates = new Map();
     let openDistricts = [];
     for(const d of DISTRICTS) {
-        const shut = shutGate(d);
-        const open = openGate(d);
+        // Many small boxes that never move on their own: baked into a mesh per material, like the rest of the town.
+        const shut = mergeByMaterial(shutGate(d));
+        const open = mergeByMaterial(openGate(d));
         open.visible = false;
         scene.add(shut, open);
         gates.set(d.id, { shut, open });
