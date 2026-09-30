@@ -19,6 +19,7 @@ import { BASE_DASH_TIME, BASE_DASH_COOLDOWN } from './perks.js';
 
 const QUICK_FIRE_WINDOW = 0.4; // seconds of game time a tap stays live, to wait out the gun's cooldown
 const SHOT_CONVERGE_DISTANCE = 30; // shots leave the gun and meet the aim line this far out: nearly parallel, never crooked
+const TOUCH_AIM_SNAP = false; // when false, dragging or tapping fires where you point/walk; no snapping to the nearest enemy
 const AIM_DISTANCE = 30; // with nothing to snap to, shots meet the aim line this far ahead
 const WALK_TURN_RATE = 14; // how fast the body turns to face the walking direction (about 0.2 s for a full turn)
 
@@ -308,10 +309,10 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             if(touch.aiming) {
                 faceX = touch.aimX;
                 faceZ = touch.aimY;
-                target = pickTarget(pos, enemies, { dirX: faceX, dirZ: faceZ });
+                target = TOUCH_AIM_SNAP ? pickTarget(pos, enemies, { dirX: faceX, dirZ: faceZ }) : null;
                 touchWantsFire = touch.firing;
             } else if(quickFire) {
-                target = pickTarget(pos, enemies);
+                target = TOUCH_AIM_SNAP ? pickTarget(pos, enemies) : null;
                 touchWantsFire = true;
             } else if(touch.autoFire && move.lengthSq() === 0) {
                 target = pickTarget(pos, enemies);
