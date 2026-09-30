@@ -1,5 +1,6 @@
 import { SFX, MUSIC, VOICE } from './audioManifest.js';
 import { DEMO, assetUrl } from './demo.js';
+import { footstepFor } from './soundscape.js';
 
 const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
 const masterGain = audioCtx.createGain();
@@ -22,7 +23,19 @@ synthMusicGain.connect(musicGain);
 fileMusicGain.connect(musicGain);
 musicGain.connect(masterGain);
 sfxGain.connect(masterGain);
-masterGain.connect(audioCtx.destination);
+// A limiter on the whole mix: many shots and a big explosion in one frame can no longer clip.
+const limiter = audioCtx.createDynamicsCompressor();
+limiter.threshold.value = -10;
+limiter.knee.value = 6;
+limiter.ratio.value = 12;
+limiter.attack.value = 0.003;
+limiter.release.value = 0.2;
+masterGain.connect(limiter);
+limiter.connect(audioCtx.destination);
+// The bed under the fight (wind, crickets...) and the footsteps have their own level, and follow the effects switch.
+const ambienceGain = audioCtx.createGain();
+ambienceGain.gain.value = 1;
+ambienceGain.connect(masterGain);
 
 let musicIntervalId = null;
 let musicStep = 0;
@@ -54,6 +67,7 @@ function persistAudioSettings() {
 function applyAudioSettings() {
     musicGain.gain.value = musicEnabled ? musicVolume : 0;
     sfxGain.gain.value = sfxEnabled ? BASE_SFX_GAIN : 0;
+    ambienceGain.gain.value = sfxEnabled ? 1 : 0;
 }
 
 function scheduleTone(freq, duration, when, volume, type = 'triangle') {
@@ -182,7 +196,23 @@ function playRecordedSfx(key) {
     if(now - (lastPlayedAt.get(key) ?? -1) < (REPEAT_GAPS[key] ?? REPEAT_GAP)) return true;
     lastPlayedAt.set(key, now);
     const isShot = key in SFX_MIX;
-    playBuffer(buffer, sfxGain, SFX_MIX[key] ?? 1, isShot ? 0.93 + Math.random() * 0.14 : 1);
+    if(isShot) {
+        // Each shot is pitched a little differently and a little brighter or duller, so rapid fire does not drone.
+        const source = audioCtx.createBufferSource();
+        source.buffer = buffer;
+        source.playbackRate.value = 0.93 + Math.random() * 0.14;
+        const tone = audioCtx.createBiquadFilter();
+        tone.type = 'lowpass';
+        tone.frequency.value = 7000 + Math.random() * 9000;
+        const level = audioCtx.createGain();
+        level.gain.value = SFX_MIX[key];
+        source.connect(tone);
+        tone.connect(level);
+        level.connect(sfxGain);
+        source.start();
+    } else {
+        playBuffer(buffer, sfxGain, SFX_MIX[key] ?? 1, 1);
+    }
     return true;
 }
 
@@ -245,6 +275,140 @@ loadAudioSettings();
 applyAudioSettings();
 
 // Called on every tap and key press: unlocks audio, and starts the music only if none is playing.
+// ---------- Place sounds, made from noise and tones (no files): the bed under the fight, and footsteps ----------
+const noiseBuffer = (() => {
+    const buffer = audioCtx.createBuffer(1, audioCtx.sampleRate * 2, audioCtx.sampleRate);
+    const data = buffer.getChannelData(0);
+    for(let i = 0; i < data.length; i++) data[i] = Math.random() * 2 - 1;
+    return buffer;
+})();
+
+let bed = null; // { key, nodes: [stoppable...], gain }
+
+function loopingNoise(destination, filterType, freq, q = 0.7) {
+    const source = audioCtx.createBufferSource();
+    source.buffer = noiseBuffer;
+    source.loop = true;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = filterType;
+    filter.frequency.value = freq;
+    filter.Q.value = q;
+    source.connect(filter);
+    filter.connect(destination);
+    source.start();
+    return { source, filter };
+}
+
+// A slow wobble on a parameter: freq Hz, depth as a share of the parameter's own value.
+function wobble(param, base, freq, depth, nodes) {
+    const lfo = audioCtx.createOscillator();
+    const amount = audioCtx.createGain();
+    lfo.frequency.value = freq;
+    amount.gain.value = base * depth;
+    lfo.connect(amount);
+    amount.connect(param);
+    lfo.start();
+    nodes.push(lfo);
+}
+
+// Plays the bed for a stage (soundscape.bedFor). A stage change fades the old bed out and the new one in.
+export function setBed(spec) {
+    if(bed?.key === spec.key) return;
+    stopBed();
+    const gain = audioCtx.createGain();
+    gain.gain.value = 0;
+    gain.connect(ambienceGain);
+    const nodes = [];
+    const wind = loopingNoise(gain, 'bandpass', spec.pitch, 0.6);
+    nodes.push(wind.source);
+    wobble(wind.filter.frequency, spec.pitch, 0.11, 0.35, nodes); // gusts rise and fall
+    // The second layer of some beds, each very quiet.
+    const layer = audioCtx.createGain();
+    layer.gain.value = 0;
+    layer.connect(gain);
+    if(spec.extra === 'crickets') {
+        const tone = audioCtx.createOscillator(); tone.frequency.value = 4300; tone.connect(layer); tone.start(); nodes.push(tone);
+        wobble(layer.gain, 0.01, 7, 1, nodes); layer.gain.value = 0.012;
+    } else if(spec.extra === 'hum') {
+        const tone = audioCtx.createOscillator(); tone.type = 'sawtooth'; tone.frequency.value = 55;
+        const low = audioCtx.createBiquadFilter(); low.type = 'lowpass'; low.frequency.value = 180;
+        tone.connect(low); low.connect(layer); tone.start(); nodes.push(tone); layer.gain.value = 0.05;
+    } else if(spec.extra === 'water') {
+        const water = loopingNoise(layer, 'lowpass', 420); nodes.push(water.source);
+        wobble(layer.gain, 0.04, 0.35, 1, nodes); layer.gain.value = 0.05;
+    } else if(spec.extra === 'swell') {
+        const swell = loopingNoise(layer, 'lowpass', 300); nodes.push(swell.source);
+        wobble(layer.gain, 0.03, 0.08, 1, nodes); layer.gain.value = 0.04;
+    } else if(spec.extra === 'bell' || spec.extra === 'birds') {
+        // Now and then: a single soft tone, on a slow timer.
+        const timer = setInterval(() => {
+            if(audioCtx.state !== 'running') return;
+            const t = audioCtx.currentTime;
+            const tone = audioCtx.createOscillator();
+            const envelope = audioCtx.createGain();
+            tone.type = 'sine';
+            tone.frequency.value = spec.extra === 'bell' ? 392 : 2200 + Math.random() * 900;
+            envelope.gain.setValueAtTime(0.0001, t);
+            envelope.gain.exponentialRampToValueAtTime(spec.extra === 'bell' ? 0.03 : 0.012, t + 0.02);
+            envelope.gain.exponentialRampToValueAtTime(0.0001, t + (spec.extra === 'bell' ? 2.5 : 0.18));
+            tone.connect(envelope); envelope.connect(gain);
+            tone.start(t); tone.stop(t + 2.6);
+        }, spec.extra === 'bell' ? 11000 : 5000);
+        nodes.push({ stop: () => clearInterval(timer) });
+    }
+    gain.gain.linearRampToValueAtTime(spec.level, audioCtx.currentTime + 1.5);
+    bed = { key: spec.key, nodes, gain };
+}
+
+function stopBed() {
+    if(!bed) return;
+    const old = bed;
+    bed = null;
+    const now = audioCtx.currentTime;
+    old.gain.gain.cancelScheduledValues(now);
+    old.gain.gain.setValueAtTime(old.gain.gain.value, now);
+    old.gain.gain.linearRampToValueAtTime(0, now + 0.8);
+    setTimeout(() => {
+        for(const node of old.nodes) { try { node.stop(); } catch { /* already stopped */ } }
+        old.gain.disconnect();
+    }, 1000);
+}
+
+// One footstep on the given ground (SURFACES in soundscape.js).
+let lastStepAt = 0;
+export function playFootstep(surface, left) {
+    const now = audioCtx.currentTime;
+    if(audioCtx.state !== 'running' || now - lastStepAt < 0.08) return;
+    lastStepAt = now;
+    const spec = footstepFor(surface, left);
+    const source = audioCtx.createBufferSource();
+    source.buffer = noiseBuffer;
+    const filter = audioCtx.createBiquadFilter();
+    filter.type = spec.filter;
+    filter.frequency.value = spec.freq;
+    filter.Q.value = 0.8;
+    const envelope = audioCtx.createGain();
+    envelope.gain.setValueAtTime(spec.gain, now);
+    if(spec.crunch) envelope.gain.setValueAtTime(spec.gain * 0.3, now + spec.decay * 0.35); // a second grain: it crunches
+    if(spec.crunch) envelope.gain.setValueAtTime(spec.gain * 0.8, now + spec.decay * 0.4);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, now + spec.decay);
+    source.connect(filter);
+    filter.connect(envelope);
+    envelope.connect(ambienceGain);
+    source.start(now, Math.random(), spec.decay + 0.02);
+    if(spec.knock) {
+        const knock = audioCtx.createOscillator();
+        const knockGain = audioCtx.createGain();
+        knock.frequency.value = spec.knock;
+        knockGain.gain.setValueAtTime(spec.gain * 1.2, now);
+        knockGain.gain.exponentialRampToValueAtTime(0.0001, now + 0.07);
+        knock.connect(knockGain);
+        knockGain.connect(ambienceGain);
+        knock.start(now);
+        knock.stop(now + 0.08);
+    }
+}
+
 export function resumeAudio() {
     if(audioCtx.state !== 'running' && audioCtx.state !== 'closed') audioCtx.resume().catch(() => {});
     if(musicEnabled && !musicSource && musicIntervalId === null) startBackgroundTrack();

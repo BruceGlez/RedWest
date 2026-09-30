@@ -2,12 +2,13 @@ import * as THREE from 'three';
 import { keys, mouse, touch } from './input.js';
 import { createPlayerMesh } from './assets.js';
 import { checkCollision } from './physics.js';
-import { playSound } from './audio.js';
+import { playSound, playFootstep } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
 import { createMuzzleFlash, createShellCasing } from './particleSystem.js';
 import { addKick } from './feedback.js';
 import { addFootprint } from './decals.js';
+import { groundSurface } from './world.js';
 import { createStepper, advanceStepper } from './steps.js';
 import { weaponKick, muzzleFlash } from './combatMath.js';
 import { enemies } from './state.js';
@@ -231,6 +232,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         for(const step of advanceStepper(stepper, movedDistance)) {
             const heading = Math.atan2(playerGroup.position.x - beforePos.x, playerGroup.position.z - beforePos.z);
             addFootprint(scene, playerGroup.position.x, playerGroup.position.z, heading, step.left);
+            playFootstep(groundSurface(), step.left);
         }
         if(move.length() > 0 && movedDistance < 0.001) {
             playerGroup.userData.blockedFrames++;

@@ -1,7 +1,9 @@
 import * as THREE from 'three';
 import { createRock, createDeadTree, createCrate, createCactus, createFence, createBarrel, createTombstone, createHaystack, createSpire, createWall, clearScenery } from './scenery.js';
 import { createGroundTexture, createSkyTexture } from './textures.js';
-import { atmosphereFor, DEFAULT_ATMOSPHERE, FENCE_GROUP } from './atmosphere.js';
+import { atmosphereFor, soundFor, DEFAULT_ATMOSPHERE, FENCE_GROUP } from './atmosphere.js';
+import { setBed } from './audio.js';
+import { bedFor } from './soundscape.js';
 import { setSceneryTint } from './scenery.js';
 import { setupAmbience, setAmbienceLook } from './ambience.js';
 import { setDecalColor } from './decals.js';
@@ -12,6 +14,7 @@ let sunLight = null;
 let hemiLight = null;
 let groundMaterial = null;
 let appliedAtmosphere = null;
+let currentSurface = 'sand';
 let currentHero = DEFAULT_ATMOSPHERE.hero;
 let currentKit = DEFAULT_ATMOSPHERE.kit; // what generateMap builds: the current stage's props
 const SUN_OFFSET = new THREE.Vector3(-26, 44, -18);
@@ -80,9 +83,17 @@ export function setAtmosphere(scene, outlawId) {
     setDecalColor(new THREE.Color(look.terrain.base).multiplyScalar(0.45).getHex());
     // A new home ground gets its own map of props. This only happens on the start screen, never mid-run.
     currentKit = look.kit;
+    const sound = soundFor(outlawId);
+    currentSurface = sound.surface;
+    setBed(bedFor(sound, look.wind));
     currentHero = look.hero;
     clearScenery(scene);
     generateMap(scene);
+}
+
+// What the ground sounds like here (SURFACES in soundscape.js), for footsteps.
+export function groundSurface() {
+    return currentSurface;
 }
 
 export function updateSun(focus) {

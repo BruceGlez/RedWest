@@ -181,6 +181,25 @@ export const ATMOSPHERES = {
     }
 };
 
+// What the ground sounds like underfoot (SURFACES in soundscape.js), and what floats on the air besides the wind.
+export const SOUND = {
+    default: { surface: 'sand', bed: 'wind' },
+    'dusty-pete': { surface: 'sand', bed: 'wind' },
+    'rattlesnake-rosa': { surface: 'gravel', bed: 'night' },
+    'deacon-graves': { surface: 'grass', bed: 'bell' },
+    'calloway-gang': { surface: 'soil', bed: 'day' },
+    'iron-jack': { surface: 'cinder', bed: 'furnace' },
+    'mesa-morgan': { surface: 'rock', bed: 'wind' },
+    'silas-vane': { surface: 'sand', bed: 'wind' },
+    'el-espectro': { surface: 'grass', bed: 'mist' },
+    'lucky-lou': { surface: 'planks', bed: 'river' },
+    'colonel-crane': { surface: 'snow', bed: 'wind' }
+};
+
+export function soundFor(outlawId) {
+    return SOUND[outlawId] ?? SOUND.default;
+}
+
 export function atmosphereFor(outlawId) {
     return ATMOSPHERES[outlawId] ?? DEFAULT_ATMOSPHERE;
 }
