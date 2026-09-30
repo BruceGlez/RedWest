@@ -156,8 +156,9 @@ bursts stay cheap: dust puffs, footsteps, smoke.
   limiter on the whole mix so many shots and an explosion together cannot clip. Effects switch off the beds and footsteps too.
 - **Town barks** (`src/barks.js`): one line on each building's card from whoever runs it, chosen from the marshal's progress.
 - **Numbers:** fight, 15 enemies: 38 draw calls, 38 shader programs, about 52,700 triangles (three runs of `node tools/perf.mjs`).
+- **Story pictures (2026-09-30):** the seven opening and ending panels have pictures (`tools/story-picture.mjs`, OpenAI Images, about 30 KB each as webp), shown above the text in the panel reader.
 - **Still open here:** a listening check on a real phone (the bed and footstep levels are first guesses; also on the release
-  checklist), music layers that follow Heat and more gunshot variants need recorded files (`tools/elevenlabs.mjs`, an API key);
+  checklist), music layers that follow Heat and more gunshot variants need recorded files (`tools/elevenlabs.mjs`; the key is set in the cloud environment, so this is possible next);
   the stable and the undertaker are scenery, so they have no barks; the horizon is only seen from a tilted camera.
 
 ### 3. Post-processing with a quality switch (M)

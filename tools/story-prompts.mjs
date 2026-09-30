@@ -1,0 +1,17 @@
+// Picture prompts for the story panels (tools/story-picture.mjs): the opening and the ending of chapter one. One
+// shared style, so the panels sit with the characters and the town. No text in any picture: the words are on the
+// panels in the game (src/story.js). Fit for all ages: nothing is hurt, nobody is shown dying.
+
+export const STYLE = 'Cinematic wide 3:2 illustration for a mobile game cutscene. Stylized, chunky toy-like 3D render look with bold flat colors and soft studio lighting, like a Brawl Stars story panel. Warm painterly light, strong readable silhouettes. Absolutely no text, no lettering, no captions, no signs with words, no logos. Family-friendly: no blood, no injuries, nobody aimed at with a weapon.';
+
+const MARSHAL = 'Marshal Flint Reed: a lawman with a thick dark handlebar moustache, a wide-brim brown cowboy hat with a gold sheriff star on the front, a long orange-brown leather duster coat and a red bandana';
+
+export const PANELS = {
+    'opening-1': `A sweeping view of the Red West territory at golden dusk: red mesas, a dry river bed, and one long railroad with a small steam train crossing the plain. On a distant ridge, the tiny back-view silhouette of a lone rider in a long dusty coat and wide hat, looking out over it all. ${STYLE}`,
+    'opening-2': `A small frontier settlement at night seen from a hilltop far away: an orange glow of fire behind its rooftops and sparks drifting into a dark blue starry sky. On the hill in the foreground, the small silhouette of a fourteen-year-old boy in a hat watching, his back to us. Sad, quiet mood, nobody in danger shown. ${STYLE}`,
+    'opening-3': `Dawn at a frontier cavalry fort gate. In front, ${MARSHAL}, as a young man, stands tall with his back half turned, holding his hat to his chest. Behind him in the gateway, a stern grey-haired older cavalry officer with mutton-chop sideburns stands with folded arms, looking away. A single gold star badge catches the sunrise. ${STYLE}`,
+    'opening-4': `Dusk in a small brick-and-timber frontier town called Lantern Rock. A steam train stands at the depot, and townsfolk hang glowing lanterns along the street. ${MARSHAL}, steps off the train carrying a saddlebag and looks up at the lanterns. Blank paper wanted posters (drawings of faces only, no writing) are pinned to the depot wall. ${STYLE}`,
+    'ending-1': `A wooden territorial courtroom in warm lamplight. On the table, ten sheets of old paper fanned out beside a wooden gavel. ${MARSHAL}, and a young female deputy with a short auburn bob and a silver star stand beside the table. In the background a man in a fine dark suit is being led out of the door by two guards, seen from behind. ${STYLE}`,
+    'ending-2': `A close, dramatic view of ten old ledger pages fanned out on a dark wooden desk, each stamped with the same embossed red wax seal in the shape of an eight-point compass star. Lamplight, dust in the air, a brass magnifying glass on the desk. No writing visible on the pages. ${STYLE}`,
+    'ending-3': `Morning inside a small sheriff's office. On the brick wall a new wanted poster hangs: the shadowed silhouette of a face above a compass rose, with no name, no letters and no words anywhere on it (not even the word wanted); the poster is only a dark silhouette and a compass rose. ${MARSHAL}, and a young female deputy with a short auburn bob and a silver star look up at it. Through the window, far snowy mountains lie to the north under a cold blue sky. ${STYLE}`
+};

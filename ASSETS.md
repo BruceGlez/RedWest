@@ -18,6 +18,7 @@ show what licence applied if anyone asks.
 | App icons | `public/icons/` | Made for the project | Owned | | |
 | Three.js | npm `three` | | MIT licence | | |
 | Other code-built art (props, box characters, the Drifter) | `src/` | Written in code | Owned | | |
+| Story panels (opening and ending pictures) | `public/story/`, originals in `art/story/` | OpenAI Images API (`tools/story-picture.mjs`, prompts in `tools/story-prompts.mjs`) | The OpenAI account's terms allow commercial use of generated images; original prompts, no other games' characters or real people | 2026-09-30 | No text in the pictures; the words are on the panels in the game. Regenerate one with `node tools/story-picture.mjs <name>`. |
 
 ## Animals
 

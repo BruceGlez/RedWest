@@ -1,4 +1,5 @@
 import test from 'node:test';
+import { existsSync, statSync } from 'node:fs';
 import assert from 'node:assert/strict';
 import { STORY, OPENING, ENDING, CHAPTER_ONE_END, CARD_MAX, PAGE_MAX, CARD_STARS, storyFor, unlockedCards, hasPage, pagesHeld, caseComplete } from '../src/story.js';
 import { OUTLAWS } from '../src/outlaws.js';
@@ -66,4 +67,13 @@ test('the opening and the ending are short panels, fit for every age', () => {
         assert.ok(!banned.test(panel.text), `"${panel.title}": nothing graphic`);
     }
     assert.match(OPENING[0].text, /grow old/, 'the Drifter is a rumour on the road');
+});
+
+test('every opening and ending panel has its picture, small enough for a phone', () => {
+    for(const panel of [...OPENING, ...ENDING]) {
+        assert.ok(panel.image && panel.image.startsWith('story/'), `"${panel.title}" names a picture`);
+        const file = new URL(`../public/${panel.image}`, import.meta.url);
+        assert.ok(existsSync(file), `${panel.image} exists`);
+        assert.ok(statSync(file).size < 120 * 1024, `${panel.image} stays under 120 KB`);
+    }
 });
