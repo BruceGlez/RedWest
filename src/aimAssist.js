@@ -2,7 +2,7 @@
 // drag to aim with a gentle snap, or (optional) fire automatically while standing still.
 
 export const AUTO_AIM_RANGE = 42;
-const ASSIST_ANGLE = 0.24; // radians (~14 degrees) either side of the stick direction
+const ASSIST_ANGLE = 0.35; // radians (~20 degrees) either side of the stick direction
 
 // origin: {x, z}; enemies: objects with .position {x, z}.
 // Without a direction: the nearest enemy in range. With a direction: the nearest enemy inside
@@ -41,4 +41,29 @@ export function edgeIndicator(nx, ny, width, height, margin = 28) {
         y: (height / 2) + (dy * scale * ((height / 2) - margin)),
         angle: Math.atan2(dy, dx)
     };
+}
+
+// Where to shoot so the bullet meets a moving target: its position plus where it will have walked by the
+// time the bullet arrives. from/target: {x, z}; velocity: the target's {x, z} in units per second.
+// Two passes are enough at bullet speeds of 60 or more; the lead is capped so a knocked-back or turning enemy
+// never sends the shot far off.
+export function leadPoint(from, target, velocity, bulletSpeed, maxSeconds = 0.6) {
+    let x = target.x;
+    let z = target.z;
+    for(let pass = 0; pass < 2; pass++) {
+        const seconds = Math.min(maxSeconds, Math.hypot(x - from.x, z - from.z) / Math.max(1, bulletSpeed));
+        x = target.x + velocity.x * seconds;
+        z = target.z + velocity.z * seconds;
+    }
+    return { x, z };
+}
+
+// The flat direction (unit x/z) from the gun's muzzle to the aim point. The bullet leaves from the hand, to
+// one side of the body, so aiming along the body's facing would send it past the target by that offset.
+// Returns null when the point is too close to the muzzle for a direction to mean anything.
+export function directionTo(muzzle, point, minDistance = 1.5) {
+    const dx = point.x - muzzle.x;
+    const dz = point.z - muzzle.z;
+    const length = Math.hypot(dx, dz);
+    return length < minDistance ? null : { x: dx / length, z: dz / length };
 }

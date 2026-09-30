@@ -6,12 +6,13 @@ import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
 import { enemies } from './state.js';
-import { pickTarget } from './aimAssist.js';
+import { pickTarget, leadPoint, directionTo } from './aimAssist.js';
 import { getWeapon, defaultWeapon } from './weapons.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { BASE_DASH_TIME, BASE_DASH_COOLDOWN } from './perks.js';
 
 const QUICK_FIRE_WINDOW = 0.4; // seconds of game time a tap stays live, to wait out the gun's cooldown
+const AIM_DISTANCE = 30; // with nothing to snap to, shots meet the aim line this far ahead
 const WALK_TURN_RATE = 14; // how fast the body turns to face the walking direction (about 0.2 s for a full turn)
 
 export function createPlayerSystem(scene, camera, gameState, playerStats) {
@@ -45,6 +46,22 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
     };
     const heldGun = () => heldWeapon().stats;
 
+    // Where the shot is aimed on the ground (set every frame from the aim), and how fast each enemy is moving,
+    // so shots go from the gun to the aim point and lead a moving target.
+    let aimPoint = null;
+    function trackEnemyVelocity(dt) {
+        if(dt <= 0) return;
+        for(const e of enemies) {
+            const u = e.userData;
+            if(u.lastX !== undefined) {
+                u.vx = THREE.MathUtils.lerp(u.vx ?? 0, (e.position.x - u.lastX) / dt, 0.35);
+                u.vz = THREE.MathUtils.lerp(u.vz ?? 0, (e.position.z - u.lastZ) / dt, 0.35);
+            }
+            u.lastX = e.position.x;
+            u.lastZ = e.position.z;
+        }
+    }
+
     function shoot() {
         if(gameState.isGameOver || !gameState.isGameStarted) return;
         playerGroup.userData.isAiming = true;
@@ -66,6 +83,8 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         for(const volleyOffset of volleyOffsets) {
             for(let i = 0; i < pelletsPerVolley; i++) {
                 const dir = new THREE.Vector3(0, 0, 1).applyQuaternion(playerGroup.quaternion);
+                const toAim = aimPoint && directionTo(gunPos, aimPoint);
+                if(toAim) dir.set(toAim.x, 0, toAim.z);
                 let pelletOffset = 0;
                 if(pelletsPerVolley > 1) {
                     const spreadStep = weaponCfg.spread / Math.max(1, pelletsPerVolley - 1);
@@ -220,6 +239,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         if(isMoving && !character) playerGroup.position.y = Math.abs(Math.sin(timeInSeconds * 12)) * 0.1;
         else playerGroup.position.y = THREE.MathUtils.lerp(playerGroup.position.y, 0, dt * 14);
 
+        trackEnemyVelocity(dt);
         let touchWantsFire = false;
         if(touch.enabled) {
             // Drag: aim with a gentle snap. Tap: quick-fire at the nearest enemy. Optional auto-fire
@@ -248,9 +268,12 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
                 target = pickTarget(pos, enemies);
                 touchWantsFire = target !== null;
             }
+            aimPoint = null;
             if(target) {
-                faceX = target.position.x - pos.x;
-                faceZ = target.position.z - pos.z;
+                const lead = leadPoint(pos, target.position, { x: target.userData.vx ?? 0, z: target.userData.vz ?? 0 }, heldGun().speed);
+                aimPoint = lead;
+                faceX = lead.x - pos.x;
+                faceZ = lead.z - pos.z;
             }
             if(faceX !== 0 || faceZ !== 0) {
                 if(!touch.aiming && !target) {
@@ -264,6 +287,10 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
                     faceZ = Math.cos(angle);
                 }
                 playerGroup.lookAt(pos.x + faceX, pos.y, pos.z + faceZ);
+                if(!aimPoint) {
+                    const length = Math.hypot(faceX, faceZ) || 1;
+                    aimPoint = { x: pos.x + (faceX / length) * AIM_DISTANCE, z: pos.z + (faceZ / length) * AIM_DISTANCE };
+                }
             }
             aimLine.visible = touch.aiming;
             if(touch.aiming) {
@@ -275,7 +302,10 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             raycaster.setFromCamera(mouse, camera);
             const intersect = new THREE.Vector3();
             raycaster.ray.intersectPlane(groundPlane, intersect);
-            if(intersect) playerGroup.lookAt(intersect.x, playerGroup.position.y, intersect.z);
+            if(intersect) {
+                playerGroup.lookAt(intersect.x, playerGroup.position.y, intersect.z);
+                aimPoint = { x: intersect.x, z: intersect.z };
+            }
         }
 
         const gunGroup = playerGroup.userData.gunMesh;
