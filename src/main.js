@@ -62,7 +62,8 @@ ui.setRunLog(loadRunLog());
 const progress = loadProgress();
 ui.setProgress(progress);
 // Pictures of the 3D characters ship as files (tools/render-portraits.mjs), so menus never wait on a model.
-const portraitFile = name => (PORTRAIT_FILES.has(name) ? assetUrl(`portraits/${name}.webp`) : null);
+// (The playable ad is one self-contained file that may load nothing else, so it draws its own pictures instead.)
+const portraitFile = name => (!DEMO && PORTRAIT_FILES.has(name) ? assetUrl(`portraits/${name}.webp`) : null);
 const outlawPortraits = renderOutlawPortraits(renderer);
 for(const outlaw of OUTLAWS) outlawPortraits[outlaw.id] = portraitFile(outlaw.id) ?? outlawPortraits[outlaw.id];
 const enemyPortraits = renderEnemyPortraits(renderer);
@@ -254,7 +255,7 @@ if(DEMO) {
 const previewCharacters = new Map();
 function previewCharacter(id) {
     const item = getShopItem(id);
-    if(!item?.model) return null;
+    if(DEMO || !item?.model) return null; // the ad has no shop, and carries only the marshal's and Pete's models
     if(!previewCharacters.has(id)) {
         previewCharacters.set(id, null);
         loadCharacterModel(item.model).then(gltf => {
