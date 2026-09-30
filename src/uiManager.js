@@ -11,6 +11,7 @@ import { track } from './analytics.js';
 import { ownsItem } from './profile.js';
 import { purchaseSupport, canRestore } from './purchases.js';
 import { arena } from './arena.js';
+import { assetUrl } from './demo.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 import { CHAPTER_ONE_END, OPENING, ENDING, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
 
@@ -668,6 +669,7 @@ export function createUIManager(gameState, playerStats) {
             + `<button type="button" class="story-btn" data-close>CLOSE</button>`
             + `<button type="button" class="story-btn" data-nav="${card + 1}" ${card === story.cards.length - 1 ? 'disabled' : ''}>NEXT &#8250;</button></div>`;
         els.storyContent.dataset.outlaw = index;
+        els.storyContent.classList.remove('story-wide');
         els.storyModal.style.display = 'flex';
     }
 
@@ -687,12 +689,15 @@ export function createUIManager(gameState, playerStats) {
         index = Math.max(0, Math.min(panels.length - 1, index));
         const panel = panels[index];
         const last = index === panels.length - 1;
-        els.storyContent.innerHTML = `<div class="story-head">${SEAL}<div><div class="story-kicker">${kind === 'opening' ? 'THE OPENING' : 'THE ENDING'} &middot; ${index + 1} OF ${panels.length}</div>`
+        if(panels[index + 1]?.image) new Image().src = assetUrl(panels[index + 1].image); // the next picture loads while this one is read
+        els.storyContent.innerHTML = (panel.image ? `<img class="story-pic" src="${assetUrl(panel.image)}" alt="">` : '')
+            + `<div class="story-head">${panel.image ? '' : SEAL}<div><div class="story-kicker">${kind === 'opening' ? 'THE OPENING' : 'THE ENDING'} &middot; ${index + 1} OF ${panels.length}</div>`
             + `<h3>${panel.title}</h3></div></div><p>${panel.text}</p>`
             + `<div class="story-nav"><button type="button" class="story-btn" data-seq-nav="${index - 1}" ${index === 0 ? 'disabled' : ''}>&#8249; BACK</button>`
             + `<button type="button" class="story-btn" data-close>${last ? 'DONE' : 'SKIP'}</button>`
             + `<button type="button" class="story-btn" data-seq-nav="${index + 1}" ${last ? 'disabled' : ''}>NEXT &#8250;</button></div>`;
         els.storyContent.dataset.seq = kind;
+        els.storyContent.classList.add('story-wide');
         delete els.storyContent.dataset.outlaw;
         els.storyModal.style.display = 'flex';
         if(kind === 'opening') {

@@ -129,18 +129,19 @@ export function caseComplete(progress, outlawCount) {
     return pagesHeld(progress).length >= outlawCount;
 }
 
+// Each panel has a picture (public/story/, made with tools/story-picture.mjs from tools/story-prompts.mjs).
 // The opening: what a first-time player reads once, before the first ride (four short panels, skippable). Flint's
 // arrival, and why the Wanted Road matters. The last line of the first panel is the Drifter, a rumour on the road.
 export const OPENING = [
-    { title: 'Red West', text: 'A territory of red mesas, dry rivers and one long railroad. The law is thin, water is money, and a company is quietly buying everything. They say a rider walks the Wanted Road whom no one has ever seen grow old. Nobody has seen him leave.' },
-    { title: 'Cinder Creek', text: 'Flint Reed grew up in Cinder Creek. When he was fourteen a fire took the settlement in a night. The Company called it a bandit raid, and its water rights changed hands the next week. His father never came back from the trail.' },
-    { title: 'The Star', text: 'A colonel raised him at Fort Pell. At twenty-two Flint refused an order to clear a valley, rode out, and earned his own star. Now he has the hardest posting in the territory: Red West.' },
-    { title: 'Lantern Rock', text: 'The train stops at Lantern Rock, a small town that hangs its lamps every evening so travellers can find it across the dark. Ten names are on the Wanted Road. Flint means to ask each of them the same question: who paid you?' }
+    { title: 'Red West', image: 'story/opening-1.webp', text: 'A territory of red mesas, dry rivers and one long railroad. The law is thin, water is money, and a company is quietly buying everything. They say a rider walks the Wanted Road whom no one has ever seen grow old. Nobody has seen him leave.' },
+    { title: 'Cinder Creek', image: 'story/opening-2.webp', text: 'Flint Reed grew up in Cinder Creek. When he was fourteen a fire took the settlement in a night. The Company called it a bandit raid, and its water rights changed hands the next week. His father never came back from the trail.' },
+    { title: 'The Star', image: 'story/opening-3.webp', text: 'A colonel raised him at Fort Pell. At twenty-two Flint refused an order to clear a valley, rode out, and earned his own star. Now he has the hardest posting in the territory: Red West.' },
+    { title: 'Lantern Rock', image: 'story/opening-4.webp', text: 'The train stops at Lantern Rock, a small town that hangs its lamps every evening so travellers can find it across the dark. Ten names are on the Wanted Road. Flint means to ask each of them the same question: who paid you?' }
 ];
 
 // The ending of chapter one, in three panels (the Case File shows the same text as one card).
 export const ENDING = [
-    { title: 'The Court', text: 'The ten pages go to the territorial court, and Ambrose Thorne is arrested. Before they take him, he says one thing: he was never the one giving the orders.' },
-    { title: 'The Seal', text: 'Every page carries the same eight-point compass seal. Flint has seen it ten times now, in ten different hands, and it has never once been signed.' },
-    { title: 'The Poster', text: 'The next morning a new poster hangs on the sheriff\'s wall: no name, only a face and a compass rose. Far to the north a survey camp waits for its guide. The Wanted Road is not finished.' }
+    { title: 'The Court', image: 'story/ending-1.webp', text: 'The ten pages go to the territorial court, and Ambrose Thorne is arrested. Before they take him, he says one thing: he was never the one giving the orders.' },
+    { title: 'The Seal', image: 'story/ending-2.webp', text: 'Every page carries the same eight-point compass seal. Flint has seen it ten times now, in ten different hands, and it has never once been signed.' },
+    { title: 'The Poster', image: 'story/ending-3.webp', text: 'The next morning a new poster hangs on the sheriff\'s wall: no name, only a face and a compass rose. Far to the north a survey camp waits for its guide. The Wanted Road is not finished.' }
 ];
