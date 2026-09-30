@@ -69,7 +69,8 @@ try {
     // Off-screen enemies get edge arrows (the phone camera is closer than desktop).
     await page.waitForFunction(() => [...document.querySelectorAll('.edge-arrow')].some(a => a.style.display === 'block'));
 
-    // Tap the aim side: Brawl Stars-style quick fire turns toward the nearest enemy and shoots.
+    // Tap the aim side: quick fire shoots where the marshal is facing. Touch aim no longer snaps to the nearest enemy
+    // (TOUCH_AIM_SNAP in src/playerSystem.js is off on purpose: it fires where you point or walk).
     await page.evaluate(async () => {
         const { spawnEnemy } = await import('/src/enemySystem.js');
         const p = S.enemies[0].parent.children.find(o => o.userData.type === 'player');
@@ -81,6 +82,11 @@ try {
         window.__player = p;
     });
     const shotsBeforeTap = await page.evaluate(() => S.gameState.runStats.shotsFired);
+    const facingBeforeTap = await page.evaluate(() => {
+        const p = window.__player;
+        const f = p.getWorldDirection(p.position.clone()).setY(0).normalize();
+        return [f.x, f.z];
+    });
     await page.locator('#stick-aim').evaluate(zone => {
         const fire = type => zone.dispatchEvent(new PointerEvent(type, { pointerId: 9, pointerType: 'touch', clientX: 650, clientY: 250, bubbles: true, cancelable: true, isPrimary: true }));
         fire('pointerdown');
@@ -103,13 +109,12 @@ try {
         };
     }, shotsBeforeTap);
     assert.ok(tapResult.fired, `a tap on the aim side quick-fires: ${JSON.stringify(tapResult)}`);
-    const facing = await page.evaluate(() => {
+    const facing = await page.evaluate(([x, z]) => {
         const p = window.__player;
-        const forward = p.getWorldDirection(p.position.clone());
-        const to = window.__target.position.clone().sub(p.position).setY(0).normalize();
-        return forward.setY(0).normalize().dot(to);
-    });
-    assert.ok(facing > 0.95, `quick fire faces the nearest enemy (dot ${facing.toFixed(3)})`);
+        const forward = p.getWorldDirection(p.position.clone()).setY(0).normalize();
+        return forward.x * x + forward.z * z;
+    }, facingBeforeTap);
+    assert.ok(facing > 0.95, `quick fire keeps the marshal's facing, it does not snap to the enemy (dot ${facing.toFixed(3)})`);
 
     // Archero-style auto-fire: turn it on in settings, stand still, and it shoots by itself.
     await page.locator('#btn-pause').dispatchEvent('pointerdown');
