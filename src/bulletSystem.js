@@ -1,11 +1,12 @@
 import * as THREE from 'three';
 import { bullets, obstacles, enemies, playerStats, gameState } from './state.js';
 import { checkCollision, getObstacleAt, getNearbyEnemies, markObstacleGridDirty, rebuildEnemyGrid } from './physics.js';
-import { createExplosion } from './particleSystem.js';
+import { createExplosion, createImpact } from './particleSystem.js';
+import { flashEnemy, startFall } from './combatFx.js';
+import { impactForObstacle } from './combatMath.js';
 import { spawnLoot } from './lootSystem.js';
 import { playSound } from './audio.js';
 import { createCrate, createCactus, createDeadTree, createFence, createRock, createBarrel, createTombstone, createHaystack, createSpire, createWall } from './scenery.js';
-import { disposeBaked } from './meshMerge.js';
 
 const PLAYER_BULLET_COLOR = new THREE.Color(0xffff00);
 
@@ -185,7 +186,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
         // 2. Check Obstacle Collision (Destruction)
         const hitObs = getObstacleAt(b.position.x, b.position.z, 0.5);
             if(hitObs) { 
-            createExplosion(scene, b.position, 0x8B4513); 
+            createImpact(scene, b.position, impactForObstacle(hitObs.type), b.userData.velocity.clone().normalize());
             resolveVolley(b, false, callbacks);
             releaseBullet(scene, b, i);
             
@@ -201,8 +202,8 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                 markObstacleGridDirty();
                 
                 // Effects
-                createExplosion(scene, hitObs.mesh.position, 0x8B4513); 
-                createExplosion(scene, hitObs.mesh.position, 0xdeb887);
+                createImpact(scene, hitObs.mesh.position, impactForObstacle(hitObs.type));
+                createImpact(scene, hitObs.mesh.position, 'dust');
                 
                 // Drop Loot & Respawn
                 if(Math.random() < 0.3) spawnLoot(scene, hitObs.x, hitObs.z);
@@ -247,7 +248,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
             if(dist < hitRad && e.userData.frontArmor && isFrontalHit(e, b)) {
                 // Iron front: the shot bounces off. It still counts as on target for Heat.
                 resolveVolley(b, true, callbacks);
-                createExplosion(scene, b.position, 0xcfd8dc);
+                createImpact(scene, b.position, 'sparks', b.userData.velocity.clone().normalize().negate());
                 playSound('break');
                 callbacks.onDeflect?.(e.position);
                 releaseBullet(scene, b, i);
@@ -268,10 +269,10 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                 
                 if(e.userData.hp <= 0) { 
                     // Enemy Dead
-                    createExplosion(scene, e.position, 0x8a0303); 
+                    createImpact(scene, e.position, 'poof');
+                    flashEnemy(e);
                     spawnLoot(scene, e.position.x, e.position.z); 
-                    scene.remove(e); 
-                    disposeBaked(e);
+                    startFall(scene, e); // it tumbles and pops away; it is already out of the fight
                     enemies.splice(j,1); 
                     runStats.enemiesKilled++;
                     if(e.userData.type === 'bandit') runStats.banditsKilled++;
@@ -285,7 +286,8 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                 } else { 
                     // Enemy Hit
                     playSound('hit'); 
-                    createExplosion(scene, e.position, 0xffaa00); 
+                    createImpact(scene, b.position, 'hit', b.userData.velocity.clone().normalize());
+                    flashEnemy(e);
                     // Knockback (except boss)
                     if(e.userData.type !== 'boss' && !e.userData.heavy) {
                         const knockDir = b.userData.velocity.clone().normalize().multiplyScalar(1.0);

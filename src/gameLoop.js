@@ -20,6 +20,7 @@ import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFee
 import { recordRun, saveProgress } from './progress.js';
 import { arena } from './arena.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
+import { clearCombatFx, updateCombatFx } from './combatFx.js';
 import { disposeBaked } from './meshMerge.js';
 
 const FINAL_WAVE = FINAL_PURSUIT;
@@ -428,6 +429,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
     function clearSceneCollections() {
         for(const e of enemies) { scene.remove(e); disposeBaked(e); }
+        clearCombatFx();
         for(const l of loots) scene.remove(l);
         for(const obs of obstacles) {
             scene.remove(obs.mesh);
@@ -602,6 +604,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         }
         advanceHeat(gameState.heat, dt);
         updateParticles(dt, scene);
+        updateCombatFx(dt);
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();
         // Sub-step bullets on slow frames so fast shots cannot skip past a target between frames.
         const bulletSteps = Math.max(1, Math.ceil(dt / 0.02));

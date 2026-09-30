@@ -214,6 +214,7 @@ export function createCharacterInstance(gltf, height) {
     return {
         object: holder, mixer, play, combat, muzzle,
         has: name => !!actions[name],
+        clipSeconds: name => actions[name]?.getClip().duration ?? 0,
         get gunOut() { return gunOut && !drawing; }
     };
 }

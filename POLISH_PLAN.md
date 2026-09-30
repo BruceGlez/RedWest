@@ -111,12 +111,35 @@ on the outlaw, which is now the box figure's hidden baked body; it looks inside 
 
 ### 2. Combat feel (M)
 
-**Done 2026-09-30: aim.** Shots left the character's gun hand but were aimed along the body, so they passed to one side of the target, and they went to where an enemy stood, not where it would be. Now every shot goes from the muzzle to the aim point, quick-fire and drag-aim lead a moving enemy by its speed (`leadPoint` in `src/aimAssist.js`, capped at 0.6 s), and the drag snap cone is 20 degrees instead of 14. Unit tests cover both; the feel on a real phone still needs a check, and the numbers (cone, lead cap) are first guesses.
+**Done 2026-09-30: aim.** Shots left the character's gun hand but were aimed along the body, so they passed to one side of the target, and they went to where an enemy stood, not where it would be. Now every shot goes from the muzzle to the aim point, quick-fire and drag-aim lead a moving enemy by its speed (`leadPoint` in `src/aimAssist.js`, capped at 0.6 s), and the drag snap cone is 20 degrees instead of 14. Unit tests cover both; **checked on a real phone by the owner (2026-09-30): aim feels good**, so the cone and lead cap stay as they are.
 
 Add a 60 to 100 ms white hit flash on enemies, muzzle flash sprites, impact particles (dust or sparks by surface),
 shell casings, a camera kick per weapon (a pistol does not shake like a shotgun), and death reactions: play the
 `dead` clip, or a short tumble, before the enemy is removed. The particle system moves to instanced sprites so
 bursts stay cheap: dust puffs, footsteps, smoke.
+
+**Done 2026-09-30: combat feel, first pass.**
+- **Hit flash.** A shot enemy flashes white for 0.09 s. A baked enemy writes white into its own colour buffer and writes the
+  colours back, so no material is cloned; an imported model flashes through its own material's glow (`src/combatFx.js`).
+- **Impacts by surface.** Bullets throw what the target is made of: stone chips from rocks, walls and tombstones, splinters
+  from crates, fences, trees and barrels, leaves from cacti, straw from haystacks, sparks off an iron front, an orange burst
+  on a hit, a cartoon puff where an enemy falls (`IMPACTS` in `src/combatMath.js`). These are silent; the old per-hit boom is gone
+  (the hit and break sounds remain), the boom stays for dynamite and the player being hit.
+- **Falls instead of vanishing.** A defeated enemy leaves `enemies` at once (so it cannot be hit, aimed at, counted or shoot;
+  kills, loot and score are unchanged) and plays a fall: the wolf and imported outlaws play their own `dead` clip (capped at
+  1.1 s), box-built enemies tip over, hop once, and pop away (0.6 s). Then their geometry is freed.
+- **Muzzle flash, casings, recoil.** One flash block and two sparks at the muzzle, a brass casing thrown out to the side, and a
+  camera shove against the shot, sized from the gun's numbers (`weaponKick`, `muzzleFlash`): a pistol barely moves the view, a
+  shotgun or buffalo gun shoves it.
+- **One draw call for every particle.** `src/particleSystem.js` is now a single `InstancedMesh` (220 slots) instead of a mesh
+  per particle, so a fight full of bursts no longer adds draw calls. Fight, 15 enemies: 43 to 49 draw calls, 36 programs (same
+  as before this work).
+- **Wind sway** for cacti and dead trees (a vertex shader change on the shared prop material, weighted by height and by where
+  each one stands, driven by the stage's wind: `src/wind.js`).
+- Tests: `tests/combatMath.test.js` (impacts, fall pose and length, kick and flash per gun). Screenshots checked for the fall,
+  the puff and the flash.
+- **Not done:** footprints and scorch decals, and a feel check on a real phone (flash length 0.09 s, kick sizes and fall
+  length are first guesses). No screen shows an enemy dying: the fall is a tumble and a puff, as the under-13 rule needs.
 
 ### 3. Post-processing with a quality switch (M)
 

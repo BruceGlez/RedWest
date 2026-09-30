@@ -5,19 +5,30 @@ import { edgeIndicator } from './aimAssist.js';
 // arrows. Everything here is presentation only; gameplay rules never read it.
 
 let trauma = 0;
+let kickX = 0;
+let kickZ = 0;
 let hitStopUntil = 0;
 
 export function addShake(amount) {
     trauma = Math.min(1, trauma + amount);
 }
 
-// Camera offset for this frame; trauma decays so shakes settle quickly.
+// A shove of the camera along a direction (unit x/z), for a gun's recoil: it snaps back within about a quarter second.
+export function addKick(dirX, dirZ, amount) {
+    kickX += dirX * amount;
+    kickZ += dirZ * amount;
+}
+
+// Camera offset for this frame; trauma decays so shakes settle quickly, and a kick springs back.
 export function shakeOffset(dt, time) {
     trauma = Math.max(0, trauma - (dt * 2.2));
+    const settle = Math.exp(-14 * dt);
+    kickX *= settle;
+    kickZ *= settle;
     const strength = trauma * trauma * 1.4;
     return {
-        x: Math.sin(time * 0.071) * strength,
-        z: Math.sin((time * 0.083) + 1.7) * strength
+        x: Math.sin(time * 0.071) * strength + kickX,
+        z: Math.sin((time * 0.083) + 1.7) * strength + kickZ
     };
 }
 
@@ -32,6 +43,8 @@ export function timeScale(now) {
 
 export function resetFeedback() {
     trauma = 0;
+    kickX = 0;
+    kickZ = 0;
     hitStopUntil = 0;
     for(const item of floaters) item.el.style.display = 'none';
     floaters.length = 0;
