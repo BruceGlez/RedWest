@@ -12,6 +12,7 @@ import { ownsItem } from './profile.js';
 import { purchaseSupport, canRestore } from './purchases.js';
 import { arena } from './arena.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
+import { CHAPTER_ONE_END, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
 
 export function createUIManager(gameState, playerStats) {
     let waveBannerTimeoutId = null;
@@ -81,6 +82,10 @@ export function createUIManager(gameState, playerStats) {
         bookProgress: document.getElementById('book-progress'),
         bookEnemies: document.getElementById('book-enemies'),
         bookOutlaws: document.getElementById('book-outlaws'),
+        bookCase: document.getElementById('book-case'),
+        caseCount: document.getElementById('case-count'),
+        storyModal: document.getElementById('story-modal'),
+        storyContent: document.getElementById('story-content'),
         bookCount: document.getElementById('book-count'),
         bookTotal: document.getElementById('book-total'),
         newEnemyCard: document.getElementById('new-enemy-card'),
@@ -611,8 +616,66 @@ export function createUIManager(gameState, playerStats) {
                 + (unlocked ? `<p class="book-story"><b>${outlaw.home}</b> ${outlaw.bio}</p>` : '')
                 + (unlocked ? `<p class="book-tip"><b>${outlaw.signature.move}:</b> ${outlaw.signature.detail}</p>` : '')
                 + `<p class="book-status ${defeated ? 'done' : ''}">${status}</p>`
+                + (unlocked && storyFor(outlaw.id) ? `<button type="button" class="story-btn" data-story="${i}">STORY ${unlockedCards(progress.stars[i]).filter(Boolean).length} / 3</button>` : '')
                 + `<p class="poster-stars">${starsHtml(progress.stars[i])}</p></div></div>`;
         }).join('');
+        renderCase();
+    }
+
+
+    // ---------- Story cards and the Case File (src/story.js) ----------
+    const SEAL = '<svg class="ledger-seal" viewBox="0 0 40 40" aria-hidden="true"><polygon fill="currentColor" points="20,1 24,14 37,10 26,18 39,20 26,22 37,30 24,26 20,39 16,26 3,30 14,22 1,20 14,18 3,10 16,14"/><circle cx="20" cy="20" r="5" fill="#f7e6be"/></svg>';
+
+    function renderCase() {
+        if(!els.bookCase || !progress) return;
+        const held = OUTLAWS.filter((o, i) => hasPage(progress.stars[i])).length;
+        els.caseCount.textContent = `${held} / ${OUTLAWS.length} PAGES`;
+        const pages = OUTLAWS.map((outlaw, i) => {
+            const story = storyFor(outlaw.id);
+            if(!story) return '';
+            if(!hasPage(progress.stars[i])) {
+                const hint = isUnlocked(progress, i) ? STAR_GOALS[1] : `Stage ${i + 1}`;
+                return `<div class="book-card ledger-page locked">${SEAL}<div class="book-info"><p class="ledger-no">PAGE ${i + 1}</p><h4>???</h4><p class="book-from">${hint}</p></div></div>`;
+            }
+            return `<button type="button" class="book-card ledger-page" data-story="${i}" data-card="1">${SEAL}<div class="book-info">`
+                + `<p class="ledger-no">PAGE ${i + 1} &middot; ${outlaw.name}</p><h4>${story.page.title}</h4><p class="ledger-text">${story.page.text}</p></div></button>`;
+        }).join('');
+        const done = caseComplete(progress, OUTLAWS.length);
+        const end = done
+            ? `<div class="book-card ledger-page case-end">${SEAL}<div class="book-info"><p class="ledger-no">CHAPTER ONE</p><h4>${CHAPTER_ONE_END.title}</h4><p class="ledger-text">${CHAPTER_ONE_END.text}</p></div></div>`
+            : `<div class="book-card ledger-page locked case-end">${SEAL}<div class="book-info"><p class="ledger-no">CHAPTER ONE</p><h4>???</h4><p class="book-from">Find all ${OUTLAWS.length} pages.</p></div></div>`;
+        els.bookCase.innerHTML = pages + end;
+    }
+
+    // One story card in a small overlay: earlier and later cards of the same outlaw are a tap away, and a card
+    // that is still locked says which star opens it.
+    function showStory(index, card) {
+        const outlaw = OUTLAWS[index];
+        const story = storyFor(outlaw?.id);
+        if(!story || !progress) return;
+        card = Math.max(0, Math.min(story.cards.length - 1, card));
+        const open = unlockedCards(progress.stars[index])[card];
+        const entry = story.cards[card];
+        els.storyContent.innerHTML = `<div class="story-head">${portraitHtml(outlaw)}<div><div class="story-kicker">${outlaw.name} &middot; CARD ${card + 1} OF ${story.cards.length}</div>`
+            + `<h3>${open ? entry.title : '???'}</h3></div></div>`
+            + (open ? `<p>${entry.text}</p>` : `<p class="story-locked">Earn the star &ldquo;${STAR_GOALS[card]}&rdquo; to read this.</p>`)
+            + `<div class="story-nav"><button type="button" class="story-btn" data-nav="${card - 1}" ${card === 0 ? 'disabled' : ''}>&#8249; BACK</button>`
+            + `<button type="button" class="story-btn" data-close>CLOSE</button>`
+            + `<button type="button" class="story-btn" data-nav="${card + 1}" ${card === story.cards.length - 1 ? 'disabled' : ''}>NEXT &#8250;</button></div>`;
+        els.storyContent.dataset.outlaw = index;
+        els.storyModal.style.display = 'flex';
+    }
+
+    function hideStory() {
+        if(els.storyModal) els.storyModal.style.display = 'none';
+    }
+
+    // New story cards earned by this run, for the result screen.
+    function newStoryNote(index, newStars) {
+        const story = storyFor(getOutlaw(index).id);
+        if(!story) return '';
+        const titles = story.cards.filter((card, k) => (newStars & (1 << k)) !== 0).map(card => `&ldquo;${card.title}&rdquo;`);
+        return titles.length ? `<p class="story-note">NEW STORY: ${titles.join(', ')} &middot; read it in the Bounty Book</p>` : '';
     }
 
     function showNewEnemy(type) {
@@ -674,7 +737,7 @@ export function createUIManager(gameState, playerStats) {
         const unlock = roadResult.unlockedNext
             ? `<p class="unlock-note">NEW OUTLAW ON THE ROAD: ${getOutlaw(index + 1).name}</p>`
             : '';
-        els.resultRoad.innerHTML = `<p class="result-outlaw">${getOutlaw(index).name}</p><ul class="result-goals">${goals}</ul>${unlock}`;
+        els.resultRoad.innerHTML = `<p class="result-outlaw">${getOutlaw(index).name}</p><ul class="result-goals">${goals}</ul>${newStoryNote(index, roadResult.newStars)}${unlock}`;
     }
 
     function setRunLog(records) {
@@ -823,6 +886,17 @@ export function createUIManager(gameState, playerStats) {
         els.recordsBtn.addEventListener('click', () => showPanel(els.panels[1]));
         els.howtoBtn.addEventListener('click', () => showPanel(els.panels[2]));
         els.bookBtn.addEventListener('click', () => showPanel(els.panels[3]));
+        const openStory = event => {
+            const button = event.target.closest('[data-story]');
+            if(button) showStory(Number(button.dataset.story), Number(button.dataset.card ?? 0));
+        };
+        els.bookOutlaws.addEventListener('click', openStory);
+        els.bookCase.addEventListener('click', openStory);
+        els.storyModal.addEventListener('click', event => {
+            const nav = event.target.closest('[data-nav]');
+            if(nav && !nav.disabled) showStory(Number(els.storyContent.dataset.outlaw), Number(nav.dataset.nav));
+            else if(event.target === els.storyModal || event.target.closest('[data-close]')) hideStory();
+        });
         els.shopBtn.addEventListener('click', openShop);
         els.jobsBtn.addEventListener('click', () => { showPanel(els.panels[5]); renderJobs(); });
         els.shopTabs.addEventListener('click', onShopClick);

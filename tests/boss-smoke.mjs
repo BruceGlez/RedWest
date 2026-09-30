@@ -99,7 +99,8 @@ try {
         S.playerStats.hp = 50;
         S.playerStats.invulnerabilityTimer = 0;
         const [pete] = await window.spawnOutlaw(0);
-        const skinned = pete.getObjectByProperty('isSkinnedMesh', true);
+        // (the box figure's own baked body is a skinned mesh too, and is hidden once the model shows)
+        const skinned = pete.userData.model?.object.getObjectByProperty('isSkinnedMesh', true);
         const start = S.gameState.runTime;
         const deadline = Date.now() + 90000;
         while(S.gameState.runTime - start < 8 && S.playerStats.hp === 50 && Date.now() < deadline) await new Promise(r => setTimeout(r, 100));

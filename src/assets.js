@@ -1,22 +1,6 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { obstacles } from './state.js';
-import { markObstacleGridDirty } from './physics.js';
-import { mergeByMaterial } from './meshMerge.js';
-
-function addObstacle(obstacle) {
-    obstacles.push(obstacle);
-    markObstacleGridDirty();
-}
-
-// Props built from several boxes are drawn as one mesh per material (fewer draw calls on phones).
-function placeProp(scene, group, obstacle) {
-    const prop = mergeByMaterial(group);
-    prop.traverse(o => { if(o.isMesh) { o.castShadow = true; o.receiveShadow = true; } });
-    scene.add(prop);
-    addObstacle({ ...obstacle, mesh: prop });
-}
-
+import { bakeSkinned } from './meshMerge.js';
 
 // ---------- Cartoon look: cel shading + outlines (Brawl Stars-style readability) ----------
 // Three light bands instead of smooth shading.
@@ -34,6 +18,11 @@ function toonMat({ color = 0xffffff, transparent = false, opacity = 1, metalness
     const material = new THREE.MeshToonMaterial({ color, gradientMap: TOON_GRADIENT, transparent, opacity });
     if(metalness > 0.5) material.emissive = new THREE.Color(color).multiplyScalar(0.25);
     return material;
+}
+
+// Cel shading for props whose colour is baked into the vertices (and the instance): one material for a whole kind.
+export function toonVertexColorMaterial() {
+    return new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_GRADIENT });
 }
 
 // Cel shading for imported, textured characters (colour comes from the model's own texture).
@@ -104,6 +93,19 @@ function addOutline(root) {
     }
     return root;
 }
+
+
+// Enemies that swing their legs and arms are baked into one skinned mesh plus one skinned outline (see
+// bakeSkinned). The bones keep the names animation.js looks up. `material` is only for enemies that fade
+// (ghosts), which need a see-through material of their own.
+const BAKED_MAT = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_GRADIENT });
+const HUMANOID_BONES = ['leftLeg', 'rightLeg', 'leftArm', 'rightArm'];
+const QUADRUPED_BONES = ['fl', 'fr', 'bl', 'br'];
+function bakeEnemy(container, boneNames, material = BAKED_MAT) {
+    return bakeSkinned(container, { boneNames, material, outlineMaterial: OUTLINE_MAT, outlineWidth: OUTLINE_WIDTH });
+}
+// The humanoid builders wrap everything in one turned group (children[0]); the bake goes inside it.
+const bakeHumanoid = (group, material) => { bakeEnemy(group.children[0], HUMANOID_BONES, material); return group; };
 
 const mat = {
     // ROUGH TEXTURES (Cloth, Skin, Wood)
@@ -224,7 +226,7 @@ export function createGunslingerMesh() {
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.4, 0.9, 1.4), mat.blackHat); hatTop.position.y = 5.0; mesh.add(hatTop);
 
     group.userData = { muzzle: gunGroup.userData.muzzle, type: 'gunslinger' };
-    addOutline(group);
+    bakeHumanoid(group);
     return group;
 }
 
@@ -241,7 +243,7 @@ export function createEnemyMesh() {
     const bandana = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.6, 1.25), mat.red); bandana.position.y = 3.9; mesh.add(bandana);
     const hatBrim = new THREE.Mesh(new THREE.BoxGeometry(2.2, 0.2, 2.2), mat.blackHat); hatBrim.position.y = 4.6; mesh.add(hatBrim);
     const hatTop = new THREE.Mesh(new THREE.BoxGeometry(1.3, 0.8, 1.3), mat.blackHat); hatTop.position.y = 5.0; mesh.add(hatTop);
-    addOutline(group);
+    bakeHumanoid(group);
     return group;
 }
 
@@ -263,7 +265,7 @@ export function createWolfMesh() {
     const leftEye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), mat.red); leftEye.position.set(-0.3, 2.7, 2.75); group.add(leftEye);
     const rightEye = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.1), mat.red); rightEye.position.set(0.3, 2.7, 2.75); group.add(rightEye);
     group.userData = { type: 'wolf' };
-    addOutline(group);
+    bakeEnemy(group, QUADRUPED_BONES);
     return group;
 }
 
@@ -279,36 +281,8 @@ export function createWhiskeyMesh() {
 }
 
 
-export function createCrate(scene, x, z) {
-    const size = 3.5;
-    const group = new THREE.Group();
-    const crate = new THREE.Mesh(new THREE.BoxGeometry(size, size, size), mat.wood);
-    crate.position.set(0, size / 2, 0);
-    crate.castShadow = true;
-    crate.receiveShadow = true;
-    group.add(crate);
-
-    const detail = new THREE.Mesh(new THREE.BoxGeometry(size + 0.2, size * 0.1, 0.2), mat.coat);
-    detail.position.set(0, size / 2, size / 2);
-    detail.rotation.z = Math.PI / 4;
-    group.add(detail);
-    const detail2 = detail.clone();
-    detail2.rotation.z = -Math.PI / 4;
-    group.add(detail2);
-
-    group.position.set(x, 0, z);
-    placeProp(scene, group, { x, z, radius: size * 0.7, destructible: true, type: 'crate' });
-}
 
 
-export function createCactus(scene, x, z) {
-    const group = new THREE.Group();
-    const trunk = new THREE.Mesh(new THREE.BoxGeometry(2, 6, 2), mat.green); trunk.position.y = 3; trunk.castShadow = true; group.add(trunk);
-    const arm = new THREE.Mesh(new THREE.BoxGeometry(3, 1, 1), mat.green); arm.position.set(1, 4, 0); group.add(arm);
-    const armUp = new THREE.Mesh(new THREE.BoxGeometry(1, 2, 1), mat.green); armUp.position.set(2, 5, 0); group.add(armUp);
-    group.position.set(x, 0, z);
-    placeProp(scene, group, { x, z, radius: 1.5, destructible: true, type: 'cactus' });
-}
 
 export function createAmmoMesh() {
     const group = new THREE.Group();
@@ -347,52 +321,8 @@ export function createBossMesh(colors = null) {
     mesh.add(hpGroup);
 
     group.userData = { muzzle: gunReal.userData.muzzle, hpBar: hpFg, type: 'boss' };
-    addOutline(group);
+    bakeHumanoid(group);
     return group;
-}
-
-
-export function createRock(scene, x, z) {
-    const scale = 0.5 + Math.random();
-    const geo = new THREE.DodecahedronGeometry(scale, 0); 
-    const mesh = new THREE.Mesh(geo, Math.random() > 0.5 ? mat.stone : mat.sandStone);
-    mesh.rotation.set(Math.random()*3, Math.random()*3, Math.random()*3);
-    mesh.position.set(x, scale * 0.3, z);
-    mesh.castShadow = true; mesh.receiveShadow = true;
-    scene.add(mesh);
-    addObstacle({ mesh: mesh, x: x, z: z, radius: scale * 0.5, destructible: true, type: 'rock' });
-}
-
-
-export function createDeadTree(scene, x, z) {
-    const group = new THREE.Group();
-    const trunkHeight = 4 + Math.random() * 2;
-    const trunk = new THREE.Mesh(new THREE.BoxGeometry(0.6, trunkHeight, 0.6), mat.deadWood);
-    trunk.position.y = trunkHeight / 2; trunk.rotation.z = (Math.random() - 0.5) * 0.3; trunk.castShadow = true; group.add(trunk);
-    const branchCount = 2 + Math.floor(Math.random() * 3);
-    for(let i=0; i<branchCount; i++) {
-        const len = 1.5 + Math.random();
-        const branch = new THREE.Mesh(new THREE.BoxGeometry(0.3, len, 0.3), mat.deadWood);
-        branch.position.y = (trunkHeight * 0.4) + Math.random() * (trunkHeight * 0.5);
-        branch.rotation.y = Math.random() * Math.PI * 2;
-        branch.rotation.z = Math.PI / 3 + Math.random() * 0.5; branch.translateOnAxis(new THREE.Vector3(0,1,0), len/2);
-        group.add(branch);
-    }
-    group.position.set(x, 0, z);
-    placeProp(scene, group, { x, z, radius: 1.0, destructible: true, type: 'tree' });
-}
-
-// [DESTRUCTIBLE] Fence
-export function createFence(scene, x, z, angle) {
-    const group = new THREE.Group();
-    const postGeo = new THREE.BoxGeometry(0.4, 2.5, 0.4);
-    const p1 = new THREE.Mesh(postGeo, mat.wood); p1.position.set(-1.5, 1.25, 0); p1.castShadow = true; group.add(p1);
-    const p2 = new THREE.Mesh(postGeo, mat.wood); p2.position.set(1.5, 1.25, 0); p2.castShadow = true; group.add(p2);
-    const railGeo = new THREE.BoxGeometry(3.4, 0.2, 0.1);
-    const r1 = new THREE.Mesh(railGeo, mat.wood); r1.position.set(0, 1.8, 0); r1.rotation.z = (Math.random()-0.5)*0.1; group.add(r1);
-    const r2 = new THREE.Mesh(railGeo, mat.wood); r2.position.set(0, 1.0, 0); r2.rotation.z = (Math.random()-0.5)*0.1; group.add(r2);
-    group.position.set(x, 0, z); group.rotation.y = angle;
-    placeProp(scene, group, { x, z, radius: 1.5, destructible: true, type: 'fence' });
 }
 
 // Recolour the player's outfit. colors: { hat, coat, pants } hex values (see cosmetics.js).
@@ -507,7 +437,9 @@ export function createRattlerMesh() {
     group.add(box(0.12, 0.12, 0.12, colorMat(0xffeb3b), 0.3, 0.55, 1.1));
     group.add(box(0.3, 0.4, 0.4, colorMat(0xe0cfa0), 0, 0.4, -4.1));
     group.userData = { type: 'rattler', segments };
-    addOutline(group);
+    // The segments sway side to side (animation.js): they become bones, and userData points at the bones.
+    bakeEnemy(group, segments.map(seg => seg.name));
+    group.userData.segments = segments.map(seg => group.getObjectByName(seg.name));
     return group;
 }
 
@@ -526,49 +458,43 @@ export function addAimLaser(group, { width = 0.12, height = 2.6 } = {}) {
 export function createRiflemanMesh() {
     const group = createHumanoid({ type: 'rifleman', coat: 0x2f5d8a, hat: 0x3b2a1a, bandana: 0xe0e0e0, weapon: 'rifle', hatStyle: 'bowler' });
     addAimLaser(group);
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createDynamiterMesh() {
     const group = createHumanoid({ type: 'dynamiter', coat: 0x8d6e63, vest: 0xd84315, hat: 0x5d4037, bandana: 0x212121, weapon: 'dynamite', hatStyle: 'bowler' });
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createBruteMesh() {
     const group = createHumanoid({ type: 'brute', coat: 0x5d4037, vest: 0x78909c, hat: 0x3e2723, bandana: 0x8d0000, bulk: 1.45 });
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createKniferMesh() {
     const group = createHumanoid({ type: 'knifer', coat: 0x1b1b1b, vest: 0x8e1b1b, hat: 0x111111, bandana: 0xf5f5f5, weapon: 'knife', hatStyle: 'bowler' });
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createTrooperMesh() {
     const group = createHumanoid({ type: 'trooper', coat: 0x546e7a, hat: 0x37474f, bandana: 0xfbc02d, weapon: 'rifle' });
     addAimLaser(group);
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createDuelistMesh() {
     const group = createHumanoid({ type: 'duelist', coat: 0x4a148c, hat: 0x111111, bandana: 0xffc107, weapon: 'shotgun', hatStyle: 'sombrero' });
-    addOutline(group);
-    return group;
+    return bakeHumanoid(group);
 }
 
 export function createGhostMesh() {
-    // Each ghost fades independently, so it gets its own transparent materials.
-    const own = hex => new THREE.MeshToonMaterial({ color: hex, gradientMap: TOON_GRADIENT, transparent: true, opacity: 1, emissive: new THREE.Color(hex).multiplyScalar(0.25) });
-    const group = createHumanoid({ type: 'ghost', coat: 0xcfd8dc, hat: 0xeceff1, pants: 0xb0bec5, bandana: 0x6a1b9a, materials: own, skinMat: own(0xe3f2fd), weapon: null, hatStyle: 'hood' });
-    const materials = new Set();
-    group.traverse(o => { if(o.isMesh && o.material.transparent) materials.add(o.material); });
-    group.userData.fadeMaterials = [...materials];
-    addOutline(group);
+    // Each ghost fades independently, so it gets a see-through material of its own. The parts are plain (the
+    // bake reads their colour, and their glow, into vertex colours) and the baked mesh wears the see-through one.
+    const plain = hex => new THREE.MeshToonMaterial({ color: hex, emissive: new THREE.Color(hex).multiplyScalar(0.25) });
+    const group = createHumanoid({ type: 'ghost', coat: 0xcfd8dc, hat: 0xeceff1, pants: 0xb0bec5, bandana: 0x6a1b9a, materials: plain, skinMat: plain(0xe3f2fd), weapon: null, hatStyle: 'hood' });
+    const fade = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_GRADIENT, transparent: true, opacity: 1 });
+    bakeHumanoid(group, fade);
+    group.userData.fadeMaterials = [fade];
     return group;
 }
 
@@ -591,6 +517,6 @@ export function createRiderMesh() {
     rider.position.set(0, 2.1, -0.2);
     group.add(rider);
     group.userData = { type: 'rider', quadruped: true };
-    addOutline(group);
+    bakeEnemy(group, QUADRUPED_BONES); // the rider sits on the horse: only the horse's legs move
     return group;
 }

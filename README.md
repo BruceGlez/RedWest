@@ -76,7 +76,9 @@ Each finished run is recorded in that browser's playtest log: result, pursuit re
 [POLISH_PLAN.md](POLISH_PLAN.md) lists what "studio grade" needs, in order (world and props first, then combat
 feel, post-processing, audio, UI), and gathers the open items from the other documents in one place.
 [STORY_BIBLE.md](STORY_BIBLE.md) proposes the story: the marshal's background, one home ground and one story
-per outlaw, and how the story reaches the player. It is a proposal for the owner to approve, not built yet.
+per outlaw, and how the story reaches the player. Built so far: enemies drawn as one skinned mesh each, instanced
+scenery, a look per stage (sky, fog, light, wind, dust or snow), and three story cards and a ledger page per outlaw in the
+Bounty Book (story cards, and the Case File of ten pages). The opening and ending panels, town barks and story props are open.
 
 ## Verify
 
@@ -91,6 +93,7 @@ npm run test:store
 npm run test:bosses
 npm run test:characters
 npm run test:event
+npm run test:story
 npm run test:demo
 ```
 

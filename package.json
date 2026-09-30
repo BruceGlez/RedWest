@@ -19,6 +19,7 @@
     "ios:open": "cap open ios",
     "test:characters": "node tests/characters-smoke.mjs",
     "test:event": "node tests/event-smoke.mjs",
+    "test:story": "node tests/story-smoke.mjs",
     "build:demo": "vite build --mode demo && node tools/inline-demo.mjs",
     "test:demo": "node tests/demo-smoke.mjs"
   },

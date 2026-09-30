@@ -97,16 +97,14 @@ export function createDesertGroundTexture(size = 1024) {
 }
 
 // Warm sunset sky for anything above the horizon (mostly seen on the lobby camera).
-export function createSkyTexture() {
+// stops: four colours (hex numbers) from the top of the sky to the horizon; the default is the warm sunset.
+export function createSkyTexture(stops = [0x6fb3e0, 0xf4c98e, 0xffb070, 0xf7d7a8]) {
     const canvas = document.createElement('canvas');
     canvas.width = 4;
     canvas.height = 256;
     const ctx = canvas.getContext('2d');
     const g = ctx.createLinearGradient(0, 0, 0, 256);
-    g.addColorStop(0, '#6fb3e0');
-    g.addColorStop(0.45, '#f4c98e');
-    g.addColorStop(0.75, '#ffb070');
-    g.addColorStop(1, '#f7d7a8');
+    [0, 0.45, 0.75, 1].forEach((at, i) => g.addColorStop(at, `#${stops[i].toString(16).padStart(6, '0')}`));
     ctx.fillStyle = g;
     ctx.fillRect(0, 0, 4, 256);
     const texture = new THREE.CanvasTexture(canvas);
