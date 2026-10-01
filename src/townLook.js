@@ -4,6 +4,7 @@ import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
 import { ShaderPass } from 'three/addons/postprocessing/ShaderPass.js';
 import { OutputPass } from 'three/addons/postprocessing/OutputPass.js';
+import { QUALITY, createGovernor } from './townQuality.js';
 
 // Art direction for Frontier Town, kept apart from how the town is built (src/townScene.js) and how the player
 // moves in it (src/townWalk.js): this file only changes how the finished scene is drawn, and can be switched
@@ -118,14 +119,19 @@ const GradeShader = {
         }`
 };
 
-// scene / camera: the town's. Returns { render(dt), resize(w, h), setEnabled(on) }.
-export function createTownLook(renderer, scene, camera, { enabled = true, samples = 4 } = {}) {
+// scene / camera: the town's. options: enabled; level: 'high' | 'medium' | 'low' (src/townQuality.js); auto: step down by
+// itself when the town runs slowly; onQuality(level, 'auto' | 'user'): called when the level changes.
+// Returns { render(dt), resize(w, h), setEnabled(on), setQuality(level, auto), feed(dt), quality, auto, enabled }.
+export function createTownLook(renderer, scene, camera, { enabled = true, level = 'high', auto = true, onQuality = () => {} } = {}) {
     const uLook = { value: enabled ? 1 : 0 };
     const patched = new WeakSet();
     const originalBackground = scene.background;
     const sky = skyTexture();
+    const governor = createGovernor({ level, auto });
     let on = enabled;
     let sinceScan = Infinity;
+    const size = renderer.getSize(new THREE.Vector2());
+    let width = size.x, height = size.y;
 
     // Buildings rebuild when they are upgraded and can bring new materials: look again every half second.
     function scan() {
@@ -138,15 +144,32 @@ export function createTownLook(renderer, scene, camera, { enabled = true, sample
         });
     }
 
-    const size = renderer.getSize(new THREE.Vector2());
-    const target = new THREE.WebGLRenderTarget(size.x, size.y, { type: THREE.HalfFloatType, samples });
-    const composer = new EffectComposer(renderer, target);
-    composer.addPass(new RenderPass(scene, camera));
-    const bloom = new UnrealBloomPass(new THREE.Vector2(size.x, size.y), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
-    composer.addPass(bloom);
-    const grade = new ShaderPass(GradeShader);
-    composer.addPass(grade);
-    composer.addPass(new OutputPass());
+    // The post-processing chain for the current level; none at all at 'low' (only the painted shading and the sky).
+    let composer = null;
+    let grade = null;
+    function dropPost() {
+        composer?.dispose();
+        composer = grade = null;
+    }
+    function buildPost() {
+        dropPost();
+        const q = QUALITY[governor.level];
+        if(!on || !q.post) return;
+        composer = new EffectComposer(renderer, new THREE.WebGLRenderTarget(width, height, { type: THREE.HalfFloatType, samples: q.samples }));
+        composer.setPixelRatio(Math.min(renderer.getPixelRatio(), q.pixelRatioCap));
+        composer.setSize(width, height);
+        composer.addPass(new RenderPass(scene, camera));
+        const bloom = new UnrealBloomPass(new THREE.Vector2(width, height), BLOOM.strength, BLOOM.radius, BLOOM.threshold);
+        if(q.bloomScale !== 1) { // the composer tells every pass the full size: bloom works on a smaller picture of it
+            const full = bloom.setSize.bind(bloom);
+            bloom.setSize = (w, h) => full(Math.max(1, Math.round(w * q.bloomScale)), Math.max(1, Math.round(h * q.bloomScale)));
+            bloom.setSize(width * composer._pixelRatio, height * composer._pixelRatio);
+        }
+        composer.addPass(bloom);
+        grade = new ShaderPass(GradeShader);
+        composer.addPass(grade);
+        composer.addPass(new OutputPass());
+    }
 
     function apply() {
         uLook.value = on ? 1 : 0;
@@ -154,6 +177,17 @@ export function createTownLook(renderer, scene, camera, { enabled = true, sample
     }
     apply();
     scan();
+    buildPost();
+
+    // One frame took dt seconds: drops a level when the town has been slow for a while (never goes back up by itself).
+    function feed(dt) {
+        const stepped = governor.observe(dt);
+        if(stepped) {
+            buildPost();
+            onQuality(stepped, 'auto');
+        }
+        return stepped;
+    }
 
     let clock = 0;
     return {
@@ -168,6 +202,11 @@ export function createTownLook(renderer, scene, camera, { enabled = true, sample
                 sinceScan = 0;
                 scan();
             }
+            feed(dt);
+            if(!composer) {
+                renderer.render(scene, camera);
+                return;
+            }
             grade.uniforms.time.value = clock % 10;
             // renderer.info restarts on every render() call, and the composer makes one per pass. Count the whole
             // frame (the town plus the post passes) so the draw-call guards in tests/mobile-smoke.mjs stay honest.
@@ -177,14 +216,28 @@ export function createTownLook(renderer, scene, camera, { enabled = true, sample
             composer.render(dt);
             info.autoReset = true;
         },
-        resize(width, height) {
-            composer.setPixelRatio(renderer.getPixelRatio());
-            composer.setSize(width, height);
+        resize(w, h) {
+            width = w;
+            height = h;
+            if(!composer) return;
+            composer.setPixelRatio(Math.min(renderer.getPixelRatio(), QUALITY[governor.level].pixelRatioCap));
+            composer.setSize(w, h);
         },
         setEnabled(next) {
             on = !!next;
             apply();
+            buildPost(); // frees the chain while LOOK is off, builds it again when it is back on
         },
+        // By hand: a level, and whether it may still step down by itself.
+        setQuality(next, allowAuto = false) {
+            governor.set(next);
+            governor.auto = allowAuto;
+            buildPost();
+            onQuality(governor.level, 'user');
+        },
+        feed,
+        get quality() { return governor.level; },
+        get auto() { return governor.auto; },
         get enabled() { return on; }
     };
 }

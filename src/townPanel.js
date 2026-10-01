@@ -14,7 +14,8 @@ import { loadNews, saveNews, newlyOpened, bannerFor, markSeen, markVisited, talk
 import { getFolk, folkLine } from './townFolk.js';
 import { loadCompanion, saveCompanion } from './townCompanion.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
-import { featureOn, rememberFeature } from './townFeatures.js';
+import { featureOn, rememberFeature, qualityParam } from './townFeatures.js';
+import { loadQuality, saveQuality, nextChoice, startLevel } from './townQuality.js';
 import { normalizePass, seasonEndsAt, themeFor, tierFor, tierReward, TIERS, POINTS_PER_TIER, POINTS } from './pass.js';
 import { getShopItem } from './cosmetics.js';
 import { purchaseSupport } from './purchases.js';
@@ -33,6 +34,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         touch: $('town-touch'),
         walkButton: $('town-walk-btn'),
         lookButton: $('town-look-btn'),
+        qualityButton: $('town-quality-btn'),
         hint: $('town-hint'),
         news: $('town-news'),
         newsTitle: $('town-news-title'),
@@ -49,6 +51,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     let town3d = null; // built the first time the town opens
     let look = null; // the art direction pass (src/townLook.js), an independent switch
     let walk = null; // the walkable town (src/townWalk.js), an independent switch
+    let quality = loadQuality(); // what the player chose for LOOK's quality, and the best level the device managed
+    let qualityChoice = startLevel(quality, qualityParam()).choice; // for this visit (the URL may override the saved choice)
     let news = loadNews(); // which districts the player has been told about and has walked into, kept on this device
     let newsTimer = null;
     let companion = loadCompanion(); // the dog from the Calloway farm: { adopted, following }, kept on this device
@@ -452,7 +456,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             town3d = createTownScene({ time: featureOn('time') });
             walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot, lineFor: personLine });
             // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
-            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; } };
+            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; }, get look() { return look; } };
         }
         town3d.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
@@ -462,11 +466,37 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         ui.showTown();
         render();
     });
+    // LOOK's quality (src/townQuality.js): AUTO steps down by itself on a slow phone, and remembers where it ended up.
+    const LEVEL_NAMES = { high: 'HIGH', medium: 'MED', low: 'LOW' };
+    function onQualityChange(level, why) {
+        if(why === 'auto' && qualityChoice === 'auto') {
+            quality = { ...quality, floor: level };
+            saveQuality(quality);
+            track('look_quality_auto');
+        }
+        syncTools();
+    }
+    els.qualityButton.addEventListener('click', () => {
+        if(!look) return;
+        qualityChoice = nextChoice(qualityChoice);
+        if(qualityChoice === 'auto') {
+            quality = { choice: 'auto', floor: 'high' }; // back to auto gives the device another chance at the best look
+            look.setQuality('high', true);
+        } else {
+            quality = { choice: qualityChoice, floor: quality.floor };
+            look.setQuality(qualityChoice, false);
+        }
+        saveQuality(quality);
+        syncTools();
+    });
     // WALK and LOOK are separate switches: either can be on without the other.
     function syncTools() {
         const walking = !!walk?.active;
         els.walkButton.setAttribute('aria-pressed', String(walking));
         els.lookButton.setAttribute('aria-pressed', String(!!look?.enabled));
+        els.qualityButton.style.display = (look ? look.enabled : featureOn('look')) ? '' : 'none';
+        const shown = look?.quality ?? startLevel(quality, qualityParam()).level;
+        els.qualityButton.textContent = qualityChoice === 'auto' ? `QUALITY: AUTO (${LEVEL_NAMES[shown]})` : `QUALITY: ${LEVEL_NAMES[qualityChoice]}`;
         els.hint.textContent = walking
             ? ('ontouchstart' in window ? 'Stick to walk. Tap a door to go in.' : 'WASD to walk. E at a door to go in.')
             : 'Drag to look around. Tap a building.';
@@ -597,7 +627,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         },
         frame(renderer, dt) {
             if(!look) { // needs the renderer, which only the loop hands over
-                look = createTownLook(renderer, town3d.scene, town3d.camera, { enabled: featureOn('look') });
+                const start = startLevel(quality, qualityParam());
+                look = createTownLook(renderer, town3d.scene, town3d.camera, { enabled: featureOn('look'), level: start.level, auto: start.auto, onQuality: onQualityChange });
                 look.resize(window.innerWidth, window.innerHeight);
                 syncTools();
             }

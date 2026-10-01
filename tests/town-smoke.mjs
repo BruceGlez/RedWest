@@ -291,6 +291,63 @@ try {
         await context.close();
     }
 
+    // LOOK's quality (src/townQuality.js): a button that goes round auto, high, medium, low; auto steps down on a slow device
+    // and remembers where it ended up.
+    {
+        const { page, errors, context } = await open();
+        const label = () => page.locator('#town-quality-btn').textContent();
+        const look = () => page.evaluate(() => ({ quality: window.__redWestTown.look.quality, auto: window.__redWestTown.look.auto }));
+        await page.waitForFunction(() => window.__redWestTown.look);
+        assert.match(await label(), /^QUALITY: AUTO \((HIGH|MED|LOW)\)$/);
+        for(const [text, quality, auto] of [['QUALITY: HIGH', 'high', false], ['QUALITY: MED', 'medium', false], ['QUALITY: LOW', 'low', false]]) {
+            await page.locator('#town-quality-btn').click();
+            assert.equal(await label(), text);
+            assert.deepEqual(await look(), { quality, auto });
+            await page.waitForTimeout(400); // the town draws a few frames at this level
+        }
+        await page.locator('#town-quality-btn').click();
+        assert.match(await label(), /^QUALITY: AUTO \(HIGH\)$/, 'back to auto starts again at the best look');
+        assert.deepEqual(await look(), { quality: 'high', auto: true });
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('redWestTownQuality.v1')).choice), 'auto');
+
+        // A slow device: feed slow frames (the real ones only add to this) and auto steps down, one level at a time.
+        await page.evaluate(() => { for(let i = 0; i < 150; i++) window.__redWestTown.look.feed(0.1); }); // fifteen seconds at ten frames a second
+        assert.equal((await look()).quality, 'low', 'steps down to low');
+        assert.match(await label(), /^QUALITY: AUTO \(LOW\)$/);
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('redWestTownQuality.v1')).floor), 'low', 'remembers where it ended up');
+        await page.waitForTimeout(500);
+
+        // LOOK off takes the quality button away.
+        await page.locator('#town-look-btn').click();
+        assert.equal(await page.locator('#town-quality-btn').isVisible(), false);
+        await page.locator('#town-look-btn').click();
+        assert.equal(await page.locator('#town-quality-btn').isVisible(), true);
+        assert.equal((await look()).quality, 'low', 'LOOK back on keeps the level');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // The next visit starts from where the device ended up, not from the top.
+        const seed = () => localStorage.setItem('redWestTownQuality.v1', JSON.stringify({ choice: 'auto', floor: 'medium' }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        await page.waitForFunction(() => window.__redWestTown.look);
+        assert.deepEqual(await page.evaluate(() => ({ quality: window.__redWestTown.look.quality, auto: window.__redWestTown.look.auto })), { quality: 'medium', auto: true });
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // ?quality=low is for that page load only: low, and by hand (it never changes by itself).
+        const { page, errors, context } = await open('?quality=low');
+        await page.waitForFunction(() => window.__redWestTown.look);
+        assert.deepEqual(await page.evaluate(() => ({ quality: window.__redWestTown.look.quality, auto: window.__redWestTown.look.auto })), { quality: 'low', auto: false });
+        assert.equal(await page.locator('#town-quality-btn').textContent(), 'QUALITY: LOW');
+        await page.evaluate(() => { for(let i = 0; i < 150; i++) window.__redWestTown.look.feed(0.1); });
+        assert.equal(await page.evaluate(() => window.__redWestTown.look.quality), 'low');
+        assert.equal(await page.evaluate(() => localStorage.getItem('redWestTownQuality.v1')), null, 'the URL choice is not saved');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+
     // Each off on its own from the URL.
     {
         const { page, errors, context } = await open('?walk=off');

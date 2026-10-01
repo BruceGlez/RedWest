@@ -22,3 +22,9 @@ export function featureOn(name, search = globalThis.location?.search ?? '', save
 export function rememberFeature(name, on) {
     try { localStorage.setItem(KEY, JSON.stringify({ ...stored(), [name]: !!on })); } catch { /* private mode */ }
 }
+
+// ?quality=auto|high|medium|low for one page load (src/townQuality.js), or null.
+export function qualityParam(search = globalThis.location?.search ?? '') {
+    const value = new URLSearchParams(search).get('quality');
+    return ['auto', 'high', 'medium', 'low'].includes(value) ? value : null;
+}

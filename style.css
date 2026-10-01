@@ -950,6 +950,7 @@ a.round-btn { display: flex; align-items: center; justify-content: center; text-
     font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 11px; letter-spacing: 0.5px; padding: 6px 10px; border-radius: 8px; cursor: pointer;
     background: rgba(26, 15, 10, 0.82); color: #8d7a5e; border: 2px solid #6d4c41; box-shadow: 0 3px 8px rgba(0, 0, 0, 0.5);
 }
+.town-quality { font-size: 9px; padding: 5px 8px; }
 .town-tool[aria-pressed="true"] { color: #ffd54f; border-color: #c8a050; }
 .walk-stick {
     position: absolute; left: calc(18px + env(safe-area-inset-left)); bottom: calc(26px + env(safe-area-inset-bottom)); z-index: 3;
