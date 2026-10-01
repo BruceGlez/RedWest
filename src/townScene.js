@@ -1212,6 +1212,7 @@ export function createTownScene(options = {}) {
         },
         overview() {
             view.target.set(3 * SPREAD, 0, -12 * SPREAD);
+            view.distance = viewSize[0] < viewSize[1] ? 160 * SPREAD : 70 * SPREAD; // back out from the walking camera to the whole town
             this.resize(...viewSize);
         },
         // Building id under a screen point (normalized device coordinates), or null.
