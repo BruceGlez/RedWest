@@ -227,20 +227,43 @@ function playRecordedSfx(key) {
 let musicTrack = DEMO ? 'fight' : 'home';
 let musicSource = null;
 let musicSourceTrack = null;
+// Every recorded music source that exists. Whatever happens to the one in `musicSource`, all of these are stopped and
+// disconnected before another starts, so a loop that was somehow left behind can never keep playing under the next song.
+const musicSources = new Set();
 const switchPending = new Set(); // tracks that will replace the synth loop once loaded
 
 // Only one music source ever exists. Each step is guarded on its own so a failing stop()
 // (seen on iPhone) still disconnects the old loop instead of leaving it playing untracked.
 function stopRecordedMusic() {
-    const source = musicSource;
     musicSource = null;
     musicSourceTrack = null;
-    if(!source) return;
-    try { source.stop(); } catch { /* already stopped */ }
-    try { source.disconnect(); } catch { /* already disconnected */ }
+    for(const source of musicSources) {
+        try { source.stop(); } catch { /* already stopped */ }
+        try { source.disconnect(); } catch { /* already disconnected */ }
+    }
+    musicSources.clear();
+}
+
+// Track changes are applied once per moment: the Boss Arena goes straight from the fight loop to the showdown, and starting
+// the first only to stop it again in the same instant is how a song ends up playing twice (seen on iPhone, where the context
+// is still unlocking). Whatever the last request was is what starts.
+let musicUpdateQueued = false;
+function queueMusicUpdate() {
+    if(musicUpdateQueued) return;
+    musicUpdateQueued = true;
+    queueMicrotask(() => {
+        musicUpdateQueued = false;
+        if(musicEnabled) startBackgroundTrack();
+    });
 }
 
 function startBackgroundTrack() {
+    // A song started in a context that is not running yet can play out of step, on top of the next one, once the context
+    // unlocks (iPhone). So nothing is created until it runs; resuming is asked for, and the song starts when it has.
+    if(audioCtx.state !== 'running' && audioCtx.state !== 'closed') {
+        audioCtx.resume().then(() => { if(audioCtx.state === 'running' && musicEnabled) startBackgroundTrack(); }).catch(() => {});
+        return;
+    }
     const id = `music/${musicTrack}`;
     const buffer = buffers.get(id);
     if(buffer) {
@@ -253,6 +276,8 @@ function startBackgroundTrack() {
         source.connect(fileMusicGain);
         musicSource = source;
         musicSourceTrack = musicTrack;
+        musicSources.add(source);
+        source.onended = () => musicSources.delete(source);
         try {
             source.start();
         } catch {
@@ -544,7 +569,7 @@ export function setMusicTrack(track) {
     if(DEMO) track = 'fight'; // the playable ad carries one music track
     if(!MUSIC[track] || track === musicTrack) return;
     musicTrack = track;
-    if(musicEnabled && (musicIntervalId !== null || musicSource)) startBackgroundTrack();
+    if(musicEnabled && (musicIntervalId !== null || musicSource)) queueMusicUpdate();
 }
 
 // While the marshal's Heat is high the fight loop gives way to the hotter one, and back again when it cools. Only

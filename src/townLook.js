@@ -128,6 +128,7 @@ export function createTownLook(renderer, scene, camera, { enabled = true, level 
     const originalBackground = scene.background;
     const sky = skyTexture();
     const governor = createGovernor({ level, auto });
+    const initialLevel = governor.level; // where it started (AUTO may step down from here)
     let on = enabled;
     let sinceScan = Infinity;
     const size = renderer.getSize(new THREE.Vector2());
@@ -237,6 +238,7 @@ export function createTownLook(renderer, scene, camera, { enabled = true, level 
         },
         feed,
         get quality() { return governor.level; },
+        get initialQuality() { return initialLevel; },
         get auto() { return governor.auto; },
         get enabled() { return on; }
     };

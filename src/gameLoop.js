@@ -19,7 +19,7 @@ import { ENEMY_TYPES, rosterWave, featuredFor, enemyCost } from './enemyTypes.js
 import { markSeen, recordKills } from './progress.js';
 import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
 import { recordRun, saveProgress } from './progress.js';
-import { arena } from './arena.js';
+import { arena, endTownFight } from './arena.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 import { clearCombatFx, updateCombatFx } from './combatFx.js';
 import { disposeBaked } from './meshMerge.js';
@@ -448,6 +448,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     let hotMusic = false;
 
     function resetGame() {
+        endTownFight(); // a fight started from the town's Arena is over: the home screen is the home screen again
         hotMusic = false;
         bountyChoiceAt = 0;
         gameState.event = null;

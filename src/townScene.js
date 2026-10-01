@@ -1,6 +1,6 @@
 import * as THREE from 'three';
 import { mergeByMaterial } from './meshMerge.js';
-import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces } from './townDistricts.js';
+import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces, getDistrict } from './townDistricts.js';
 import { FOLK, createWalker, stepWalker } from './townFolk.js';
 import { skyAt } from './townTime.js';
 import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
@@ -192,6 +192,22 @@ const BUILDERS = {
         g.add(box(6.4, 0.5, 6.4, C.brickDark, 0, 6.2, 0));
         return g;
     },
+    // The Arena (src/arena.js): a walled ring of sand with a gate and a flag, where practice fights are picked.
+    arena() {
+        const g = new THREE.Group();
+        g.add(box(11, 0.08, 9, 0xb89a64, 0, 0.05, 0)); // the sand
+        g.add(box(11, 3, 0.4, C.timber, 0, 1.5, -4.3)); // back wall
+        for(const x of [-5.3, 5.3]) g.add(box(0.4, 3, 9, C.timber, x, 1.5, 0)); // side walls
+        for(const x of [-3.75, 3.75]) g.add(box(3.5, 3, 0.4, C.timber, x, 1.5, 4.3)); // front wall, with the gate between
+        for(const x of [-2, 2]) g.add(box(0.5, 5, 0.5, C.timber, x, 2.5, 4.3)); // gateposts
+        g.add(box(4.8, 0.4, 0.5, C.timber, 0, 5, 4.3)); // the beam
+        const s = sign('ARENA', 4);
+        s.position.set(0, 6, 4.6);
+        g.add(s);
+        g.add(box(0.25, 7, 0.25, C.timber, -5.3, 3.5, 4.3), box(2.2, 1.2, 0.08, 0x8b0000, -4.2, 6.4, 4.3)); // a flag
+        g.add(box(0.5, 1.8, 0.5, C.timber, 0, 0.9, 0)); // the post in the middle of the ring
+        return g;
+    },
     saloon() {
         const g = new THREE.Group();
         g.add(box(10, 8, 7, C.brick, 0, 4, 0));
@@ -276,7 +292,8 @@ export const TOWN_LAYOUT = [
     { id: 'jail', x: -16, z: 5, label: 'JAIL' },
     { id: 'gunsmith', x: 1, z: 5, label: 'GUNSMITH' },
     { id: 'tailor', x: 12, z: 5, label: 'TAILOR' },
-    { id: 'depot', x: 33, z: -15, label: 'MOST WANTED' }
+    { id: 'depot', x: 33, z: -15, label: 'MOST WANTED' },
+    { id: 'arena', x: 29, z: 6, label: 'ARENA' }
 ];
 
 function lamp(x, z) {
@@ -707,46 +724,48 @@ export function createTownScene(options = {}) {
     scenery.add(box(0.25, 3.6, 0.25, C.timberDark, 34.5, 1.8, -3.4), trainSign);
     scene.add(mergeByMaterial(scenery));
     // Gates: a fence while a district is shut, an open gate once its outlaw is beaten (setDistricts).
-    // Many small boxes that never move on their own: baked into a mesh per material, like the rest of the town. All the
-    // shut gates are one merged set (rebuilt when a district opens), each open gate is its own so it can rise.
-    const gates = new Map();
+    // Many small boxes that never move on their own: baked into a mesh per material, like the rest of the town. All the shut
+    // gates are one merged set and all the open gates are another (each rebuilt when a district opens); a gate that is rising
+    // out of the ground is its own group until it has finished, and then joins the open set.
+    const gates = new Map(); // id -> { rise: the group of a gate that is rising, or null }
     let openDistricts = [];
-    let shutGates = null;
-    let shutKey = '';
-    function rebuildShutGates() {
-        const key = openDistricts.join(',');
-        if(key === shutKey && shutGates) return;
-        shutKey = key;
-        if(shutGates) {
-            scene.remove(shutGates);
-            shutGates.traverse(o => { if(o.isMesh) o.geometry.dispose(); });
-        }
-        const all = new THREE.Group();
-        for(const d of DISTRICTS) if(!openDistricts.includes(d.id)) all.add(shutGate(d));
-        shutGates = mergeByMaterial(all);
-        scene.add(shutGates);
-    }
-    for(const d of DISTRICTS) {
-        const open = mergeByMaterial(openGate(d));
-        open.visible = false;
-        scene.add(open);
-        gates.set(d.id, { open });
-    }
-    rebuildShutGates();
+    const sets = { shut: null, open: null };
+    const setKeys = { shut: '', open: '' };
     const rising = new Map(); // open gates growing up out of the ground, id -> 0..1
+    function rebuildSet(name, make, ids) {
+        const key = ids.join(',');
+        if(key === setKeys[name] && sets[name]) return;
+        setKeys[name] = key;
+        if(sets[name]) {
+            scene.remove(sets[name]);
+            sets[name].traverse(o => { if(o.isMesh) o.geometry.dispose(); });
+        }
+        const group = new THREE.Group();
+        for(const d of DISTRICTS) if(ids.includes(d.id)) group.add(make(d));
+        sets[name] = mergeByMaterial(group);
+        scene.add(sets[name]);
+    }
+    function rebuildGates() {
+        rebuildSet('shut', shutGate, DISTRICTS.map(d => d.id).filter(id => !openDistricts.includes(id)));
+        rebuildSet('open', openGate, openDistricts.filter(id => !rising.has(id)));
+    }
+    for(const d of DISTRICTS) gates.set(d.id, { rise: null });
+    rebuildGates();
     function setDistricts(ids) {
         openDistricts = DISTRICTS.filter(d => ids.includes(d.id)).map(d => d.id);
-        for(const [id, gate] of gates) gate.open.visible = openDistricts.includes(id);
-        rebuildShutGates();
+        rebuildGates();
     }
     // A district's gate rises out of the ground (when the player is told it has opened).
     function celebrate(ids) {
         for(const id of ids) {
             const gate = gates.get(id);
-            if(!gate || !openDistricts.includes(id)) continue;
-            gate.open.scale.y = 0.01;
+            if(!gate || !openDistricts.includes(id) || rising.has(id)) continue;
+            gate.rise = mergeByMaterial(openGate(getDistrict(id)));
+            gate.rise.scale.y = 0.01;
+            scene.add(gate.rise);
             rising.set(id, 0);
         }
+        rebuildGates(); // the rising gates leave the open set while they grow
     }
     // Notes on the board: one for each job left today. Coins in the cash box: what the jail has earned. Each is rebuilt as
     // a few merged meshes when it changes (rarely), so it costs a draw call or two, not one for every note and coin.
@@ -900,9 +919,15 @@ export function createTownScene(options = {}) {
         if(timeOn) applyTime(elapsed + timeOffset);
         for(const [id, progress] of rising) {
             const next = Math.min(1, progress + dt * 1.2);
-            gates.get(id).open.scale.y = 0.01 + 0.99 * (1 - Math.pow(1 - next, 3));
-            if(next >= 1) rising.delete(id);
-            else rising.set(id, next);
+            const gate = gates.get(id);
+            gate.rise.scale.y = 0.01 + 0.99 * (1 - Math.pow(1 - next, 3));
+            if(next >= 1) { // it has grown: it joins the open gates, and its own group goes
+                rising.delete(id);
+                scene.remove(gate.rise);
+                gate.rise.traverse(o => { if(o.isMesh) o.geometry.dispose(); });
+                gate.rise = null;
+                rebuildGates();
+            } else rising.set(id, next);
         }
         smokeTimer -= dt;
         if(smokeTimer <= 0) {

@@ -11,7 +11,7 @@ import { loadRunLog, clearRunLog } from './runLog.js';
 import { loadProgress, saveProgress, isUnlocked } from './progress.js';
 import { renderOutlawPortraits, renderEnemyPortraits, renderEnemyModelPortrait, renderPlayerPreview, renderCharacterPortrait } from './portraits.js';
 import { OUTLAWS } from './outlaws.js';
-import { arena } from './arena.js';
+import { arena, beginTownFight } from './arena.js';
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit, restorePurchases, lastCredit } from './purchases.js';
@@ -22,8 +22,8 @@ import { isChild, canShareStats } from './privacy.js';
 import { configureAnalytics, track } from './analytics.js';
 import { generatedName } from './names.js';
 import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
-import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
-import { WOLF_MODEL, WOLF_MODEL_HEIGHT } from './enemySystem.js';
+import { loadCharacterModel, loadedCharacterModel, createCharacterInstance } from './characterModels.js';
+import { WOLF_MODEL, WOLF_MODEL_HEIGHT, attachMissingOutlawModels } from './enemySystem.js';
 import { applyPlayerLoadout } from './assets.js';
 import { applyPerk } from './perks.js';
 import { DEMO, openStore, assetUrl } from './demo.js';
@@ -82,9 +82,17 @@ function loadOutlawModel(index) {
             if(picture) outlawPortraits[outlaw.id] = picture;
             ui.setPortraits(outlawPortraits, enemyPortraits);
             syncOutlawThumbs();
-        }).catch(() => {})); // missing file: the box outlaw is used
+            attachMissingOutlawModels(); // a boss that spawned before this finished downloading gets its model now
+        }).catch(() => { outlawModelRequests.delete(index); })); // missing file: the box outlaw is used, and the next request tries again
     }
     return outlawModelRequests.get(index);
+}
+// The model, with one more try if the first download failed (a flaky phone connection): a fight should not start as the
+// plain box figure just because of one dropped download.
+async function ensureOutlawModel(index) {
+    await loadOutlawModel(index);
+    const url = OUTLAWS[index]?.model;
+    if(url && !loadedCharacterModel(url)) await loadOutlawModel(index);
 }
 // The 3D wolf (about 0.6 MB) loads in the background: wolves spawn as the box wolf until it is ready,
 // and stay the box wolf if the file is missing. Not needed in the playable ad.
@@ -120,6 +128,14 @@ const town = createTownPanel({
     onBuyPass: () => buyRealMoneyProduct('season_pass'),
     isChild: () => isChild(privacyPanel.privacy),
     // Most Wanted: fight this week's event outlaw (its model first), then back to the home screen.
+    // The Arena in the town: a practice fight against a boss already beaten on the Wanted Road (its model first).
+    portrait: id => outlawPortraits[id],
+    onArenaFight: async index => {
+        if(!beginTownFight(index, progress)) return;
+        ui.hidePanels();
+        await ensureOutlawModel(index);
+        keys.startRequested = true;
+    },
     // The train at the depot: the same hunt as PLAY, for the outlaw the Wanted Road has selected.
     onBoardTrain: () => {
         ui.hidePanels();
@@ -347,7 +363,7 @@ ui.bindControlHandlers({
     onRideOn: () => gameLoop.rideOnToBonus(),
     // The arena starts a fight at once, so it waits for that outlaw's model first.
     onPlay: async () => {
-        if(arena.enabled) await loadOutlawModel(arena.outlaw);
+        if(arena.enabled) await ensureOutlawModel(arena.outlaw);
         keys.startRequested = true;
     },
     onBuyItem: async id => {

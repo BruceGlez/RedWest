@@ -331,7 +331,8 @@ try {
         const seed = () => localStorage.setItem('redWestTownQuality.v1', JSON.stringify({ choice: 'auto', floor: 'medium' }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
         await page.waitForFunction(() => window.__redWestTown.look);
-        assert.deepEqual(await page.evaluate(() => ({ quality: window.__redWestTown.look.quality, auto: window.__redWestTown.look.auto })), { quality: 'medium', auto: true });
+        // (It may already have stepped down since: slow headless frames make AUTO do that after a few seconds. What matters is where it started.)
+        assert.deepEqual(await page.evaluate(() => ({ started: window.__redWestTown.look.initialQuality, auto: window.__redWestTown.look.auto })), { started: 'medium', auto: true });
         assert.deepEqual(errors, []);
         await context.close();
     }
@@ -348,6 +349,56 @@ try {
         await context.close();
     }
 
+    // The Arena (src/arena.js): a place in town. Boss fights are an option; a boss opens once beaten on the Wanted Road.
+    {
+        // Nothing beaten: every boss is locked. The overview (?walk=off) opens it by tapping its sign.
+        const { page, errors, context } = await open('?walk=off');
+        await page.locator('.town-label', { hasText: 'ARENA' }).click();
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /BOSS FIGHTS/, 'boss fights are one of the options');
+        assert.equal(await page.locator('[data-arena-fight]').count(), 10, 'all ten outlaws are listed');
+        assert.equal(await page.locator('[data-arena-fight]:not([disabled])').count(), 0, 'none beaten, none open');
+        assert.equal(await page.locator('.arena-row.locked').count(), 10);
+        assert.match(await page.locator('.arena-row').first().textContent(), /Beat them on the Wanted Road/);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // Dusty Pete and Deacon Graves beaten: those two open, the rest stay locked. Walking up to the gate opens the card too.
+        const seed = () => localStorage.setItem('redWestProgress.v1', JSON.stringify({ selected: 3, stars: [7, 0, 1, 0, 0, 0, 0, 0, 0, 0], best: [] }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        await goTo(page, 'arena');
+        await page.locator('.walk-prompt').filter({ hasText: 'ARENA' }).waitFor({ state: 'visible' });
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('[data-arena-fight]:not([disabled])')].map(b => b.dataset.arenaFight)), ['0', '2']);
+        assert.match(await page.locator('#town-grid').textContent(), /2 \/ 10 OPEN/);
+        // The options switch on and off.
+        assert.match(await page.locator('[data-arena-toggle="invincible"]').textContent(), /CAN'T DIE: OFF/);
+        await page.locator('[data-arena-toggle="invincible"]').click();
+        assert.match(await page.locator('[data-arena-toggle="invincible"]').textContent(), /CAN'T DIE: ON/);
+        // Fight Dusty Pete: the card closes, the run starts as an Arena run, and the town does not stay open behind it.
+        await page.evaluate(async () => { window.__rw = { state: await import('/src/state.js'), arena: (await import('/src/arena.js')).arena }; });
+        await page.locator('[data-arena-fight="0"]').click();
+        await page.waitForFunction(() => window.__rw.state.gameState.isGameStarted, null, { timeout: 90000 });
+        assert.deepEqual(await page.evaluate(() => ({ enabled: window.__rw.arena.enabled, fromTown: window.__rw.arena.fromTown, outlaw: window.__rw.arena.outlaw, invincible: window.__rw.arena.invincible, wave: window.__rw.state.gameState.outlawIndex })),
+            { enabled: true, fromTown: true, outlaw: 0, invincible: true, wave: 0 });
+        assert.equal(await page.locator('#town-screen').isVisible(), false);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // A boss that is locked cannot be started even if asked for (the rule is in the code, not only the greyed button).
+        const { page, errors, context } = await open();
+        const started = await page.evaluate(async () => {
+            const { beginTownFight, arena } = await import('/src/arena.js');
+            const ok = beginTownFight(5, { stars: [7, 7, 7, 7, 7, 0, 0, 0, 0, 0] });
+            return { ok, enabled: arena.enabled };
+        });
+        assert.deepEqual(started, { ok: false, enabled: false });
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
     // Each off on its own from the URL.
     {
         const { page, errors, context } = await open('?walk=off');

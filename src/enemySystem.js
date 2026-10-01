@@ -312,6 +312,30 @@ function attachWolfModel(enemy) {
 // The part that shakes as an attack tell: the imported model, or the box figure.
 const bodyOf = e => e.userData.model?.object ?? e.children[0];
 
+// Own see-through materials, so fading him never fades anyone else sharing a colour. Safe to call again after a model is
+// attached late: only meshes not yet prepared are changed.
+function prepareFade(enemy) {
+    const u = enemy.userData;
+    u.fadeMaterials = u.fadeMaterials || [];
+    enemy.traverse(o => {
+        if(!o.isMesh || o.userData.isOutline || o.userData.fadeReady) return;
+        o.material = o.material.clone();
+        o.material.transparent = true;
+        o.userData.fadeReady = true;
+        u.fadeMaterials.push(o.material);
+    });
+}
+
+// A boss that spawned before its 3D model had finished downloading (a slow connection) is the plain box figure. When the
+// download finishes the model is attached to it, instead of the box figure staying for the whole fight.
+export function attachMissingOutlawModels() {
+    for(const enemy of enemies) {
+        if(enemy.userData.type !== 'boss' || enemy.userData.model) continue;
+        attachOutlawModel(enemy, getOutlaw(gameState.outlawIndex));
+        if(enemy.userData.model && enemy.userData.bossStyle === 'specter') prepareFade(enemy);
+    }
+}
+
 function setupBoss(enemy, style) {
     const u = enemy.userData;
     u.bossStyle = style;
@@ -325,14 +349,7 @@ function setupBoss(enemy, style) {
     if(style === 'preacher') addAimLaser(enemy, { width: 0.3, height: 2.4 });
     if(style === 'juggernaut') u.frontArmor = true;
     if(style === 'specter') {
-        // Own see-through materials, so fading him never fades anyone else sharing a colour.
-        u.fadeMaterials = [];
-        enemy.traverse(o => {
-            if(!o.isMesh || o.userData.isOutline) return;
-            o.material = o.material.clone();
-            o.material.transparent = true;
-            u.fadeMaterials.push(o.material);
-        });
+        prepareFade(enemy);
         u.state = 'solid';
         u.stateTimer = 3;
     }

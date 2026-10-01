@@ -12,6 +12,7 @@ import { spotLabel, getSpot, jobsLeft } from './townSpots.js';
 import { unlockedDistricts, doorLabel, districtOf, lockedHint, districtAt, getDistrict } from './townDistricts.js';
 import { loadNews, saveNews, newlyOpened, bannerFor, markSeen, markVisited, talkOfTheTown } from './townNews.js';
 import { getFolk, folkLine } from './townFolk.js';
+import { arena, ARENA_MODES, arenaRoster } from './arena.js';
 import { loadCompanion, saveCompanion } from './townCompanion.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
 import { featureOn, rememberFeature, qualityParam } from './townFeatures.js';
@@ -22,7 +23,7 @@ import { purchaseSupport } from './purchases.js';
 
 // The Frontier Town screen (src/town.js has the rules): a 3D town at dusk (src/townScene.js) with a label over
 // each building; tapping a building or its label opens its card in a sheet. Also the TOWN button's badge.
-export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onBuyPass, isChild = () => false, getProgress = () => null }) {
+export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onArenaFight = () => {}, portrait = () => '', onBuyPass, isChild = () => false, getProgress = () => null }) {
     const $ = id => document.getElementById(id);
     const els = {
         button: $('town-btn'),
@@ -211,6 +212,26 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             + '</div>';
     }
 
+    // The Arena: practice fights that save nothing. Boss fights are one of its options; a boss opens once you have beaten them
+    // on the Wanted Road (src/arena.js).
+    function arenaCard() {
+        const roster = arenaRoster(getProgress(), OUTLAWS, { unlockAll: arena.unlockAll });
+        const open = roster.filter(r => r.unlocked).length;
+        const modes = ARENA_MODES.map(mode => `<button type="button" class="shop-tab${mode.id === arena.mode ? ' active' : ''}" data-arena-mode="${mode.id}">${mode.name}</button>`).join('');
+        const toggles = `<button type="button" class="shop-tab${arena.invincible ? ' active' : ''}" data-arena-toggle="invincible">CAN'T DIE: ${arena.invincible ? 'ON' : 'OFF'}</button>`
+            + `<button type="button" class="shop-tab${arena.gang ? ' active' : ''}" data-arena-toggle="gang">GANG: ${arena.gang ? 'ON' : 'OFF'}</button>`;
+        const rows = roster.map(({ index, outlaw, unlocked }) => {
+            const picture = portrait(outlaw.id);
+            return `<div class="arena-row${unlocked ? '' : ' locked'}">${picture ? `<img src="${picture}" alt="">` : '<span class="arena-pic"></span>'}`
+                + `<div class="arena-who"><b>${outlaw.name}</b><small>${unlocked ? `Stage ${index + 1} &middot; ${outlaw.title}` : 'Beat them on the Wanted Road to open'}</small></div>`
+                + `<button type="button" class="shop-action" data-arena-fight="${index}"${unlocked ? '' : ' disabled'}>${unlocked ? 'FIGHT' : 'LOCKED'}</button></div>`;
+        }).join('');
+        return `<div class="town-card arena-town" data-building="arena"><div class="town-sign"><span>ARENA</span><span class="town-level">${open} / ${roster.length} OPEN</span></div>`
+            + `<p class="town-blurb">Practice fights. Nothing here is saved.</p>`
+            + `<div class="arena-modes">${modes}</div><div class="arena-toggles">${toggles}</div>`
+            + `<div class="arena-list-town">${rows}</div></div>`;
+    }
+
     // The bounty board in the square: the day's three jobs and how far along each is.
     function boardCard() {
         const list = profile.jobs?.list ?? [];
@@ -251,6 +272,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
 
     function sheetHtml(id) {
         if(districtOf(id)) return districtCard(id);
+        if(id === 'arena') return arenaCard();
         if(id === 'board') return boardCard();
         if(id === 'depot') return eventCard();
         if(id === 'saloon') return passCard();
@@ -400,7 +422,18 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     els.grid.addEventListener('click', event => {
         const button = event.target.closest('button');
         if(!button || button.disabled) return;
-        if(button.hasAttribute('data-companion')) {
+        if(button.hasAttribute('data-arena-fight')) {
+            track('arena_fight');
+            openId = null; // the card closes and the fight begins
+            render();
+            onArenaFight(Number(button.dataset.arenaFight));
+        } else if(button.dataset.arenaToggle) {
+            arena[button.dataset.arenaToggle] = !arena[button.dataset.arenaToggle];
+            render();
+        } else if(button.dataset.arenaMode) {
+            arena.mode = button.dataset.arenaMode;
+            render();
+        } else if(button.hasAttribute('data-companion')) {
             companion = { adopted: true, following: !(companion.adopted && companion.following) };
             saveCompanion(companion);
             walk?.setCompanion(companion.following);
