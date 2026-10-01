@@ -249,7 +249,9 @@ try {
     await page.evaluate(async () => { window.__rwTestState = await import('/src/state.js'); });
     await page.locator('#town-btn').click();
     await page.locator('#town-screen').waitFor({ state: 'visible' });
-    // The town is a 3D view; tapping a building's label opens its card.
+    // The town is a 3D view; tapping a building's label opens its card. The town is spread out now, so the signs are for the
+    // overview (WALK off): walking, the camera follows the marshal and only the nearby signs are on screen.
+    if(await page.locator('#town-walk-btn').getAttribute('aria-pressed') === 'true') await page.locator('#town-walk-btn').click();
     await page.locator('[data-open-building="jail"]').click();
     const jailText = await page.locator('.town-card[data-building="jail"]').textContent();
     assert.match(jailText, /3 of 10 outlaws jailed/, jailText);
