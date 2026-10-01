@@ -30,6 +30,8 @@ reacts. If a feature could just as well be a button, it does not belong here.
 | **B** | Districts beyond the town's edge that open with a star, each with its own mood and a place to use | medium | **built 2026-09-30** (below) |
 | **C** | Townsfolk with routines and proximity barks, plus a companion that follows the marshal | medium | **built 2026-09-30** (below) |
 | **D** | Art pass for the new districts: modelled buildings, painted textures (`POLISH_PLAN.md`, section 6) | large | parked on purpose |
+| **E** | Districts for the last four outlaws: Vane's Crossing, Tres Rios, the Silver Belle, Fort Pell | medium | **built 2026-10-01** (below) |
+| **F** | A town that reacts: a "new district" moment, townsfolk who talk about it, and a day that turns to night | small to medium | **built 2026-10-01** (below) |
 
 ### Step A, as built
 
@@ -75,6 +77,36 @@ data are in `src/townDistricts.js`; they are drawn in `src/townScene.js`.
   kennel button takes it, sends it home and calls it back. It is kept on the device, and is only a companion: nothing
   about it touches fights or the wallet.
 
+### Step E, as built
+
+Four more districts, each the old home ground of an outlaw whose epilogue prop already stands in town (`STORY_BIBLE.md`),
+so the town and the road keep the same story. Each opens with the first star on its outlaw.
+
+| District | Opens with | Edge of town | What is there |
+|---|---|---|---|
+| **Vane's Crossing** | Silas Vane | east | A street of weathered false fronts and a clock tower whose clock has stopped |
+| **Tres Rios** | El Espectro | north-west | An adobe hacienda, a well, and a stone with a struck-out date |
+| **The Silver Belle** | Lucky Lou | south-east | A riverboat tied at a pier, a notice post, crates |
+| **Fort Pell** | Colonel Crane | north-east | A palisade, barracks, a flagpole, and the gatling oiled and pointed at the sky |
+
+The Foundry Yard now ends at x = 37 so Fort Pell can meet the town's east edge. A test keeps every district apart from the
+others and joined to the town.
+
+### Step F, as built
+
+- **A "new district" moment** (`src/townNews.js`): the first time the town opens after a district opens, a banner says
+  `NEW: <DISTRICT> IS OPEN` and which edge the gate is on, and the gate rises out of the ground. Tap it or wait to dismiss.
+  What has been announced is remembered on the device.
+- **Townsfolk talk about it**: until the marshal has walked into a new district, everyone mentions the newest one
+  (`react` lines in `src/townFolk.js`). Once he has been in, the usual lines return.
+- **A day that turns to night** (`src/townTime.js`): the light slowly goes from the dusk the town has always had, through
+  night, a pink dawn and a hazy day, and back to dusk. A round takes ten minutes; lamps and windows shine brighter at
+  night. `?time=off` keeps it at dusk.
+
+Draw calls: the overview was pushed over the limit by the extra geometry, so the shut gates, the board's notes and the cash
+box coins are merged and rebuilt only when they change, and townsfolk share materials. Worst case (everything open, overview,
+LOOK on) is about 123, about 110 with LOOK off, and about 80 while walking (the limit is 130).
+
 ### Step D, parked
 
 See `POLISH_PLAN.md`, section 6. Whatever is built in A to C only needs to keep `walkMap()` (footprints and doors) correct
@@ -82,7 +114,7 @@ when its art is replaced.
 
 ## How we know it works
 
-- Unit tests: `townSpots`, `townDistricts`, `townFolk`, `townCompanion` and `townWalkLogic` cover positions, unlock rules, routines,
+- Unit tests: `townSpots`, `townDistricts`, `townFolk`, `townCompanion`, `townNews`, `townTime` and `townWalkLogic` cover positions, unlock rules, routines,
   barks, the dog's following and the walking rules.
 - `npm run test:town`: in a real browser, each place can be reached and used (the train starts a run, the cash box pays, the
   board opens), shut districts hold the marshal back, open ones can be entered, no townsperson walks through a wall, and the

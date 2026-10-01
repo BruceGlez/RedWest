@@ -225,6 +225,72 @@ try {
         await context.close();
     }
 
+    // Seven districts, the day, and a town that reacts. All ten outlaws beaten opens everything.
+    {
+        const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7] } }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 8); // the town and seven districts
+
+        // You are told once, with a banner, and what was announced is remembered.
+        await page.locator('#town-news').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-news-title').textContent(), /^NEW: .* IS OPEN$/);
+        assert.match(await page.locator('#town-news-text').textContent(), /edge of town/);
+        assert.equal(await page.evaluate(() => window.__redWestTown.news.seen.length), 7, 'all seven announced');
+        await page.locator('#town-news').click();
+        await page.locator('#town-news').waitFor({ state: 'hidden' });
+
+        // Until the marshal has walked into the districts, the townsfolk talk about the newest one.
+        const talk = () => page.evaluate(() => {
+            const f = window.__redWestTown.town3d.folk[0];
+            window.__redWestTown.walk.place(f.walker.x + 1.6, f.walker.z);
+            return f.name;
+        });
+        const folk = await talk();
+        await page.locator('.walk-bubble').waitFor({ state: 'visible' });
+        assert.match(await page.locator('.walk-bubble').textContent(), /Fort Pell is open/, `${folk} talks of the newest district`);
+
+        // The four new places can each be reached and read.
+        for(const [id, pattern] of [['clock', /clock on the tower stopped/], ['grave', /struck out/], ['landing', /played straight/], ['gatling', /one page is missing/]]) {
+            const door = await page.evaluate(id => {
+                const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
+                window.__redWestTown.walk.place(d.x, d.z);
+                return { x: d.x, z: d.z, at: window.__redWestTown.walk.position };
+            }, id);
+            assert.ok(Math.hypot(door.at.x - door.x, door.at.z - door.z) < 0.01, `${id}: the marshal can stand at its door (open ground)`);
+            await page.locator('.walk-prompt').waitFor({ state: 'visible' });
+            await page.keyboard.press('e');
+            await page.locator('#town-sheet').waitFor({ state: 'visible' });
+            assert.match(await page.locator('#town-grid').textContent(), pattern);
+            await page.locator('#town-sheet-close').click();
+        }
+        // Having walked into all of them, the talk dies down and the usual lines return.
+        for(const [door, district] of [['kennel', 'ranch'], ['furnace', 'foundry'], ['channel', 'canal']]) {
+            await page.evaluate(id => { const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id); window.__redWestTown.walk.place(d.x, d.z); }, door);
+            await page.waitForFunction(id => window.__redWestTown.news.visited.includes(id), district); // a frame has to see him there
+        }
+        await page.waitForFunction(() => window.__redWestTown.news.visited.length === 7);
+        await talk();
+        await page.locator('.walk-bubble').waitFor({ state: 'visible' });
+        assert.doesNotMatch(await page.locator('.walk-bubble').textContent(), / is open/, 'back to the usual line');
+
+        // The day: it starts at dusk, goes to night when asked, and stays there while the clock runs on.
+        assert.equal(await page.evaluate(() => window.__redWestTown.town3d.timeOfDay), 'dusk');
+        const night = await page.evaluate(() => { window.__redWestTown.town3d.setTimeOfDay(180); return window.__redWestTown.town3d.timeOfDay; });
+        assert.equal(night, 'night');
+        await page.waitForTimeout(700);
+        assert.equal(await page.evaluate(() => window.__redWestTown.town3d.timeOfDay), 'night');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // ?time=off keeps it at dusk however long you wait.
+        const { page, errors, context } = await open('?time=off');
+        await page.waitForTimeout(1500);
+        assert.equal(await page.evaluate(() => window.__redWestTown.town3d.timeOfDay), 'dusk');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+
     // Each off on its own from the URL.
     {
         const { page, errors, context } = await open('?walk=off');

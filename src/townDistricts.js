@@ -26,8 +26,8 @@ export const DISTRICTS = [
     },
     {
         id: 'foundry', name: 'FOUNDRY YARD', outlaw: 'iron-jack',
-        area: { minX: 12, maxX: 40, minZ: -46, maxZ: -18 },
-        fence: { from: [12, -21], to: [40, -21], read: [26, -19.4] },
+        area: { minX: 12, maxX: 37, minZ: -46, maxZ: -18 },
+        fence: { from: [12, -21], to: [37, -21], read: [24.5, -19.4] },
         ground: 0x3a3634,
         place: { id: 'furnace', verb: 'READ', object: { x: 16, z: -30, hx: 1.6, hz: 1.4 }, stand: [16, -27.4] },
         card: {
@@ -44,6 +44,50 @@ export const DISTRICTS = [
         card: {
             title: "MORGAN'S CHANNEL",
             text: 'The dry channel from Redstone Mesa runs here now, with water in it, and a fire crew keeps its buckets by the bridge. The log at the warehouse door has one rule, in Morgan\'s hand: no blasting after dark.'
+        }
+    },
+    {
+        id: 'crossing', name: "VANE'S CROSSING", outlaw: 'silas-vane',
+        area: { minX: 37, maxX: 82, minZ: -12, maxZ: 10 },
+        fence: { from: [40, -12], to: [40, 10], read: [38.4, -1] },
+        ground: 0x8c7653,
+        place: { id: 'clock', verb: 'READ', object: { x: 75, z: -1, hx: 1.5, hz: 1.5 }, stand: [71.2, -1] },
+        card: {
+            title: "VANE'S CROSSING",
+            text: 'The Crossing is open again, and wagons use it. Silas Vane left the clock on the tower stopped at the hour the Company paid him to close the road. He says it should stay stopped, so that nobody forgets what the road cost.'
+        }
+    },
+    {
+        id: 'tresrios', name: 'TRES RIOS', outlaw: 'el-espectro',
+        area: { minX: -40, maxX: -5, minZ: -46, maxZ: -18 },
+        fence: { from: [-38, -21], to: [-5, -21], read: [-21.5, -19.4] },
+        ground: 0xa8895c,
+        place: { id: 'grave', verb: 'READ', object: { x: -27, z: -26, hx: 0.6, hz: 0.4 }, stand: [-27, -24.4] },
+        card: {
+            title: 'TRES RIOS',
+            text: 'Don Rafael Ibarra has his name back in the town records, and the land grant is framed in the hacienda. The stone with his old name still stands by the wall, with the date struck out. He asked that it be left.'
+        }
+    },
+    {
+        id: 'belle', name: 'THE SILVER BELLE', outlaw: 'lucky-lou',
+        area: { minX: 26, maxX: 64, minZ: 16, maxZ: 44 },
+        fence: { from: [26, 19], to: [40, 19], read: [33, 17.4] },
+        ground: 0x7e6a4a,
+        place: { id: 'landing', verb: 'READ', object: { x: 49, z: 30.6, hx: 0.3, hz: 0.3 }, stand: [46.6, 30.6] },
+        card: {
+            title: 'THE SILVER BELLE',
+            text: 'The riverboat is tied up here for good. The ledger Lou kept went to the court, and the deck hands keep the paddle wheel painted. The sign on the gangway says every game aboard is played straight.'
+        }
+    },
+    {
+        id: 'fort', name: 'FORT PELL', outlaw: 'colonel-crane',
+        area: { minX: 37, maxX: 80, minZ: -46, maxZ: -14 },
+        fence: { from: [40, -21], to: [40, -14], read: [38.6, -17.5] },
+        ground: 0x5d5a4a,
+        place: { id: 'gatling', verb: 'READ', object: { x: 60, z: -26, hx: 1.2, hz: 1.0 }, stand: [60, -23.6] },
+        card: {
+            title: 'FORT PELL',
+            text: "The Colonel's old regiment stands down here. The gatling is oiled and unloaded, pointed at the sky. On the staff list nailed by the gate, one page is missing, and the Colonel will not say where it went."
         }
     }
 ];
@@ -78,7 +122,10 @@ export function districtPlaces(unlocked = []) {
 }
 
 // What the walk prompt says at a district's places and at a shut gate ('' for anything else).
-const PLACE_LABELS = { kennel: 'THE KENNEL', furnace: 'THE FURNACE', channel: 'THE CHANNEL LOG' };
+const PLACE_LABELS = {
+    kennel: 'THE KENNEL', furnace: 'THE FURNACE', channel: 'THE CHANNEL LOG',
+    clock: 'THE STOPPED CLOCK', grave: 'THE OLD STONE', landing: 'THE GANGWAY', gatling: 'THE GATLING'
+};
 export function doorLabel(id) {
     if(id.startsWith('gate-')) {
         const d = getDistrict(id.slice(5));
@@ -91,4 +138,24 @@ export function doorLabel(id) {
 export function districtOf(id) {
     if(id.startsWith('gate-')) return getDistrict(id.slice(5));
     return DISTRICTS.find(d => d.place.id === id) ?? null;
+}
+
+// A district's name as it reads in a sentence ("FOUNDRY YARD" -> "Foundry Yard", "MORGAN'S CHANNEL" -> "Morgan's Channel").
+export function placeName(district) {
+    return district.name.toLowerCase().replace(/(^|\s)([a-z])/g, (m, space, letter) => space + letter.toUpperCase());
+}
+
+const insideArea = (a, x, z) => x >= a.minX && x <= a.maxX && z >= a.minZ && z <= a.maxZ;
+
+// The district a point lies in (its own ground, not the strip shared with the town), or null.
+export function districtAt(x, z) {
+    if(insideArea(TOWN_AREA, x, z)) return null;
+    return DISTRICTS.find(d => insideArea(d.area, x, z)) ?? null;
+}
+
+// Which edge of the town a district's gate is on: 'north', 'south', 'east' or 'west'.
+export function edgeOf(district) {
+    const [x1, z1] = district.fence.from, [x2, z2] = district.fence.to;
+    if(z1 === z2) return z1 < 0 ? 'north' : 'south';
+    return (x1 + x2) / 2 < 0 ? 'west' : 'east';
 }
