@@ -32,7 +32,7 @@ reacts. If a feature could just as well be a button, it does not belong here.
 | **D** | Art pass for the new districts: modelled buildings, painted textures (`POLISH_PLAN.md`, section 6) | large | parked on purpose |
 | **E** | Districts for the last four outlaws: Vane's Crossing, Tres Rios, the Silver Belle, Fort Pell | medium | **built 2026-10-01** (below) |
 | **G** | The Arena in town, with boss fights as one of its options, locked until beaten on the Wanted Road | small to medium | **built 2026-10-01** (below) |
-| **H** | Every district is a place of its own: a full screen you step into, with goods to make and things to do | large, in slices | **planned 2026-10-01** (below) |
+| **H** | Every district is a place of its own: a whole new map you walk around, with goods to make and things to do | large, in slices | **H1 built 2026-10-01**; the rest planned, see `PLACES.md` |
 | **F** | A town that reacts: a "new district" moment, townsfolk who talk about it, and a day that turns to night | small to medium | **built 2026-10-01** (below) |
 
 ### Step A, as built
@@ -122,47 +122,23 @@ LOOK on) is about 123, about 110 with LOOK off, and about 80 while walking (the 
 - **Back home**: a fight from the town is an Arena run only until you are back at the home screen (`endTownFight`).
 - **`?arena`** still shows the same list full-screen for testing and now respects the same locks; `?arena=all` opens every boss.
 
-### Step H, planned: districts you step into
+### Step H, as built so far (H1): places you step into
 
-Today a district is ground to walk on with one plaque. The plan: each district becomes a **place of its own**. Walk to its
-gate or building, press E or tap, and a **full screen** replaces the town (a new place, with its own picture, its own
-things to do and a way back to the street). The town stays the map; places are where the doing is.
+Each district is becoming a **place of its own**: its gate opens a whole new map you walk around (not ground in the town),
+with things to make and do. `PLACES.md` documents every place, the rules they all follow, and the order they will be built in.
 
-**Rules (kept from before):** places only change income and goods, never combat (`tests/town.test.js` style test for each
-place); no timer is ever sold as a speed-up; goods are earned, never bought with real money; nothing here is chance-based
-spending (the game has an under-13 mode).
+- **Calloway Farm** is the first. Walk to the farm gate and press E: the town stops and the farm's own map starts, with six
+  plots, a coop, a stand and the kennel, and an arch back to the road. Crops grow in real time and wait; the stand pays a fixed
+  price; the farm is a side income that stays under the jail (`src/farm.js`, tested). It is shut until the Calloways are beaten.
+- **The place shell**: a place is a scene with the same few parts as the town's (`src/placeFarm.js`), a pure map
+  (`src/farmLayout.js`), and its own rules that the server and the offline wallet both run (`wallet.farm`, `/api/town/farm`).
+  The walking code, the cards and LOOK are the town's own, so the next place costs a map, a scene and a rules file.
+- **Three more districts**, so every outlaw has one: Copper Bit (Dusty Pete, south-west), Whisper Wash (Rattlesnake Rosa,
+  west) and Hollow Hill (Deacon Graves, north). They are ground in the town for now, with a plaque each, and become places in
+  H4 and H5. Tres Rios was narrowed on its west side to make room for Whisper Wash.
 
-**The screen.** First version is a painted 2D screen, like the Arena card but full size: a layered scene (sky, buildings,
-the place's own props) with tappable spots, a header with the place's name and a BACK TO TOWN button. It reuses the card
-plumbing in `src/townPanel.js`, so it is cheap on phones and the draw-call guard is untouched. A walkable 3D room inside each
-place is possible later and belongs to the parked art pass (step D); the place screens do not need it.
-
-**Production, the Township way without the timers to buy.** Each place makes **goods** slowly in real time, up to a cap that
-is the same idea as the jail (come back once or twice a day and collect everything; nothing is lost by being away). Goods
-are kept in a small store (a new `goods` map in the profile, saved like the jail clock). Goods are spent on three things:
-- **Orders:** townsfolk and the depot ask for crates of goods and pay Bounty Dollars (the Township order board, fed by the
-  bounty board in the square).
-- **Building upgrades:** some upgrade costs become dollars plus goods (iron bars for the Bank, and so on).
-- **Place upgrades:** each place has its own levels, bought with dollars and goods, that raise its output or its cap.
-
-| Place | Makes / does | Needs |
-|---|---|---|
-| **Calloway Farm** | Grows feed and eggs in plots you plant and harvest; the dog herds. First slice. | nothing |
-| **Foundry Yard** | Smelts scrap (a drop from runs) into iron bars at the furnace | scrap from fights |
-| **Morgan's Channel** | Water and fish; pumped water raises the farm's plots (places help each other) | nothing |
-| **Vane's Crossing** | A wagon train arrives each day with orders for the town's goods and pays for them | goods |
-| **Tres Rios** | A garden and cantina kitchen: turns eggs and feed into meals (worth more as orders) | farm goods |
-| **The Silver Belle** | A trading post: goods sell here at a price that changes by day, the same for everyone | goods |
-| **Fort Pell** | Sends deputies on patrols that come back with dollars and scrap after a set time | nothing |
-
-**Slices (each one playable and merged on its own):**
-1. **H1: the place screen and Calloway Farm.** The full-screen shell, the goods store and the farm's plots, with tests.
-2. **H2: orders** on the bounty board, so goods have a use, and the Morgan's Channel link to the farm.
-3. **H3: Foundry Yard and Fort Pell** (scrap and patrols).
-4. **H4: Vane's Crossing, Tres Rios and the Silver Belle** (wagons, meals, trading).
-
-**Open questions for the owner:** (1) painted 2D place screens first, or wait for 3D rooms? (2) Should goods also be dropped
-by outlaws on the road, so fighting feeds the town? (3) Do places stay open to look at before their outlaw is beaten?
+Next: H2 orders and the Channel's water for the farm, H3 the Foundry and Fort Pell, H4 Copper Bit, Tres Rios and Whisper Wash,
+H5 the Silver Belle and Hollow Hill.
 
 ### Step D, parked
 
@@ -171,7 +147,7 @@ when its art is replaced.
 
 ## How we know it works
 
-- Unit tests: `townSpots`, `townDistricts`, `townFolk`, `townCompanion`, `townNews`, `townTime` and `townWalkLogic` cover positions, unlock rules, routines,
+- Unit tests: `farm` and `farmLayout` (the first place's rules and map), `townSpots`, `townDistricts`, `townFolk`, `townCompanion`, `townNews`, `townTime` and `townWalkLogic` cover positions, unlock rules, routines,
   barks, the dog's following and the walking rules.
 - `npm run test:town`: in a real browser, each place can be reached and used (the train starts a run, the cash box pays, the
   board opens), shut districts hold the marshal back, open ones can be entered, no townsperson walks through a wall, and the

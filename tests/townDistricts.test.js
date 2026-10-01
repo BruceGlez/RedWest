@@ -51,7 +51,7 @@ test('each fence runs along the edge of its area and its sign can be read from i
 });
 
 test("each place is inside its own district, clear of the buildings and of the prop's own box", () => {
-    for(const d of DISTRICTS) {
+    for(const d of DISTRICTS.filter(d => d.place)) {
         const { object, stand } = d.place;
         assert.ok(inside(d.area, stand[0], stand[1], 0.6), `${d.id}: the stand point is on its ground`);
         assert.ok(inside(d.area, object.x, object.z), `${d.id}: the prop is on its ground`);
@@ -64,21 +64,34 @@ test("each place is inside its own district, clear of the buildings and of the p
 
 test('walk areas and places grow with the open districts', () => {
     assert.deepEqual(walkAreas([]), [TOWN_AREA]);
-    assert.equal(walkAreas(['ranch', 'canal']).length, 3);
+    assert.equal(walkAreas(['canal', 'foundry']).length, 3);
+    assert.equal(walkAreas(['ranch', 'canal']).length, 2, 'the farm is a place of its own, so it adds no ground to the town');
     assert.deepEqual(districtPlaces([]), []);
+    assert.deepEqual(districtPlaces(['ranch']), [], 'and no place in the town');
     assert.deepEqual(districtPlaces(['canal']).map(p => p.id), ['channel']);
     assert.equal(districtPlaces(['canal'])[0].district, 'canal');
 });
 
-test('there are seven districts, for the Calloways, Iron Jack, Morgan, Vane, Espectro, Lou and Crane', () => {
-    assert.deepEqual(DISTRICTS.map(d => d.id).sort(), ['belle', 'canal', 'crossing', 'fort', 'foundry', 'ranch', 'tresrios']);
-    assert.deepEqual(DISTRICTS.map(d => d.outlaw).sort(), ['calloway-gang', 'colonel-crane', 'el-espectro', 'iron-jack', 'lucky-lou', 'mesa-morgan', 'silas-vane']);
+test('every outlaw has a district: ten of them, one for each', () => {
+    assert.equal(DISTRICTS.length, OUTLAWS.length);
+    assert.deepEqual(DISTRICTS.map(d => d.outlaw).sort(), OUTLAWS.map(o => o.id).sort());
+    assert.deepEqual(DISTRICTS.map(d => d.id).sort(), ['belle', 'canal', 'chapel', 'copper', 'crossing', 'fort', 'foundry', 'ranch', 'tresrios', 'wash']);
+});
+
+test('the farm is the one place so far you step into; the others are ground in the town', () => {
+    assert.deepEqual(DISTRICTS.filter(d => d.interior).map(d => d.id), ['ranch']);
+    assert.equal(getDistrict('ranch').place, null);
+    assert.equal(doorLabel('enter-ranch'), 'CALLOWAY FARM');
+    assert.equal(districtOf('enter-ranch'), getDistrict('ranch'));
+    assert.equal(doorLabel('enter-nope'), '');
 });
 
 test('every place has a prompt wording and is found from its id and from its gate', () => {
     for(const d of DISTRICTS) {
-        assert.ok(doorLabel(d.place.id).length > 3, `${d.id}: place wording`);
-        assert.equal(districtOf(d.place.id), d);
+        if(d.place) {
+            assert.ok(doorLabel(d.place.id).length > 3, `${d.id}: place wording`);
+            assert.equal(districtOf(d.place.id), d);
+        }
         assert.equal(districtOf(`gate-${d.id}`), d);
         assert.match(doorLabel(`gate-${d.id}`), /SHUT/);
     }

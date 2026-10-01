@@ -8,17 +8,19 @@ import { OUTLAWS } from './outlaws.js';
 // area: the ground you may walk once it is open. Each one reaches 3 units into the town (more than a marshal's width),
 //       so walking across the edge never lands in a gap between two areas.
 // fence: the line across the way in while it is shut, from (x1, z1) to (x2, z2), and where to stand to read the sign.
-// place: the thing to use inside (a plaque, or the kennel), with where it stands and where you stand.
+// place: the thing to use inside (a plaque), with where it stands and where you stand.
+// interior: a district that is a place of its own (PLACES.md). Its gate opens a whole new map you walk around (the farm's is
+//           src/farmLayout.js) and not ground in the town, so it has no walk area and no place here.
 
 export const TOWN_AREA = { minX: -38, maxX: 40, minZ: -21, maxZ: 19 };
 
 export const DISTRICTS = [
     {
-        id: 'ranch', name: 'CALLOWAY FARM', outlaw: 'calloway-gang',
+        id: 'ranch', name: 'CALLOWAY FARM', outlaw: 'calloway-gang', interior: 'farm',
         area: { minX: -72, maxX: -35, minZ: -10, maxZ: 6 },
         fence: { from: [-38, -10], to: [-38, 6], read: [-36.4, -2] },
         ground: 0x55613a,
-        place: { id: 'kennel', verb: 'MEET', object: { x: -46, z: 2.4, hx: 1.0, hz: 0.8 }, stand: [-46, 4.6] },
+        place: null,
         card: {
             title: 'CALLOWAY FARM',
             text: 'The Calloway brothers rebuilt these fences themselves. The paper they lost the farm to hangs in the barn, with a nail through the small print. They keep one dog more than they can feed.'
@@ -59,8 +61,8 @@ export const DISTRICTS = [
     },
     {
         id: 'tresrios', name: 'TRES RIOS', outlaw: 'el-espectro',
-        area: { minX: -40, maxX: -5, minZ: -46, maxZ: -18 },
-        fence: { from: [-38, -21], to: [-5, -21], read: [-21.5, -19.4] },
+        area: { minX: -34, maxX: -5, minZ: -46, maxZ: -18 },
+        fence: { from: [-34, -21], to: [-5, -21], read: [-19.5, -19.4] },
         ground: 0xa8895c,
         place: { id: 'grave', verb: 'READ', object: { x: -27, z: -26, hx: 0.6, hz: 0.4 }, stand: [-27, -24.4] },
         card: {
@@ -89,6 +91,39 @@ export const DISTRICTS = [
             title: 'FORT PELL',
             text: "The Colonel's old regiment stands down here. The gatling is oiled and unloaded, pointed at the sky. On the staff list nailed by the gate, one page is missing, and the Colonel will not say where it went."
         }
+    },
+    {
+        id: 'copper', name: 'COPPER BIT', outlaw: 'dusty-pete',
+        area: { minX: -62, maxX: -22, minZ: 16, maxZ: 44 },
+        fence: { from: [-38, 19], to: [-22, 19], read: [-30, 17.4] },
+        ground: 0x8a6e4c,
+        place: { id: 'piano', verb: 'READ', object: { x: -46, z: 30, hx: 1.4, hz: 0.8 }, stand: [-46, 32.4] },
+        card: {
+            title: 'COPPER BIT',
+            text: "Copper Bit's saloon street is open again. Dusty Pete runs the bar, and the broken piano stays broken: he says the sour notes keep the tune honest. The first drink of the day is on the house."
+        }
+    },
+    {
+        id: 'wash', name: 'WHISPER WASH', outlaw: 'rattlesnake-rosa',
+        area: { minX: -72, maxX: -35, minZ: -34, maxZ: -12 },
+        fence: { from: [-38, -21], to: [-38, -12], read: [-36.4, -16.5] },
+        ground: 0x7c6a52,
+        place: { id: 'den', verb: 'READ', object: { x: -58, z: -24, hx: 1.8, hz: 1.2 }, stand: [-58, -21.2] },
+        card: {
+            title: 'WHISPER WASH',
+            text: "Water runs down the old riverbed again, a thin line you can step across. Rosa's wolf pups sleep in the den under the bank, and the pack answers to her whistle alone. Nobody has asked them to leave."
+        }
+    },
+    {
+        id: 'chapel', name: 'HOLLOW HILL', outlaw: 'deacon-graves',
+        area: { minX: -3, maxX: 10, minZ: -46, maxZ: -18 },
+        fence: { from: [-3, -21], to: [10, -21], read: [3.5, -19.4] },
+        ground: 0x4f5a40,
+        place: { id: 'bell', verb: 'READ', object: { x: 3.5, z: -34, hx: 1.0, hz: 1.0 }, stand: [3.5, -31.4] },
+        card: {
+            title: 'HOLLOW HILL',
+            text: 'The Deacon rebuilt the chapel from the burnt beams, one pew at a time. The bell rings once at dusk for everyone the road took. He keeps a lamp lit in the window and asks nothing for it.'
+        }
     }
 ];
 
@@ -113,20 +148,21 @@ export function lockedHint(district) {
 
 // The ground you can walk on: the town plus every open district.
 export function walkAreas(unlocked = []) {
-    return [TOWN_AREA, ...DISTRICTS.filter(d => unlocked.includes(d.id)).map(d => d.area)];
+    return [TOWN_AREA, ...DISTRICTS.filter(d => !d.interior && unlocked.includes(d.id)).map(d => d.area)];
 }
 
 // Interaction places of the open districts (src/townSpots.js has the town's own).
 export function districtPlaces(unlocked = []) {
-    return DISTRICTS.filter(d => unlocked.includes(d.id)).map(d => ({ ...d.place, district: d.id }));
+    return DISTRICTS.filter(d => d.place && unlocked.includes(d.id)).map(d => ({ ...d.place, district: d.id }));
 }
 
 // What the walk prompt says at a district's places and at a shut gate ('' for anything else).
 const PLACE_LABELS = {
-    kennel: 'THE KENNEL', furnace: 'THE FURNACE', channel: 'THE CHANNEL LOG',
-    clock: 'THE STOPPED CLOCK', grave: 'THE OLD STONE', landing: 'THE GANGWAY', gatling: 'THE GATLING'
+    furnace: 'THE FURNACE', channel: 'THE CHANNEL LOG', clock: 'THE STOPPED CLOCK', grave: 'THE OLD STONE',
+    landing: 'THE GANGWAY', gatling: 'THE GATLING', piano: 'THE BROKEN PIANO', den: 'THE DEN', bell: 'THE CHAPEL BELL'
 };
 export function doorLabel(id) {
+    if(id.startsWith('enter-')) return getDistrict(id.slice(6))?.name ?? '';
     if(id.startsWith('gate-')) {
         const d = getDistrict(id.slice(5));
         return d ? `${d.name}: SHUT` : '';
@@ -134,10 +170,11 @@ export function doorLabel(id) {
     return PLACE_LABELS[id] ?? '';
 }
 
-// The district a place (kennel, furnace, channel) or a shut gate (gate-ranch, ...) belongs to, or null.
+// The district a place (furnace, channel, ...), a shut gate (gate-ranch) or an open way in (enter-ranch) (gate-ranch, ...) belongs to, or null.
 export function districtOf(id) {
     if(id.startsWith('gate-')) return getDistrict(id.slice(5));
-    return DISTRICTS.find(d => d.place.id === id) ?? null;
+    if(id.startsWith('enter-')) return getDistrict(id.slice(6));
+    return DISTRICTS.find(d => d.place?.id === id) ?? null;
 }
 
 // A district's name as it reads in a sentence ("FOUNDRY YARD" -> "Foundry Yard", "MORGAN'S CHANNEL" -> "Morgan's Channel").

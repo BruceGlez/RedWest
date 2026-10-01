@@ -1,5 +1,6 @@
 import { OUTLAWS } from './outlaws.js';
 import { EconomyError } from './economyError.js';
+import { createFarm, normalizeFarm } from './farm.js';
 
 // Frontier Town (GROWTH_PLAN.md, Phase 1.1): buildings between runs.
 // - The Jail holds every outlaw you have beaten; they pay a bounty each hour, collected when you
@@ -49,7 +50,7 @@ export function getBuilding(id) {
 }
 
 export function createTown(now = new Date()) {
-    return { levels: Object.fromEntries(BUILDINGS.map(b => [b.id, 1])), jailCollectedAt: now.toISOString() };
+    return { levels: Object.fromEntries(BUILDINGS.map(b => [b.id, 1])), jailCollectedAt: now.toISOString(), farm: createFarm(now) };
 }
 
 export function normalizeTown(raw, now = new Date()) {
@@ -61,6 +62,7 @@ export function normalizeTown(raw, now = new Date()) {
     }
     const collected = Date.parse(raw.jailCollectedAt);
     if(Number.isFinite(collected)) town.jailCollectedAt = new Date(collected).toISOString();
+    town.farm = normalizeFarm(raw.farm, now); // Calloway Farm (src/farm.js)
     return town;
 }
 

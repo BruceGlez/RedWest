@@ -376,3 +376,35 @@ test('CORS answers the web game and the iPhone app from one ALLOWED_ORIGIN list'
         await new Promise(resolve => server.close(resolve));
     }
 });
+
+test('Calloway Farm is shut until the Calloways are beaten, then crops grow on the server clock', async () => {
+    const s = await startAdminServer();
+    try {
+        const a = await s.account();
+        const farm = body => s.call('/api/town/farm', { token: a.token, body });
+        const shut = await farm({ action: 'plant', plot: 0, crop: 'wheat' });
+        assert.equal(shut.status, 400);
+        assert.equal(shut.data.code, 'locked');
+        for(let outlawIndex = 0; outlawIndex <= 3; outlawIndex++) { // the Calloways are the fourth outlaw
+            await s.call('/api/run', { token: a.token, body: { score: 900, seconds: 120, outlawIndex, bounty: 'banked', kills: {} } });
+            s.advanceDays(1 / 24);
+        }
+        const planted = await farm({ action: 'plant', plot: 0, crop: 'wheat' });
+        assert.equal(planted.status, 200);
+        assert.equal(planted.data.profile.town.farm.plots[0].crop, 'wheat');
+        const early = await farm({ action: 'harvest', plot: 0 });
+        assert.equal(early.data.code, 'not_ready', 'twenty minutes have not passed on the server clock');
+        s.advanceDays(30 / 1440);
+        const harvested = await farm({ action: 'harvest', plot: 0 });
+        assert.deepEqual(harvested.data.result, { good: 'wheat', amount: 2 });
+        const before = harvested.data.profile.balances.dollars;
+        const sold = await farm({ action: 'sell', good: 'all' });
+        assert.equal(sold.data.result.dollars, 4);
+        assert.equal(sold.data.profile.balances.dollars, before + 4);
+        assert.equal((await farm({ action: 'sell', good: 'all' })).data.code, 'nothing_to_sell');
+        assert.equal((await farm({ action: 'plant', plot: 99, crop: 'wheat' })).data.code, 'no_plot');
+        assert.equal((await farm({})).status, 400, 'no action, no farm');
+    } finally {
+        await s.close();
+    }
+});

@@ -6,7 +6,10 @@ import { BUILDINGS, buildingEffects, jailedOutlaws, jailRate, jailCapacity, jail
 import { track } from './analytics.js';
 import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, disableReminders, updateJailReminder } from './reminders.js';
 import { createTownScene, TOWN_LAYOUT } from './townScene.js';
-import { createTownLook } from './townLook.js';
+import { createTownLook, DAY_SKY } from './townLook.js';
+import { createFarmScene } from './placeFarm.js';
+import { CROPS, GOODS, EGG, getCrop, plotStates, eggsReady, minutesToNextEgg, minutesText } from './farm.js';
+import { FARM_START, farmLabel, plotIndex } from './farmLayout.js';
 import { createTownWalk } from './townWalk.js';
 import { spotLabel, getSpot, jobsLeft } from './townSpots.js';
 import { unlockedDistricts, doorLabel, districtOf, lockedHint, districtAt, getDistrict } from './townDistricts.js';
@@ -34,6 +37,9 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         sheetClose: $('town-sheet-close'),
         touch: $('town-touch'),
         walkButton: $('town-walk-btn'),
+        title: $('town-title'),
+        placeBack: $('town-place-back'),
+        toast: $('town-toast'),
         lookButton: $('town-look-btn'),
         qualityButton: $('town-quality-btn'),
         hint: $('town-hint'),
@@ -52,6 +58,9 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     let town3d = null; // built the first time the town opens
     let look = null; // the art direction pass (src/townLook.js), an independent switch
     let walk = null; // the walkable town (src/townWalk.js), an independent switch
+    let farm3d = null; // Calloway Farm, a place of its own (src/placeFarm.js), built the first time you go in
+    let farmWalk = null; // walking on the farm: the same walking code, on the farm's map
+    let place = null; // the district you are inside (its id), or null while you are in the town
     let quality = loadQuality(); // what the player chose for LOOK's quality, and the best level the device managed
     let qualityChoice = startLevel(quality, qualityParam()).choice; // for this visit (the URL may override the saved choice)
     let news = loadNews(); // which districts the player has been told about and has walked into, kept on this device
@@ -271,6 +280,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     }
 
     function sheetHtml(id) {
+        if(place) return farmCard(id);
         if(districtOf(id)) return districtCard(id);
         if(id === 'arena') return arenaCard();
         if(id === 'board') return boardCard();
@@ -328,6 +338,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         if(!profile || !isOpen()) return;
         els.dollars.textContent = profile.balances.dollars.toLocaleString();
         renderLabels();
+        farm3d?.setFarm(profile.town.farm);
         town3d?.setLevels(profile.town.levels, {
             gunsmith: profile.owned.filter(id => id.startsWith('gun-')).length,
             tailor: profile.owned.filter(id => /^(hat|coat|pants|bullets)-/.test(id)).length
@@ -343,13 +354,13 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         if(openId) els.grid.innerHTML = sheetHtml(openId);
     }
 
-    async function act(work) {
+    async function act(work, onError = say) {
         if(busy) return;
         busy = true;
         try {
             await work();
         } catch(error) {
-            say(error.message, true);
+            onError(error.message, true);
         } finally {
             busy = false;
             render();
@@ -367,10 +378,125 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         });
     }
 
+
+    // ---------- Calloway Farm: a place of its own (src/farm.js has the rules, src/farmLayout.js the map) ----------
+    let toastTimer = null;
+    function toast(text, error = false) {
+        els.toast.textContent = text;
+        els.toast.classList.toggle('error', error);
+        els.toast.style.display = '';
+        clearTimeout(toastTimer);
+        toastTimer = setTimeout(() => { els.toast.style.display = 'none'; }, 2800);
+    }
+    const crate = (label, value) => `<span class="farm-chip">${label} <b>${value}</b></span>`;
+    function storeLine(store) {
+        const have = GOODS.filter(g => store[g.id] > 0);
+        return have.length ? have.map(g => crate(g.name, store[g.id])).join('') : '<span class="farm-chip">THE BARN IS EMPTY</span>';
+    }
+    function farmCard(id) {
+        const farm = profile.town.farm;
+        const now = new Date();
+        const index = plotIndex(id);
+        const card = (title, body, actions = '') => `<div class="town-card" data-building="${id}"><div class="town-sign"><span>${title}</span></div>${body}${actions ? `<div class="town-actions farm-actions">${actions}</div>` : ''}</div>`;
+        if(index >= 0) {
+            const plot = plotStates(farm, now)[index];
+            if(plot.state === 'empty') {
+                const buttons = CROPS.map(c => `<button type="button" class="shop-action collect farm-crop" data-plant="${c.id}" data-plot="${index}">${c.name}<small>${minutesText(c.minutes)} · ${c.yield} x $${c.price}</small></button>`).join('');
+                return card(`PLOT ${index + 1}`, '<p class="town-blurb">Pick a crop. It grows while you are away and waits for you, however long that is.</p>', buttons);
+            }
+            return card(`PLOT ${index + 1}`, `<p class="town-blurb">${plot.crop.name}: ${minutesText(plot.minutesLeft)} to go.</p>`
+                + `<div class="farm-bar"><i style="width:${Math.round(plot.fraction * 100)}%"></i></div><p class="town-stat">${plot.crop.blurb}</p>`);
+        }
+        switch(id) {
+            case 'coop': {
+                const eggs = eggsReady(farm, now);
+                const text = eggs >= EGG.cap ? 'The basket is full.' : `The next egg is ${minutesText(minutesToNextEgg(farm, now))} away.`;
+                return card('THE COOP', `<p class="town-blurb">The hens lay an egg every ${EGG.minutes} minutes, up to ${EGG.cap}. ${text}</p><p class="town-stat">${eggs} ${eggs === 1 ? 'egg' : 'eggs'} waiting</p>`,
+                    `<button type="button" class="shop-action collect" data-farm-eggs${eggs ? '' : ' disabled'}>COLLECT ${eggs || ''} EGGS</button>`);
+            }
+            case 'stand': {
+                const rows = GOODS.filter(g => farm.store[g.id] > 0).map(g => `<div class="farm-row"><span>${g.name} x ${farm.store[g.id]}</span><span>$${farm.store[g.id] * g.price}</span><button type="button" class="shop-action upgrade" data-sell="${g.id}">SELL</button></div>`).join('');
+                const total = GOODS.reduce((sum, g) => sum + farm.store[g.id] * g.price, 0);
+                return card('THE FARM STAND', `<p class="town-blurb">${total ? 'Fair prices, the same every day.' : 'Nothing to sell yet. Harvest a plot or collect the eggs, then come back.'}</p>${rows}`,
+                    total ? `<button type="button" class="shop-action collect" data-sell="all">SELL ALL FOR $${total}</button>` : '');
+            }
+            case 'barn': return card('THE BARN', `<p class="town-blurb">${getDistrict('ranch').card.text}</p><div class="farm-chips">${storeLine(farm.store)}</div>`);
+            case 'kennel': {
+                const label = !companion.adopted ? 'TAKE THE DOG' : companion.following ? 'SEND THE DOG HOME' : 'CALL THE DOG';
+                return card('THE KENNEL', '<p class="town-blurb">The Calloways keep one dog more than they can feed. It would rather be out working.</p>', `<button type="button" class="shop-action collect" data-companion>${label}</button>`);
+            }
+            default: return '';
+        }
+    }
+    // Something the farm does for real: the wallet runs the rules (src/farm.js), here or on the server.
+    function farmDo(body, wording) {
+        openId = null;
+        return act(async () => {
+            const result = await wallet.farm(body);
+            onProfile(result.profile);
+            track(`farm_${body.action}`);
+            toast(wording(result.result));
+        }, text => toast(text, true));
+    }
+    // Walking up to something on the farm (src/townWalk.js, the farm's own instance).
+    function useFarm(id) {
+        if(id === 'leave') return leavePlace();
+        const farm = profile?.town.farm;
+        const index = plotIndex(id);
+        if(farm && index >= 0 && plotStates(farm)[index].state === 'ready') {
+            return farmDo({ action: 'harvest', plot: index }, r => `Harvested ${r.amount} ${GOODS.find(g => g.id === r.good).name.toLowerCase()}.`);
+        }
+        if(farm && id === 'coop' && eggsReady(farm) > 0) return farmDo({ action: 'eggs' }, r => `Collected ${r.amount} ${r.amount === 1 ? 'egg' : 'eggs'}.`);
+        openBuilding(id);
+    }
+    function enterPlace(id) {
+        const district = getDistrict(id);
+        if(!district?.interior || !profile || place || !unlockedDistricts(profile.stats.stageStars).includes(id)) return;
+        if(!farm3d) {
+            farm3d = createFarmScene();
+            farmWalk = createTownWalk({
+                town3d: farm3d, host: els.screen, onOpen: useFarm, blocked: () => !!openId, start: FARM_START,
+                describe: door => farmLabel(door, profile?.town.farm)
+            });
+        }
+        track('place_enter');
+        walk?.exit(); // the town stops where the marshal stood, ready for when he comes back out
+        place = id;
+        farm3d.resize(window.innerWidth, window.innerHeight);
+        farm3d.setFarm(profile.town.farm);
+        look?.setScene(farm3d.scene, farm3d.camera, { sky: DAY_SKY });
+        farmWalk.setCompanion(companion.following);
+        farmWalk.enter();
+        news = markVisited(news, id);
+        saveNews(news);
+        els.labels.style.display = 'none';
+        els.title.textContent = district.name;
+        openId = null;
+        syncTools();
+        render();
+    }
+    function leavePlace() {
+        if(!place) return;
+        farmWalk.exit();
+        place = null;
+        look?.setScene(town3d.scene, town3d.camera);
+        els.labels.style.display = '';
+        els.title.textContent = 'FRONTIER TOWN';
+        els.toast.style.display = 'none';
+        openId = null;
+        if(featureOn('walk')) walk.enter();
+        walk?.setCompanion(companion.following);
+        syncTools();
+        render();
+    }
+    els.placeBack.addEventListener('click', leavePlace);
+
     // Walking up to a door or a place (src/townWalk.js). The places of src/townSpots.js are not buildings:
     // the train starts the next hunt, the cash box pays the jail's money at once, the board shows the day's jobs.
     function useSpot(id) {
-        if(id === 'train') {
+        if(id.startsWith('enter-')) {
+            enterPlace(id.slice(6));
+        } else if(id === 'train') {
             track('train_ride');
             onBoardTrain();
         } else if(id === 'cashbox') {
@@ -422,7 +548,14 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     els.grid.addEventListener('click', event => {
         const button = event.target.closest('button');
         if(!button || button.disabled) return;
-        if(button.hasAttribute('data-arena-fight')) {
+        if(button.dataset.plant) {
+            const crop = getCrop(button.dataset.plant);
+            farmDo({ action: 'plant', plot: Number(button.dataset.plot), crop: crop.id }, () => `Planted ${crop.name.toLowerCase()}.`);
+        } else if(button.dataset.sell) {
+            farmDo({ action: 'sell', good: button.dataset.sell }, r => `Sold for $${r.dollars}.`);
+        } else if(button.hasAttribute('data-farm-eggs')) {
+            farmDo({ action: 'eggs' }, r => `Collected ${r.amount} ${r.amount === 1 ? 'egg' : 'eggs'}.`);
+        } else if(button.hasAttribute('data-arena-fight')) {
             track('arena_fight');
             openId = null; // the card closes and the fight begins
             render();
@@ -436,7 +569,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         } else if(button.hasAttribute('data-companion')) {
             companion = { adopted: true, following: !(companion.adopted && companion.following) };
             saveCompanion(companion);
-            walk?.setCompanion(companion.following);
+            (place ? farmWalk : walk)?.setCompanion(companion.following);
             track(companion.following ? 'companion_on' : 'companion_off');
             render();
         } else if(button.hasAttribute('data-collect')) {
@@ -482,6 +615,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     });
     els.button.addEventListener('click', () => {
         track('town_open');
+        if(place) leavePlace(); // the town always opens on its streets
         confirmUpgrade = null;
         openId = null;
         say('');
@@ -489,7 +623,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             town3d = createTownScene({ time: featureOn('time') });
             walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot, lineFor: personLine });
             // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
-            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; }, get look() { return look; } };
+            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; }, get look() { return look; }, get place() { return place; }, get farm3d() { return farm3d; }, get farmWalk() { return farmWalk; }, enterPlace, leavePlace };
         }
         town3d.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
@@ -530,12 +664,16 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         els.qualityButton.style.display = (look ? look.enabled : featureOn('look')) ? '' : 'none';
         const shown = look?.quality ?? startLevel(quality, qualityParam()).level;
         els.qualityButton.textContent = qualityChoice === 'auto' ? `QUALITY: AUTO (${LEVEL_NAMES[shown]})` : `QUALITY: ${LEVEL_NAMES[qualityChoice]}`;
-        els.hint.textContent = walking
-            ? ('ontouchstart' in window ? 'Stick to walk. Tap a door to go in.' : 'WASD to walk. E at a door to go in.')
-            : 'Drag to look around. Tap a building.';
+        els.walkButton.style.display = place ? 'none' : '';
+        els.placeBack.style.display = place ? '' : 'none';
+        els.hint.textContent = place
+            ? ('ontouchstart' in window ? 'Stick to walk. Tap the prompt to use what you stand by.' : 'WASD to walk. E to use what you stand by.')
+            : walking
+                ? ('ontouchstart' in window ? 'Stick to walk. Tap a door to go in.' : 'WASD to walk. E at a door to go in.')
+                : 'Drag to look around. Tap a building.';
     }
     els.walkButton.addEventListener('click', () => {
-        if(!walk) return;
+        if(!walk || place) return;
         if(walk.active) walk.exit(); else walk.enter();
         rememberFeature('walk', walk.active);
         syncTools();
@@ -557,6 +695,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     window.addEventListener('resize', () => {
         headerBottom = 0;
         town3d?.resize(window.innerWidth, window.innerHeight);
+        farm3d?.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
     });
 
@@ -576,7 +715,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     });
     els.touch.addEventListener('pointermove', event => {
         const last = pointers.get(event.pointerId);
-        if(!last || !town3d || walk?.active) return;
+        if(!last || !town3d || walk?.active || place) return;
         const dx = event.clientX - last.x;
         const dy = event.clientY - last.y;
         last.x = event.clientX;
@@ -600,7 +739,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         pointers.delete(event.pointerId);
         if(pointers.size < 2) pinchFrom = 0;
         if(wasTap && town3d && event.type === 'pointerup') {
-            const id = town3d.pick((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
+            const id = place ? null : town3d.pick((event.clientX / window.innerWidth) * 2 - 1, -(event.clientY / window.innerHeight) * 2 + 1);
             if(id) openBuilding(id);
             else if(openId) { openId = null; render(); }
         }
@@ -609,7 +748,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     els.touch.addEventListener('pointercancel', release);
     els.touch.addEventListener('wheel', event => {
         event.preventDefault();
-        if(!walk?.active) town3d?.zoom(event.deltaY > 0 ? 1.1 : 0.9);
+        if(!walk?.active && !place) town3d?.zoom(event.deltaY > 0 ? 1.1 : 0.9);
     }, { passive: false });
     // Keep the jail's numbers and the badge ticking while the game is open.
     setInterval(render, 30000);
@@ -663,7 +802,14 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
                 const start = startLevel(quality, qualityParam());
                 look = createTownLook(renderer, town3d.scene, town3d.camera, { enabled: featureOn('look'), level: start.level, auto: start.auto, onQuality: onQualityChange });
                 look.resize(window.innerWidth, window.innerHeight);
+                if(place) look.setScene(farm3d.scene, farm3d.camera, { sky: DAY_SKY });
                 syncTools();
+            }
+            if(place) { // inside a place: its own map is drawn and walked, and the town waits
+                farm3d.update(dt);
+                farmWalk.update(dt);
+                look.render(dt);
+                return;
             }
             town3d.update(dt);
             walk?.update(dt);

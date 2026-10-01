@@ -1134,3 +1134,17 @@ body.demo #start-screen, body.demo #welcome-modal { display: none !important; }
 .arena-card.locked { opacity: 0.6; }
 .arena-card.locked .portrait img { filter: grayscale(1) brightness(0.45); }
 .arena-fight:disabled { filter: grayscale(1); cursor: default; }
+
+/* ---------- Places you step into: Calloway Farm (src/placeFarm.js, src/townPanel.js) ---------- */
+.town-leave { background: #6b2a1c; }
+.town-toast { position: absolute; left: 50%; top: calc(112px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 5; max-width: 86vw; padding: 8px 16px;
+    background: rgba(24, 16, 10, 0.92); border: 2px solid #c8a050; border-radius: 10px; color: #f0d9a8; font-size: 15px; text-align: center; pointer-events: none; }
+.town-toast.error { border-color: #d9534f; color: #ffb4a8; }
+.farm-actions { flex-wrap: wrap; justify-content: center; }
+.farm-crop small { display: block; font-size: 11px; opacity: 0.85; margin-top: 2px; }
+.farm-row { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 4px 0; font-size: 15px; }
+.farm-row .shop-action { flex: 0 0 auto; padding: 4px 12px; }
+.farm-bar { height: 10px; margin: 8px 0; background: #2a1d15; border: 1px solid #c8a050; border-radius: 6px; overflow: hidden; }
+.farm-bar i { display: block; height: 100%; background: #8ab84a; }
+.farm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
+.farm-chip { padding: 3px 9px; background: rgba(0, 0, 0, 0.3); border: 1px solid #8a6a3a; border-radius: 12px; font-size: 13px; color: #f0d9a8; }

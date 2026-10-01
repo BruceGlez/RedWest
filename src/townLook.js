@@ -29,6 +29,8 @@ export const GRADE = {
 };
 export const BLOOM = { strength: 0.45, radius: 0.5, threshold: 1.0 };
 export const SKY = { top: '#0c1f29', middle: '#1d3640', horizon: '#6a5248' };
+// A place by day (the farm, src/placeFarm.js) draws a warm afternoon sky instead of the town's dusk.
+export const DAY_SKY = { top: '#4d86b8', middle: '#8cbad6', horizon: '#efd9a6' };
 
 const SHADER_NOISE = `
 float lookHash(vec2 p) { return fract(sin(dot(p, vec2(127.1, 311.7))) * 43758.5453); }
@@ -68,15 +70,15 @@ function paint(material, uLook) {
 }
 
 // Vertical dusk gradient, used as the scene background.
-function skyTexture() {
+function skyTexture(colors = SKY) {
     const canvas = document.createElement('canvas');
     canvas.width = 4;
     canvas.height = 256;
     const g = canvas.getContext('2d');
     const gradient = g.createLinearGradient(0, 0, 0, 256);
-    gradient.addColorStop(0, SKY.top);
-    gradient.addColorStop(0.55, SKY.middle);
-    gradient.addColorStop(1, SKY.horizon);
+    gradient.addColorStop(0, colors.top);
+    gradient.addColorStop(0.55, colors.middle);
+    gradient.addColorStop(1, colors.horizon);
     g.fillStyle = gradient;
     g.fillRect(0, 0, 4, 256);
     const texture = new THREE.CanvasTexture(canvas);
@@ -122,11 +124,16 @@ const GradeShader = {
 // scene / camera: the town's. options: enabled; level: 'high' | 'medium' | 'low' (src/townQuality.js); auto: step down by
 // itself when the town runs slowly; onQuality(level, 'auto' | 'user'): called when the level changes.
 // Returns { render(dt), resize(w, h), setEnabled(on), setQuality(level, auto), feed(dt), quality, auto, enabled }.
-export function createTownLook(renderer, scene, camera, { enabled = true, level = 'high', auto = true, onQuality = () => {} } = {}) {
+export function createTownLook(renderer, firstScene, firstCamera, { enabled = true, level = 'high', auto = true, onQuality = () => {} } = {}) {
+    let scene = firstScene;
+    let camera = firstCamera;
     const uLook = { value: enabled ? 1 : 0 };
     const patched = new WeakSet();
-    const originalBackground = scene.background;
-    const sky = skyTexture();
+    const backgrounds = new WeakMap(); // each scene's own background, for when LOOK is off
+    backgrounds.set(scene, scene.background);
+    const skies = new WeakMap();
+    skies.set(scene, skyTexture());
+    const sky = () => skies.get(scene);
     const governor = createGovernor({ level, auto });
     const initialLevel = governor.level; // where it started (AUTO may step down from here)
     let on = enabled;
@@ -174,7 +181,7 @@ export function createTownLook(renderer, scene, camera, { enabled = true, level 
 
     function apply() {
         uLook.value = on ? 1 : 0;
-        scene.background = on ? sky : originalBackground;
+        scene.background = on ? sky() : backgrounds.get(scene);
     }
     apply();
     scan();
@@ -235,6 +242,20 @@ export function createTownLook(renderer, scene, camera, { enabled = true, level 
             governor.auto = allowAuto;
             buildPost();
             onQuality(governor.level, 'user');
+        },
+        // Draw another scene instead (a place you have stepped into): the same painted shading, bloom and grade.
+        // options.sky: the colours of its sky when LOOK is on (the town's dusk when left out).
+        setScene(nextScene, nextCamera, { sky: colors } = {}) {
+            if(nextScene === scene && nextCamera === camera) return;
+            scene.background = backgrounds.get(scene); // the one we leave is as it was found
+            scene = nextScene;
+            camera = nextCamera;
+            if(!backgrounds.has(scene)) backgrounds.set(scene, scene.background);
+            if(!skies.has(scene)) skies.set(scene, skyTexture(colors));
+            sinceScan = Infinity;
+            apply();
+            scan();
+            buildPost(); // its render pass looks at the new scene
         },
         feed,
         get quality() { return governor.level; },
