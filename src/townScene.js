@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { mergeByMaterial } from './meshMerge.js';
 import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces } from './townDistricts.js';
 import { FOLK, createWalker, stepWalker } from './townFolk.js';
+import { skyAt } from './townTime.js';
 import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
 
 // Frontier Town as a small 3D diorama at dusk (look "A" in art/town/dusk-gang-town.jpg): gaslit brick and
@@ -16,12 +17,16 @@ const C = {
     coat: 0x2a2521, cap: 0x3a342c, skin: 0xd9a27a, smoke: 0x6e6a66, sky: 0x1d3640, green: 0x3f4f3a
 };
 
+// Lamp and window materials, with the glow they were made with: the time of day (src/townTime.js) scales them.
+const glowBase = new Map();
 const mat = (() => {
     const cache = new Map();
     return (color, emissive = 0) => {
         const key = `${color}:${emissive}`;
         if(!cache.has(key)) {
-            cache.set(key, new THREE.MeshLambertMaterial({ color, emissive: emissive ? color : 0x000000, emissiveIntensity: emissive }));
+            const material = new THREE.MeshLambertMaterial({ color, emissive: emissive ? color : 0x000000, emissiveIntensity: emissive });
+            cache.set(key, material);
+            if(emissive) glowBase.set(material, emissive);
         }
         return cache.get(key);
     };
@@ -44,8 +49,11 @@ function roof(w, d, h, color, y) {
     return mesh;
 }
 
-// A painted sign board with Rye lettering.
+// A painted sign board with Rye lettering. The same words share one material, so repeats merge into one draw call.
+const signMaterials = new Map();
 function sign(text, width = 5, color = '#2a1d15', ink = '#f0d9a8') {
+    const key = `${text}|${color}|${ink}`;
+    if(signMaterials.has(key)) return new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), signMaterials.get(key));
     const canvas = document.createElement('canvas');
     canvas.width = 512;
     canvas.height = 128;
@@ -62,8 +70,9 @@ function sign(text, width = 5, color = '#2a1d15', ink = '#f0d9a8') {
     g.fillText(text, 256, 70, 470);
     const texture = new THREE.CanvasTexture(canvas);
     texture.colorSpace = THREE.SRGBColorSpace;
-    const mesh = new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), new THREE.MeshBasicMaterial({ map: texture }));
-    return mesh;
+    const material = new THREE.MeshBasicMaterial({ map: texture });
+    signMaterials.set(key, material);
+    return new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), material);
 }
 
 // How lively the town looks: more windows light up as buildings are upgraded (set before building).
@@ -279,12 +288,12 @@ function lamp(x, z) {
 
 function townsperson(seed) {
     const g = new THREE.Group();
-    g.add(box(0.9, 1.6, 0.6, C.coat, 0, 1.3, 0), box(0.8, 0.8, 0.55, 0x2b2b2e, 0, 0.4, 0));
+    g.add(box(0.9, 1.6, 0.6, C.coat, 0, 1.3, 0), box(0.8, 0.8, 0.55, C.coat, 0, 0.4, 0)); // one material for coat and trousers: fewer draw calls
     const head = new THREE.Mesh(new THREE.SphereGeometry(0.38, 8, 6), mat(C.skin));
     head.position.y = 2.45;
-    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.22, 10), mat(seed % 3 ? C.cap : 0x4a3b2a));
+    const cap = new THREE.Mesh(new THREE.CylinderGeometry(0.42, 0.44, 0.22, 10), mat(C.cap));
     cap.position.set(0, 2.72, 0.04);
-    g.add(head, cap, box(0.6, 0.06, 0.35, seed % 3 ? C.cap : 0x4a3b2a, 0, 2.63, 0.38));
+    g.add(head, cap, box(0.6, 0.06, 0.35, C.cap, 0, 2.63, 0.38));
     g.scale.setScalar(1.15);
     return g;
 }
@@ -456,10 +465,109 @@ function districtScenery(scenery, smokeSources) {
     scenery.add(box(0.15, 2.4, 0.15, C.timberDark, 3.8, 1.2, 34.6), log);
     block(3.8, 34.6, 0.3, 0.3);
     scenery.add(lamp(0, 25), lamp(4.6, 35.4));
+
+
+    // Vane's Crossing: a street of weathered false fronts and a clock tower whose clock has stopped.
+    const falseFront = (x, z, turn) => {
+        const g = new THREE.Group();
+        g.add(box(7, 4.6, 3, 0x7a6a55, 0, 2.3, 0), box(7.4, 1.6, 0.35, 0x6a5a48, 0, 5.4, 1.4), box(1.3, 2.6, 0.12, C.trim, -1.5, 1.3, 1.54), box(1.3, 1.1, 0.12, C.trim, 1.6, 2.6, 1.54));
+        g.position.set(x, 0, z);
+        g.rotation.y = turn;
+        scenery.add(g);
+        block(x, z, 3.7, 1.7);
+    };
+    for(const x of [50, 58, 66]) { falseFront(x, -9, 0); falseFront(x, 7.5, Math.PI); }
+    const tower = new THREE.Group();
+    const face = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.2, 20), mat(0xe8dcc0));
+    face.rotation.x = Math.PI / 2;
+    face.position.set(0, 7.2, 1.55);
+    const cone = new THREE.Mesh(new THREE.ConeGeometry(2.5, 2.4, 4), mat(C.slate));
+    cone.rotation.y = Math.PI / 4;
+    cone.position.y = 10.4;
+    tower.add(box(3, 9, 3, C.stone, 0, 4.5, 0), face, cone,
+        box(0.12, 0.85, 0.06, C.trim, 0.25, 7.3, 1.68).rotateZ(-0.6), box(0.12, 0.6, 0.06, C.trim, -0.1, 7.15, 1.68).rotateZ(0.5));
+    tower.position.set(75, 0, -1);
+    scenery.add(tower);
+    block(75, -1, 1.5, 1.5);
+    scenery.add(box(0.2, 1.3, 0.2, C.timberDark, 56, 0.65, -4.2), box(2.2, 0.14, 0.14, C.timberDark, 56, 1.2, -4.2), lamp(48, -1), lamp(62, 3));
+
+    // Tres Rios: an adobe hacienda, a well, and a stone with a struck-out date.
+    const hacienda = new THREE.Group();
+    hacienda.add(box(12, 4.2, 6, 0xc9a77c, 0, 2.1, 0), box(12.5, 0.45, 6.5, 0x9a5a3a, 0, 4.4, 0), box(1.6, 2.8, 0.12, C.trim, 0, 1.4, 3.05), box(1.3, 1.2, 0.12, C.trim, -3.5, 2.4, 3.05), box(1.3, 1.2, 0.12, C.trim, 3.5, 2.4, 3.05));
+    hacienda.position.set(-18, 0, -38);
+    scenery.add(hacienda);
+    block(-18, -38, 6.2, 3.2);
+    const stone = new THREE.Group();
+    stone.add(box(1, 1.6, 0.3, C.stone, 0, 0.8, 0), box(0.6, 0.12, 0.34, C.stoneDark, 0, 1.2, 0), box(1.4, 0.3, 2.2, 0x8a6a42, 0, 0.15, -1.2));
+    stone.position.set(-27, 0, -26);
+    scenery.add(stone);
+    block(-27, -26, 0.6, 0.4);
+    const well = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.9, 12), mat(C.stone));
+    well.position.set(-12, 0.45, -30);
+    scenery.add(well, box(0.2, 2.6, 0.2, C.timberDark, -13, 1.3, -30), box(0.2, 2.6, 0.2, C.timberDark, -11, 1.3, -30), box(2.6, 0.16, 0.5, C.timberDark, -12, 2.6, -30));
+    block(-12, -30, 1.1, 1.1);
+    scenery.add(box(10, 1.4, 0.5, 0xc9a77c, -32, 0.7, -44), box(10, 1.4, 0.5, 0xc9a77c, -10, 0.7, -44), lamp(-20, -22), lamp(-9, -24));
+
+    // The Silver Belle: a riverboat tied up at a pier, a notice post, crates.
+    scenery.add(box(38, 0.04, 8, 0x2f6f7a, 45, 0.06, 38, 0.12));
+    blocks.push({ minX: 26, maxX: 64, minZ: 34, maxZ: 42 });
+    const boat = new THREE.Group();
+    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 3.6, 12), mat(0x8b0000));
+    wheel.rotation.x = Math.PI / 2;
+    wheel.position.set(-7.4, 1.8, 0);
+    boat.add(box(14, 1.6, 5, 0xe8e0d0, 0, 1.0, 0), box(14.4, 0.8, 5.2, C.timberDark, 0, 0.3, 0), box(8, 2.4, 3.6, 0xf2ead8, -1, 3.0, 0), box(8.5, 0.3, 4, 0x8b0000, -1, 4.35, 0),
+        box(0.9, 3, 0.9, C.iron, 3.2, 4.6, 0), box(0.9, 0.4, 0.9, 0x8b0000, 3.2, 5.9, 0), wheel);
+    const hull = sign('SILVER BELLE', 5);
+    hull.position.set(-1, 3.0, 1.85);
+    boat.add(hull);
+    boat.position.set(46, 0, 38);
+    scenery.add(boat, box(2.6, 0.2, 6, C.timber, 44.5, 0.25, 32.6));
+    const notice = sign('SILVER BELLE', 3.4);
+    notice.position.set(49, 2.9, 30.75);
+    scenery.add(box(0.15, 2.4, 0.15, C.timberDark, 49, 1.2, 30.6), notice);
+    block(49, 30.6, 0.3, 0.3);
+    for(const [x, z] of [[56, 28], [57.3, 28.7]]) scenery.add(box(1.3, 1.3, 1.3, C.timberDark, x, 0.65, z));
+    block(56.6, 28.4, 1.4, 1.2);
+    scenery.add(lamp(40, 26), lamp(53, 26));
+
+    // Fort Pell: a palisade, barracks, a flagpole, and the gatling, oiled and pointed at the sky.
+    scenery.add(box(43, 3.2, 0.5, C.timber, 58.5, 1.6, -45.2), box(0.5, 3.2, 32, C.timber, 79.4, 1.6, -30));
+    for(let x = 38; x <= 79; x += 1.5) scenery.add(box(0.5, 0.7, 0.5, C.timberDark, x, 3.5, -45.2));
+    const barracks = new THREE.Group();
+    barracks.add(box(14, 4, 6, 0x8a6a48, 0, 2, 0), roof(14, 6, 2, C.slate, 4), box(1.6, 2.8, 0.12, C.trim, -3, 1.4, 3.05), box(1.6, 2.8, 0.12, C.trim, 3, 1.4, 3.05));
+    barracks.position.set(62, 0, -38);
+    scenery.add(barracks);
+    block(62, -38, 7.2, 3.2);
+    scenery.add(box(0.25, 11, 0.25, C.iron, 48, 5.5, -24), box(2.4, 1.4, 0.08, 0x2a3f6a, 49.3, 10, -24));
+    block(48, -24, 0.4, 0.4);
+    const gatling = new THREE.Group();
+    gatling.add(box(2.2, 0.8, 1.8, C.iron, 0, 0.9, 0), box(0.5, 0.5, 0.9, C.brass, 0, 1.5, -0.2));
+    for(const side of [-1, 1]) {
+        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.14, 12), mat(C.timberDark));
+        w.rotation.z = Math.PI / 2;
+        w.position.set(side * 1.2, 0.85, 0);
+        gatling.add(w);
+    }
+    const barrels = new THREE.Group();
+    for(const [bx, by] of [[0, 0], [0.22, 0.14], [-0.22, 0.14], [0, 0.3]]) {
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.6, 8), mat(C.iron));
+        barrel.position.set(bx, by, 1.3);
+        barrel.rotation.x = Math.PI / 2;
+        barrels.add(barrel);
+    }
+    barrels.position.set(0, 1.6, 0);
+    barrels.rotation.x = -0.95;
+    gatling.add(barrels);
+    gatling.position.set(60, 0, -26);
+    scenery.add(gatling);
+    block(60, -26, 1.2, 1.0);
+    scenery.add(lamp(50, -20), lamp(70, -23));
     return blocks;
 }
 
-export function createTownScene() {
+// options.time: false keeps the light at dusk (?time=off, src/townTime.js).
+export function createTownScene(options = {}) {
+    const timeOn = options.time !== false;
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(C.sky);
     scene.fog = new THREE.Fog(C.sky, 85, 150);
@@ -467,7 +575,8 @@ export function createTownScene() {
     const view = { target: new THREE.Vector3(3, 0, -12), distance: 70, minDistance: 36, maxDistance: 95, pitch: 0.72 };
 
     // Dusk: cool teal sky light, a low amber sun, warm lamps.
-    scene.add(new THREE.HemisphereLight(0x8fc3cf, 0x5a3a24, 2.4));
+    const hemi = new THREE.HemisphereLight(0x8fc3cf, 0x5a3a24, 2.4);
+    scene.add(hemi);
     const sun = new THREE.DirectionalLight(0xffa860, 2.8);
     sun.position.set(-30, 40, 45);
     scene.add(sun);
@@ -598,39 +707,63 @@ export function createTownScene() {
     scenery.add(box(0.25, 3.6, 0.25, C.timberDark, 34.5, 1.8, -3.4), trainSign);
     scene.add(mergeByMaterial(scenery));
     // Gates: a fence while a district is shut, an open gate once its outlaw is beaten (setDistricts).
+    // Many small boxes that never move on their own: baked into a mesh per material, like the rest of the town. All the
+    // shut gates are one merged set (rebuilt when a district opens), each open gate is its own so it can rise.
     const gates = new Map();
     let openDistricts = [];
+    let shutGates = null;
+    let shutKey = '';
+    function rebuildShutGates() {
+        const key = openDistricts.join(',');
+        if(key === shutKey && shutGates) return;
+        shutKey = key;
+        if(shutGates) {
+            scene.remove(shutGates);
+            shutGates.traverse(o => { if(o.isMesh) o.geometry.dispose(); });
+        }
+        const all = new THREE.Group();
+        for(const d of DISTRICTS) if(!openDistricts.includes(d.id)) all.add(shutGate(d));
+        shutGates = mergeByMaterial(all);
+        scene.add(shutGates);
+    }
     for(const d of DISTRICTS) {
-        // Many small boxes that never move on their own: baked into a mesh per material, like the rest of the town.
-        const shut = mergeByMaterial(shutGate(d));
         const open = mergeByMaterial(openGate(d));
         open.visible = false;
-        scene.add(shut, open);
-        gates.set(d.id, { shut, open });
+        scene.add(open);
+        gates.set(d.id, { open });
     }
+    rebuildShutGates();
+    const rising = new Map(); // open gates growing up out of the ground, id -> 0..1
     function setDistricts(ids) {
         openDistricts = DISTRICTS.filter(d => ids.includes(d.id)).map(d => d.id);
-        for(const [id, gate] of gates) {
-            const isOpen = openDistricts.includes(id);
-            gate.shut.visible = !isOpen;
-            gate.open.visible = isOpen;
+        for(const [id, gate] of gates) gate.open.visible = openDistricts.includes(id);
+        rebuildShutGates();
+    }
+    // A district's gate rises out of the ground (when the player is told it has opened).
+    function celebrate(ids) {
+        for(const id of ids) {
+            const gate = gates.get(id);
+            if(!gate || !openDistricts.includes(id)) continue;
+            gate.open.scale.y = 0.01;
+            rising.set(id, 0);
         }
     }
-    // Notes on the board: one for each job left today. Coins in the cash box: what the jail has earned.
-    const notes = new THREE.Group();
-    notes.position.set(boardAt.x, 0, boardAt.z);
-    for(let i = 0; i < BOARD_NOTES; i++) {
-        const note = new THREE.Group();
-        note.add(box(0.75, 1.0, 0.05, 0xe8d9b0, 0, 0, 0), box(0.55, 0.14, 0.06, 0x7a2a1f, 0, 0.3, 0), box(0.55, 0.08, 0.06, 0x3b2a20, 0, 0.02, 0), box(0.45, 0.08, 0.06, 0x3b2a20, 0, -0.18, 0));
-        note.position.set(-0.95 + i * 0.95, 2.35, 0.13);
-        note.rotation.z = (i - 1) * 0.06;
-        notes.add(note);
-    }
-    scene.add(notes);
-    const coins = new THREE.Group();
-    coins.position.set(cashAt.x, 1.5, cashAt.z);
-    scene.add(coins);
+    // Notes on the board: one for each job left today. Coins in the cash box: what the jail has earned. Each is rebuilt as
+    // a few merged meshes when it changes (rarely), so it costs a draw call or two, not one for every note and coin.
+    const swap = (holder, build) => {
+        if(holder.mesh) {
+            scene.remove(holder.mesh);
+            holder.mesh.traverse(o => { if(o.isMesh) o.geometry.dispose(); });
+        }
+        const group = new THREE.Group();
+        build(group);
+        holder.mesh = group.children.length ? mergeByMaterial(group) : null;
+        if(holder.mesh) scene.add(holder.mesh);
+    };
+    const notesHolder = { mesh: null };
+    let notesKey = -1;
     const coinGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.1, 12);
+    const coinsHolder = { mesh: null };
     let coinKey = '';
     function setJailCash(stored, capacity) {
         const count = coinCount(stored, capacity);
@@ -638,18 +771,29 @@ export function createTownScene() {
         const key = `${count}|${full}`;
         if(key === coinKey) return;
         coinKey = key;
-        coins.clear();
-        for(let i = 0; i < count; i++) {
-            const coin = new THREE.Mesh(coinGeometry, mat(0xd9a520, full ? 0.9 : 0.25));
-            coin.position.set(-0.75 + (i % 4) * 0.5, 0.05 + (i > 3 ? 0.1 : 0), (i % 2 ? 0.25 : -0.25));
-            coins.add(coin);
-        }
-        // A full box shows a lamp on top, and its gold glows (bloom picks it up with LOOK on).
-        if(full) coins.add(box(0.36, 0.36, 0.36, C.glow, 0, 0.45, 0, 1.6));
+        swap(coinsHolder, group => {
+            for(let i = 0; i < count; i++) {
+                const coin = new THREE.Mesh(coinGeometry, mat(0xd9a520, full ? 0.9 : 0.25));
+                coin.position.set(cashAt.x - 0.75 + (i % 4) * 0.5, 1.55 + (i > 3 ? 0.1 : 0), cashAt.z + (i % 2 ? 0.25 : -0.25));
+                group.add(coin);
+            }
+            // A full box shows a lamp on top, and its gold glows (bloom picks it up with LOOK on).
+            if(full) group.add(box(0.36, 0.36, 0.36, C.glow, cashAt.x, 1.95, cashAt.z, 1.6));
+        });
     }
     function setBoardNotes(jobsLeft) {
         const shown = boardNotes(jobsLeft);
-        notes.children.forEach((note, i) => { note.visible = i < shown; });
+        if(shown === notesKey) return;
+        notesKey = shown;
+        swap(notesHolder, group => {
+            for(let i = 0; i < shown; i++) {
+                const note = new THREE.Group();
+                note.add(box(0.75, 1.0, 0.05, 0xe8d9b0, 0, 0, 0), box(0.55, 0.14, 0.06, 0x7a2a1f, 0, 0.3, 0), box(0.55, 0.08, 0.06, 0x3b2a20, 0, 0.02, 0), box(0.45, 0.08, 0.06, 0x3b2a20, 0, -0.18, 0));
+                note.position.set(boardAt.x - 0.95 + i * 0.95, 2.35, boardAt.z + 0.13);
+                note.rotation.z = (i - 1) * 0.06;
+                group.add(note);
+            }
+        });
     }
     setJailCash(0, 1);
     setBoardNotes(BOARD_NOTES);
@@ -668,10 +812,31 @@ export function createTownScene() {
         ...districtBlocks
     ];
     // Two real lamp lights on the main street (each light costs every lit pixel on a phone); the other lamps glow.
+    const lampLights = [];
     for(const [x, z] of [[-8, 1.5], [8, -9]]) {
         const light = new THREE.PointLight(0xffa040, 75, 26, 1.6);
         light.position.set(x, 4.5, z);
         scene.add(light);
+        lampLights.push(light);
+    }
+
+    // The time of day (src/townTime.js): the light, the sky and the lamps follow a slow ten-minute round that starts
+    // at the dusk the town has always had.
+    let timeOffset = 0;
+    function applyTime(seconds) {
+        const k = skyAt(seconds);
+        hemi.color.setHex(k.hemiSky);
+        hemi.groundColor.setHex(k.hemiGround);
+        hemi.intensity = k.hemiI;
+        sun.color.setHex(k.sun);
+        sun.intensity = k.sunI;
+        scene.fog.color.setHex(k.sky);
+        if(scene.background?.isColor) scene.background.setHex(k.sky);
+        else scene.backgroundIntensity = k.bg; // the painted sky of LOOK
+        glow.material.opacity = k.glow;
+        for(const [material, base] of glowBase) material.emissiveIntensity = base * k.lamps;
+        for(const light of lampLights) light.intensity = 75 * k.lights;
+        return k;
     }
 
     // Smoke puffs rising and fading: one instanced mesh for every puff (a single draw call), reused in a ring.
@@ -732,6 +897,13 @@ export function createTownScene() {
     let elapsed = 0;
     function update(dt) {
         elapsed += dt;
+        if(timeOn) applyTime(elapsed + timeOffset);
+        for(const [id, progress] of rising) {
+            const next = Math.min(1, progress + dt * 1.2);
+            gates.get(id).open.scale.y = 0.01 + 0.99 * (1 - Math.pow(1 - next, 3));
+            if(next >= 1) rising.delete(id);
+            else rising.set(id, next);
+        }
         smokeTimer -= dt;
         if(smokeTimer <= 0) {
             smokeTimer = PUFF_EVERY;
@@ -862,6 +1034,13 @@ export function createTownScene() {
         setBoardNotes,
         // Step B: which districts are open (the ids from src/townDistricts.js).
         setDistricts,
+        celebrate,
+        // The light at a moment of the town's day, in seconds (tests, and ?time=off still allows an explicit one).
+        setTimeOfDay(seconds) {
+            timeOffset = seconds - elapsed;
+            return applyTime(seconds).name;
+        },
+        get timeOfDay() { return skyAt(elapsed + timeOffset).name; },
         get openDistricts() { return [...openDistricts]; },
         // Step C: the townsfolk. talkTo(id, x, z) makes one stand still and face a point; talkTo(null) lets everyone go on.
         folk,

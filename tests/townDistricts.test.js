@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DISTRICTS, TOWN_AREA, getDistrict, opensWith, unlockedDistricts, lockedHint, walkAreas, districtPlaces } from '../src/townDistricts.js';
+import { DISTRICTS, TOWN_AREA, getDistrict, opensWith, unlockedDistricts, lockedHint, walkAreas, districtPlaces, placeName, districtAt, doorLabel, districtOf } from '../src/townDistricts.js';
 import { OUTLAWS } from '../src/outlaws.js';
 import { TOWN_LAYOUT } from '../src/townScene.js';
 
@@ -68,4 +68,35 @@ test('walk areas and places grow with the open districts', () => {
     assert.deepEqual(districtPlaces([]), []);
     assert.deepEqual(districtPlaces(['canal']).map(p => p.id), ['channel']);
     assert.equal(districtPlaces(['canal'])[0].district, 'canal');
+});
+
+test('there are seven districts, for the Calloways, Iron Jack, Morgan, Vane, Espectro, Lou and Crane', () => {
+    assert.deepEqual(DISTRICTS.map(d => d.id).sort(), ['belle', 'canal', 'crossing', 'fort', 'foundry', 'ranch', 'tresrios']);
+    assert.deepEqual(DISTRICTS.map(d => d.outlaw).sort(), ['calloway-gang', 'colonel-crane', 'el-espectro', 'iron-jack', 'lucky-lou', 'mesa-morgan', 'silas-vane']);
+});
+
+test('every place has a prompt wording and is found from its id and from its gate', () => {
+    for(const d of DISTRICTS) {
+        assert.ok(doorLabel(d.place.id).length > 3, `${d.id}: place wording`);
+        assert.equal(districtOf(d.place.id), d);
+        assert.equal(districtOf(`gate-${d.id}`), d);
+        assert.match(doorLabel(`gate-${d.id}`), /SHUT/);
+    }
+});
+
+test('names read in a sentence', () => {
+    assert.equal(placeName(getDistrict('foundry')), 'Foundry Yard');
+    assert.equal(placeName(getDistrict('canal')), "Morgan's Channel");
+    assert.equal(placeName(getDistrict('belle')), 'The Silver Belle');
+    assert.equal(placeName(getDistrict('tresrios')), 'Tres Rios');
+});
+
+test('a point is in a district only beyond the town: the shared strip still counts as town', () => {
+    assert.equal(districtAt(0, 0), null);
+    assert.equal(districtAt(-36, -2), null, 'the strip the farm shares with the town');
+    assert.equal(districtAt(-50, 0)?.id, 'ranch');
+    assert.equal(districtAt(16, -30)?.id, 'foundry');
+    assert.equal(districtAt(60, -2)?.id, 'crossing');
+    assert.equal(districtAt(50, -30)?.id, 'fort');
+    assert.equal(districtAt(200, 200), null);
 });

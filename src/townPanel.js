@@ -9,7 +9,8 @@ import { createTownScene, TOWN_LAYOUT } from './townScene.js';
 import { createTownLook } from './townLook.js';
 import { createTownWalk } from './townWalk.js';
 import { spotLabel, getSpot, jobsLeft } from './townSpots.js';
-import { unlockedDistricts, doorLabel, districtOf, lockedHint } from './townDistricts.js';
+import { unlockedDistricts, doorLabel, districtOf, lockedHint, districtAt, getDistrict } from './townDistricts.js';
+import { loadNews, saveNews, newlyOpened, bannerFor, markSeen, markVisited, talkOfTheTown } from './townNews.js';
 import { getFolk, folkLine } from './townFolk.js';
 import { loadCompanion, saveCompanion } from './townCompanion.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
@@ -33,6 +34,9 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         walkButton: $('town-walk-btn'),
         lookButton: $('town-look-btn'),
         hint: $('town-hint'),
+        news: $('town-news'),
+        newsTitle: $('town-news-title'),
+        newsText: $('town-news-text'),
         labels: $('town-labels'),
         dollars: $('town-dollars'),
         message: $('town-message'),
@@ -45,6 +49,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     let town3d = null; // built the first time the town opens
     let look = null; // the art direction pass (src/townLook.js), an independent switch
     let walk = null; // the walkable town (src/townWalk.js), an independent switch
+    let news = loadNews(); // which districts the player has been told about and has walked into, kept on this device
+    let newsTimer = null;
     let companion = loadCompanion(); // the dog from the Calloway farm: { adopted, following }, kept on this device
     let openId = null; // the building whose card is showing
     let headerBottom = 0; // measured once the town is on screen (reset on resize)
@@ -300,7 +306,9 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             gunsmith: profile.owned.filter(id => id.startsWith('gun-')).length,
             tailor: profile.owned.filter(id => /^(hat|coat|pants|bullets)-/.test(id)).length
         });
-        town3d?.setDistricts(unlockedDistricts(profile.stats.stageStars));
+        const unlocked = unlockedDistricts(profile.stats.stageStars);
+        town3d?.setDistricts(unlocked);
+        if(town3d) announce(unlocked);
         town3d?.setJailCash(jailStored(profile), jailCapacity(profile));
         town3d?.setBoardNotes(jobsLeft(profile));
         const progress = getProgress();
@@ -347,12 +355,30 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             openBuilding(id); // a building's door, or the board
         }
     }
+    // Told once when a district has opened: a banner, and its gate rises. Tap it, or wait, to dismiss.
+    function announce(unlocked) {
+        const fresh = newlyOpened(unlocked, news);
+        if(!fresh.length) return;
+        news = markSeen(news, fresh);
+        saveNews(news);
+        const first = bannerFor(getDistrict(fresh[0]));
+        els.newsTitle.textContent = first.title;
+        els.newsText.textContent = fresh.length > 1 ? `${first.text} (${fresh.length - 1} more are open too.)` : first.text;
+        els.news.style.display = '';
+        clearTimeout(newsTimer);
+        newsTimer = setTimeout(() => { els.news.style.display = 'none'; }, 9000);
+        town3d?.celebrate(fresh);
+        track('district_open');
+    }
+    els.news.addEventListener('click', () => { els.news.style.display = 'none'; clearTimeout(newsTimer); });
+
     // What a townsperson says: one line for how far the marshal has got (src/townFolk.js).
     function personLine(id) {
         const progress = getProgress();
         const beaten = progress ? progress.stars.filter(mask => (mask & 1) !== 0).length : 0;
         const person = getFolk(id);
-        return person ? folkLine(person, beaten) : '';
+        const talk = profile ? talkOfTheTown(unlockedDistricts(profile.stats.stageStars), news) : null;
+        return person ? folkLine(person, beaten, talk) : '';
     }
     const describeSpot = door => {
         const named = doorLabel(door.id);
@@ -423,10 +449,10 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         openId = null;
         say('');
         if(!town3d) {
-            town3d = createTownScene();
+            town3d = createTownScene({ time: featureOn('time') });
             walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot, lineFor: personLine });
             // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
-            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; } };
+            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; } };
         }
         town3d.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
@@ -577,6 +603,14 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             }
             town3d.update(dt);
             walk?.update(dt);
+            if(walk?.active) { // walking into a district for the first time ends the talk about it
+                const here = districtAt(walk.position.x, walk.position.z);
+                if(here && !news.visited.includes(here.id)) {
+                    news = markVisited(news, here.id);
+                    saveNews(news);
+                    track('district_visit');
+                }
+            }
             look.render(dt);
             const w = window.innerWidth;
             const h = window.innerHeight;

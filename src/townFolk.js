@@ -10,27 +10,27 @@ export const FOLK_TALK_RANGE = 3.4;
 
 // route: points [x, z, wait in seconds] walked in order and round again. lines: [nothing beaten, a few, many].
 export const FOLK = [
-    { id: 'gil', name: 'Old Gil', route: [[-30, -6.5, 8], [-15, -7.2, 6], [-7, -6.5, 4]], lines: [
+    { id: 'gil', react: '{place} is open. The horses went that way first. They always know.', name: 'Old Gil', route: [[-30, -6.5, 8], [-15, -7.2, 6], [-7, -6.5, 4]], lines: [
         'A rider came through at dawn asking for the marshal. Left no name.',
         'Word on the Road is somebody is paying them. Nobody will say who.',
         'The horses go quiet when the wind turns toward Slagtown. I listen to horses.'] },
-    { id: 'grimsby', name: 'Mr. Grimsby', route: [[-27, 13, 9], [-7, 13, 2], [-7, 3.5, 5], [-7, 13, 0]], lines: [
+    { id: 'grimsby', react: 'I hear {place} is open, Marshal. I hope I am not needed there.', name: 'Mr. Grimsby', route: [[-27, 13, 9], [-7, 13, 2], [-7, 3.5, 5], [-7, 13, 0]], lines: [
         'Business is slow, Marshal. I would like it to stay that way.',
         'I have measured fewer men lately. Your doing, I think.',
         'I still keep a box with a name on it. I hope I never use it.'] },
-    { id: 'pruitt', name: 'Mr. Pruitt', route: [[14, -7.9, 10], [7.5, -7, 0], [7.5, -1, 4], [7.5, -7, 0]], lines: [
+    { id: 'pruitt', react: '{place} is open, I am told. I have been asked to keep the accounts. Gladly.', name: 'Mr. Pruitt', route: [[14, -7.9, 10], [7.5, -7, 0], [7.5, -1, 4], [7.5, -7, 0]], lines: [
         'Good day, Marshal. Your account is in order. I hope the road is kind.',
         'The ledgers from the Road do not add up. I intend to find out why.',
         'Every bounty leaves a paper trail. Somebody will read it one day.'] },
-    { id: 'barkeep', name: 'The barkeep', route: [[-15, -7.2, 9], [-7, -6.5, 0], [-7, -1.5, 3], [-7, -6.5, 0]], lines: [
+    { id: 'barkeep', react: 'Everyone in here is talking about {place}. Nobody has been brave enough to look.', name: 'The barkeep', route: [[-15, -7.2, 9], [-7, -6.5, 0], [-7, -1.5, 3], [-7, -6.5, 0]], lines: [
         'Quiet night. The man who ran the Tin Cup is still out there somewhere.',
         'Folk come in to hear who you brought down. Nobody asks what you drink.',
         'Half this room once wanted you dead. Now they tip well.'] },
-    { id: 'miner', name: 'A miner', route: [[22, -1.5, 7], [10, -1.5, 3]], lines: [
+    { id: 'miner', react: '{place} is open. First new ground I have had to walk in years.', name: 'A miner', route: [[22, -1.5, 7], [10, -1.5, 3]], lines: [
         'The smelter at Slagtown still runs. Whatever it makes, it is not for us.',
         'This town is getting bigger. I can feel it in my boots.',
         'I dig for the Company no more. The work here is honest, and slower.'] },
-    { id: 'station-master', name: 'The station master', route: [[36, -9.5, 9], [36, -2, 0], [27, -2, 6], [36, -2, 0]], lines: [
+    { id: 'station-master', react: 'Folk keep asking the way to {place}. I tell them to follow the marshal.', name: 'The station master', route: [[36, -9.5, 9], [36, -2, 0], [27, -2, 6], [36, -2, 0]], lines: [
         'The train was late again. Somebody at the Company office wanted it that way.',
         'Every hunt starts here. Get on, Marshal, and get back.',
         'I have run this line for years. You are the first to make it feel safe.'] }
@@ -43,7 +43,10 @@ export function folkTier(beaten) {
     return beaten >= 5 ? 2 : beaten >= 1 ? 1 : 0;
 }
 
-export function folkLine(person, beaten = 0) {
+// What they say. While the town is talking about a district that has just opened (`place`, its name), everyone mentions
+// it; otherwise it is the line for how far the marshal has got.
+export function folkLine(person, beaten = 0, place = null) {
+    if(place && person.react) return person.react.replace('{place}', place);
     return person.lines[folkTier(beaten)];
 }
 
