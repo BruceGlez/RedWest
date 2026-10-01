@@ -67,6 +67,7 @@ const portraitFile = name => (!DEMO && PORTRAIT_FILES.has(name) ? assetUrl(`port
 const outlawPortraits = renderOutlawPortraits(renderer);
 for(const outlaw of OUTLAWS) outlawPortraits[outlaw.id] = portraitFile(outlaw.id) ?? outlawPortraits[outlaw.id];
 const enemyPortraits = renderEnemyPortraits(renderer);
+for(const id of Object.keys(enemyPortraits)) enemyPortraits[id] = portraitFile(`enemy-${id}`) ?? enemyPortraits[id];
 ui.setPortraits(outlawPortraits, enemyPortraits);
 // Outlaws' 3D models load one at a time (about 1 MB each): the selected outlaw now, others when
 // picked. Once loaded, the outlaw fights as the model and their WANTED poster is redrawn from it.
