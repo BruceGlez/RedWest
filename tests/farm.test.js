@@ -1,9 +1,10 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { CROPS, EGG, GOODS, PLOT_COUNT, createFarm, normalizeFarm, farmOpen, plotState, eggsReady, minutesToNextEgg, plant, harvest, collectEggs, sell, farmAction, minutesText } from '../src/farm.js';
+import { CROPS, EGG, GOODS, FARM_LEVELS, PLOT_COUNT, farmLevel, createFarm, normalizeFarm, farmOpen, plotState, eggsReady, minutesToNextEgg, plant, harvest, collectEggs, sell, farmAction, minutesText } from '../src/farm.js';
 import { createProfile, normalizeProfile } from '../src/profile.js';
 import { OUTLAWS } from '../src/outlaws.js';
-import { JAIL_BOUNTY_SHARE, normalizeTown } from '../src/town.js';
+import { JAIL_BOUNTY_SHARE, normalizeTown, jailStored, jailRate } from '../src/town.js';
+import { unlockedDistricts } from '../src/townDistricts.js';
 
 const T0 = new Date('2026-10-01T08:00:00Z');
 const later = minutes => new Date(T0.getTime() + minutes * 60000);
@@ -139,6 +140,7 @@ test('the farm stays a side income: a tended plot never beats the jail, and a wh
     const jailTopPerHour = OUTLAWS.reduce((sum, o) => sum + o.bounty, 0) * JAIL_BOUNTY_SHARE; // $108 with all ten beaten
     let best = 0;
     for(const c of CROPS) best = Math.max(best, (c.price * c.yield) / (c.minutes / 60));
+    best *= FARM_LEVELS[FARM_LEVELS.length - 1].standBonus; // even at the top level
     assert.ok(best * PLOT_COUNT < jailTopPerHour, `six tended plots (${best * PLOT_COUNT}/h) stay under the jail (${jailTopPerHour}/h)`);
     // One visit a day: the best a day's check-in can bank, a pumpkin on every plot plus a full basket.
     const pumpkin = CROPS.find(c => c.id === 'pumpkin');
@@ -151,4 +153,71 @@ test('time reads as minutes and hours', () => {
     assert.equal(minutesText(12.3), '13m');
     assert.equal(minutesText(60), '1h');
     assert.equal(minutesText(95), '1h 35m');
+});
+
+test('the farm levels up with the Calloways\' stars: shut at none, then one level for each star', () => {
+    const profile = createProfile(T0);
+    assert.equal(farmLevel(profile), 0, 'shut');
+    for(const [mask, level] of [[1, 1], [3, 2], [5, 2], [7, 3], [6, 0]]) {
+        profile.stats.stageStars[calloways] = mask;
+        assert.equal(farmLevel(profile), level, `stars ${mask}`);
+    }
+});
+
+test('a higher level gives a bigger egg basket and a better price at the stand, and nothing grows faster', () => {
+    const at = stars => { const p = createProfile(T0); p.stats.stageStars[calloways] = stars; p.town.farm.coopAt = T0.toISOString(); return p; };
+    for(const [stars, cap] of [[1, 8], [3, 10], [7, 12]]) {
+        const p = at(stars);
+        assert.equal(eggsReady(p.town.farm, later(60 * 100), farmLevel(p)), cap);
+        assert.deepEqual(collectEggs(p, later(60 * 100)), { good: 'egg', amount: cap });
+    }
+    for(const [stars, paid] of [[1, 20], [3, 22], [7, 24]]) {
+        const p = at(stars);
+        p.town.farm.store.wheat = 10;
+        assert.equal(sell(p, 'all').dollars, paid, `ten wheat at level ${farmLevel(p)}`);
+    }
+    const wheat = CROPS.find(c => c.id === 'wheat');
+    for(const stars of [1, 3, 7]) { // the time a crop takes never depends on the level
+        const p = at(stars);
+        plant(p, 0, 'wheat', T0);
+        assert.equal(plotState(p.town.farm, 0, later(wheat.minutes - 1)).state, 'growing');
+        assert.equal(plotState(p.town.farm, 0, later(wheat.minutes)).state, 'ready');
+    }
+});
+
+test('a shut place never changes another, and another never changes it', () => {
+    // 1. Only the Calloways open the farm: every other outlaw beaten, and the farm stays shut.
+    const others = OUTLAWS.map((_, i) => i).filter(i => i !== calloways);
+    const shut = createProfile(T0);
+    for(const i of others) shut.stats.stageStars[i] = 7;
+    assert.equal(farmOpen(shut), false);
+    assert.equal(farmLevel(shut), 0);
+    assert.throws(() => plant(shut, 0, 'wheat', T0), { code: 'locked' });
+
+    // 2. With the Calloways beaten, the farm does exactly the same whichever other outlaws are beaten.
+    const play = stars => {
+        const p = createProfile(T0);
+        p.stats.stageStars = stars.slice();
+        const out = [];
+        out.push(plant(p, 0, 'corn', T0), plant(p, 1, 'wheat', T0));
+        p.town.farm.coopAt = T0.toISOString();
+        out.push(harvest(p, 1, later(25)), collectEggs(p, later(95)), sell(p, 'all'));
+        return { out, farm: p.town.farm, dollars: p.balances.dollars, level: farmLevel(p) };
+    };
+    const alone = OUTLAWS.map(() => 0); alone[calloways] = 1;
+    const withAll = OUTLAWS.map(() => 7); withAll[calloways] = 1;
+    assert.deepEqual(play(alone), play(withAll), 'the other outlaws change nothing on the farm');
+
+    // 3. And the farm changes nothing outside itself: no stars, no jail, no buildings, no other district.
+    const p = openProfile();
+    const before = JSON.stringify({ stars: p.stats.stageStars, levels: p.town.levels, jail: p.town.jailCollectedAt, jailRate: jailRate(p), jailStored: jailStored(p, later(600)), districts: unlockedDistricts(p.stats.stageStars) });
+    plant(p, 0, 'wheat', T0); harvest(p, 0, later(30)); collectEggs(p, later(300)); sell(p, 'all');
+    const after = JSON.stringify({ stars: p.stats.stageStars, levels: p.town.levels, jail: p.town.jailCollectedAt, jailRate: jailRate(p), jailStored: jailStored(p, later(600)), districts: unlockedDistricts(p.stats.stageStars) });
+    assert.equal(after, before);
+
+    // 4. Opening the farm opens only the farm's own district.
+    const stars = OUTLAWS.map(() => 0);
+    assert.deepEqual(unlockedDistricts(stars), []);
+    stars[calloways] = 1;
+    assert.deepEqual(unlockedDistricts(stars), ['ranch']);
 });

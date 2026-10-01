@@ -18,6 +18,90 @@ the first one built; the other nine are described here so they can be built one 
   that glows when it is lit, a pier with a wagon on it.
 - **Mood only from the inspirations.** No names, art or characters from other games or films (`ASSETS.md`).
 
+## How the places fit together
+
+The ten places are one game, not ten side games. Two rules hold them together: **the story and the road set the order**, and
+**no place ever depends on another**.
+
+### The road is the spine
+
+The Wanted Road is the story, and the town is what the road rebuilds. Every place is its outlaw's own ground being put right
+(`STORY_BIBLE.md`, the epilogues), so a place opens for the same reason the outlaw fell. They open in the order you beat them,
+and the places a player has early are the plain, basic ones; the later ones are bigger and make more of the goods.
+
+| Road | Outlaw | Grievance, as the place tells it | Place | Verb | Tier |
+|---|---|---|---|---|---|
+| 1 | Dusty Pete | A saloon street gone to ruin | Copper Bit | COOK | 1: the basics |
+| 2 | Rattlesnake Rosa | A dry canyon and an unlucky pack | Whisper Wash | SCOUT | 1 |
+| 3 | Deacon Graves | A burnt chapel | Hollow Hill | BUILD | 1 |
+| 4 | The Calloways | A farm lost on the small print | Calloway Farm | GROW | 1 |
+| 5 | Iron Jack Harlan | A man the smithy would not hire | Foundry Yard | SMELT | 2: make and move |
+| 6 | Mad Mesa Morgan | A dry channel | Morgan's Channel | WATER | 2 |
+| 7 | Silas Vane | A road closed for pay | Vane's Crossing | TRADE | 2 |
+| 8 | El Espectro | A name struck from the records | Tres Rios | TEND | 3: refine |
+| 9 | Lucky Lou | A crooked ledger | The Silver Belle | MARKET | 3 |
+| 10 | Colonel Crane | A regiment stood down | Fort Pell | PATROL | 3 |
+
+Goods and prices follow the same tiers: what an early place makes is cheap and plain (wheat, eggs), and what a late place makes is
+dear (chilli, iron bars, a patrol's pay). A place's best hour always stays below the jail's top rate.
+
+### A place grows with its outlaw's stars
+
+A place has a level, and the level is the outlaw's stars: **1 star opens it, 2 stars (the bounty collected) make it level 2, 3
+stars (rode on) make it level 3**. The Calloway Farm does this now (`farmLevel`, `FARM_LEVELS` in `src/farm.js`):
+
+| Level | Calloways' stars | Egg basket | The stand pays | The farm's story |
+|---|---|---|---|---|
+| 1 | beaten | 8 | base price | The fences are up again and the dog is fed. |
+| 2 | and the bounty collected | 10 | +10% | The barn has a new roof. |
+| 3 | and ridden on | 12 | +20% | The paper they lost the farm to is burned. |
+
+A level only ever changes **capacity and prices, plus a line of the story**. It never makes anything grow faster and never
+touches a fight. So the way to improve your town is the way you already play: beat outlaws, and beat them well. A place
+that is shut is level 0 and shows its outlaw's name.
+
+### No place depends on another
+
+This is the hard rule, and it holds in both directions:
+
+1. **A place reads only its own outlaw's stars.** The farm checks the Calloways and nothing else. Beating Jack or failing against
+   Lou cannot open it, shut it or level it.
+2. **A place writes only its own state, and the wallet.** The farm changes the farm and the dollars. It never touches stars, the
+   jail, the buildings, or the other districts (`tests/farm.test.js` checks this).
+3. **A link between two places is a bonus, never a need.** It exists only while both ends are open. Take one end away and the
+   other goes back to exactly what it does alone. Each link is a small pure function of "is the other place open", so a test can
+   run the place with its partner shut and open and compare.
+4. **Nothing can ask for something that is shut.** Orders name only goods from open places. A project (Hollow Hill) lists what it
+   needs, and a need from a shut place reads "Iron Jack's yard is shut", never blocks the other projects, and always has at least
+   one route that uses only tier 1 places. Prices (Silver Belle) and patrols (Fort Pell) count only open places.
+5. **Shut places add nothing and take nothing away.** They are not in totals, prices or orders, and the town simply shows the
+   gate.
+
+The test for it is the one already in `tests/farm.test.js`: play the place with every other outlaw beaten and with none, and
+the results must be identical.
+
+### The links (bonuses only)
+
+| Link | When both are open | When the other end is shut |
+|---|---|---|
+| Channel to Farm | Crops grow 10% sooner ("watered") | The farm grows at its normal speed |
+| Farm to Copper Bit | Pete cooks with your farm goods; meals sell for more than the goods in them | Pete cooks from his own slow kitchen stock, so cooking still works |
+| Farm to Whisper Wash | Eggs from the coop feed the pups, who grow and scout sooner | The pups eat wild food and grow at the base rate |
+| Foundry to the town | Iron bars lower the dollar cost of an upgrade | Upgrades cost the plain dollars, as now |
+| Foundry to Fort Pell | Patrols also bring back scrap | Patrols pay dollars only, a little more of them |
+| Crossing to everywhere | Orders name goods from the open places | Orders name only the goods you can make |
+| Silver Belle | The price board covers the goods of every open place | It covers the goods of the places that are open |
+| Hollow Hill | Projects use goods from several places, with a route for every tier | Each project shows what it is waiting for and the others go on |
+
+### What the player sees
+
+- The barn card on the farm already says its level, the story line for it, and what the next star would do. Every place gets the
+  same card (`THE BARN: LEVEL 2`).
+- Planned: a **town ledger** on the bounty board, one row for each of the ten places: shut (and whom to beat), or level 1 to 3
+  (and what the next star adds). It reads from the stars alone, so it is always true.
+- The banner that tells you a place has opened (`src/townNews.js`) says which outlaw opened it, and the townsfolk talk about it
+  until you have been in.
+
 ## How a place is built
 
 | Part | Where | What it holds |
@@ -79,8 +163,10 @@ west edge, and a fence and trees close it in.
 **What it earns.** Six tended wheat plots would make $72 an hour, under the jail's $108 (the test holds it there). A real
 check-in, a pumpkin on every plot and a full basket, is about $400 a day at most.
 
-**What comes next here.** More plots and a second field with a place upgrade (dollars and goods), and a coop that holds
-more. Water from Morgan's Channel makes wheat give one more (step H2).
+**Levels.** Level 1 is the table above. Level 2 (the bounty collected) and level 3 (ridden on) give a bigger egg basket and a
+better price at the stand (see "A place grows with its outlaw's stars"). The farm never needs another place. **What comes
+next here:** a second field as a place upgrade. Water from Morgan's Channel makes crops grow 10% sooner, but only while the
+Channel is open (step H2).
 
 ### 2. Foundry Yard: SMELT (planned)
 
@@ -88,16 +174,17 @@ more. Water from Morgan's Channel makes wheat give one more (step H2).
 
 **The map.** A yard with the furnace in the middle, an anvil, a slag heap, a rail siding for ore carts, and the smithy.
 **What you do.** Scrap drops from fights on the road (a few pieces a run, never from Arena fights). Feed it to the furnace and
-it becomes **iron bars** over time; the furnace glows and smokes while it is lit. Bars are spent on town upgrades (the Bank, the
-Jail and the Sheriff's levels cost dollars *and* bars) and on place upgrades. **Links:** pumps for the Channel and rails for the
-Crossing are made here.
+it becomes **iron bars** over time; the furnace glows and smokes while it is lit. Bars lower the dollar cost of town upgrades
+(never required: the plain dollar price always works) and of place upgrades. **Links:** see the table of links; the Foundry
+works fully alone.
 
 ### 3. Morgan's Channel: WATER (planned)
 
 *The dry channel from Redstone Mesa runs here now, with water in it. No blasting after dark.* Opens with Mad Mesa Morgan.
 
 **The map.** The channel across the middle, a footbridge, the warehouse, the fire crew's buckets, and a row of fishing posts.
-**What you do.** Open the sluice and the channel waters the **farm**: wheat gives one more, so the places help each other. Cast
+**What you do.** Open the sluice and the channel waters the **farm**: crops grow 10% sooner while both are open, so the places help each other
+and neither needs the other. Cast
 from a fishing post and the line pays out after a while: **fish** are goods, sold or cooked at Copper Bit. The warehouse stores
 goods beyond the barn's cap.
 
@@ -106,8 +193,8 @@ goods beyond the barn's cap.
 *The Crossing is open again, and wagons use it. The clock on the tower stays stopped.* Opens with Silas Vane.
 
 **The map.** The street of false fronts, the clock tower, a wagon yard.
-**What you do.** A **wagon train** arrives each day with three orders (for example, "6 eggs and 4 wheat for $40"). Fill them
-from the barn; a filled order pays dollars, and an order left unfilled waits a day, then is replaced. This is the Township order
+**What you do.** A **wagon train** arrives each day with three orders (for example, "6 eggs and 4 wheat for $40"). Orders name only goods
+from places that are open. Fill them from the barn; a filled order pays dollars, and an order left unfilled waits a day, then is replaced. This is the Township order
 board, and the bounty board in the square points here when orders are waiting.
 
 ### 5. Tres Rios: TEND (planned)
@@ -126,7 +213,7 @@ with Lucky Lou.
 
 **The map.** The pier, the boat, the notice post, crates, a price board on the gangway.
 **What you do.** A **price board**: each good sells for a little more or less each day, the same for everybody (the day's number
-comes from the date, so it can be tested). Sell when the price is high; there is nothing to gamble and nothing to lose, only a
+comes from the date, so it can be tested). The board lists only the goods of open places. Sell when the price is high; there is nothing to gamble and nothing to lose, only a
 better day to sell. The notice post shows tomorrow's prices.
 
 ### 7. Fort Pell: PATROL (planned)
@@ -145,8 +232,9 @@ Southwest of the town (the gate is on the south edge, left of the channel).
 
 **Built now:** a street of weathered false fronts, a SALOON sign, spilled kegs, a hitching rail, and the broken piano, which you
 can read about.
-**The place:** the saloon kitchen. Turn farm goods into **meals** (bread from wheat, an egg plate, cornbread, pumpkin pie); a
-meal sells for more than the goods in it. The **piano** is the one game here: a short tune to play on the broken keys, once a
+**The place:** the saloon kitchen. Turn goods into **meals** (bread from wheat, an egg plate, cornbread, pumpkin pie); a
+meal sells for more than the goods in it. With the farm open Pete cooks with your farm goods; without it he cooks from his own
+kitchen stock, a slow trickle, so Copper Bit works on its own. The **piano** is the one game here: a short tune to play on the broken keys, once a
 day, that pays a small tip. It tests timing, not luck, and a bad try only costs the try.
 
 ### 9. Whisper Wash: SCOUT (canyon built, place planned)
@@ -155,8 +243,8 @@ day, that pays a small tip. It tests timing, not luck, and a bad try only costs 
 West edge, north of the farm.
 
 **Built now:** a dry riverbed with a thread of water, canyon walls, the den, and three pups.
-**The place:** raise the pups. Feed them eggs and they grow; a grown pup can **scout**: it goes out for a set time and returns
-with a find (a trinket to sell, a tool, an arrowhead). The farm feeds the Wash, and the Wash pays the farm back.
+**The place:** raise the pups. Feed them and they grow (eggs from the farm if it is open make them grow sooner; wild food otherwise); a grown pup can **scout**: it goes out for a set time and returns
+with a find (a trinket to sell, a tool, an arrowhead). The farm can feed the Wash, but the Wash never needs the farm.
 
 ### 10. Hollow Hill: BUILD (chapel built, place planned)
 
@@ -164,8 +252,8 @@ with a find (a trinket to sell, a tool, an arrowhead). The farm feeds the Wash, 
 Deacon Graves. North edge, between Tres Rios and the Foundry.
 
 **Built now:** the chapel with a bell tower, the bell on a frame, graves under the hill, and lamps.
-**The place:** a **project board** of things the town builds together: the bell tower, a new pew, a school bench. Each takes goods
-from several places (iron bars, wheat, fish). A finished project shows in the town for good, and the bell rings at dusk. This
+**The place:** a **project board** of things the town builds together: the bell tower, a new pew, a school bench. Each lists the goods it needs (iron bars, wheat, fish) and has a route that uses only the early
+places, so a shut place never blocks a project. A finished project shows in the town for good, and the bell rings at dusk. This
 is the long game that gives goods from every place somewhere to go, and it is where "the town changes because of what you
 did" is clearest.
 

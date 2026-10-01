@@ -8,7 +8,7 @@ import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, 
 import { createTownScene, TOWN_LAYOUT } from './townScene.js';
 import { createTownLook, DAY_SKY } from './townLook.js';
 import { createFarmScene } from './placeFarm.js';
-import { CROPS, GOODS, EGG, getCrop, plotStates, eggsReady, minutesToNextEgg, minutesText } from './farm.js';
+import { CROPS, GOODS, EGG, getCrop, plotStates, eggsReady, minutesToNextEgg, minutesText, farmLevel, farmLevelInfo } from './farm.js';
 import { FARM_START, farmLabel, plotIndex } from './farmLayout.js';
 import { createTownWalk } from './townWalk.js';
 import { spotLabel, getSpot, jobsLeft } from './townSpots.js';
@@ -338,7 +338,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         if(!profile || !isOpen()) return;
         els.dollars.textContent = profile.balances.dollars.toLocaleString();
         renderLabels();
-        farm3d?.setFarm(profile.town.farm);
+        farm3d?.setFarm(profile.town.farm, new Date(), Math.max(1, farmLevel(profile)));
         town3d?.setLevels(profile.town.levels, {
             gunsmith: profile.owned.filter(id => id.startsWith('gun-')).length,
             tailor: profile.owned.filter(id => /^(hat|coat|pants|bullets)-/.test(id)).length
@@ -409,18 +409,26 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         }
         switch(id) {
             case 'coop': {
-                const eggs = eggsReady(farm, now);
-                const text = eggs >= EGG.cap ? 'The basket is full.' : `The next egg is ${minutesText(minutesToNextEgg(farm, now))} away.`;
-                return card('THE COOP', `<p class="town-blurb">The hens lay an egg every ${EGG.minutes} minutes, up to ${EGG.cap}. ${text}</p><p class="town-stat">${eggs} ${eggs === 1 ? 'egg' : 'eggs'} waiting</p>`,
+                const level = Math.max(1, farmLevel(profile));
+                const cap = farmLevelInfo(level).eggCap;
+                const eggs = eggsReady(farm, now, level);
+                const text = eggs >= cap ? 'The basket is full.' : `The next egg is ${minutesText(minutesToNextEgg(farm, now, level))} away.`;
+                return card('THE COOP', `<p class="town-blurb">The hens lay an egg every ${EGG.minutes} minutes, up to ${cap}. ${text}</p><p class="town-stat">${eggs} ${eggs === 1 ? 'egg' : 'eggs'} waiting</p>`,
                     `<button type="button" class="shop-action collect" data-farm-eggs${eggs ? '' : ' disabled'}>COLLECT ${eggs || ''} EGGS</button>`);
             }
             case 'stand': {
-                const rows = GOODS.filter(g => farm.store[g.id] > 0).map(g => `<div class="farm-row"><span>${g.name} x ${farm.store[g.id]}</span><span>$${farm.store[g.id] * g.price}</span><button type="button" class="shop-action upgrade" data-sell="${g.id}">SELL</button></div>`).join('');
-                const total = GOODS.reduce((sum, g) => sum + farm.store[g.id] * g.price, 0);
-                return card('THE FARM STAND', `<p class="town-blurb">${total ? 'Fair prices, the same every day.' : 'Nothing to sell yet. Harvest a plot or collect the eggs, then come back.'}</p>${rows}`,
+                const bonus = farmLevelInfo(Math.max(1, farmLevel(profile))).standBonus; // what the stand pays at this level
+                const pays = (g, count) => Math.round(count * g.price * bonus);
+                const rows = GOODS.filter(g => farm.store[g.id] > 0).map(g => `<div class="farm-row"><span>${g.name} x ${farm.store[g.id]}</span><span>$${pays(g, farm.store[g.id])}</span><button type="button" class="shop-action upgrade" data-sell="${g.id}">SELL</button></div>`).join('');
+                const total = Math.round(GOODS.reduce((sum, g) => sum + farm.store[g.id] * g.price, 0) * bonus);
+                const over = bonus > 1 ? ` The stand pays ${Math.round((bonus - 1) * 100)}% over.` : '';
+                return card('THE FARM STAND', `<p class="town-blurb">${total ? `Fair prices, the same every day.${over}` : 'Nothing to sell yet. Harvest a plot or collect the eggs, then come back.'}</p>${rows}`,
                     total ? `<button type="button" class="shop-action collect" data-sell="all">SELL ALL FOR $${total}</button>` : '');
             }
-            case 'barn': return card('THE BARN', `<p class="town-blurb">${getDistrict('ranch').card.text}</p><div class="farm-chips">${storeLine(farm.store)}</div>`);
+            case 'barn': {
+                const level = Math.max(1, farmLevel(profile));
+                return card(`THE BARN: LEVEL ${level}`, `<p class="town-blurb">${getDistrict('ranch').card.text}</p><p class="town-stat">${farmLevelInfo(level).note}${level < 3 ? ' More stars on the Calloways raise the farm another level.' : ''}</p><div class="farm-chips">${storeLine(farm.store)}</div>`);
+            }
             case 'kennel': {
                 const label = !companion.adopted ? 'TAKE THE DOG' : companion.following ? 'SEND THE DOG HOME' : 'CALL THE DOG';
                 return card('THE KENNEL', '<p class="town-blurb">The Calloways keep one dog more than they can feed. It would rather be out working.</p>', `<button type="button" class="shop-action collect" data-companion>${label}</button>`);
@@ -446,7 +454,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         if(farm && index >= 0 && plotStates(farm)[index].state === 'ready') {
             return farmDo({ action: 'harvest', plot: index }, r => `Harvested ${r.amount} ${GOODS.find(g => g.id === r.good).name.toLowerCase()}.`);
         }
-        if(farm && id === 'coop' && eggsReady(farm) > 0) return farmDo({ action: 'eggs' }, r => `Collected ${r.amount} ${r.amount === 1 ? 'egg' : 'eggs'}.`);
+        if(farm && id === 'coop' && eggsReady(farm, new Date(), Math.max(1, farmLevel(profile))) > 0) return farmDo({ action: 'eggs' }, r => `Collected ${r.amount} ${r.amount === 1 ? 'egg' : 'eggs'}.`);
         openBuilding(id);
     }
     function enterPlace(id) {
@@ -456,14 +464,14 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             farm3d = createFarmScene();
             farmWalk = createTownWalk({
                 town3d: farm3d, host: els.screen, onOpen: useFarm, blocked: () => !!openId, start: FARM_START,
-                describe: door => farmLabel(door, profile?.town.farm)
+                describe: door => farmLabel(door, profile?.town.farm, new Date(), profile ? Math.max(1, farmLevel(profile)) : 1)
             });
         }
         track('place_enter');
         walk?.exit(); // the town stops where the marshal stood, ready for when he comes back out
         place = id;
         farm3d.resize(window.innerWidth, window.innerHeight);
-        farm3d.setFarm(profile.town.farm);
+        farm3d.setFarm(profile.town.farm, new Date(), Math.max(1, farmLevel(profile)));
         look?.setScene(farm3d.scene, farm3d.camera, { sky: DAY_SKY });
         farmWalk.setCompanion(companion.following);
         farmWalk.enter();

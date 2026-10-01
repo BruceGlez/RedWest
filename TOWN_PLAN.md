@@ -137,6 +137,9 @@ with things to make and do. `PLACES.md` documents every place, the rules they al
   west) and Hollow Hill (Deacon Graves, north). They are ground in the town for now, with a plaque each, and become places in
   H4 and H5. Tres Rios was narrowed on its west side to make room for Whisper Wash.
 
+**How they fit together** (`PLACES.md`, "How the places fit together"): the road sets the order, a place has a level for each star on its
+outlaw (the farm does now), and no place ever depends on another: a link is a bonus that exists only while both ends are open.
+
 Next: H2 orders and the Channel's water for the farm, H3 the Foundry and Fort Pell, H4 Copper Bit, Tres Rios and Whisper Wash,
 H5 the Silver Belle and Hollow Hill.
 

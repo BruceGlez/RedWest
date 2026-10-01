@@ -454,16 +454,23 @@ try {
         await prompt('COOP: 6 EGGS');
         await page.keyboard.press('e');
         await toast('Collected 6 eggs');
-        // The stand pays a fixed price: 5 wheat at $2, 2 corn at $6, 6 eggs at $2 = $34.
+        // The barn says how far the farm has come: all three Calloway stars make it level 3.
+        await stand('barn');
+        await prompt('THE BARN');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /THE BARN: LEVEL 3/);
+        await page.locator('#town-sheet-close').click();
+        // The stand pays a fixed price: 5 wheat at $2, 2 corn at $6, 6 eggs at $2 = $34, and 20% over at level 3 (the Calloways are fully beaten): $41.
         const before = await dollars();
         await stand('stand');
         await prompt('THE FARM STAND');
         await page.keyboard.press('e');
         await page.locator('#town-sheet').waitFor({ state: 'visible' });
-        assert.match(await page.locator('#town-grid').textContent(), /SELL ALL FOR \$34/);
+        assert.match(await page.locator('#town-grid').textContent(), /SELL ALL FOR \$41/);
         await page.locator('[data-sell="all"]').click();
-        await toast('Sold for \\$34');
-        assert.equal(await dollars(), before + 34, 'the money landed in the wallet');
+        await toast('Sold for \\$41');
+        assert.equal(await dollars(), before + 41, 'the money landed in the wallet');
         // The kennel is here now, and the dog comes along inside the farm.
         await stand('kennel');
         await prompt('THE KENNEL');
