@@ -1159,8 +1159,9 @@ export function createTownScene(options = {}) {
             const upright = width < height;
             camera.fov = upright ? 50 : 38;
             view.pitch = upright ? 0.95 : 0.72; // look further down, so the tall screen is town rather than sky
-            view.maxDistance = (upright ? 150 : 95) * SPREAD;
-            view.distance = upright ? Math.max(view.distance, 125 * SPREAD) : Math.min(view.distance, view.maxDistance);
+            // A tall screen sees less of the town's width, so it stands further back: all of the middle of town fits.
+            view.maxDistance = (upright ? 200 : 95) * SPREAD;
+            view.distance = upright ? Math.max(view.distance, 160 * SPREAD) : Math.min(view.distance, view.maxDistance);
             camera.updateProjectionMatrix();
             placeCamera();
         },
