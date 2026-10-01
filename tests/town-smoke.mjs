@@ -26,6 +26,8 @@ try {
         await page.locator('#town-btn').click();
         await page.locator('#town-screen').waitFor({ state: 'visible' });
         await page.waitForFunction(() => window.__redWestTown);
+        // The profile (stars, jail, jobs) arrives a moment after the town opens; everything below depends on it.
+        await page.waitForFunction(() => window.__redWestTown.hasProfile);
         await page.waitForTimeout(800);
         return { page, errors, context };
     };
@@ -154,7 +156,7 @@ try {
         // Beaten: the Calloways, Iron Jack and Mesa Morgan open the farm, the foundry yard and the channel.
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 0, 0, 0, 0] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
-        assert.equal(await page.evaluate(() => window.__redWestTown.town3d.walkMap().areas.length), 4, 'the town and three districts');
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 4); // the town and three districts
         const at = (id) => page.evaluate(id => {
             const door = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
             window.__redWestTown.walk.place(door.x, door.z);
