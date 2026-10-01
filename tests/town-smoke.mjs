@@ -138,6 +138,19 @@ try {
         await context.close();
     }
 
+    {
+        // Nothing beaten: the train runs to Main Street only, and the other stops are greyed and name the outlaw to beat.
+        const { page, errors, context } = await open();
+        await goTo(page, 'platform');
+        await page.locator('.walk-prompt').filter({ hasText: 'THE TOWN TRAIN' }).waitFor({ state: 'visible' });
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('[data-travel]').count(), 1);
+        assert.equal(await page.locator('.farm-crop[disabled]').count(), 10);
+        assert.match(await page.locator('#town-grid').textContent(), /Beat IRON JACK HARLAN/);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
     // Step B: districts open with a star. Shut, the gate holds the marshal back and says which outlaw opens it.
     {
         const { page, errors, context } = await open();
@@ -147,8 +160,13 @@ try {
         await page.keyboard.press('e');
         await page.locator('#town-sheet').waitFor({ state: 'visible' });
         assert.match(await page.locator('#town-grid').textContent(), /Beat IRON JACK HARLAN/);
-        const z = await page.evaluate(() => { window.__redWestTown.walk.place(16, -27.4); return window.__redWestTown.walk.position.z; });
-        assert.ok(z > -21, `a shut district cannot be entered (z = ${z})`);
+        // Try to stand inside the shut Foundry Yard: the marshal is held at its fence (the sign is read 1.6 inside the town).
+        const held = await page.evaluate(() => {
+            const gate = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === 'gate-foundry');
+            window.__redWestTown.walk.place(gate.x, gate.z - 12);
+            return { z: window.__redWestTown.walk.position.z, fence: gate.z - 1.6 };
+        });
+        assert.ok(held.z > held.fence, `a shut district cannot be entered (z = ${held.z}, fence at ${held.fence})`);
         assert.deepEqual(errors, []);
         await context.close();
     }
@@ -175,8 +193,12 @@ try {
         // The farm has a way in, not ground: there is no kennel in the town any more, and the gate reads as an entrance.
         const doors = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.map(d => d.id));
         assert.ok(doors.includes('enter-ranch') && !doors.includes('kennel') && !doors.includes('gate-ranch'));
-        const pos = await page.evaluate(() => { window.__redWestTown.walk.place(-50, 0); return window.__redWestTown.walk.position; });
-        assert.ok(pos.x > -38, 'the farm is not ground in the town: the marshal cannot walk into it');
+        const pos = await page.evaluate(() => {
+            const gate = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === 'enter-ranch');
+            window.__redWestTown.walk.place(gate.x - 14, gate.z);
+            return { x: window.__redWestTown.walk.position.x, edge: gate.x + 1.6 };
+        });
+        assert.ok(pos.x > pos.edge - 3.3, `the farm is not ground in the town: the marshal cannot walk into it (x = ${pos.x}, edge at ${pos.edge})`);
         assert.deepEqual(errors, []);
         await context.close();
     }
@@ -209,7 +231,7 @@ try {
         assert.ok((await page.locator('.walk-bubble').textContent()).includes(person.name), 'the bubble names who is speaking');
         const frozen = await page.evaluate(() => window.__redWestTown.town3d.folk[0].walker.talking);
         assert.equal(frozen, true, 'the one being spoken to stands still');
-        await page.evaluate(() => window.__redWestTown.walk.place(0, 13));
+        await page.evaluate(() => { const a = window.__redWestTown.town3d.walkMap().areas[0]; window.__redWestTown.walk.place(a.maxX - 1, a.maxZ - 1); }); // the far corner of the town
         await page.locator('.walk-bubble').waitFor({ state: 'hidden' });
         assert.equal(await page.evaluate(() => window.__redWestTown.town3d.folk.some(f => f.walker.talking)), false, 'and goes on when the marshal leaves');
         assert.deepEqual(errors, []);
@@ -267,6 +289,24 @@ try {
         await talk();
         await page.locator('.walk-bubble').waitFor({ state: 'visible' });
         assert.doesNotMatch(await page.locator('.walk-bubble').textContent(), / is open/, 'back to the usual line');
+
+        // The town train: the districts are a real walk apart, so the platform beside the depot has a train to every stop.
+        const stopsOpen = await page.evaluate(async () => (await import('/src/townTravel.js')).stops(window.__redWestTown.town3d.openDistricts));
+        assert.equal(stopsOpen.length, 11, 'Main Street and ten districts');
+        const toPlatform = async () => {
+            await goTo(page, 'platform');
+            await page.locator('.walk-prompt').filter({ hasText: 'THE TOWN TRAIN' }).waitFor({ state: 'visible' });
+            await page.keyboard.press('e');
+            await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        };
+        for(const stop of stopsOpen) {
+            await toPlatform();
+            assert.equal(await page.locator('[data-travel]').count(), 11, 'every stop is open with everything beaten');
+            await page.locator(`[data-travel="${stop.id}"]`).click();
+            await page.waitForFunction(name => document.getElementById('town-toast').textContent.includes(`Off the train at ${name}`), stop.name);
+            const at = await page.evaluate(() => window.__redWestTown.walk.position);
+            assert.ok(Math.hypot(at.x - stop.at[0], at.z - stop.at[1]) < 0.7, `${stop.id}: stepped off at the stop (${at.x.toFixed(1)}, ${at.z.toFixed(1)} for ${stop.at.map(n => n.toFixed(1))})`);
+        }
 
         // The day: it starts at dusk, goes to night when asked, and stays there while the clock runs on.
         assert.equal(await page.evaluate(() => window.__redWestTown.town3d.timeOfDay), 'dusk');
@@ -488,7 +528,8 @@ try {
         assert.equal(await page.locator('#town-place-back').isVisible(), false);
         assert.equal(await page.evaluate(() => window.__redWestTown.walk.hasDog), true, 'the dog came back with him');
         const stayed = await page.evaluate(() => window.__redWestTown.walk.position);
-        assert.ok(Math.hypot(stayed.x + 36.4, stayed.z + 2) < 3.5, `back at the farm gate (${stayed.x.toFixed(1)}, ${stayed.z.toFixed(1)})`);
+        const gateAt = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.find(d => d.id === 'enter-ranch'));
+        assert.ok(Math.hypot(stayed.x - gateAt.x, stayed.z - gateAt.z) < 3.5, `back at the farm gate (${stayed.x.toFixed(1)}, ${stayed.z.toFixed(1)})`);
         assert.deepEqual(errors, []);
         await context.close();
     }

@@ -1,4 +1,5 @@
 import { OUTLAWS } from './outlaws.js';
+import { SPREAD } from './townSpace.js';
 
 // Lantern Rock grows outward as outlaws fall (TOWN_PLAN.md, step B). Each district is ground beyond the town's edge,
 // fenced off and named until the outlaw that opens it has been beaten (the first star, the same rule the jail uses).
@@ -12,9 +13,12 @@ import { OUTLAWS } from './outlaws.js';
 // interior: a district that is a place of its own (PLACES.md). Its gate opens a whole new map you walk around (the farm's is
 //           src/farmLayout.js) and not ground in the town, so it has no walk area and no place here.
 
-export const TOWN_AREA = { minX: -38, maxX: 40, minZ: -21, maxZ: 19 };
+// The town's ground, spread out (src/townSpace.js). The districts below are written as originally laid out, against the
+// original edge (x from -38 to 40, z from -21 to 19), and each is then moved out by exactly how far the edge moved at its gate,
+// so it still meets the town with the same overlap and the districts stand further apart from one another.
+export const TOWN_AREA = { minX: -38 * SPREAD, maxX: 40 * SPREAD, minZ: -21 * SPREAD, maxZ: 19 * SPREAD };
 
-export const DISTRICTS = [
+const BASE_DISTRICTS = [
     {
         id: 'ranch', name: 'CALLOWAY FARM', outlaw: 'calloway-gang', interior: 'farm',
         area: { minX: -72, maxX: -35, minZ: -10, maxZ: 6 },
@@ -126,6 +130,25 @@ export const DISTRICTS = [
         }
     }
 ];
+
+// How far a district moves: its gate's centre, spread outward like the rest of the town.
+export const districtOffset = d => {
+    const [x1, z1] = d.fence.from, [x2, z2] = d.fence.to;
+    return [(x1 + x2) / 2 * (SPREAD - 1), (z1 + z2) / 2 * (SPREAD - 1)];
+};
+const shifted = (box, [dx, dz]) => ({ minX: box.minX + dx, maxX: box.maxX + dx, minZ: box.minZ + dz, maxZ: box.maxZ + dz });
+export const DISTRICTS = BASE_DISTRICTS.map(d => {
+    const o = districtOffset(d);
+    const at = ([x, z]) => [x + o[0], z + o[1]];
+    return {
+        ...d,
+        area: shifted(d.area, o),
+        fence: { from: at(d.fence.from), to: at(d.fence.to), read: at(d.fence.read) },
+        place: d.place && { ...d.place, object: { ...d.place.object, x: d.place.object.x + o[0], z: d.place.object.z + o[1] }, stand: at(d.place.stand) }
+    };
+});
+// The districts as originally written, for src/townScene.js, which draws each one where it was designed and moves it as a whole.
+export const districtOffsetById = id => districtOffset(BASE_DISTRICTS.find(d => d.id === id));
 
 const BY_ID = new Map(DISTRICTS.map(d => [d.id, d]));
 export const getDistrict = id => BY_ID.get(id) ?? null;

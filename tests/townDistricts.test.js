@@ -105,11 +105,10 @@ test('names read in a sentence', () => {
 });
 
 test('a point is in a district only beyond the town: the shared strip still counts as town', () => {
+    const middle = d => [(d.area.minX + d.area.maxX) / 2, (d.area.minZ + d.area.maxZ) / 2];
     assert.equal(districtAt(0, 0), null);
-    assert.equal(districtAt(-36, -2), null, 'the strip the farm shares with the town');
-    assert.equal(districtAt(-50, 0)?.id, 'ranch');
-    assert.equal(districtAt(16, -30)?.id, 'foundry');
-    assert.equal(districtAt(60, -2)?.id, 'crossing');
-    assert.equal(districtAt(50, -30)?.id, 'fort');
-    assert.equal(districtAt(200, 200), null);
+    const ranch = getDistrict('ranch');
+    assert.equal(districtAt(ranch.area.maxX - 1, middle(ranch)[1]), null, 'the strip the farm shares with the town');
+    for(const id of ['ranch', 'foundry', 'crossing', 'fort', 'copper', 'wash', 'chapel']) assert.equal(districtAt(...middle(getDistrict(id)))?.id, id, `${id}: its middle is its own`);
+    assert.equal(districtAt(500, 500), null);
 });

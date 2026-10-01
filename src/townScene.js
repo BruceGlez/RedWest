@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeByMaterial } from './meshMerge.js';
-import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces, getDistrict } from './townDistricts.js';
+import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces, getDistrict, districtOffsetById } from './townDistricts.js';
+import { TOWN_LAYOUT, SPREAD, spread, near, moved } from './townSpace.js';
 import { FOLK, createWalker, stepWalker } from './townFolk.js';
 import { skyAt } from './townTime.js';
 import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
@@ -285,16 +286,8 @@ const BUILDERS = {
 };
 
 // Where each building stands (x, z). All face the camera (+z); the depot's railway ends main street.
-export const TOWN_LAYOUT = [
-    { id: 'saloon', x: -15, z: -14, label: 'SALOON' },
-    { id: 'sheriff', x: 0, z: -13, label: "SHERIFF'S OFFICE" },
-    { id: 'bank', x: 14, z: -13, label: 'BANK' },
-    { id: 'jail', x: -16, z: 5, label: 'JAIL' },
-    { id: 'gunsmith', x: 1, z: 5, label: 'GUNSMITH' },
-    { id: 'tailor', x: 12, z: 5, label: 'TAILOR' },
-    { id: 'depot', x: 33, z: -15, label: 'MOST WANTED' },
-    { id: 'arena', x: 29, z: 6, label: 'ARENA' }
-];
+// Where each building stands is in src/townSpace.js (the town is laid out with room between its buildings).
+export { TOWN_LAYOUT };
 
 export function lamp(x, z) {
     const g = new THREE.Group();
@@ -319,47 +312,47 @@ function townsperson(seed) {
 // they are in the jail. Small, merged into a few meshes, and placed in the open ground between the buildings.
 // Each entry: where it stands ([x, z]) and how to build it (parts around its own origin).
 export const GUESTS = {
-    'dusty-pete': { at: [-13.5, -7.5], turn: 0.3, parts: () => [ // the Tin Cup's piano, dragged into the street
+    'dusty-pete': { at: near('saloon', -13.5, -7.5), turn: 0.3, parts: () => [ // the Tin Cup's piano, dragged into the street
         box(3, 1.4, 1.3, 0x2f1d14, 0, 1.3, 0), box(3, 0.12, 0.6, 0xf2ead8, 0, 2.05, 0.8), box(2.8, 0.1, 1.2, 0x241510, 0, 2.6, -0.4),
         box(0.2, 0.9, 0.2, 0x241510, -1.3, 0.45, 0.4), box(0.2, 0.9, 0.2, 0x241510, 1.3, 0.45, 0.4), box(1.4, 0.7, 0.8, 0x5a3d2b, 0, 0.35, 1.6)
     ] },
-    'rattlesnake-rosa': { at: [-14, 8.5], turn: 0, parts: () => [ // two wolf pups on the jail porch
+    'rattlesnake-rosa': { at: near('jail', -14, 8.5), turn: 0, parts: () => [ // two wolf pups on the jail porch
         box(0.9, 0.5, 0.5, 0x8a8f99, 0, 0.4, 0), box(0.4, 0.4, 0.4, 0x8a8f99, 0.6, 0.65, 0), box(0.15, 0.2, 0.1, 0x6f747d, 0.6, 0.95, -0.1),
         box(0.9, 0.5, 0.5, 0x7a7f88, 1.6, 0.4, 0.9), box(0.4, 0.4, 0.4, 0x7a7f88, 2.2, 0.65, 0.9), box(0.15, 0.2, 0.1, 0x5f646c, 2.2, 0.95, 0.8)
     ] },
-    'deacon-graves': { at: [-33, -8], turn: 0.2, parts: () => [ // a small chapel at the edge of town
+    'deacon-graves': { at: spread(-33, -8), turn: 0.2, parts: () => [ // a small chapel at the edge of town
         box(5, 3.2, 4, 0xe8e0cf, 0, 1.6, 0), box(5.4, 0.4, 4.4, 0x3b2a20, 0, 3.4, 0), box(1.4, 4.4, 1.4, 0xe8e0cf, -1.8, 2.2, 2.2), box(0.25, 1.4, 0.25, 0x2a1d15, -1.8, 5.2, 2.2),
         box(0.9, 0.25, 0.25, 0x2a1d15, -1.8, 5.4, 2.2), box(1, 1.7, 0.2, 0x2a1d15, 0, 0.85, 2.05)
     ] },
-    'calloway-gang': { at: [9, -7.5], turn: 0, parts: () => { // the brothers' fence, rebuilt outside the bank
+    'calloway-gang': { at: near('bank', 9, -7.5), turn: 0, parts: () => { // the brothers' fence, rebuilt outside the bank
         const out = [box(9, 0.2, 0.15, 0x6b4a2e, 2.25, 1.6, 0), box(9, 0.2, 0.15, 0x6b4a2e, 2.25, 0.9, 0)];
         for(let i = 0; i < 4; i++) out.push(box(0.25, 1.9, 0.25, 0x6b4a2e, i * 3, 0.95, 0));
         return out;
     } },
-    'iron-jack': { at: [4.2, 8.6], turn: 0, parts: () => [ // an anvil, and the armour Ezra cut him out of, on a stand
+    'iron-jack': { at: near('gunsmith', 4.2, 8.6), turn: 0, parts: () => [ // an anvil, and the armour Ezra cut him out of, on a stand
         box(1.6, 0.6, 0.8, 0x2b2b2e, 0, 0.9, 0), box(0.8, 0.9, 0.6, 0x3a3a3e, 0, 0.45, 0), box(2.2, 0.15, 1.2, 0x3a3a3e, 0, 0.1, 0),
         box(1.3, 1.6, 0.8, 0x7d858c, 2.8, 1.8, 0), box(0.6, 0.5, 0.6, 0x7d858c, 2.8, 2.9, 0), box(0.25, 2.2, 0.25, 0x5a3d2b, 2.8, 1.1, 0)
     ] },
-    'mesa-morgan': { at: [3.4, -8], turn: 0.4, parts: () => [ // the volunteer fire crew's water cart
+    'mesa-morgan': { at: near('sheriff', 3.4, -8), turn: 0.4, parts: () => [ // the volunteer fire crew's water cart
         box(2.6, 0.8, 1.4, 0xa23a2c, 0, 1.2, 0), box(1.6, 1.1, 1.1, 0x5a3d2b, 0, 2.15, 0), box(0.2, 1.2, 0.2, 0x2b2b2e, 1.6, 1.2, 0),
         box(0.8, 0.8, 0.15, 0x2b2b2e, -1, 0.6, 0.8), box(0.8, 0.8, 0.15, 0x2b2b2e, -1, 0.6, -0.8), box(0.8, 0.8, 0.15, 0x2b2b2e, 1, 0.6, 0.8), box(0.8, 0.8, 0.15, 0x2b2b2e, 1, 0.6, -0.8)
     ] },
-    'silas-vane': { at: [13.5, 8.5], turn: 0, parts: () => [ // a shooting gallery: a board of targets
+    'silas-vane': { at: near('tailor', 13.5, 8.5), turn: 0, parts: () => [ // a shooting gallery: a board of targets
         box(4, 2.4, 0.2, 0x5a3d2b, 0, 2, 0), box(0.25, 2, 0.25, 0x3b2a20, -1.8, 1, 0.3), box(0.25, 2, 0.25, 0x3b2a20, 1.8, 1, 0.3),
         box(0.8, 0.8, 0.1, 0xf2ead8, -1.1, 2.2, 0.15), box(0.4, 0.4, 0.12, 0xb02a2a, -1.1, 2.2, 0.2), box(0.8, 0.8, 0.1, 0xf2ead8, 0, 2.5, 0.15),
         box(0.4, 0.4, 0.12, 0xb02a2a, 0, 2.5, 0.2), box(0.8, 0.8, 0.1, 0xf2ead8, 1.1, 2.2, 0.15), box(0.4, 0.4, 0.12, 0xb02a2a, 1.1, 2.2, 0.2)
     ] },
-    'el-espectro': { at: [-18.8, 8.4], turn: 0.3, parts: () => [ // the chair on the jail's front porch
+    'el-espectro': { at: near('jail', -18.8, 8.4), turn: 0.3, parts: () => [ // the chair on the jail's front porch
         box(1.1, 0.2, 1.1, 0xe8e0cf, 0, 0.9, 0), box(1.1, 1.3, 0.2, 0xe8e0cf, 0, 1.6, -0.45), box(0.15, 0.9, 0.15, 0xe8e0cf, -0.45, 0.45, 0.45),
         box(0.15, 0.9, 0.15, 0xe8e0cf, 0.45, 0.45, 0.45), box(0.15, 0.9, 0.15, 0xe8e0cf, -0.45, 0.45, -0.45), box(0.15, 0.9, 0.15, 0xe8e0cf, 0.45, 0.45, -0.45),
         box(0.8, 0.12, 0.6, 0x6a1b9a, 0, 1.05, 0.05)
     ] },
-    'lucky-lou': { at: [-18.5, -8], turn: 0, parts: () => [ // her card table under a lantern
+    'lucky-lou': { at: near('saloon', -18.5, -8), turn: 0, parts: () => [ // her card table under a lantern
         box(2.4, 0.15, 1.6, 0x2f6b3a, 0, 1.6, 0), box(0.25, 1.5, 0.25, 0x3b2a20, 0, 0.75, 0), box(1.4, 0.15, 0.9, 0x3b2a20, 0, 0.1, 0),
         box(0.5, 0.6, 0.5, 0x3b2a20, -1.7, 0.4, 0), box(0.5, 0.6, 0.5, 0x3b2a20, 1.7, 0.4, 0), box(0.4, 0.05, 0.3, 0xf2ead8, -0.4, 1.7, 0.1, 0), box(0.4, 0.05, 0.3, 0xf2ead8, 0.4, 1.7, -0.1, 0),
         box(0.3, 0.4, 0.3, C.glow, 0, 2.05, 0, 0.9)
     ] },
-    'colonel-crane': { at: [29.5, -7.5], turn: 0, parts: () => [ // a flagpole by the depot
+    'colonel-crane': { at: near('depot', 29.5, -7.5), turn: 0, parts: () => [ // a flagpole by the depot
         box(0.2, 9, 0.2, 0xd8d8dc, 0, 4.5, 0), box(2.2, 1.4, 0.08, 0xb02a2a, 1.2, 8, 0), box(2.2, 0.45, 0.1, 0xf4f0e6, 1.2, 8.3, 0), box(1.2, 0.3, 1.2, 0x6b6258, 0, 0.15, 0)
     ] }
 };
@@ -420,233 +413,321 @@ function openGate(d) {
 // The fixed ground, buildings and props of each district, added to `scenery`. Returns the boxes they block.
 function districtScenery(scenery, smokeSources) {
     const blocks = [];
-    const block = (x, z, hx, hz) => blocks.push({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
     for(const d of DISTRICTS) {
         const a = d.area;
         scenery.add(box(a.maxX - a.minX, 0.06, a.maxZ - a.minZ, d.ground, (a.minX + a.maxX) / 2, 0.03, (a.minZ + a.maxZ) / 2));
     }
 
     // Calloway farm, seen over the fence: a barn, hay, a trough. The farm itself is a place you step into (src/placeFarm.js).
-    const barn = new THREE.Group();
-    barn.add(box(9, 5, 6, C.brick, 0, 2.5, 0), roof(9, 6, 2.4, C.timberDark, 5), box(2.6, 3.4, 0.2, C.trim, 0, 1.7, 3.05), box(3.4, 0.25, 0.3, C.timber, 0, 3.6, 3.1));
-    barn.position.set(-60, 0, -4);
-    scenery.add(barn);
-    block(-60, -4, 4.6, 3.1);
-    for(const [x, y, z] of [[-52, 0.5, -7.5], [-50.6, 0.5, -7.7], [-51.3, 1.5, -7.6]]) scenery.add(box(1.3, 1, 1.2, 0xc9a54a, x, y, z));
-    block(-51.3, -7.6, 1.5, 0.8);
-    scenery.add(box(2.4, 0.6, 0.8, C.timberDark, -41, 0.3, -6));
-    block(-41, -6, 1.3, 0.5);
-    for(let x = -71; x <= -37; x += 3) scenery.add(box(0.2, 1.4, 0.2, C.timberDark, x, 0.7, -9.7));
-    scenery.add(box(34, 0.12, 0.12, C.timber, -54, 0.6, -9.7), box(34, 0.12, 0.12, C.timber, -54, 1.2, -9.7));
+    {
+        const D = districtOffsetById('ranch'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        const barn = new THREE.Group();
+        barn.add(box(9, 5, 6, C.brick, 0, 2.5, 0), roof(9, 6, 2.4, C.timberDark, 5), box(2.6, 3.4, 0.2, C.trim, 0, 1.7, 3.05), box(3.4, 0.25, 0.3, C.timber, 0, 3.6, 3.1));
+        barn.position.set(-60, 0, -4);
+        sc.add(barn);
+        block(-60, -4, 4.6, 3.1);
+        for(const [x, y, z] of [[-52, 0.5, -7.5], [-50.6, 0.5, -7.7], [-51.3, 1.5, -7.6]]) sc.add(box(1.3, 1, 1.2, 0xc9a54a, x, y, z));
+        block(-51.3, -7.6, 1.5, 0.8);
+        sc.add(box(2.4, 0.6, 0.8, C.timberDark, -41, 0.3, -6));
+        block(-41, -6, 1.3, 0.5);
+        for(let x = -71; x <= -37; x += 3) sc.add(box(0.2, 1.4, 0.2, C.timberDark, x, 0.7, -9.7));
+        sc.add(box(34, 0.12, 0.12, C.timber, -54, 0.6, -9.7), box(34, 0.12, 0.12, C.timber, -54, 1.2, -9.7));
+    }
 
     // Foundry yard: Jack's furnace, an anvil, slag, crates.
-    const furnace = new THREE.Group();
-    furnace.add(box(3.2, 3.4, 2.8, C.brickDark, 0, 1.7, 0), box(1.1, 6, 1.1, C.brick, 0.8, 6.3, -0.4), box(1.5, 1.1, 0.15, C.glow, 0, 1.0, 1.42, 1.9), box(3.5, 0.3, 3.1, C.stoneDark, 0, 3.55, 0));
-    furnace.position.set(16, 0, -30);
-    scenery.add(furnace);
-    block(16, -30, 1.6, 1.4);
-    smokeSources.push({ id: 'furnace', at: new THREE.Vector3(16.8, 9.6, -30.4) });
-    scenery.add(box(0.9, 0.5, 1.5, C.iron, 19.6, 0.75, -27.6), box(0.5, 0.5, 0.6, C.iron, 19.6, 0.25, -27.6));
-    block(19.6, -27.6, 0.6, 0.9);
-    for(const [x, y, z, w] of [[35, 0.6, -24, 3], [36.5, 0.4, -25.5, 2], [33.5, 0.4, -25, 1.8]]) scenery.add(box(w, y * 2, w * 0.8, 0x24211f, x, y, z));
-    block(35, -24.4, 2.4, 1.8);
-    for(const [x, z] of [[22, -24], [23.2, -24.4], [22.6, -24.2]]) scenery.add(box(1.2, 1.2, 1.2, C.timberDark, x, 0.6 + (x === 22.6 ? 1.2 : 0), z));
-    block(22.6, -24.2, 1.6, 1);
-    scenery.add(lamp(30, -22), lamp(14, -24));
+    {
+        const D = districtOffsetById('foundry'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        const furnace = new THREE.Group();
+        furnace.add(box(3.2, 3.4, 2.8, C.brickDark, 0, 1.7, 0), box(1.1, 6, 1.1, C.brick, 0.8, 6.3, -0.4), box(1.5, 1.1, 0.15, C.glow, 0, 1.0, 1.42, 1.9), box(3.5, 0.3, 3.1, C.stoneDark, 0, 3.55, 0));
+        furnace.position.set(16, 0, -30);
+        sc.add(furnace);
+        block(16, -30, 1.6, 1.4);
+        pushSmoke({ id: 'furnace', at: new THREE.Vector3(16.8, 9.6, -30.4) });
+        sc.add(box(0.9, 0.5, 1.5, C.iron, 19.6, 0.75, -27.6), box(0.5, 0.5, 0.6, C.iron, 19.6, 0.25, -27.6));
+        block(19.6, -27.6, 0.6, 0.9);
+        for(const [x, y, z, w] of [[35, 0.6, -24, 3], [36.5, 0.4, -25.5, 2], [33.5, 0.4, -25, 1.8]]) sc.add(box(w, y * 2, w * 0.8, 0x24211f, x, y, z));
+        block(35, -24.4, 2.4, 1.8);
+        for(const [x, z] of [[22, -24], [23.2, -24.4], [22.6, -24.2]]) sc.add(box(1.2, 1.2, 1.2, C.timberDark, x, 0.6 + (x === 22.6 ? 1.2 : 0), z));
+        block(22.6, -24.2, 1.6, 1);
+        sc.add(lamp(30, -22), lamp(14, -24));
+    }
 
     // Morgan's channel: water across the district, a footbridge, the warehouse, buckets, the log.
-    scenery.add(box(44, 0.04, 4, 0x2f6f7a, 2, 0.06, 30, 0.12));
-    blocks.push({ minX: -20, maxX: 0.4, minZ: 28, maxZ: 32 }, { minX: 3.6, maxX: 24, minZ: 28, maxZ: 32 });
-    scenery.add(box(3.2, 0.22, 4.8, C.timber, 2, 0.22, 30));
-    for(const x of [0.5, 3.5]) {
-        scenery.add(box(0.12, 0.12, 4.8, C.timberDark, x, 1.05, 30));
-        for(const z of [27.9, 30, 32.1]) scenery.add(box(0.14, 1, 0.14, C.timberDark, x, 0.6, z));
+    {
+        const D = districtOffsetById('canal'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        sc.add(box(44, 0.04, 4, 0x2f6f7a, 2, 0.06, 30, 0.12));
+        pushBlocks({ minX: -20, maxX: 0.4, minZ: 28, maxZ: 32 }, { minX: 3.6, maxX: 24, minZ: 28, maxZ: 32 });
+        sc.add(box(3.2, 0.22, 4.8, C.timber, 2, 0.22, 30));
+        for(const x of [0.5, 3.5]) {
+            sc.add(box(0.12, 0.12, 4.8, C.timberDark, x, 1.05, 30));
+            for(const z of [27.9, 30, 32.1]) sc.add(box(0.14, 1, 0.14, C.timberDark, x, 0.6, z));
+        }
+        const warehouse = new THREE.Group();
+        warehouse.add(box(10, 5.2, 7, C.timberDark, 0, 2.6, 0), roof(10, 7, 2, C.slate, 5.2), box(2.6, 3.4, 0.2, C.trim, 0, 1.7, 3.55));
+        warehouse.position.set(-10, 0, 38);
+        sc.add(warehouse);
+        block(-10, 38, 5.2, 3.6);
+        for(const [x, z] of [[6, 36], [7.3, 36.8], [6.6, 38]]) {
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.4, 10), mat(C.timber));
+            barrel.position.set(x, 0.7, z);
+            sc.add(barrel);
+        }
+        block(6.6, 37, 1.6, 1.6);
+        const log = sign('CHANNEL LOG', 2.8);
+        log.position.set(3.8, 2.9, 34.75);
+        sc.add(box(0.15, 2.4, 0.15, C.timberDark, 3.8, 1.2, 34.6), log);
+        block(3.8, 34.6, 0.3, 0.3);
+        sc.add(lamp(0, 25), lamp(4.6, 35.4));
     }
-    const warehouse = new THREE.Group();
-    warehouse.add(box(10, 5.2, 7, C.timberDark, 0, 2.6, 0), roof(10, 7, 2, C.slate, 5.2), box(2.6, 3.4, 0.2, C.trim, 0, 1.7, 3.55));
-    warehouse.position.set(-10, 0, 38);
-    scenery.add(warehouse);
-    block(-10, 38, 5.2, 3.6);
-    for(const [x, z] of [[6, 36], [7.3, 36.8], [6.6, 38]]) {
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.4, 10), mat(C.timber));
-        barrel.position.set(x, 0.7, z);
-        scenery.add(barrel);
-    }
-    block(6.6, 37, 1.6, 1.6);
-    const log = sign('CHANNEL LOG', 2.8);
-    log.position.set(3.8, 2.9, 34.75);
-    scenery.add(box(0.15, 2.4, 0.15, C.timberDark, 3.8, 1.2, 34.6), log);
-    block(3.8, 34.6, 0.3, 0.3);
-    scenery.add(lamp(0, 25), lamp(4.6, 35.4));
-
 
     // Vane's Crossing: a street of weathered false fronts and a clock tower whose clock has stopped.
-    const falseFront = (x, z, turn) => {
-        const g = new THREE.Group();
-        g.add(box(7, 4.6, 3, 0x7a6a55, 0, 2.3, 0), box(7.4, 1.6, 0.35, 0x6a5a48, 0, 5.4, 1.4), box(1.3, 2.6, 0.12, C.trim, -1.5, 1.3, 1.54), box(1.3, 1.1, 0.12, C.trim, 1.6, 2.6, 1.54));
-        g.position.set(x, 0, z);
-        g.rotation.y = turn;
-        scenery.add(g);
-        block(x, z, 3.7, 1.7);
-    };
-    for(const x of [50, 58, 66]) { falseFront(x, -9, 0); falseFront(x, 7.5, Math.PI); }
-    const tower = new THREE.Group();
-    const face = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.2, 20), mat(0xe8dcc0));
-    face.rotation.x = Math.PI / 2;
-    face.position.set(0, 7.2, 1.55);
-    const cone = new THREE.Mesh(new THREE.ConeGeometry(2.5, 2.4, 4), mat(C.slate));
-    cone.rotation.y = Math.PI / 4;
-    cone.position.y = 10.4;
-    tower.add(box(3, 9, 3, C.stone, 0, 4.5, 0), face, cone,
-        box(0.12, 0.85, 0.06, C.trim, 0.25, 7.3, 1.68).rotateZ(-0.6), box(0.12, 0.6, 0.06, C.trim, -0.1, 7.15, 1.68).rotateZ(0.5));
-    tower.position.set(75, 0, -1);
-    scenery.add(tower);
-    block(75, -1, 1.5, 1.5);
-    scenery.add(box(0.2, 1.3, 0.2, C.timberDark, 56, 0.65, -4.2), box(2.2, 0.14, 0.14, C.timberDark, 56, 1.2, -4.2), lamp(48, -1), lamp(62, 3));
+    {
+        const D = districtOffsetById('crossing'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        const falseFront = (x, z, turn) => {
+            const g = new THREE.Group();
+            g.add(box(7, 4.6, 3, 0x7a6a55, 0, 2.3, 0), box(7.4, 1.6, 0.35, 0x6a5a48, 0, 5.4, 1.4), box(1.3, 2.6, 0.12, C.trim, -1.5, 1.3, 1.54), box(1.3, 1.1, 0.12, C.trim, 1.6, 2.6, 1.54));
+            g.position.set(x, 0, z);
+            g.rotation.y = turn;
+            sc.add(g);
+            block(x, z, 3.7, 1.7);
+        };
+        for(const x of [50, 58, 66]) { falseFront(x, -9, 0); falseFront(x, 7.5, Math.PI); }
+        const tower = new THREE.Group();
+        const face = new THREE.Mesh(new THREE.CylinderGeometry(1.15, 1.15, 0.2, 20), mat(0xe8dcc0));
+        face.rotation.x = Math.PI / 2;
+        face.position.set(0, 7.2, 1.55);
+        const cone = new THREE.Mesh(new THREE.ConeGeometry(2.5, 2.4, 4), mat(C.slate));
+        cone.rotation.y = Math.PI / 4;
+        cone.position.y = 10.4;
+        tower.add(box(3, 9, 3, C.stone, 0, 4.5, 0), face, cone,
+            box(0.12, 0.85, 0.06, C.trim, 0.25, 7.3, 1.68).rotateZ(-0.6), box(0.12, 0.6, 0.06, C.trim, -0.1, 7.15, 1.68).rotateZ(0.5));
+        tower.position.set(75, 0, -1);
+        sc.add(tower);
+        block(75, -1, 1.5, 1.5);
+        sc.add(box(0.2, 1.3, 0.2, C.timberDark, 56, 0.65, -4.2), box(2.2, 0.14, 0.14, C.timberDark, 56, 1.2, -4.2), lamp(48, -1), lamp(62, 3));
+    }
 
     // Tres Rios: an adobe hacienda, a well, and a stone with a struck-out date.
-    const hacienda = new THREE.Group();
-    hacienda.add(box(12, 4.2, 6, 0xc9a77c, 0, 2.1, 0), box(12.5, 0.45, 6.5, 0x9a5a3a, 0, 4.4, 0), box(1.6, 2.8, 0.12, C.trim, 0, 1.4, 3.05), box(1.3, 1.2, 0.12, C.trim, -3.5, 2.4, 3.05), box(1.3, 1.2, 0.12, C.trim, 3.5, 2.4, 3.05));
-    hacienda.position.set(-18, 0, -38);
-    scenery.add(hacienda);
-    block(-18, -38, 6.2, 3.2);
-    const stone = new THREE.Group();
-    stone.add(box(1, 1.6, 0.3, C.stone, 0, 0.8, 0), box(0.6, 0.12, 0.34, C.stoneDark, 0, 1.2, 0), box(1.4, 0.3, 2.2, 0x8a6a42, 0, 0.15, -1.2));
-    stone.position.set(-27, 0, -26);
-    scenery.add(stone);
-    block(-27, -26, 0.6, 0.4);
-    const well = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.9, 12), mat(C.stone));
-    well.position.set(-12, 0.45, -30);
-    scenery.add(well, box(0.2, 2.6, 0.2, C.timberDark, -13, 1.3, -30), box(0.2, 2.6, 0.2, C.timberDark, -11, 1.3, -30), box(2.6, 0.16, 0.5, C.timberDark, -12, 2.6, -30));
-    block(-12, -30, 1.1, 1.1);
-    scenery.add(box(10, 1.4, 0.5, 0xc9a77c, -28, 0.7, -44), box(10, 1.4, 0.5, 0xc9a77c, -10, 0.7, -44), lamp(-20, -22), lamp(-9, -24));
+    {
+        const D = districtOffsetById('tresrios'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        const hacienda = new THREE.Group();
+        hacienda.add(box(12, 4.2, 6, 0xc9a77c, 0, 2.1, 0), box(12.5, 0.45, 6.5, 0x9a5a3a, 0, 4.4, 0), box(1.6, 2.8, 0.12, C.trim, 0, 1.4, 3.05), box(1.3, 1.2, 0.12, C.trim, -3.5, 2.4, 3.05), box(1.3, 1.2, 0.12, C.trim, 3.5, 2.4, 3.05));
+        hacienda.position.set(-18, 0, -38);
+        sc.add(hacienda);
+        block(-18, -38, 6.2, 3.2);
+        const stone = new THREE.Group();
+        stone.add(box(1, 1.6, 0.3, C.stone, 0, 0.8, 0), box(0.6, 0.12, 0.34, C.stoneDark, 0, 1.2, 0), box(1.4, 0.3, 2.2, 0x8a6a42, 0, 0.15, -1.2));
+        stone.position.set(-27, 0, -26);
+        sc.add(stone);
+        block(-27, -26, 0.6, 0.4);
+        const well = new THREE.Mesh(new THREE.CylinderGeometry(1.1, 1.1, 0.9, 12), mat(C.stone));
+        well.position.set(-12, 0.45, -30);
+        sc.add(well, box(0.2, 2.6, 0.2, C.timberDark, -13, 1.3, -30), box(0.2, 2.6, 0.2, C.timberDark, -11, 1.3, -30), box(2.6, 0.16, 0.5, C.timberDark, -12, 2.6, -30));
+        block(-12, -30, 1.1, 1.1);
+        sc.add(box(10, 1.4, 0.5, 0xc9a77c, -28, 0.7, -44), box(10, 1.4, 0.5, 0xc9a77c, -10, 0.7, -44), lamp(-20, -22), lamp(-9, -24));
+    }
 
     // The Silver Belle: a riverboat tied up at a pier, a notice post, crates.
-    scenery.add(box(38, 0.04, 8, 0x2f6f7a, 45, 0.06, 38, 0.12));
-    blocks.push({ minX: 26, maxX: 64, minZ: 34, maxZ: 42 });
-    const boat = new THREE.Group();
-    const wheel = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 3.6, 12), mat(0x8b0000));
-    wheel.rotation.x = Math.PI / 2;
-    wheel.position.set(-7.4, 1.8, 0);
-    boat.add(box(14, 1.6, 5, 0xe8e0d0, 0, 1.0, 0), box(14.4, 0.8, 5.2, C.timberDark, 0, 0.3, 0), box(8, 2.4, 3.6, 0xf2ead8, -1, 3.0, 0), box(8.5, 0.3, 4, 0x8b0000, -1, 4.35, 0),
-        box(0.9, 3, 0.9, C.iron, 3.2, 4.6, 0), box(0.9, 0.4, 0.9, 0x8b0000, 3.2, 5.9, 0), wheel);
-    const hull = sign('SILVER BELLE', 5);
-    hull.position.set(-1, 3.0, 1.85);
-    boat.add(hull);
-    boat.position.set(46, 0, 38);
-    scenery.add(boat, box(2.6, 0.2, 6, C.timber, 44.5, 0.25, 32.6));
-    const notice = sign('SILVER BELLE', 3.4);
-    notice.position.set(49, 2.9, 30.75);
-    scenery.add(box(0.15, 2.4, 0.15, C.timberDark, 49, 1.2, 30.6), notice);
-    block(49, 30.6, 0.3, 0.3);
-    for(const [x, z] of [[56, 28], [57.3, 28.7]]) scenery.add(box(1.3, 1.3, 1.3, C.timberDark, x, 0.65, z));
-    block(56.6, 28.4, 1.4, 1.2);
-    scenery.add(lamp(40, 26), lamp(53, 26));
+    {
+        const D = districtOffsetById('belle'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        sc.add(box(38, 0.04, 8, 0x2f6f7a, 45, 0.06, 38, 0.12));
+        pushBlocks({ minX: 26, maxX: 64, minZ: 34, maxZ: 42 });
+        const boat = new THREE.Group();
+        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(2, 2, 3.6, 12), mat(0x8b0000));
+        wheel.rotation.x = Math.PI / 2;
+        wheel.position.set(-7.4, 1.8, 0);
+        boat.add(box(14, 1.6, 5, 0xe8e0d0, 0, 1.0, 0), box(14.4, 0.8, 5.2, C.timberDark, 0, 0.3, 0), box(8, 2.4, 3.6, 0xf2ead8, -1, 3.0, 0), box(8.5, 0.3, 4, 0x8b0000, -1, 4.35, 0),
+            box(0.9, 3, 0.9, C.iron, 3.2, 4.6, 0), box(0.9, 0.4, 0.9, 0x8b0000, 3.2, 5.9, 0), wheel);
+        const hull = sign('SILVER BELLE', 5);
+        hull.position.set(-1, 3.0, 1.85);
+        boat.add(hull);
+        boat.position.set(46, 0, 38);
+        sc.add(boat, box(2.6, 0.2, 6, C.timber, 44.5, 0.25, 32.6));
+        const notice = sign('SILVER BELLE', 3.4);
+        notice.position.set(49, 2.9, 30.75);
+        sc.add(box(0.15, 2.4, 0.15, C.timberDark, 49, 1.2, 30.6), notice);
+        block(49, 30.6, 0.3, 0.3);
+        for(const [x, z] of [[56, 28], [57.3, 28.7]]) sc.add(box(1.3, 1.3, 1.3, C.timberDark, x, 0.65, z));
+        block(56.6, 28.4, 1.4, 1.2);
+        sc.add(lamp(40, 26), lamp(53, 26));
+    }
 
     // Fort Pell: a palisade, barracks, a flagpole, and the gatling, oiled and pointed at the sky.
-    scenery.add(box(43, 3.2, 0.5, C.timber, 58.5, 1.6, -45.2), box(0.5, 3.2, 32, C.timber, 79.4, 1.6, -30));
-    for(let x = 38; x <= 79; x += 1.5) scenery.add(box(0.5, 0.7, 0.5, C.timberDark, x, 3.5, -45.2));
-    const barracks = new THREE.Group();
-    barracks.add(box(14, 4, 6, 0x8a6a48, 0, 2, 0), roof(14, 6, 2, C.slate, 4), box(1.6, 2.8, 0.12, C.trim, -3, 1.4, 3.05), box(1.6, 2.8, 0.12, C.trim, 3, 1.4, 3.05));
-    barracks.position.set(62, 0, -38);
-    scenery.add(barracks);
-    block(62, -38, 7.2, 3.2);
-    scenery.add(box(0.25, 11, 0.25, C.iron, 48, 5.5, -24), box(2.4, 1.4, 0.08, 0x2a3f6a, 49.3, 10, -24));
-    block(48, -24, 0.4, 0.4);
-    const gatling = new THREE.Group();
-    gatling.add(box(2.2, 0.8, 1.8, C.iron, 0, 0.9, 0), box(0.5, 0.5, 0.9, C.brass, 0, 1.5, -0.2));
-    for(const side of [-1, 1]) {
-        const w = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.14, 12), mat(C.timberDark));
-        w.rotation.z = Math.PI / 2;
-        w.position.set(side * 1.2, 0.85, 0);
-        gatling.add(w);
+    {
+        const D = districtOffsetById('fort'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        sc.add(box(43, 3.2, 0.5, C.timber, 58.5, 1.6, -45.2), box(0.5, 3.2, 32, C.timber, 79.4, 1.6, -30));
+        for(let x = 38; x <= 79; x += 1.5) sc.add(box(0.5, 0.7, 0.5, C.timberDark, x, 3.5, -45.2));
+        const barracks = new THREE.Group();
+        barracks.add(box(14, 4, 6, 0x8a6a48, 0, 2, 0), roof(14, 6, 2, C.slate, 4), box(1.6, 2.8, 0.12, C.trim, -3, 1.4, 3.05), box(1.6, 2.8, 0.12, C.trim, 3, 1.4, 3.05));
+        barracks.position.set(62, 0, -38);
+        sc.add(barracks);
+        block(62, -38, 7.2, 3.2);
+        sc.add(box(0.25, 11, 0.25, C.iron, 48, 5.5, -24), box(2.4, 1.4, 0.08, 0x2a3f6a, 49.3, 10, -24));
+        block(48, -24, 0.4, 0.4);
+        const gatling = new THREE.Group();
+        gatling.add(box(2.2, 0.8, 1.8, C.iron, 0, 0.9, 0), box(0.5, 0.5, 0.9, C.brass, 0, 1.5, -0.2));
+        for(const side of [-1, 1]) {
+            const w = new THREE.Mesh(new THREE.CylinderGeometry(0.85, 0.85, 0.14, 12), mat(C.timberDark));
+            w.rotation.z = Math.PI / 2;
+            w.position.set(side * 1.2, 0.85, 0);
+            gatling.add(w);
+        }
+        const barrels = new THREE.Group();
+        for(const [bx, by] of [[0, 0], [0.22, 0.14], [-0.22, 0.14], [0, 0.3]]) {
+            const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.6, 8), mat(C.iron));
+            barrel.position.set(bx, by, 1.3);
+            barrel.rotation.x = Math.PI / 2;
+            barrels.add(barrel);
+        }
+        barrels.position.set(0, 1.6, 0);
+        barrels.rotation.x = -0.95;
+        gatling.add(barrels);
+        gatling.position.set(60, 0, -26);
+        sc.add(gatling);
+        block(60, -26, 1.2, 1.0);
+        sc.add(lamp(50, -20), lamp(70, -23));
     }
-    const barrels = new THREE.Group();
-    for(const [bx, by] of [[0, 0], [0.22, 0.14], [-0.22, 0.14], [0, 0.3]]) {
-        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.1, 2.6, 8), mat(C.iron));
-        barrel.position.set(bx, by, 1.3);
-        barrel.rotation.x = Math.PI / 2;
-        barrels.add(barrel);
-    }
-    barrels.position.set(0, 1.6, 0);
-    barrels.rotation.x = -0.95;
-    gatling.add(barrels);
-    gatling.position.set(60, 0, -26);
-    scenery.add(gatling);
-    block(60, -26, 1.2, 1.0);
-    scenery.add(lamp(50, -20), lamp(70, -23));
 
     // Copper Bit: a tumbledown saloon street, spilled kegs, a hitching rail, and the broken piano.
-    const tumbledown = (x, z, turn, color) => {
-        const g = new THREE.Group();
-        g.add(box(8, 4.4, 3.2, color, 0, 2.2, 0), box(8.4, 1.5, 0.35, 0x5e4a38, 0, 5.2, 1.5), box(1.4, 2.6, 0.12, C.trim, -1.8, 1.3, 1.64), box(1.4, 1.2, 0.12, C.glow, 1.8, 2.4, 1.64, 0.5));
-        g.position.set(x, 0, z);
-        g.rotation.y = turn;
-        scenery.add(g);
-        block(x, z, 4.2, 1.8);
-    };
-    tumbledown(-56, 41, Math.PI, 0x7a6048);
-    tumbledown(-46, 41, Math.PI, 0x6c5540);
-    tumbledown(-36, 41, Math.PI, 0x82694e);
-    const saloonSign = sign('SALOON', 4);
-    saloonSign.position.set(-46, 6.6, 39.1);
-    saloonSign.rotation.y = Math.PI;
-    scenery.add(saloonSign);
-    const piano = new THREE.Group();
-    piano.add(box(2.8, 1.5, 1.4, C.timberDark, 0, 0.75, 0), box(2.9, 0.15, 0.7, 0xe8dcc0, 0, 1.58, 0.55), box(0.7, 0.1, 0.5, C.timberDark, -0.9, 1.7, 0.5).rotateZ(0.5), box(2.8, 1.1, 0.2, C.timber, 0, 2.05, -0.55));
-    piano.position.set(-46, 0, 30);
-    scenery.add(piano);
-    block(-46, 30, 1.4, 0.8);
-    for(const [x, z, turn] of [[-52, 34, 0.5], [-51, 35.2, 1.6], [-40, 28, 0.2]]) {
-        const keg = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 10), mat(C.timber));
-        keg.position.set(x, 0.55, z);
-        keg.rotation.z = turn > 1 ? Math.PI / 2 : 0;
-        scenery.add(keg);
+    {
+        const D = districtOffsetById('copper'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        const tumbledown = (x, z, turn, color) => {
+            const g = new THREE.Group();
+            g.add(box(8, 4.4, 3.2, color, 0, 2.2, 0), box(8.4, 1.5, 0.35, 0x5e4a38, 0, 5.2, 1.5), box(1.4, 2.6, 0.12, C.trim, -1.8, 1.3, 1.64), box(1.4, 1.2, 0.12, C.glow, 1.8, 2.4, 1.64, 0.5));
+            g.position.set(x, 0, z);
+            g.rotation.y = turn;
+            sc.add(g);
+            block(x, z, 4.2, 1.8);
+        };
+        tumbledown(-56, 41, Math.PI, 0x7a6048);
+        tumbledown(-46, 41, Math.PI, 0x6c5540);
+        tumbledown(-36, 41, Math.PI, 0x82694e);
+        const saloonSign = sign('SALOON', 4);
+        saloonSign.position.set(-46, 6.6, 39.1);
+        saloonSign.rotation.y = Math.PI;
+        sc.add(saloonSign);
+        const piano = new THREE.Group();
+        piano.add(box(2.8, 1.5, 1.4, C.timberDark, 0, 0.75, 0), box(2.9, 0.15, 0.7, 0xe8dcc0, 0, 1.58, 0.55), box(0.7, 0.1, 0.5, C.timberDark, -0.9, 1.7, 0.5).rotateZ(0.5), box(2.8, 1.1, 0.2, C.timber, 0, 2.05, -0.55));
+        piano.position.set(-46, 0, 30);
+        sc.add(piano);
+        block(-46, 30, 1.4, 0.8);
+        for(const [x, z, turn] of [[-52, 34, 0.5], [-51, 35.2, 1.6], [-40, 28, 0.2]]) {
+            const keg = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 10), mat(C.timber));
+            keg.position.set(x, 0.55, z);
+            keg.rotation.z = turn > 1 ? Math.PI / 2 : 0;
+            sc.add(keg);
+        }
+        block(-52, 34.6, 1.1, 1.1);
+        block(-40, 28, 0.7, 0.7);
+        for(let x = -58; x <= -34; x += 6) sc.add(box(0.2, 1.3, 0.2, C.timberDark, x, 0.65, 25));
+        sc.add(box(24, 0.14, 0.14, C.timber, -46, 1.2, 25), lamp(-58, 28), lamp(-34, 28));
     }
-    block(-52, 34.6, 1.1, 1.1);
-    block(-40, 28, 0.7, 0.7);
-    for(let x = -58; x <= -34; x += 6) scenery.add(box(0.2, 1.3, 0.2, C.timberDark, x, 0.65, 25));
-    scenery.add(box(24, 0.14, 0.14, C.timber, -46, 1.2, 25), lamp(-58, 28), lamp(-34, 28));
 
     // Whisper Wash: a dry riverbed with a thread of water, canyon walls, the wolves' den.
-    scenery.add(box(37, 0.05, 5, 0xb59a72, -53.5, 0.07, -26.5), box(37, 0.04, 0.7, 0x2f6f7a, -53.5, 0.1, -26.5, 0.1));
-    blocks.push({ minX: -72, maxX: -36, minZ: -33.5, maxZ: -30 });
-    for(const [x, z, w, h] of [[-66, -31.5, 5, 5], [-58, -32.4, 7, 7], [-48, -31.8, 6, 4.5], [-41, -33, 5, 6.5]]) {
-        scenery.add(box(w, h, 3.2, 0x8c6a4c, x, h / 2, z), box(w * 0.6, 1.2, 2.4, 0x7a5a40, x + 0.4, h + 0.5, z));
-        block(x, z, w / 2, 1.6);
+    {
+        const D = districtOffsetById('wash'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        sc.add(box(37, 0.05, 5, 0xb59a72, -53.5, 0.07, -26.5), box(37, 0.04, 0.7, 0x2f6f7a, -53.5, 0.1, -26.5, 0.1));
+        pushBlocks({ minX: -72, maxX: -36, minZ: -33.5, maxZ: -30 });
+        for(const [x, z, w, h] of [[-66, -31.5, 5, 5], [-58, -32.4, 7, 7], [-48, -31.8, 6, 4.5], [-41, -33, 5, 6.5]]) {
+            sc.add(box(w, h, 3.2, 0x8c6a4c, x, h / 2, z), box(w * 0.6, 1.2, 2.4, 0x7a5a40, x + 0.4, h + 0.5, z));
+            block(x, z, w / 2, 1.6);
+        }
+        const den = new THREE.Group();
+        den.add(box(3.6, 2.2, 2.4, 0x5a4636, 0, 1.1, 0), box(1.6, 1.4, 0.2, 0x1a1410, 0, 0.7, 1.25), box(4, 0.5, 2.8, 0x8c6a4c, 0, 2.4, 0));
+        den.position.set(-58, 0, -24);
+        sc.add(den);
+        block(-58, -24, 1.8, 1.2);
+        for(const [x, z, turn] of [[-54.6, -21.6, 0.4], [-53.4, -22.2, -0.5], [-61.5, -21.4, 0.9]]) {
+            const pup = new THREE.Group();
+            pup.add(box(0.9, 0.5, 0.4, 0x6a625a, 0, 0.5, 0), box(0.4, 0.4, 0.34, 0x6a625a, 0.55, 0.7, 0), box(0.12, 0.2, 0.1, 0x2b2b2e, 0.62, 1.0, 0.1), box(0.12, 0.2, 0.1, 0x2b2b2e, 0.62, 1.0, -0.1));
+            pup.position.set(x, 0, z);
+            pup.rotation.y = turn;
+            sc.add(pup);
+        }
+        for(let x = -70; x <= -40; x += 7) sc.add(box(0.5, 2.4, 0.5, 0x4b4036, x, 1.2, -13.4), box(0.9, 0.35, 0.9, 0x6b6258, x, 2.6, -13.4));
+        sc.add(lamp(-48, -14), lamp(-64, -14));
     }
-    const den = new THREE.Group();
-    den.add(box(3.6, 2.2, 2.4, 0x5a4636, 0, 1.1, 0), box(1.6, 1.4, 0.2, 0x1a1410, 0, 0.7, 1.25), box(4, 0.5, 2.8, 0x8c6a4c, 0, 2.4, 0));
-    den.position.set(-58, 0, -24);
-    scenery.add(den);
-    block(-58, -24, 1.8, 1.2);
-    for(const [x, z, turn] of [[-54.6, -21.6, 0.4], [-53.4, -22.2, -0.5], [-61.5, -21.4, 0.9]]) {
-        const pup = new THREE.Group();
-        pup.add(box(0.9, 0.5, 0.4, 0x6a625a, 0, 0.5, 0), box(0.4, 0.4, 0.34, 0x6a625a, 0.55, 0.7, 0), box(0.12, 0.2, 0.1, 0x2b2b2e, 0.62, 1.0, 0.1), box(0.12, 0.2, 0.1, 0x2b2b2e, 0.62, 1.0, -0.1));
-        pup.position.set(x, 0, z);
-        pup.rotation.y = turn;
-        scenery.add(pup);
-    }
-    for(let x = -70; x <= -40; x += 7) scenery.add(box(0.5, 2.4, 0.5, 0x4b4036, x, 1.2, -13.4), box(0.9, 0.35, 0.9, 0x6b6258, x, 2.6, -13.4));
-    scenery.add(lamp(-48, -14), lamp(-64, -14));
 
     // Hollow Hill: a small chapel rebuilt from burnt beams, its bell, and graves under the hill.
-    const chapel = new THREE.Group();
-    chapel.add(box(7, 4.4, 5, 0x6a5444, 0, 2.2, 0), roof(7, 5, 2.2, 0x2f3a3f, 4.4), box(1.4, 2.6, 0.12, C.trim, 0, 1.3, 2.55), box(1.0, 1.4, 0.12, C.glow, -2.3, 2.5, 2.55, 1.1), box(1.0, 1.4, 0.12, C.glow, 2.3, 2.5, 2.55, 1.1));
-    chapel.add(box(1.8, 4.2, 1.8, 0x5a4636, 0, 8.0, -1.4), box(1.2, 1.0, 1.2, C.brass, 0, 9.6, -1.4), box(2.2, 0.3, 2.2, C.slate, 0, 10.4, -1.4));
-    chapel.position.set(3.5, 0, -42);
-    scenery.add(chapel);
-    block(3.5, -42, 3.6, 2.6);
-    const bell = new THREE.Group();
-    bell.add(box(0.2, 3.2, 0.2, C.timberDark, -0.9, 1.6, 0), box(0.2, 3.2, 0.2, C.timberDark, 0.9, 1.6, 0), box(2.2, 0.2, 0.3, C.timberDark, 0, 3.2, 0), box(0.9, 1.1, 0.9, C.brass, 0, 2.4, 0));
-    bell.position.set(3.5, 0, -34);
-    scenery.add(bell);
-    block(3.5, -34, 1.0, 0.5);
-    for(const [x, z] of [[-0.6, -26], [1.6, -27], [5.5, -26.4], [7.8, -27.2], [-0.4, -23.4], [8, -23.8]]) {
-        scenery.add(box(0.8, 1.3, 0.25, C.stone, x, 0.65, z), box(0.5, 0.3, 0.3, C.stoneDark, x, 1.35, z));
-        block(x, z, 0.45, 0.2);
+    {
+        const D = districtOffsetById('chapel'); // drawn where it was designed, then the whole district is moved out with the town's edge
+        const sc = new THREE.Group();
+        sc.position.set(D[0], 0, D[1]);
+        scenery.add(sc);
+        const pushBlocks = (...list) => list.forEach(b => blocks.push({ minX: b.minX + D[0], maxX: b.maxX + D[0], minZ: b.minZ + D[1], maxZ: b.maxZ + D[1] }));
+        const block = (x, z, hx, hz) => pushBlocks({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+        const pushSmoke = source => smokeSources.push({ ...source, at: source.at.clone().add(new THREE.Vector3(D[0], 0, D[1])) });
+        const chapel = new THREE.Group();
+        chapel.add(box(7, 4.4, 5, 0x6a5444, 0, 2.2, 0), roof(7, 5, 2.2, 0x2f3a3f, 4.4), box(1.4, 2.6, 0.12, C.trim, 0, 1.3, 2.55), box(1.0, 1.4, 0.12, C.glow, -2.3, 2.5, 2.55, 1.1), box(1.0, 1.4, 0.12, C.glow, 2.3, 2.5, 2.55, 1.1));
+        chapel.add(box(1.8, 4.2, 1.8, 0x5a4636, 0, 8.0, -1.4), box(1.2, 1.0, 1.2, C.brass, 0, 9.6, -1.4), box(2.2, 0.3, 2.2, C.slate, 0, 10.4, -1.4));
+        chapel.position.set(3.5, 0, -42);
+        sc.add(chapel);
+        block(3.5, -42, 3.6, 2.6);
+        const bell = new THREE.Group();
+        bell.add(box(0.2, 3.2, 0.2, C.timberDark, -0.9, 1.6, 0), box(0.2, 3.2, 0.2, C.timberDark, 0.9, 1.6, 0), box(2.2, 0.2, 0.3, C.timberDark, 0, 3.2, 0), box(0.9, 1.1, 0.9, C.brass, 0, 2.4, 0));
+        bell.position.set(3.5, 0, -34);
+        sc.add(bell);
+        block(3.5, -34, 1.0, 0.5);
+        for(const [x, z] of [[-0.6, -26], [1.6, -27], [5.5, -26.4], [7.8, -27.2], [-0.4, -23.4], [8, -23.8]]) {
+            sc.add(box(0.8, 1.3, 0.25, C.stone, x, 0.65, z), box(0.5, 0.3, 0.3, C.stoneDark, x, 1.35, z));
+            block(x, z, 0.45, 0.2);
+        }
+        sc.add(box(14, 0.12, 0.12, C.timberDark, 3.5, 1.0, -19.2), box(0.2, 1.4, 0.2, C.timberDark, -2.6, 0.7, -19.2), box(0.2, 1.4, 0.2, C.timberDark, 9.6, 0.7, -19.2), lamp(-1.5, -30), lamp(8.5, -30));
     }
-    scenery.add(box(14, 0.12, 0.12, C.timberDark, 3.5, 1.0, -19.2), box(0.2, 1.4, 0.2, C.timberDark, -2.6, 0.7, -19.2), box(0.2, 1.4, 0.2, C.timberDark, 9.6, 0.7, -19.2), lamp(-1.5, -30), lamp(8.5, -30));
     return blocks;
 }
 
@@ -656,8 +737,8 @@ export function createTownScene(options = {}) {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(C.sky);
     scene.fog = new THREE.Fog(C.sky, 85, 150);
-    const camera = new THREE.PerspectiveCamera(38, 1, 1, 300);
-    const view = { target: new THREE.Vector3(3, 0, -12), distance: 70, minDistance: 36, maxDistance: 95, pitch: 0.72 };
+    const camera = new THREE.PerspectiveCamera(38, 1, 1, 520);
+    const view = { target: new THREE.Vector3(3 * SPREAD, 0, -12 * SPREAD), distance: 70 * SPREAD, minDistance: 40, maxDistance: 95 * SPREAD, pitch: 0.72 };
 
     // Dusk: cool teal sky light, a low amber sun, warm lamps.
     const hemi = new THREE.HemisphereLight(0x8fc3cf, 0x5a3a24, 2.4);
@@ -667,16 +748,17 @@ export function createTownScene(options = {}) {
     scene.add(sun);
 
     // Sky glow near the horizon.
-    const glow = new THREE.Mesh(new THREE.PlaneGeometry(400, 60), new THREE.MeshBasicMaterial({ color: 0xc0603a, transparent: true, opacity: 0.35, fog: false }));
-    glow.position.set(0, 10, -110);
+    const glow = new THREE.Mesh(new THREE.PlaneGeometry(700, 80), new THREE.MeshBasicMaterial({ color: 0xc0603a, transparent: true, opacity: 0.35, fog: false }));
+    glow.position.set(0, 10, -190);
     scene.add(glow);
 
     // Everything that never moves and is not tappable goes in `scenery`, merged into a few meshes below.
     const scenery = new THREE.Group();
-    const ground = new THREE.Mesh(new THREE.PlaneGeometry(220, 220), mat(C.ground));
+    const ground = new THREE.Mesh(new THREE.PlaneGeometry(420, 420), mat(C.ground));
     ground.rotation.x = -Math.PI / 2;
     scenery.add(ground);
-    for(const [w, d, x, z] of [[70, 9, 0, -4], [9, 50, -7, -4], [9, 50, 7.5, -4], [70, 6, 0, 13]]) {
+    // The streets spread with the town: main street, two cross streets, and the south road.
+    for(const [w, d, x, z] of [[70 * SPREAD, 9, 0, -4 * SPREAD], [9, 50 * SPREAD, -7 * SPREAD, -4 * SPREAD], [9, 50 * SPREAD, 7.5 * SPREAD, -4 * SPREAD], [70 * SPREAD, 6, 0, 13 * SPREAD]]) {
         const street = box(w, 0.05, d, C.street, x, 0.03, z);
         scenery.add(street);
     }
@@ -724,31 +806,37 @@ export function createTownScene(options = {}) {
         horse.rotation.y = x < 0 ? 0.4 : -0.3;
         stable.add(horse);
     }
-    stable.position.set(-32, 0, -14);
+    const stableAt = spread(-32, -14);
+    stable.position.set(stableAt[0], 0, stableAt[1]);
     scenery.add(stable);
     const undertaker = new THREE.Group();
     undertaker.add(box(5, 4.5, 5, C.timberDark, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
     const undertakerSign = sign('UNDERTAKER', 4.4);
     undertakerSign.position.set(0, 3.6, 2.6);
     undertaker.add(undertakerSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
-    undertaker.position.set(-31, 0, 6);
+    const undertakerAt = spread(-31, 6);
+    undertaker.position.set(undertakerAt[0], 0, undertakerAt[1]);
     scenery.add(undertaker);
 
     // A foundry chimney on the skyline.
     const foundry = new THREE.Group();
     foundry.add(box(12, 7, 8, C.brickDark, 0, 3.5, 0), box(2, 18, 2, C.brick, 4, 9, -1));
-    foundry.position.set(26, 0, -32);
+    const foundryAt = spread(26, -32);
+    foundry.position.set(foundryAt[0], 0, foundryAt[1]);
     scenery.add(foundry);
-    smokeSources.push({ id: 'foundry', at: new THREE.Vector3(30, 18.5, -33) });
+    smokeSources.push({ id: 'foundry', at: new THREE.Vector3(foundryAt[0] + 4, 18.5, foundryAt[1] - 1) });
 
     // Props: lamps, barrels, crates, a wagon, telegraph poles.
-    for(const [x, z] of [[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]]) scenery.add(lamp(x, z));
-    for(const [x, z] of [[-5, 9], [-4.2, 9.6], [18, 9], [-21, -9]]) {
+    const LAMPS = [[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]].map(([x, z]) => spread(x, z));
+    const BARRELS = [[-5, 9], [-4.2, 9.6], [18, 9], [-21, -9]].map(([x, z]) => spread(x, z));
+    const CRATES = [[17, 10], [17.8, 11], [-23, 10]].map(([x, z]) => spread(x, z));
+    for(const [x, z] of LAMPS) scenery.add(lamp(x, z));
+    for(const [x, z] of BARRELS) {
         const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.4, 10), mat(C.timber));
         barrel.position.set(x, 0.7, z);
         scenery.add(barrel);
     }
-    for(const [x, z] of [[17, 10], [17.8, 11], [-23, 10]]) scenery.add(box(1.3, 1.3, 1.3, C.timberDark, x, 0.65, z));
+    for(const [x, z] of CRATES) scenery.add(box(1.3, 1.3, 1.3, C.timberDark, x, 0.65, z));
     const wagon = new THREE.Group();
     wagon.add(box(4, 1, 2.2, C.timber, 0, 1.3, 0));
     const cover = new THREE.Mesh(new THREE.CylinderGeometry(1.3, 1.3, 4, 12, 1, false, 0, Math.PI), mat(0xd8cbb0));
@@ -761,10 +849,11 @@ export function createTownScene(options = {}) {
         wheel.position.set(x, 0.7, z);
         wagon.add(wheel);
     }
-    wagon.position.set(-26, 0, -4);
+    const wagonAt = spread(-26, -4);
+    wagon.position.set(wagonAt[0], 0, wagonAt[1]);
     wagon.rotation.y = 0.3;
     scenery.add(wagon);
-    for(const x of [-34, -12, 10]) scenery.add(box(0.3, 9, 0.3, C.timberDark, x, 4.5, -24), box(2.4, 0.2, 0.2, C.timberDark, x, 8.4, -24));
+    for(const x of [-34, -12, 10].map(x => x * SPREAD)) scenery.add(box(0.3, 9, 0.3, C.timberDark, x, 4.5, -24 * SPREAD), box(2.4, 0.2, 0.2, C.timberDark, x, 8.4, -24 * SPREAD));
 
     const districtBlocks = districtScenery(scenery, smokeSources);
     // Places you walk up to and use (src/townSpots.js): the bounty board, the jail's cash box, the train out.
@@ -788,8 +877,13 @@ export function createTownScene(options = {}) {
     cashProp.position.set(cashAt.x, 0, cashAt.z);
     scenery.add(cashProp);
     const trainSign = sign('RIDE OUT', 3.6);
-    trainSign.position.set(34.5, 4, -3.3);
-    scenery.add(box(0.25, 3.6, 0.25, C.timberDark, 34.5, 1.8, -3.4), trainSign);
+    const platformAt = getSpot('platform').object; // the town train's stop: a post, a sign and a bench
+    const platformSign = sign('TOWN TRAIN', 3.6);
+    platformSign.position.set(platformAt.x, 4, platformAt.z + 0.1);
+    scenery.add(box(0.25, 3.6, 0.25, C.timberDark, platformAt.x, 1.8, platformAt.z), platformSign, box(2.6, 0.2, 0.7, C.timber, platformAt.x - 2.2, 0.8, platformAt.z + 0.3), box(0.2, 0.8, 0.5, C.timberDark, platformAt.x - 3.3, 0.4, platformAt.z + 0.3), box(0.2, 0.8, 0.5, C.timberDark, platformAt.x - 1.1, 0.4, platformAt.z + 0.3));
+    const signPost = near('depot', 34.5, -3.4); // beside the locomotive, so it moves with the depot
+    trainSign.position.set(signPost[0], 4, signPost[1] + 0.1);
+    scenery.add(box(0.25, 3.6, 0.25, C.timberDark, signPost[0], 1.8, signPost[1]), trainSign);
     scene.add(mergeByMaterial(scenery));
     // Gates: a fence while a district is shut, an open gate once its outlaw is beaten (setDistricts).
     // Many small boxes that never move on their own: baked into a mesh per material, like the rest of the town. All the shut
@@ -887,20 +981,21 @@ export function createTownScene(options = {}) {
     // What the walkable town (src/townWalk.js) cannot walk through, besides the buildings: the scenery above,
     // as boxes on the ground plane.
     const at = (x, z, hx, hz) => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+    const shiftBox = (b, [dx, dz]) => ({ minX: b.minX + dx, maxX: b.maxX + dx, minZ: b.minZ + dz, maxZ: b.maxZ + dz });
     const walkBoxes = [
-        at(-32, -14, 4.2, 3.2), at(-31, 6, 2.8, 2.8), at(26, -32, 6.2, 4.2), at(-26, -4, 2.4, 1.7),
-        ...[[-5, 9], [-4.2, 9.6], [18, 9], [-21, -9]].map(([x, z]) => at(x, z, 0.7, 0.7)),
-        ...[[17, 10], [17.8, 11], [-23, 10]].map(([x, z]) => at(x, z, 0.75, 0.75)),
-        ...[[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]].map(([x, z]) => at(x, z, 0.3, 0.3)),
+        at(stableAt[0], stableAt[1], 4.2, 3.2), at(undertakerAt[0], undertakerAt[1], 2.8, 2.8), at(foundryAt[0], foundryAt[1], 6.2, 4.2), at(wagonAt[0], wagonAt[1], 2.4, 1.7),
+        ...BARRELS.map(([x, z]) => at(x, z, 0.7, 0.7)),
+        ...CRATES.map(([x, z]) => at(x, z, 0.75, 0.75)),
+        ...LAMPS.map(([x, z]) => at(x, z, 0.3, 0.3)),
         // The locomotive on the depot's rails (the depot builder puts it at (-5, 8.7) from the station), the sign post
-        // beside it, and the props of src/townSpots.js.
-        { minX: 25.4, maxX: 32.7, minZ: -7.8, maxZ: -4.8 }, at(34.5, -3.4, 0.3, 0.3),
+        // beside it, and the props of src/townSpots.js. They stand with the depot, so they move with it.
+        shiftBox({ minX: 25.4, maxX: 32.7, minZ: -7.8, maxZ: -4.8 }, moved('depot')), at(signPost[0], signPost[1], 0.3, 0.3),
         ...SPOTS.filter(spot => spot.object).map(({ object: o }) => at(o.x, o.z, o.hx, o.hz)),
         ...districtBlocks
     ];
     // Two real lamp lights on the main street (each light costs every lit pixel on a phone); the other lamps glow.
     const lampLights = [];
-    for(const [x, z] of [[-8, 1.5], [8, -9]]) {
+    for(const [x, z] of [[-8, 1.5], [8, -9]].map(([x, z]) => spread(x, z))) {
         const light = new THREE.PointLight(0xffa040, 75, 26, 1.6);
         light.position.set(x, 4.5, z);
         scene.add(light);
@@ -1064,14 +1159,14 @@ export function createTownScene(options = {}) {
             const upright = width < height;
             camera.fov = upright ? 50 : 38;
             view.pitch = upright ? 0.95 : 0.72; // look further down, so the tall screen is town rather than sky
-            view.maxDistance = upright ? 150 : 95;
-            view.distance = upright ? Math.max(view.distance, 125) : Math.min(view.distance, view.maxDistance);
+            view.maxDistance = (upright ? 150 : 95) * SPREAD;
+            view.distance = upright ? Math.max(view.distance, 125 * SPREAD) : Math.min(view.distance, view.maxDistance);
             camera.updateProjectionMatrix();
             placeCamera();
         },
         pan(dx, dz) {
-            view.target.x = THREE.MathUtils.clamp(view.target.x + dx, -24, 28);
-            view.target.z = THREE.MathUtils.clamp(view.target.z + dz, -22, 12);
+            view.target.x = THREE.MathUtils.clamp(view.target.x + dx, -24 * SPREAD, 28 * SPREAD);
+            view.target.z = THREE.MathUtils.clamp(view.target.z + dz, -22 * SPREAD, 12 * SPREAD);
             placeCamera();
         },
         zoom(factor) {
@@ -1115,7 +1210,7 @@ export function createTownScene(options = {}) {
             placeCamera();
         },
         overview() {
-            view.target.set(3, 0, -12);
+            view.target.set(3 * SPREAD, 0, -12 * SPREAD);
             this.resize(...viewSize);
         },
         // Building id under a screen point (normalized device coordinates), or null.

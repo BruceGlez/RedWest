@@ -9,7 +9,11 @@ export const FOLK_SPEED = 1.5; // units a second, a slow stroll
 export const FOLK_TALK_RANGE = 3.4;
 
 // route: points [x, z, wait in seconds] walked in order and round again. lines: [nothing beaten, a few, many].
-export const FOLK = [
+import { near, spread } from './townSpace.js';
+
+// route as originally designed; anchor: the building the route belongs to (the station master's is on the depot's platform), else
+// it spreads with the town.
+const RAW_FOLK = [
     { id: 'gil', react: '{place} is open. The horses went that way first. They always know.', name: 'Old Gil', route: [[-30, -6.5, 8], [-15, -7.2, 6], [-7, -6.5, 4]], lines: [
         'A rider came through at dawn asking for the marshal. Left no name.',
         'Word on the Road is somebody is paying them. Nobody will say who.',
@@ -30,11 +34,16 @@ export const FOLK = [
         'The smelter at Slagtown still runs. Whatever it makes, it is not for us.',
         'This town is getting bigger. I can feel it in my boots.',
         'I dig for the Company no more. The work here is honest, and slower.'] },
-    { id: 'station-master', react: 'Folk keep asking the way to {place}. I tell them to follow the marshal.', name: 'The station master', route: [[36, -9.5, 9], [36, -2, 0], [27, -2, 6], [36, -2, 0]], lines: [
+    { id: 'station-master', react: 'Folk keep asking the way to {place}. I tell them to follow the marshal.', name: 'The station master', anchor: 'depot', route: [[36, -9.5, 9], [36, -2, 0], [27, -2, 6], [36, -2, 0]], lines: [
         'The train was late again. Somebody at the Company office wanted it that way.',
         'Every hunt starts here. Get on, Marshal, and get back.',
         'I have run this line for years. You are the first to make it feel safe.'] }
 ];
+
+export const FOLK = RAW_FOLK.map(person => ({
+    ...person,
+    route: person.route.map(([x, z, wait]) => [...(person.anchor ? near(person.anchor, x, z) : spread(x, z)), wait])
+}));
 
 export const getFolk = id => FOLK.find(person => person.id === id) ?? null;
 

@@ -1148,3 +1148,7 @@ body.demo #start-screen, body.demo #welcome-modal { display: none !important; }
 .farm-bar i { display: block; height: 100%; background: #8ab84a; }
 .farm-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 8px; }
 .farm-chip { padding: 3px 9px; background: rgba(0, 0, 0, 0.3); border: 1px solid #8a6a3a; border-radius: 12px; font-size: 13px; color: #f0d9a8; }
+
+/* The town train's short fade (src/townTravel.js). */
+.town-fade { position: absolute; inset: 0; z-index: 6; background: #0c0805; opacity: 0; pointer-events: none; transition: opacity 0.35s ease; }
+.town-fade.on { opacity: 1; }

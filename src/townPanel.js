@@ -13,6 +13,7 @@ import { FARM_START, farmLabel, plotIndex } from './farmLayout.js';
 import { createTownWalk } from './townWalk.js';
 import { spotLabel, getSpot, jobsLeft } from './townSpots.js';
 import { unlockedDistricts, doorLabel, districtOf, lockedHint, districtAt, getDistrict } from './townDistricts.js';
+import { stops, stopById, TRAVEL_FADE_MS } from './townTravel.js';
 import { loadNews, saveNews, newlyOpened, bannerFor, markSeen, markVisited, talkOfTheTown } from './townNews.js';
 import { getFolk, folkLine } from './townFolk.js';
 import { arena, ARENA_MODES, arenaRoster } from './arena.js';
@@ -39,6 +40,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         walkButton: $('town-walk-btn'),
         title: $('town-title'),
         placeBack: $('town-place-back'),
+        fade: $('town-fade'),
         toast: $('town-toast'),
         lookButton: $('town-look-btn'),
         qualityButton: $('town-quality-btn'),
@@ -279,8 +281,32 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             + `<p class="town-blurb">${d.card.text}</p>${action}</div>`;
     }
 
+    // The town train (src/townTravel.js): Main Street and every district that is open; a shut one names the outlaw to beat.
+    function trainCard() {
+        const open = profile ? unlockedDistricts(profile.stats.stageStars) : [];
+        const rows = stops(open).map(stop => stop.open
+            ? `<button type="button" class="shop-action collect farm-crop" data-travel="${stop.id}">${stop.name}</button>`
+            : `<button type="button" class="shop-action farm-crop" disabled>${stop.name}<small>${stop.hint}</small></button>`).join('');
+        return `<div class="town-card" data-building="platform"><div class="town-sign"><span>THE TOWN TRAIN</span></div>`
+            + `<p class="town-blurb">The districts are a real walk apart. The train stops at Main Street and at every district that is open.</p><div class="town-actions farm-actions">${rows}</div></div>`;
+    }
+    function travelTo(id) {
+        const stop = profile && stopById(id, unlockedDistricts(profile.stats.stageStars));
+        if(!stop || !walk?.active || place) return;
+        track('train_travel');
+        openId = null;
+        render();
+        els.fade.classList.add('on'); // a short fade while the train runs
+        setTimeout(() => {
+            walk.place(stop.at[0], stop.at[1]);
+            els.fade.classList.remove('on');
+            toast(`Off the train at ${stop.name}.`);
+        }, TRAVEL_FADE_MS);
+    }
+
     function sheetHtml(id) {
         if(place) return farmCard(id);
+        if(id === 'platform') return trainCard();
         if(districtOf(id)) return districtCard(id);
         if(id === 'arena') return arenaCard();
         if(id === 'board') return boardCard();
@@ -556,7 +582,9 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     els.grid.addEventListener('click', event => {
         const button = event.target.closest('button');
         if(!button || button.disabled) return;
-        if(button.dataset.plant) {
+        if(button.dataset.travel) {
+            travelTo(button.dataset.travel);
+        } else if(button.dataset.plant) {
             const crop = getCrop(button.dataset.plant);
             farmDo({ action: 'plant', plot: Number(button.dataset.plot), crop: crop.id }, () => `Planted ${crop.name.toLowerCase()}.`);
         } else if(button.dataset.sell) {

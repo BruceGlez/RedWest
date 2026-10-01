@@ -21,7 +21,7 @@ import { createDog, followStep } from './townCompanion.js';
 
 const YAW = 0.52; // the town camera's heading (src/townScene.js)
 const HEIGHT = 3.4; // the marshal's height in town units (townsfolk are about 3.2)
-const START = [0, -3.2];
+const START = [0, -3.2 * 1.5]; // main street (src/townSpace.js spreads the town by 1.5)
 const MARSHAL_MODEL = 'models/marshal.glb';
 
 // Stand-in while the model loads (or if it cannot): a coat, a head, a hat.
