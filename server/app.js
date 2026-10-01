@@ -4,6 +4,7 @@ import { getProduct } from '../src/products.js';
 import { validateName, isGeneratedName } from '../src/names.js';
 import { AGE_BANDS } from '../src/privacy.js';
 import { collectJail, upgradeBuilding } from '../src/town.js';
+import { farmAction } from '../src/farm.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 import { createApple, AppleError } from './apple.js';
 
@@ -399,6 +400,12 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     upgradeBuilding(user.profile, body.building, now());
                     save();
                     return send(res, 200, { profile: user.profile });
+                }
+                // Calloway Farm (src/farm.js): the server clock decides what has grown.
+                if(url.pathname === '/api/town/farm' && req.method === 'POST') {
+                    const result = farmAction(user.profile, body, now());
+                    save();
+                    return send(res, 200, { result, profile: user.profile });
                 }
                 if(url.pathname === '/api/buy' && req.method === 'POST') {
                     buyItem(user.profile, body.itemId);

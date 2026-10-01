@@ -16,6 +16,8 @@ import { createDog, followStep } from './townCompanion.js';
 //   blocked  () => boolean: true while a card or dialog is open, so the marshal stands still
 //   lineFor  (personId) => string: what a townsperson says when the marshal stands near (src/townFolk.js)
 //   describe (door) => string: the prompt's wording for a door or spot (the train names the next outlaw, the cash box the money)
+//   start    [x, z]: where the marshal first stands (the farm, a place of its own, starts at its gate)
+// town3d can be any scene with the same few parts (scene, walkMap, follow, overview, project, folk, talkTo): the farm uses one.
 
 const YAW = 0.52; // the town camera's heading (src/townScene.js)
 const HEIGHT = 3.4; // the marshal's height in town units (townsfolk are about 3.2)
@@ -37,7 +39,7 @@ function placeholderFigure() {
     return g;
 }
 
-export function createTownWalk({ town3d, host, onOpen, blocked = () => false, describe = door => door.label, lineFor = () => '' }) {
+export function createTownWalk({ town3d, host, onOpen, blocked = () => false, describe = door => door.label, lineFor = () => '', start = START }) {
     const avatar = new THREE.Group();
     const figure = placeholderFigure();
     avatar.add(figure);
@@ -46,8 +48,8 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false, de
 
     let active = false;
     let map = null;
-    const position = { x: START[0], z: START[1] };
-    const camera = { x: START[0], z: START[1] };
+    const position = { x: start[0], z: start[1] };
+    const camera = { x: start[0], z: start[1] };
     let facing = 0;
     let door = null;
 
@@ -69,18 +71,22 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false, de
     window.addEventListener('blur', () => held.clear());
 
     // ---------- Input: the on-screen stick (phones) and the door prompt ----------
-    const stickEl = document.createElement('div');
-    stickEl.className = 'walk-stick';
-    stickEl.innerHTML = '<div class="walk-stick-knob"></div>';
-    stickEl.style.display = 'none';
-    const promptEl = document.createElement('button');
-    promptEl.type = 'button';
-    promptEl.className = 'walk-prompt';
-    promptEl.style.display = 'none';
-    const bubbleEl = document.createElement('div');
-    bubbleEl.className = 'walk-bubble';
-    bubbleEl.style.display = 'none';
-    host.append(stickEl, promptEl, bubbleEl);
+    // One stick, one prompt and one bubble are shared by every walk on this screen (the town's and a place's): only one
+    // is active at a time, and each leaves them hidden when it stops.
+    const shared = (tag, className, html = '') => {
+        const found = host.querySelector(`:scope > .${className}`);
+        if(found) return found;
+        const el = document.createElement(tag);
+        el.className = className;
+        el.innerHTML = html;
+        el.style.display = 'none';
+        if(tag === 'button') el.type = 'button';
+        host.append(el);
+        return el;
+    };
+    const stickEl = shared('div', 'walk-stick', '<div class="walk-stick-knob"></div>');
+    const promptEl = shared('button', 'walk-prompt');
+    const bubbleEl = shared('div', 'walk-bubble');
     const stick = { x: 0, y: 0, id: null };
     const knob = stickEl.firstElementChild;
     const moveStick = event => {

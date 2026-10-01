@@ -154,38 +154,28 @@ try {
     }
     {
         // Beaten: the Calloways, Iron Jack and Mesa Morgan open the farm, the foundry yard and the channel.
-        const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 0, 0, 0, 0] } }));
+        const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [0, 0, 0, 7, 7, 7, 0, 0, 0, 0] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
-        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 4); // the town and three districts
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 3); // the town, the foundry yard and the channel: the farm is a place of its own, not ground in the town
         const at = (id) => page.evaluate(id => {
             const door = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
             window.__redWestTown.walk.place(door.x, door.z);
             return window.__redWestTown.walk.position;
         }, id);
-        for(const [id, pattern] of [['furnace', /Ezra Stone opened the armour/], ['channel', /no blasting after dark/], ['kennel', /one dog more than they can feed/]]) {
+        for(const [id, pattern] of [['furnace', /Ezra Stone opened the armour/], ['channel', /no blasting after dark/]]) {
             const p = await at(id);
             assert.ok(p.x !== 0 || p.z !== 0);
             await page.locator('.walk-prompt').waitFor({ state: 'visible' });
             await page.keyboard.press('e');
             await page.locator('#town-sheet').waitFor({ state: 'visible' });
             assert.match(await page.locator('#town-grid').textContent(), pattern);
-            if(id === 'kennel') {
-                // The dog: take it, it comes along and is remembered; send it home.
-                assert.equal(await page.evaluate(() => window.__redWestTown.walk.hasDog), false);
-                await page.locator('[data-companion]').click();
-                assert.match(await page.locator('[data-companion]').textContent(), /SEND THE DOG HOME/);
-                assert.equal(await page.evaluate(() => window.__redWestTown.walk.hasDog), true, 'the dog is in the town');
-                assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('redWestCompanion.v1')).following), true, 'remembered on the device');
-                await page.locator('[data-companion]').click();
-                assert.match(await page.locator('[data-companion]').textContent(), /CALL THE DOG/);
-                assert.equal(await page.evaluate(() => window.__redWestTown.walk.hasDog), false);
-                await page.locator('[data-companion]').click();
-            }
             await page.locator('#town-sheet-close').click();
         }
-        // In a district the marshal can stand; the dog follows him there.
+        // The farm has a way in, not ground: there is no kennel in the town any more, and the gate reads as an entrance.
+        const doors = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.map(d => d.id));
+        assert.ok(doors.includes('enter-ranch') && !doors.includes('kennel') && !doors.includes('gate-ranch'));
         const pos = await page.evaluate(() => { window.__redWestTown.walk.place(-50, 0); return window.__redWestTown.walk.position; });
-        assert.ok(pos.x < -40, 'the farm is open ground');
+        assert.ok(pos.x > -38, 'the farm is not ground in the town: the marshal cannot walk into it');
         assert.deepEqual(errors, []);
         await context.close();
     }
@@ -225,17 +215,17 @@ try {
         await context.close();
     }
 
-    // Seven districts, the day, and a town that reacts. All ten outlaws beaten opens everything.
+    // Ten districts, the day, and a town that reacts. All ten outlaws beaten opens everything.
     {
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
-        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 8); // the town and seven districts
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 10); // the town and nine districts: the farm is a place of its own
 
         // You are told once, with a banner, and what was announced is remembered.
         await page.locator('#town-news').waitFor({ state: 'visible' });
         assert.match(await page.locator('#town-news-title').textContent(), /^NEW: .* IS OPEN$/);
         assert.match(await page.locator('#town-news-text').textContent(), /edge of town/);
-        assert.equal(await page.evaluate(() => window.__redWestTown.news.seen.length), 7, 'all seven announced');
+        assert.equal(await page.evaluate(() => window.__redWestTown.news.seen.length), 10, 'all ten announced');
         await page.locator('#town-news').click();
         await page.locator('#town-news').waitFor({ state: 'hidden' });
 
@@ -247,10 +237,10 @@ try {
         });
         const folk = await talk();
         await page.locator('.walk-bubble').waitFor({ state: 'visible' });
-        assert.match(await page.locator('.walk-bubble').textContent(), /Fort Pell is open/, `${folk} talks of the newest district`);
+        assert.match(await page.locator('.walk-bubble').textContent(), /Hollow Hill is open/, `${folk} talks of the newest district`);
 
-        // The four new places can each be reached and read.
-        for(const [id, pattern] of [['clock', /clock on the tower stopped/], ['grave', /struck out/], ['landing', /played straight/], ['gatling', /one page is missing/]]) {
+        // The places of the districts that are ground in the town can each be reached and read.
+        for(const [id, pattern] of [['clock', /clock on the tower stopped/], ['grave', /struck out/], ['landing', /played straight/], ['gatling', /one page is missing/], ['piano', /sour notes/], ['den', /wolf pups/], ['bell', /bell rings once at dusk/]]) {
             const door = await page.evaluate(id => {
                 const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
                 window.__redWestTown.walk.place(d.x, d.z);
@@ -264,11 +254,15 @@ try {
             await page.locator('#town-sheet-close').click();
         }
         // Having walked into all of them, the talk dies down and the usual lines return.
-        for(const [door, district] of [['kennel', 'ranch'], ['furnace', 'foundry'], ['channel', 'canal']]) {
+        for(const [door, district] of [['furnace', 'foundry'], ['channel', 'canal']]) {
             await page.evaluate(id => { const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id); window.__redWestTown.walk.place(d.x, d.z); }, door);
             await page.waitForFunction(id => window.__redWestTown.news.visited.includes(id), district); // a frame has to see him there
         }
-        await page.waitForFunction(() => window.__redWestTown.news.visited.length === 7);
+        // The farm counts as walked into once he has stepped inside it.
+        await page.evaluate(() => { window.__redWestTown.enterPlace('ranch'); });
+        await page.waitForFunction(() => window.__redWestTown.place === 'ranch');
+        await page.evaluate(() => window.__redWestTown.leavePlace());
+        await page.waitForFunction(() => window.__redWestTown.news.visited.length === 10);
         await talk();
         await page.locator('.walk-bubble').waitFor({ state: 'visible' });
         assert.doesNotMatch(await page.locator('.walk-bubble').textContent(), / is open/, 'back to the usual line');
@@ -396,6 +390,97 @@ try {
             return { ok, enabled: arena.enabled };
         });
         assert.deepEqual(started, { ok: false, enabled: false });
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    // Calloway Farm (src/farm.js, src/placeFarm.js): a place of its own. Shut until the Calloways are beaten; then a whole new
+    // map you walk around, with crops to plant and harvest, eggs, and a stand that pays.
+    {
+        const { page, errors, context } = await open();
+        const doors = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.map(d => d.id));
+        assert.ok(doors.includes('gate-ranch') && !doors.includes('enter-ranch'), 'shut: a gate to read, not a way in');
+        await page.evaluate(() => window.__redWestTown.enterPlace('ranch'));
+        assert.equal(await page.evaluate(() => window.__redWestTown.place), null, 'it stays shut until the Calloways are beaten');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        const seed = () => {
+            const ago = hours => new Date(Date.now() - hours * 3600000).toISOString();
+            localStorage.setItem('redWestProfile.v1', JSON.stringify({
+                stats: { stageStars: [0, 0, 0, 7, 0, 0, 0, 0, 0, 0] },
+                town: { farm: { plots: [{ crop: 'wheat', plantedAt: ago(2) }], store: { wheat: 3, corn: 2 }, coopAt: ago(3) } }
+            }));
+        };
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        const dollars = async () => Number((await page.locator('#town-dollars').textContent()).replace(/,/g, ''));
+        const stand = id => page.evaluate(id => {
+            const d = window.__redWestTown.farm3d.walkMap().doors.find(d => d.id === id);
+            window.__redWestTown.farmWalk.place(d.x, d.z);
+        }, id);
+        const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
+        const toast = pattern => page.waitForFunction(p => new RegExp(p).test(document.getElementById('town-toast').textContent), pattern);
+
+        // In through the gate: the town's walk stops, the farm's starts, and the way back shows.
+        await goTo(page, 'enter-ranch');
+        await prompt('CALLOWAY FARM');
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === 'ranch');
+        assert.equal(await walking(page), false, 'the town waits');
+        assert.equal(await page.evaluate(() => window.__redWestTown.farmWalk.active), true);
+        assert.equal(await page.locator('#town-place-back').isVisible(), true);
+        assert.equal(await page.locator('.town-label').first().isVisible(), false, 'the town signs are gone');
+        await page.waitForTimeout(600);
+        const farmCalls = await page.evaluate(() => window.__redWestRenderer?.info.render.calls ?? 0);
+        assert.ok(farmCalls < 130, `the farm stays cheap to draw (${farmCalls} draw calls)`);
+
+        // A crop that has grown is harvested by walking up to it.
+        await stand('plot-0');
+        await prompt('WHEAT READY');
+        await page.keyboard.press('e');
+        await toast('Harvested 2 wheat');
+        // An empty plot offers the crops; planting starts the clock.
+        await stand('plot-1');
+        await prompt('EMPTY PLOT');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('[data-plant]').count(), 3);
+        await page.locator('[data-plant="corn"]').click();
+        await toast('Planted corn');
+        await page.locator('#town-sheet').waitFor({ state: 'hidden' });
+        await prompt('CORN: 1h 30m');
+        // The coop has laid eggs while we were away.
+        await stand('coop');
+        await prompt('COOP: 6 EGGS');
+        await page.keyboard.press('e');
+        await toast('Collected 6 eggs');
+        // The stand pays a fixed price: 5 wheat at $2, 2 corn at $6, 6 eggs at $2 = $34.
+        const before = await dollars();
+        await stand('stand');
+        await prompt('THE FARM STAND');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /SELL ALL FOR \$34/);
+        await page.locator('[data-sell="all"]').click();
+        await toast('Sold for \\$34');
+        assert.equal(await dollars(), before + 34, 'the money landed in the wallet');
+        // The kennel is here now, and the dog comes along inside the farm.
+        await stand('kennel');
+        await prompt('THE KENNEL');
+        await page.keyboard.press('e');
+        await page.locator('[data-companion]').click();
+        assert.equal(await page.evaluate(() => window.__redWestTown.farmWalk.hasDog), true, 'the dog is on the farm');
+        await page.locator('#town-sheet-close').click();
+        // Out again: the town is back where the marshal left it.
+        await stand('leave');
+        await prompt('THE ROAD TO TOWN');
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === null);
+        assert.equal(await walking(page), true);
+        assert.equal(await page.locator('#town-place-back').isVisible(), false);
+        assert.equal(await page.evaluate(() => window.__redWestTown.walk.hasDog), true, 'the dog came back with him');
+        const stayed = await page.evaluate(() => window.__redWestTown.walk.position);
+        assert.ok(Math.hypot(stayed.x + 36.4, stayed.z + 2) < 3.5, `back at the farm gate (${stayed.x.toFixed(1)}, ${stayed.z.toFixed(1)})`);
         assert.deepEqual(errors, []);
         await context.close();
     }

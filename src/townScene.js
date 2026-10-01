@@ -11,7 +11,7 @@ import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from 
 // Buildings grow with their level. The town shares the game's renderer: while it is open the home-screen
 // loop draws this scene instead (src/gameLoop.js, setLobbyView).
 
-const C = {
+export const C = {
     ground: 0x6a5440, street: 0x8f7355, brick: 0x7b3b2a, brickDark: 0x5c2b1f, timber: 0x5a3d2b, timberDark: 0x3b2a20,
     stone: 0x6b6258, stoneDark: 0x4d463f, slate: 0x2f3a3f, trim: 0x2a1d15, glow: 0xffb347, iron: 0x2b2b2e, brass: 0xc8a050,
     coat: 0x2a2521, cap: 0x3a342c, skin: 0xd9a27a, smoke: 0x6e6a66, sky: 0x1d3640, green: 0x3f4f3a
@@ -19,7 +19,7 @@ const C = {
 
 // Lamp and window materials, with the glow they were made with: the time of day (src/townTime.js) scales them.
 const glowBase = new Map();
-const mat = (() => {
+export const mat = (() => {
     const cache = new Map();
     return (color, emissive = 0) => {
         const key = `${color}:${emissive}`;
@@ -32,14 +32,14 @@ const mat = (() => {
     };
 })();
 
-function box(w, h, d, color, x = 0, y = 0, z = 0, emissive = 0) {
+export function box(w, h, d, color, x = 0, y = 0, z = 0, emissive = 0) {
     const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), mat(color, emissive));
     mesh.position.set(x, y, z);
     return mesh;
 }
 
 // A pitched roof along x over a w by d footprint.
-function roof(w, d, h, color, y) {
+export function roof(w, d, h, color, y) {
     const shape = new THREE.Shape([new THREE.Vector2(-d / 2 - 0.4, 0), new THREE.Vector2(d / 2 + 0.4, 0), new THREE.Vector2(0, h)]);
     const geometry = new THREE.ExtrudeGeometry(shape, { depth: w + 0.6, bevelEnabled: false });
     geometry.rotateY(Math.PI / 2);
@@ -51,7 +51,7 @@ function roof(w, d, h, color, y) {
 
 // A painted sign board with Rye lettering. The same words share one material, so repeats merge into one draw call.
 const signMaterials = new Map();
-function sign(text, width = 5, color = '#2a1d15', ink = '#f0d9a8') {
+export function sign(text, width = 5, color = '#2a1d15', ink = '#f0d9a8') {
     const key = `${text}|${color}|${ink}`;
     if(signMaterials.has(key)) return new THREE.Mesh(new THREE.PlaneGeometry(width, width / 4), signMaterials.get(key));
     const canvas = document.createElement('canvas');
@@ -296,7 +296,7 @@ export const TOWN_LAYOUT = [
     { id: 'arena', x: 29, z: 6, label: 'ARENA' }
 ];
 
-function lamp(x, z) {
+export function lamp(x, z) {
     const g = new THREE.Group();
     g.add(box(0.2, 4.2, 0.2, C.iron, 0, 2.1, 0), box(0.7, 0.8, 0.7, C.glow, 0, 4.5, 0, 1.4), box(0.9, 0.15, 0.9, C.iron, 0, 4.95, 0));
     g.position.set(x, 0, z);
@@ -426,7 +426,7 @@ function districtScenery(scenery, smokeSources) {
         scenery.add(box(a.maxX - a.minX, 0.06, a.maxZ - a.minZ, d.ground, (a.minX + a.maxX) / 2, 0.03, (a.minZ + a.maxZ) / 2));
     }
 
-    // Calloway farm: a barn, hay, the kennel, a trough, a fence along the far edge.
+    // Calloway farm, seen over the fence: a barn, hay, a trough. The farm itself is a place you step into (src/placeFarm.js).
     const barn = new THREE.Group();
     barn.add(box(9, 5, 6, C.brick, 0, 2.5, 0), roof(9, 6, 2.4, C.timberDark, 5), box(2.6, 3.4, 0.2, C.trim, 0, 1.7, 3.05), box(3.4, 0.25, 0.3, C.timber, 0, 3.6, 3.1));
     barn.position.set(-60, 0, -4);
@@ -434,10 +434,6 @@ function districtScenery(scenery, smokeSources) {
     block(-60, -4, 4.6, 3.1);
     for(const [x, y, z] of [[-52, 0.5, -7.5], [-50.6, 0.5, -7.7], [-51.3, 1.5, -7.6]]) scenery.add(box(1.3, 1, 1.2, 0xc9a54a, x, y, z));
     block(-51.3, -7.6, 1.5, 0.8);
-    const kennel = new THREE.Group();
-    kennel.add(box(2, 1.4, 1.6, C.timber, 0, 0.7, 0), roof(2, 1.6, 0.8, C.timberDark, 1.4), box(0.7, 0.9, 0.1, C.trim, 0, 0.5, 0.82));
-    kennel.position.set(-46, 0, 2.4);
-    scenery.add(kennel);
     scenery.add(box(2.4, 0.6, 0.8, C.timberDark, -41, 0.3, -6));
     block(-41, -6, 1.3, 0.5);
     for(let x = -71; x <= -37; x += 3) scenery.add(box(0.2, 1.4, 0.2, C.timberDark, x, 0.7, -9.7));
@@ -523,7 +519,7 @@ function districtScenery(scenery, smokeSources) {
     well.position.set(-12, 0.45, -30);
     scenery.add(well, box(0.2, 2.6, 0.2, C.timberDark, -13, 1.3, -30), box(0.2, 2.6, 0.2, C.timberDark, -11, 1.3, -30), box(2.6, 0.16, 0.5, C.timberDark, -12, 2.6, -30));
     block(-12, -30, 1.1, 1.1);
-    scenery.add(box(10, 1.4, 0.5, 0xc9a77c, -32, 0.7, -44), box(10, 1.4, 0.5, 0xc9a77c, -10, 0.7, -44), lamp(-20, -22), lamp(-9, -24));
+    scenery.add(box(10, 1.4, 0.5, 0xc9a77c, -28, 0.7, -44), box(10, 1.4, 0.5, 0xc9a77c, -10, 0.7, -44), lamp(-20, -22), lamp(-9, -24));
 
     // The Silver Belle: a riverboat tied up at a pier, a notice post, crates.
     scenery.add(box(38, 0.04, 8, 0x2f6f7a, 45, 0.06, 38, 0.12));
@@ -579,6 +575,78 @@ function districtScenery(scenery, smokeSources) {
     scenery.add(gatling);
     block(60, -26, 1.2, 1.0);
     scenery.add(lamp(50, -20), lamp(70, -23));
+
+    // Copper Bit: a tumbledown saloon street, spilled kegs, a hitching rail, and the broken piano.
+    const tumbledown = (x, z, turn, color) => {
+        const g = new THREE.Group();
+        g.add(box(8, 4.4, 3.2, color, 0, 2.2, 0), box(8.4, 1.5, 0.35, 0x5e4a38, 0, 5.2, 1.5), box(1.4, 2.6, 0.12, C.trim, -1.8, 1.3, 1.64), box(1.4, 1.2, 0.12, C.glow, 1.8, 2.4, 1.64, 0.5));
+        g.position.set(x, 0, z);
+        g.rotation.y = turn;
+        scenery.add(g);
+        block(x, z, 4.2, 1.8);
+    };
+    tumbledown(-56, 41, Math.PI, 0x7a6048);
+    tumbledown(-46, 41, Math.PI, 0x6c5540);
+    tumbledown(-36, 41, Math.PI, 0x82694e);
+    const saloonSign = sign('SALOON', 4);
+    saloonSign.position.set(-46, 6.6, 39.1);
+    saloonSign.rotation.y = Math.PI;
+    scenery.add(saloonSign);
+    const piano = new THREE.Group();
+    piano.add(box(2.8, 1.5, 1.4, C.timberDark, 0, 0.75, 0), box(2.9, 0.15, 0.7, 0xe8dcc0, 0, 1.58, 0.55), box(0.7, 0.1, 0.5, C.timberDark, -0.9, 1.7, 0.5).rotateZ(0.5), box(2.8, 1.1, 0.2, C.timber, 0, 2.05, -0.55));
+    piano.position.set(-46, 0, 30);
+    scenery.add(piano);
+    block(-46, 30, 1.4, 0.8);
+    for(const [x, z, turn] of [[-52, 34, 0.5], [-51, 35.2, 1.6], [-40, 28, 0.2]]) {
+        const keg = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 1.1, 10), mat(C.timber));
+        keg.position.set(x, 0.55, z);
+        keg.rotation.z = turn > 1 ? Math.PI / 2 : 0;
+        scenery.add(keg);
+    }
+    block(-52, 34.6, 1.1, 1.1);
+    block(-40, 28, 0.7, 0.7);
+    for(let x = -58; x <= -34; x += 6) scenery.add(box(0.2, 1.3, 0.2, C.timberDark, x, 0.65, 25));
+    scenery.add(box(24, 0.14, 0.14, C.timber, -46, 1.2, 25), lamp(-58, 28), lamp(-34, 28));
+
+    // Whisper Wash: a dry riverbed with a thread of water, canyon walls, the wolves' den.
+    scenery.add(box(37, 0.05, 5, 0xb59a72, -53.5, 0.07, -26.5), box(37, 0.04, 0.7, 0x2f6f7a, -53.5, 0.1, -26.5, 0.1));
+    blocks.push({ minX: -72, maxX: -36, minZ: -33.5, maxZ: -30 });
+    for(const [x, z, w, h] of [[-66, -31.5, 5, 5], [-58, -32.4, 7, 7], [-48, -31.8, 6, 4.5], [-41, -33, 5, 6.5]]) {
+        scenery.add(box(w, h, 3.2, 0x8c6a4c, x, h / 2, z), box(w * 0.6, 1.2, 2.4, 0x7a5a40, x + 0.4, h + 0.5, z));
+        block(x, z, w / 2, 1.6);
+    }
+    const den = new THREE.Group();
+    den.add(box(3.6, 2.2, 2.4, 0x5a4636, 0, 1.1, 0), box(1.6, 1.4, 0.2, 0x1a1410, 0, 0.7, 1.25), box(4, 0.5, 2.8, 0x8c6a4c, 0, 2.4, 0));
+    den.position.set(-58, 0, -24);
+    scenery.add(den);
+    block(-58, -24, 1.8, 1.2);
+    for(const [x, z, turn] of [[-54.6, -21.6, 0.4], [-53.4, -22.2, -0.5], [-61.5, -21.4, 0.9]]) {
+        const pup = new THREE.Group();
+        pup.add(box(0.9, 0.5, 0.4, 0x6a625a, 0, 0.5, 0), box(0.4, 0.4, 0.34, 0x6a625a, 0.55, 0.7, 0), box(0.12, 0.2, 0.1, 0x2b2b2e, 0.62, 1.0, 0.1), box(0.12, 0.2, 0.1, 0x2b2b2e, 0.62, 1.0, -0.1));
+        pup.position.set(x, 0, z);
+        pup.rotation.y = turn;
+        scenery.add(pup);
+    }
+    for(let x = -70; x <= -40; x += 7) scenery.add(box(0.5, 2.4, 0.5, 0x4b4036, x, 1.2, -13.4), box(0.9, 0.35, 0.9, 0x6b6258, x, 2.6, -13.4));
+    scenery.add(lamp(-48, -14), lamp(-64, -14));
+
+    // Hollow Hill: a small chapel rebuilt from burnt beams, its bell, and graves under the hill.
+    const chapel = new THREE.Group();
+    chapel.add(box(7, 4.4, 5, 0x6a5444, 0, 2.2, 0), roof(7, 5, 2.2, 0x2f3a3f, 4.4), box(1.4, 2.6, 0.12, C.trim, 0, 1.3, 2.55), box(1.0, 1.4, 0.12, C.glow, -2.3, 2.5, 2.55, 1.1), box(1.0, 1.4, 0.12, C.glow, 2.3, 2.5, 2.55, 1.1));
+    chapel.add(box(1.8, 4.2, 1.8, 0x5a4636, 0, 8.0, -1.4), box(1.2, 1.0, 1.2, C.brass, 0, 9.6, -1.4), box(2.2, 0.3, 2.2, C.slate, 0, 10.4, -1.4));
+    chapel.position.set(3.5, 0, -42);
+    scenery.add(chapel);
+    block(3.5, -42, 3.6, 2.6);
+    const bell = new THREE.Group();
+    bell.add(box(0.2, 3.2, 0.2, C.timberDark, -0.9, 1.6, 0), box(0.2, 3.2, 0.2, C.timberDark, 0.9, 1.6, 0), box(2.2, 0.2, 0.3, C.timberDark, 0, 3.2, 0), box(0.9, 1.1, 0.9, C.brass, 0, 2.4, 0));
+    bell.position.set(3.5, 0, -34);
+    scenery.add(bell);
+    block(3.5, -34, 1.0, 0.5);
+    for(const [x, z] of [[-0.6, -26], [1.6, -27], [5.5, -26.4], [7.8, -27.2], [-0.4, -23.4], [8, -23.8]]) {
+        scenery.add(box(0.8, 1.3, 0.25, C.stone, x, 0.65, z), box(0.5, 0.3, 0.3, C.stoneDark, x, 1.35, z));
+        block(x, z, 0.45, 0.2);
+    }
+    scenery.add(box(14, 0.12, 0.12, C.timberDark, 3.5, 1.0, -19.2), box(0.2, 1.4, 0.2, C.timberDark, -2.6, 0.7, -19.2), box(0.2, 1.4, 0.2, C.timberDark, 9.6, 0.7, -19.2), lamp(-1.5, -30), lamp(8.5, -30));
     return blocks;
 }
 
@@ -1033,6 +1101,7 @@ export function createTownScene(options = {}) {
             for(const place of districtPlaces(openDistricts)) doors.push({ id: place.id, label: place.id.toUpperCase(), verb: place.verb, x: place.stand[0], z: place.stand[1], district: place.district });
             for(const d of DISTRICTS) {
                 if(!openDistricts.includes(d.id)) doors.push({ id: `gate-${d.id}`, label: 'LOCKED', verb: 'READ', x: d.fence.read[0], z: d.fence.read[1], district: d.id });
+                else if(d.interior) doors.push({ id: `enter-${d.id}`, label: d.name, verb: 'ENTER', x: d.fence.read[0], z: d.fence.read[1], district: d.id }); // a place of its own
             }
             return { areas: walkAreas(openDistricts), boxes, doors };
         },

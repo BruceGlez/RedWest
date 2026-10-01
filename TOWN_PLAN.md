@@ -32,6 +32,7 @@ reacts. If a feature could just as well be a button, it does not belong here.
 | **D** | Art pass for the new districts: modelled buildings, painted textures (`POLISH_PLAN.md`, section 6) | large | parked on purpose |
 | **E** | Districts for the last four outlaws: Vane's Crossing, Tres Rios, the Silver Belle, Fort Pell | medium | **built 2026-10-01** (below) |
 | **G** | The Arena in town, with boss fights as one of its options, locked until beaten on the Wanted Road | small to medium | **built 2026-10-01** (below) |
+| **H** | Every district is a place of its own: a whole new map you walk around, with goods to make and things to do | large, in slices | **H1 built 2026-10-01**; the rest planned, see `PLACES.md` |
 | **F** | A town that reacts: a "new district" moment, townsfolk who talk about it, and a day that turns to night | small to medium | **built 2026-10-01** (below) |
 
 ### Step A, as built
@@ -121,6 +122,24 @@ LOOK on) is about 123, about 110 with LOOK off, and about 80 while walking (the 
 - **Back home**: a fight from the town is an Arena run only until you are back at the home screen (`endTownFight`).
 - **`?arena`** still shows the same list full-screen for testing and now respects the same locks; `?arena=all` opens every boss.
 
+### Step H, as built so far (H1): places you step into
+
+Each district is becoming a **place of its own**: its gate opens a whole new map you walk around (not ground in the town),
+with things to make and do. `PLACES.md` documents every place, the rules they all follow, and the order they will be built in.
+
+- **Calloway Farm** is the first. Walk to the farm gate and press E: the town stops and the farm's own map starts, with six
+  plots, a coop, a stand and the kennel, and an arch back to the road. Crops grow in real time and wait; the stand pays a fixed
+  price; the farm is a side income that stays under the jail (`src/farm.js`, tested). It is shut until the Calloways are beaten.
+- **The place shell**: a place is a scene with the same few parts as the town's (`src/placeFarm.js`), a pure map
+  (`src/farmLayout.js`), and its own rules that the server and the offline wallet both run (`wallet.farm`, `/api/town/farm`).
+  The walking code, the cards and LOOK are the town's own, so the next place costs a map, a scene and a rules file.
+- **Three more districts**, so every outlaw has one: Copper Bit (Dusty Pete, south-west), Whisper Wash (Rattlesnake Rosa,
+  west) and Hollow Hill (Deacon Graves, north). They are ground in the town for now, with a plaque each, and become places in
+  H4 and H5. Tres Rios was narrowed on its west side to make room for Whisper Wash.
+
+Next: H2 orders and the Channel's water for the farm, H3 the Foundry and Fort Pell, H4 Copper Bit, Tres Rios and Whisper Wash,
+H5 the Silver Belle and Hollow Hill.
+
 ### Step D, parked
 
 See `POLISH_PLAN.md`, section 6. Whatever is built in A to C only needs to keep `walkMap()` (footprints and doors) correct
@@ -128,7 +147,7 @@ when its art is replaced.
 
 ## How we know it works
 
-- Unit tests: `townSpots`, `townDistricts`, `townFolk`, `townCompanion`, `townNews`, `townTime` and `townWalkLogic` cover positions, unlock rules, routines,
+- Unit tests: `farm` and `farmLayout` (the first place's rules and map), `townSpots`, `townDistricts`, `townFolk`, `townCompanion`, `townNews`, `townTime` and `townWalkLogic` cover positions, unlock rules, routines,
   barks, the dog's following and the walking rules.
 - `npm run test:town`: in a real browser, each place can be reached and used (the train starts a run, the cash box pays, the
   board opens), shut districts hold the marshal back, open ones can be entered, no townsperson walks through a wall, and the
