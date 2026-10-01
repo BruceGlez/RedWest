@@ -6,3 +6,5 @@ data/
 tools/.meshy-cache/
 art/characters/*.png
 dist-demo/
+*.blend
+*.blend1
