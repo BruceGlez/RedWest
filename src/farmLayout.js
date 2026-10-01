@@ -38,9 +38,9 @@ export const plotIndex = id => (/^plot-(\d)$/.test(id) ? Number(id.slice(5)) : -
 
 // What the walk map is made of: ground, walls and doors. `farm` and `now` make the verbs match what a plot or the coop
 // can do right now (a ready crop says HARVEST), so the prompt never offers something that would be refused.
-export function farmMap(farm = null, now = new Date()) {
+export function farmMap(farm = null, now = new Date(), level = 1) {
     const states = farm ? plotStates(farm, now) : PLOTS.map(() => ({ state: 'empty' }));
-    const eggs = farm ? eggsReady(farm, now) : 0;
+    const eggs = farm ? eggsReady(farm, now, level) : 0;
     const doors = [
         ...PLOTS.map(p => ({ id: plotId(p.index), label: 'PLOT', verb: { empty: 'PLANT', growing: 'LOOK', ready: 'HARVEST' }[states[p.index].state], x: p.x, z: p.z })),
         ...SPOTS.map(spot => ({
@@ -52,7 +52,7 @@ export function farmMap(farm = null, now = new Date()) {
 }
 
 // The words on the prompt for a door, from the farm's state ("WHEAT: 12m", "CORN READY", "COOP: 3 EGGS").
-export function farmLabel(door, farm = null, now = new Date()) {
+export function farmLabel(door, farm = null, now = new Date(), level = 1) {
     const index = plotIndex(door.id);
     if(index >= 0) {
         const plot = farm ? plotStates(farm, now)[index] : { state: 'empty' };
@@ -63,9 +63,9 @@ export function farmLabel(door, farm = null, now = new Date()) {
     switch(door.id) {
         case 'coop': {
             if(!farm) return 'THE COOP';
-            const eggs = eggsReady(farm, now);
+            const eggs = eggsReady(farm, now, level);
             if(eggs) return `COOP: ${eggs} ${eggs === 1 ? 'EGG' : 'EGGS'}`;
-            return `COOP: NEXT EGG IN ${minutesText(minutesToNextEgg(farm, now))}`;
+            return `COOP: NEXT EGG IN ${minutesText(minutesToNextEgg(farm, now, level))}`;
         }
         case 'stand': return 'THE FARM STAND';
         case 'barn': return 'THE BARN';

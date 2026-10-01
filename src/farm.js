@@ -1,5 +1,6 @@
 import { EconomyError } from './economyError.js';
 import { OUTLAWS } from './outlaws.js';
+import { starCount } from './progress.js';
 
 // Calloway Farm, the first place you step into (PLACES.md, TOWN_PLAN.md step H). The rules are here with no
 // rendering, so the server and the offline wallet run the same code and tests/farm.test.js can check them.
@@ -9,7 +10,9 @@ import { OUTLAWS } from './outlaws.js';
 // - The coop lays an egg every half hour, up to a full basket.
 // - Goods go into the barn. The farm stand pays a fixed price for them in Bounty Dollars.
 // - No timer can be sped up and nothing is bought with real money. Nothing here touches combat.
-// - It opens with the first star on the Calloways, like the district it belongs to.
+// - It opens with the first star on the Calloways, like the district it belongs to, and grows with their other two stars
+//   (PLACES.md, "How the places fit together"). It reads the Calloways' stars and nothing else, so no other outlaw, place or
+//   shut gate can change it, and it changes nothing outside itself except the wallet when you sell.
 
 export const FARM_OUTLAW = 'calloway-gang';
 export const PLOT_COUNT = 6;
@@ -22,6 +25,14 @@ export const CROPS = [
     { id: 'pumpkin', name: 'PUMPKIN', minutes: 480, yield: 4, price: 12, blurb: 'Slow. Plant it before bed.' }
 ];
 export const EGG = { id: 'egg', name: 'EGGS', minutes: 30, cap: 8, price: 2 };
+
+// The farm grows with the Calloways' stars: 1 beaten, 2 bounty collected, 3 ridden on. A level changes only the egg basket and
+// what the stand pays (never how fast anything grows), so the best a tended plot earns stays under the jail (tests/farm.test.js).
+export const FARM_LEVELS = [
+    { level: 1, eggCap: 8, standBonus: 1.0, note: 'The fences are up again and the dog is fed.' },
+    { level: 2, eggCap: 10, standBonus: 1.1, note: 'The barn has a new roof. The stand pays ten percent over.' },
+    { level: 3, eggCap: 12, standBonus: 1.2, note: 'The paper they lost the farm to is burned. The stand pays a fifth over.' }
+];
 export const GOODS = [...CROPS.map(({ id, name, price }) => ({ id, name, price })), { id: EGG.id, name: EGG.name, price: EGG.price }];
 
 const MINUTE = 60000;
@@ -51,10 +62,19 @@ export function normalizeFarm(raw, now = new Date()) {
     return farm;
 }
 
+const FARM_INDEX = OUTLAWS.findIndex(o => o.id === FARM_OUTLAW);
+const farmMask = profile => (profile.stats?.stageStars?.[FARM_INDEX]) | 0;
+
 export function farmOpen(profile) {
-    const index = OUTLAWS.findIndex(o => o.id === FARM_OUTLAW);
-    return (((profile.stats?.stageStars?.[index]) | 0) & 1) !== 0;
+    return (farmMask(profile) & 1) !== 0;
 }
+
+// 0 while shut, then 1 to 3 with the Calloways' stars.
+export function farmLevel(profile) {
+    if(!farmOpen(profile)) return 0;
+    return Math.max(1, Math.min(FARM_LEVELS.length, starCount(farmMask(profile))));
+}
+export const farmLevelInfo = level => FARM_LEVELS[Math.max(1, Math.min(FARM_LEVELS.length, level)) - 1];
 
 // One plot: 'empty', 'growing' or 'ready'. A clock that moved backwards counts as no time passing (never more than
 // the full growing time left), so moving the clock forward and back gains nothing.
@@ -70,14 +90,14 @@ export function plotState(farm, index, now = new Date()) {
 export const plotStates = (farm, now = new Date()) => farm.plots.map((_, i) => plotState(farm, i, now));
 
 // Eggs waiting in the coop now.
-export function eggsReady(farm, now = new Date()) {
+export function eggsReady(farm, now = new Date(), level = 1) {
     const minutes = Math.max(0, (now.getTime() - Date.parse(farm.coopAt)) / MINUTE);
-    return Math.min(EGG.cap, Math.floor(minutes / EGG.minutes));
+    return Math.min(farmLevelInfo(level).eggCap, Math.floor(minutes / EGG.minutes));
 }
 
 // Minutes until the next egg (0 when the basket is full).
-export function minutesToNextEgg(farm, now = new Date()) {
-    if(eggsReady(farm, now) >= EGG.cap) return 0;
+export function minutesToNextEgg(farm, now = new Date(), level = 1) {
+    if(eggsReady(farm, now, level) >= farmLevelInfo(level).eggCap) return 0;
     const minutes = Math.max(0, (now.getTime() - Date.parse(farm.coopAt)) / MINUTE);
     return EGG.minutes - (minutes % EGG.minutes);
 }
@@ -116,11 +136,12 @@ export function harvest(profile, index, now = new Date()) {
 
 export function collectEggs(profile, now = new Date()) {
     const farm = requireOpen(profile);
-    const eggs = eggsReady(farm, now);
+    const cap = farmLevelInfo(farmLevel(profile)).eggCap;
+    const eggs = eggsReady(farm, now, farmLevel(profile));
     if(!eggs) throw new EconomyError('no_eggs', 'No eggs yet.');
     farm.store.egg = Math.min(9999, farm.store.egg + eggs);
     // A full basket restarts the clock; otherwise the part of an egg already laid is kept.
-    farm.coopAt = eggs >= EGG.cap ? now.toISOString() : new Date(Date.parse(farm.coopAt) + eggs * EGG.minutes * MINUTE).toISOString();
+    farm.coopAt = eggs >= cap ? now.toISOString() : new Date(Date.parse(farm.coopAt) + eggs * EGG.minutes * MINUTE).toISOString();
     return { good: 'egg', amount: eggs };
 }
 
@@ -135,6 +156,7 @@ export function sell(profile, goodId) {
         farm.store[g.id] = 0;
     }
     if(!dollars) throw new EconomyError('nothing_to_sell', 'You have nothing to sell.');
+    dollars = Math.round(dollars * farmLevelInfo(farmLevel(profile)).standBonus);
     profile.balances.dollars += dollars;
     return { dollars };
 }
