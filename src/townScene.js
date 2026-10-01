@@ -1,5 +1,8 @@
 import * as THREE from 'three';
 import { mergeByMaterial } from './meshMerge.js';
+import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces } from './townDistricts.js';
+import { FOLK, createWalker, stepWalker } from './townFolk.js';
+import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
 
 // Frontier Town as a small 3D diorama at dusk (look "A" in art/town/dusk-gang-town.jpg): gaslit brick and
 // timber, chimney smoke, fog, a steam train at the depot, townsfolk in flat caps and long coats.
@@ -349,6 +352,113 @@ function guestsGroup(ids) {
     return group.children.length ? mergeByMaterial(group) : group;
 }
 
+
+// ---------- Districts beyond the town's edge (TOWN_PLAN.md, step B; src/townDistricts.js has the rules) ----------
+// Each one is always drawn, so a shut district can be seen over its fence; only the fence and gate change when it opens.
+const fenceLine = d => {
+    const [x1, z1] = d.fence.from, [x2, z2] = d.fence.to;
+    return { x1, z1, x2, z2, alongX: z1 === z2, length: Math.hypot(x2 - x1, z2 - z1), cx: (x1 + x2) / 2, cz: (z1 + z2) / 2 };
+};
+
+// A shut gate: a fence across the way in, and a LOCKED sign.
+function shutGate(d) {
+    const g = new THREE.Group();
+    const f = fenceLine(d);
+    const posts = Math.round(f.length / 2);
+    for(let i = 0; i <= posts; i++) {
+        const t = i / posts;
+        g.add(box(0.25, 1.9, 0.25, C.timberDark, f.x1 + (f.x2 - f.x1) * t, 0.95, f.z1 + (f.z2 - f.z1) * t));
+    }
+    for(const y of [0.7, 1.5]) g.add(f.alongX ? box(f.length, 0.14, 0.14, C.timber, f.cx, y, f.cz) : box(0.14, 0.14, f.length, C.timber, f.cx, y, f.cz));
+    const notice = sign('LOCKED', 2.6);
+    notice.position.set(f.cx, 2.7, f.cz);
+    notice.rotation.y = f.alongX ? 0 : 0.6;
+    g.add(notice, f.alongX ? box(0.2, 2.2, 0.2, C.timberDark, f.cx, 1.1, f.cz) : box(0.2, 2.2, 0.2, C.timberDark, f.cx, 1.1, f.cz));
+    return g;
+}
+
+// An open gate: two tall posts, a beam and the district's name.
+function openGate(d) {
+    const g = new THREE.Group();
+    const f = fenceLine(d);
+    const along = f.alongX ? [1, 0] : [0, 1];
+    for(const side of [-1, 1]) g.add(box(0.35, 4.4, 0.35, C.timberDark, f.cx + along[0] * 3 * side, 2.2, f.cz + along[1] * 3 * side));
+    g.add(f.alongX ? box(6.6, 0.3, 0.3, C.timberDark, f.cx, 4.3, f.cz) : box(0.3, 0.3, 6.6, C.timberDark, f.cx, 4.3, f.cz));
+    const name = sign(d.name, 4.6);
+    name.position.set(f.cx, 5.3, f.cz);
+    name.rotation.y = f.alongX ? 0 : 0.6;
+    g.add(name, lamp(f.cx + along[0] * 3.4, f.cz + along[1] * 3.4));
+    return g;
+}
+
+// The fixed ground, buildings and props of each district, added to `scenery`. Returns the boxes they block.
+function districtScenery(scenery, smokeSources) {
+    const blocks = [];
+    const block = (x, z, hx, hz) => blocks.push({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
+    for(const d of DISTRICTS) {
+        const a = d.area;
+        scenery.add(box(a.maxX - a.minX, 0.06, a.maxZ - a.minZ, d.ground, (a.minX + a.maxX) / 2, 0.03, (a.minZ + a.maxZ) / 2));
+    }
+
+    // Calloway farm: a barn, hay, the kennel, a trough, a fence along the far edge.
+    const barn = new THREE.Group();
+    barn.add(box(9, 5, 6, C.brick, 0, 2.5, 0), roof(9, 6, 2.4, C.timberDark, 5), box(2.6, 3.4, 0.2, C.trim, 0, 1.7, 3.05), box(3.4, 0.25, 0.3, C.timber, 0, 3.6, 3.1));
+    barn.position.set(-60, 0, -4);
+    scenery.add(barn);
+    block(-60, -4, 4.6, 3.1);
+    for(const [x, y, z] of [[-52, 0.5, -7.5], [-50.6, 0.5, -7.7], [-51.3, 1.5, -7.6]]) scenery.add(box(1.3, 1, 1.2, 0xc9a54a, x, y, z));
+    block(-51.3, -7.6, 1.5, 0.8);
+    const kennel = new THREE.Group();
+    kennel.add(box(2, 1.4, 1.6, C.timber, 0, 0.7, 0), roof(2, 1.6, 0.8, C.timberDark, 1.4), box(0.7, 0.9, 0.1, C.trim, 0, 0.5, 0.82));
+    kennel.position.set(-46, 0, 2.4);
+    scenery.add(kennel);
+    scenery.add(box(2.4, 0.6, 0.8, C.timberDark, -41, 0.3, -6));
+    block(-41, -6, 1.3, 0.5);
+    for(let x = -71; x <= -37; x += 3) scenery.add(box(0.2, 1.4, 0.2, C.timberDark, x, 0.7, -9.7));
+    scenery.add(box(34, 0.12, 0.12, C.timber, -54, 0.6, -9.7), box(34, 0.12, 0.12, C.timber, -54, 1.2, -9.7));
+
+    // Foundry yard: Jack's furnace, an anvil, slag, crates.
+    const furnace = new THREE.Group();
+    furnace.add(box(3.2, 3.4, 2.8, C.brickDark, 0, 1.7, 0), box(1.1, 6, 1.1, C.brick, 0.8, 6.3, -0.4), box(1.5, 1.1, 0.15, C.glow, 0, 1.0, 1.42, 1.9), box(3.5, 0.3, 3.1, C.stoneDark, 0, 3.55, 0));
+    furnace.position.set(16, 0, -30);
+    scenery.add(furnace);
+    block(16, -30, 1.6, 1.4);
+    smokeSources.push({ id: 'furnace', at: new THREE.Vector3(16.8, 9.6, -30.4) });
+    scenery.add(box(0.9, 0.5, 1.5, C.iron, 19.6, 0.75, -27.6), box(0.5, 0.5, 0.6, C.iron, 19.6, 0.25, -27.6));
+    block(19.6, -27.6, 0.6, 0.9);
+    for(const [x, y, z, w] of [[35, 0.6, -24, 3], [36.5, 0.4, -25.5, 2], [33.5, 0.4, -25, 1.8]]) scenery.add(box(w, y * 2, w * 0.8, 0x24211f, x, y, z));
+    block(35, -24.4, 2.4, 1.8);
+    for(const [x, z] of [[22, -24], [23.2, -24.4], [22.6, -24.2]]) scenery.add(box(1.2, 1.2, 1.2, C.timberDark, x, 0.6 + (x === 22.6 ? 1.2 : 0), z));
+    block(22.6, -24.2, 1.6, 1);
+    scenery.add(lamp(30, -22), lamp(14, -24));
+
+    // Morgan's channel: water across the district, a footbridge, the warehouse, buckets, the log.
+    scenery.add(box(44, 0.04, 4, 0x2f6f7a, 2, 0.06, 30, 0.12));
+    blocks.push({ minX: -20, maxX: 0.4, minZ: 28, maxZ: 32 }, { minX: 3.6, maxX: 24, minZ: 28, maxZ: 32 });
+    scenery.add(box(3.2, 0.22, 4.8, C.timber, 2, 0.22, 30));
+    for(const x of [0.5, 3.5]) {
+        scenery.add(box(0.12, 0.12, 4.8, C.timberDark, x, 1.05, 30));
+        for(const z of [27.9, 30, 32.1]) scenery.add(box(0.14, 1, 0.14, C.timberDark, x, 0.6, z));
+    }
+    const warehouse = new THREE.Group();
+    warehouse.add(box(10, 5.2, 7, C.timberDark, 0, 2.6, 0), roof(10, 7, 2, C.slate, 5.2), box(2.6, 3.4, 0.2, C.trim, 0, 1.7, 3.55));
+    warehouse.position.set(-10, 0, 38);
+    scenery.add(warehouse);
+    block(-10, 38, 5.2, 3.6);
+    for(const [x, z] of [[6, 36], [7.3, 36.8], [6.6, 38]]) {
+        const barrel = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 1.4, 10), mat(C.timber));
+        barrel.position.set(x, 0.7, z);
+        scenery.add(barrel);
+    }
+    block(6.6, 37, 1.6, 1.6);
+    const log = sign('CHANNEL LOG', 2.8);
+    log.position.set(3.8, 2.9, 34.75);
+    scenery.add(box(0.15, 2.4, 0.15, C.timberDark, 3.8, 1.2, 34.6), log);
+    block(3.8, 34.6, 0.3, 0.3);
+    scenery.add(lamp(0, 25), lamp(4.6, 35.4));
+    return blocks;
+}
+
 export function createTownScene() {
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(C.sky);
@@ -462,7 +572,87 @@ export function createTownScene() {
     scenery.add(wagon);
     for(const x of [-34, -12, 10]) scenery.add(box(0.3, 9, 0.3, C.timberDark, x, 4.5, -24), box(2.4, 0.2, 0.2, C.timberDark, x, 8.4, -24));
 
+    const districtBlocks = districtScenery(scenery, smokeSources);
+    // Places you walk up to and use (src/townSpots.js): the bounty board, the jail's cash box, the train out.
+    // The wood and iron are scenery; the coins and the notes change, so they are separate small groups.
+    const boardAt = getSpot('board').object;
+    const boardProp = new THREE.Group();
+    boardProp.add(box(0.25, 3.2, 0.25, C.timberDark, -1.35, 1.6, 0), box(0.25, 3.2, 0.25, C.timberDark, 1.35, 1.6, 0),
+        box(3.0, 1.9, 0.18, C.timber, 0, 2.35, 0), box(3.4, 0.22, 0.34, C.timberDark, 0, 3.4, 0));
+    const boardSign = sign('BOUNTIES', 3);
+    boardSign.position.set(0, 4.05, 0.05);
+    boardProp.add(boardSign);
+    boardProp.position.set(boardAt.x, 0, boardAt.z);
+    scenery.add(boardProp);
+    const cashAt = getSpot('cashbox').object;
+    const cashProp = new THREE.Group();
+    cashProp.add(box(2.4, 1.2, 1.6, C.iron, 0, 0.6, 0), box(2.46, 0.18, 1.66, C.brass, 0, 0.8, 0), box(2.4, 0.28, 1.6, C.stoneDark, 0, 1.34, 0),
+        box(0.4, 0.4, 0.12, C.brass, 0, 0.8, 0.84));
+    const cashSign = sign('CASH', 1.8);
+    cashSign.position.set(0, 0.42, 0.83);
+    cashProp.add(cashSign);
+    cashProp.position.set(cashAt.x, 0, cashAt.z);
+    scenery.add(cashProp);
+    const trainSign = sign('RIDE OUT', 3.6);
+    trainSign.position.set(34.5, 4, -3.3);
+    scenery.add(box(0.25, 3.6, 0.25, C.timberDark, 34.5, 1.8, -3.4), trainSign);
     scene.add(mergeByMaterial(scenery));
+    // Gates: a fence while a district is shut, an open gate once its outlaw is beaten (setDistricts).
+    const gates = new Map();
+    let openDistricts = [];
+    for(const d of DISTRICTS) {
+        // Many small boxes that never move on their own: baked into a mesh per material, like the rest of the town.
+        const shut = mergeByMaterial(shutGate(d));
+        const open = mergeByMaterial(openGate(d));
+        open.visible = false;
+        scene.add(shut, open);
+        gates.set(d.id, { shut, open });
+    }
+    function setDistricts(ids) {
+        openDistricts = DISTRICTS.filter(d => ids.includes(d.id)).map(d => d.id);
+        for(const [id, gate] of gates) {
+            const isOpen = openDistricts.includes(id);
+            gate.shut.visible = !isOpen;
+            gate.open.visible = isOpen;
+        }
+    }
+    // Notes on the board: one for each job left today. Coins in the cash box: what the jail has earned.
+    const notes = new THREE.Group();
+    notes.position.set(boardAt.x, 0, boardAt.z);
+    for(let i = 0; i < BOARD_NOTES; i++) {
+        const note = new THREE.Group();
+        note.add(box(0.75, 1.0, 0.05, 0xe8d9b0, 0, 0, 0), box(0.55, 0.14, 0.06, 0x7a2a1f, 0, 0.3, 0), box(0.55, 0.08, 0.06, 0x3b2a20, 0, 0.02, 0), box(0.45, 0.08, 0.06, 0x3b2a20, 0, -0.18, 0));
+        note.position.set(-0.95 + i * 0.95, 2.35, 0.13);
+        note.rotation.z = (i - 1) * 0.06;
+        notes.add(note);
+    }
+    scene.add(notes);
+    const coins = new THREE.Group();
+    coins.position.set(cashAt.x, 1.5, cashAt.z);
+    scene.add(coins);
+    const coinGeometry = new THREE.CylinderGeometry(0.27, 0.27, 0.1, 12);
+    let coinKey = '';
+    function setJailCash(stored, capacity) {
+        const count = coinCount(stored, capacity);
+        const full = cashBoxFull(stored, capacity);
+        const key = `${count}|${full}`;
+        if(key === coinKey) return;
+        coinKey = key;
+        coins.clear();
+        for(let i = 0; i < count; i++) {
+            const coin = new THREE.Mesh(coinGeometry, mat(0xd9a520, full ? 0.9 : 0.25));
+            coin.position.set(-0.75 + (i % 4) * 0.5, 0.05 + (i > 3 ? 0.1 : 0), (i % 2 ? 0.25 : -0.25));
+            coins.add(coin);
+        }
+        // A full box shows a lamp on top, and its gold glows (bloom picks it up with LOOK on).
+        if(full) coins.add(box(0.36, 0.36, 0.36, C.glow, 0, 0.45, 0, 1.6));
+    }
+    function setBoardNotes(jobsLeft) {
+        const shown = boardNotes(jobsLeft);
+        notes.children.forEach((note, i) => { note.visible = i < shown; });
+    }
+    setJailCash(0, 1);
+    setBoardNotes(BOARD_NOTES);
     // What the walkable town (src/townWalk.js) cannot walk through, besides the buildings: the scenery above,
     // as boxes on the ground plane.
     const at = (x, z, hx, hz) => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
@@ -470,7 +660,12 @@ export function createTownScene() {
         at(-32, -14, 4.2, 3.2), at(-31, 6, 2.8, 2.8), at(26, -32, 6.2, 4.2), at(-26, -4, 2.4, 1.7),
         ...[[-5, 9], [-4.2, 9.6], [18, 9], [-21, -9]].map(([x, z]) => at(x, z, 0.7, 0.7)),
         ...[[17, 10], [17.8, 11], [-23, 10]].map(([x, z]) => at(x, z, 0.75, 0.75)),
-        ...[[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]].map(([x, z]) => at(x, z, 0.3, 0.3))
+        ...[[-8, 0.8], [8, 0.8], [-8, -9], [8, -9], [22, 1], [-24, 1]].map(([x, z]) => at(x, z, 0.3, 0.3)),
+        // The locomotive on the depot's rails (the depot builder puts it at (-5, 8.7) from the station), the sign post
+        // beside it, and the props of src/townSpots.js.
+        { minX: 25.4, maxX: 32.7, minZ: -7.8, maxZ: -4.8 }, at(34.5, -3.4, 0.3, 0.3),
+        ...SPOTS.filter(spot => spot.object).map(({ object: o }) => at(o.x, o.z, o.hx, o.hz)),
+        ...districtBlocks
     ];
     // Two real lamp lights on the main street (each light costs every lit pixel on a phone); the other lamps glow.
     for(const [x, z] of [[-8, 1.5], [8, -9]]) {
@@ -510,14 +705,12 @@ export function createTownScene() {
         p.age = 0;
     }
 
-    // Townsfolk walking up and down the streets.
-    const walkers = [];
-    const paths = [[-26, -4, 26, -4], [26, -3, -26, -3], [-7, 12, -7, -20], [7.5, -20, 7.5, 12], [-20, 13, 20, 13], [20, 14, -20, 14]];
-    paths.forEach((path, i) => {
-        const person = mergeByMaterial(townsperson(i)); // six parts, three or four draw calls
-        person.userData = { path, t: (i * 0.37) % 1, speed: 0.025 + (i % 3) * 0.006 };
-        scene.add(person);
-        walkers.push(person);
+    // Townsfolk keep routines between their stops (src/townFolk.js); the marshal can stop one to hear a line.
+    const folk = FOLK.map((def, i) => {
+        const object = mergeByMaterial(townsperson(i)); // six parts, three or four draw calls
+        const walker = createWalker(def.route, i * 7.5);
+        scene.add(object);
+        return { id: def.id, name: def.name, walker, object };
     });
 
     let viewSize = [window.innerWidth, window.innerHeight];
@@ -560,12 +753,11 @@ export function createTownScene() {
         smoke.count = live;
         smoke.instanceMatrix.needsUpdate = true;
         puffAlpha.needsUpdate = true;
-        for(const person of walkers) {
-            const u = person.userData;
-            u.t = (u.t + dt * u.speed) % 1;
-            const [x1, z1, x2, z2] = u.path;
-            person.position.set(x1 + (x2 - x1) * u.t, Math.abs(Math.sin(elapsed * 8 + u.t * 40)) * 0.12, z1 + (z2 - z1) * u.t);
-            person.rotation.y = Math.atan2(x2 - x1, z2 - z1);
+        for(const person of folk) {
+            stepWalker(person.walker, dt);
+            const w = person.walker;
+            person.object.position.set(w.x, w.moving ? Math.abs(Math.sin(elapsed * 8 + w.x * 3)) * 0.12 : 0, w.z);
+            person.object.rotation.y = w.heading;
         }
     }
 
@@ -633,13 +825,19 @@ export function createTownScene() {
                 if(spot.id === 'depot') {
                     // Only the station house blocks the way; the railway yard in front of it is open ground.
                     boxes.push(at(spot.x, spot.z, 3.2, 2.7));
-                    doors.push({ id: spot.id, label: spot.label, x: spot.x - 2, z: spot.z + 6.4 });
+                    doors.push({ id: spot.id, label: spot.label, verb: 'ENTER', x: spot.x - 2, z: spot.z + 6.4 });
                     continue;
                 }
                 boxes.push({ minX: b.min.x, maxX: b.max.x, minZ: b.min.z, maxZ: b.max.z });
-                doors.push({ id: spot.id, label: spot.label, x: (b.min.x + b.max.x) / 2, z: b.max.z + 1.3 });
+                doors.push({ id: spot.id, label: spot.label, verb: 'ENTER', x: (b.min.x + b.max.x) / 2, z: b.max.z + 1.3 });
             }
-            return { bounds: { minX: -38, maxX: 40, minZ: -21, maxZ: 19 }, boxes, doors };
+            for(const spot of SPOTS) doors.push({ id: spot.id, label: spot.id.toUpperCase(), verb: spot.verb, x: spot.stand[0], z: spot.stand[1] });
+            // Open districts add ground and their places; a shut one adds a gate to read.
+            for(const place of districtPlaces(openDistricts)) doors.push({ id: place.id, label: place.id.toUpperCase(), verb: place.verb, x: place.stand[0], z: place.stand[1], district: place.district });
+            for(const d of DISTRICTS) {
+                if(!openDistricts.includes(d.id)) doors.push({ id: `gate-${d.id}`, label: 'LOCKED', verb: 'READ', x: d.fence.read[0], z: d.fence.read[1], district: d.id });
+            }
+            return { areas: walkAreas(openDistricts), boxes, doors };
         },
         // Third-person view that follows a point (the walking marshal); overview() goes back to the whole town.
         follow(x, z) {
@@ -658,6 +856,26 @@ export function createTownScene() {
         pick(ndcX, ndcY) {
             raycaster.setFromCamera({ x: ndcX, y: ndcY }, camera);
             return raycaster.intersectObjects(hitMeshes, false)[0]?.object.userData.building ?? null;
+        },
+        // What the jail has earned (the coins in the cash box) and the jobs left today (notes on the board).
+        setJailCash,
+        setBoardNotes,
+        // Step B: which districts are open (the ids from src/townDistricts.js).
+        setDistricts,
+        get openDistricts() { return [...openDistricts]; },
+        // Step C: the townsfolk. talkTo(id, x, z) makes one stand still and face a point; talkTo(null) lets everyone go on.
+        folk,
+        talkTo(id, x, z) {
+            for(const person of folk) {
+                const talking = person.id === id;
+                person.walker.talking = talking;
+                if(talking) person.walker.heading = Math.atan2(x - person.walker.x, z - person.walker.z);
+            }
+        },
+        // A world point as a screen position (0..1) for the speech bubble.
+        project(x, y, z) {
+            projected.set(x, y, z).project(camera);
+            return { x: (projected.x + 1) / 2, y: (1 - projected.y) / 2, visible: projected.z < 1 };
         },
         // Screen positions (0..1) above each building, for the name labels.
         labelPositions() {

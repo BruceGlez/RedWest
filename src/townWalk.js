@@ -1,6 +1,8 @@
 import * as THREE from 'three';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { moveInTown, stepFromInput, nearestDoor, turnToward, PLAYER_RADIUS } from './townWalkLogic.js';
+import { folkNear } from './townFolk.js';
+import { createDog, followStep } from './townCompanion.js';
 
 // The walkable Frontier Town: the marshal walks the streets (WASD or arrows, or the on-screen stick on a phone)
 // and steps up to a building's door to open its card (E, Enter, or tap the prompt). Kept apart from how the
@@ -12,6 +14,8 @@ import { moveInTown, stepFromInput, nearestDoor, turnToward, PLAYER_RADIUS } fro
 //   host     the town screen element (the stick and the door prompt are added to it)
 //   onOpen   (buildingId) => void: a door was used
 //   blocked  () => boolean: true while a card or dialog is open, so the marshal stands still
+//   lineFor  (personId) => string: what a townsperson says when the marshal stands near (src/townFolk.js)
+//   describe (door) => string: the prompt's wording for a door or spot (the train names the next outlaw, the cash box the money)
 
 const YAW = 0.52; // the town camera's heading (src/townScene.js)
 const HEIGHT = 3.4; // the marshal's height in town units (townsfolk are about 3.2)
@@ -33,7 +37,7 @@ function placeholderFigure() {
     return g;
 }
 
-export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) {
+export function createTownWalk({ town3d, host, onOpen, blocked = () => false, describe = door => door.label, lineFor = () => '' }) {
     const avatar = new THREE.Group();
     const figure = placeholderFigure();
     avatar.add(figure);
@@ -73,7 +77,10 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) 
     promptEl.type = 'button';
     promptEl.className = 'walk-prompt';
     promptEl.style.display = 'none';
-    host.append(stickEl, promptEl);
+    const bubbleEl = document.createElement('div');
+    bubbleEl.className = 'walk-bubble';
+    bubbleEl.style.display = 'none';
+    host.append(stickEl, promptEl, bubbleEl);
     const stick = { x: 0, y: 0, id: null };
     const knob = stickEl.firstElementChild;
     const moveStick = event => {
@@ -104,6 +111,62 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) 
     stickEl.addEventListener('pointercancel', endStick);
     promptEl.addEventListener('click', () => { if(door && !blocked()) use(); });
 
+    // ---------- The dog (src/townCompanion.js) ----------
+    let dog = null;
+    let companionOn = false;
+    const dogAt = { x: 0, z: 0, heading: 0 };
+    function showDog() {
+        const should = companionOn && active;
+        if(should && !dog) dog = createDog();
+        if(!dog) return;
+        if(should) {
+            if(!dog.object.parent) {
+                dogAt.x = position.x - 1.6;
+                dogAt.z = position.z + 1.2;
+                town3d.scene.add(dog.object);
+            }
+        } else {
+            dog.object.parent?.remove(dog.object);
+        }
+    }
+
+    // ---------- Talking to townsfolk ----------
+    let talkingId = null;
+    let talkClock = 0;
+    const talkedOut = new Set(); // heard enough: they go on until the marshal has left and come back
+    function updateTalk(dt) {
+        const walkers = town3d.folk.map(f => f.walker);
+        for(const entry of town3d.folk) {
+            if(talkedOut.has(entry.id) && Math.hypot(entry.walker.x - position.x, entry.walker.z - position.z) > 5) talkedOut.delete(entry.id);
+        }
+        const near = folkNear(walkers.filter((w, i) => !talkedOut.has(town3d.folk[i].id)), position.x, position.z);
+        const entry = near ? town3d.folk.find(f => f.walker === near) : null;
+        if(entry?.id !== talkingId) {
+            talkingId = entry?.id ?? null;
+            talkClock = 0;
+            town3d.talkTo(talkingId, position.x, position.z);
+        } else if(entry) {
+            talkClock += dt;
+            town3d.talkTo(entry.id, position.x, position.z);
+            if(talkClock > 7) {
+                talkedOut.add(entry.id);
+                talkingId = null;
+                town3d.talkTo(null);
+            }
+        }
+        const person = talkingId ? town3d.folk.find(f => f.id === talkingId) : null;
+        if(!person) {
+            bubbleEl.style.display = 'none';
+            return;
+        }
+        const at = town3d.project(person.walker.x, 4.6, person.walker.z);
+        const text = `<b>${person.name}</b> ${lineFor(person.id)}`;
+        if(bubbleEl.innerHTML !== text) bubbleEl.innerHTML = text;
+        bubbleEl.style.display = at.visible ? '' : 'none';
+        bubbleEl.style.left = `${Math.round(at.x * window.innerWidth)}px`;
+        bubbleEl.style.top = `${Math.round(at.y * window.innerHeight)}px`;
+    }
+
     function use() {
         if(!door) return;
         const { id } = door;
@@ -122,16 +185,26 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) 
     }
 
     function showPrompt(next) {
-        if(next?.id === door?.id) return;
         door = next;
         promptEl.style.display = door ? '' : 'none';
-        if(door) promptEl.textContent = `${door.label}  ·  ${'ontouchstart' in window ? 'TAP' : 'E'} TO ENTER`;
+        if(!door) return;
+        // Worded every frame: the money in the cash box and the outlaw on the train change while you stand there.
+        const text = `${describe(door)}  ·  ${'ontouchstart' in window ? 'TAP' : 'E'} TO ${door.verb || 'ENTER'}`;
+        if(promptEl.textContent !== text) promptEl.textContent = text;
     }
 
     return {
         get active() { return active; },
+        get hasDog() { return !!dog?.object.parent; },
+        // The dog comes along (or goes home). It is only shown while walking.
+        setCompanion(on) {
+            companionOn = !!on;
+            showDog();
+        },
         // Start walking: the marshal stands on main street and the camera drops in behind.
         enter() {
+            held.clear(); // a key let go while the town was closed must not keep walking
+            stick.x = stick.y = 0;
             if(active) return;
             active = true;
             map = town3d.walkMap();
@@ -139,6 +212,7 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) 
             camera.x = position.x;
             camera.z = position.z;
             town3d.scene.add(avatar);
+            showDog();
             stickEl.style.display = matchMedia('(pointer: coarse)').matches ? '' : 'none';
             loadMarshal();
             this.update(0);
@@ -150,6 +224,10 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) 
             held.clear();
             stick.x = stick.y = 0;
             town3d.scene.remove(avatar);
+            showDog();
+            talkingId = null;
+            town3d.talkTo(null);
+            bubbleEl.style.display = 'none';
             stickEl.style.display = 'none';
             showPrompt(null);
             town3d.overview();
@@ -178,6 +256,15 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false }) 
             camera.x += (position.x - camera.x) * follow;
             camera.z += (position.z - camera.z) * follow;
             town3d.follow(camera.x, camera.z);
+            updateTalk(dt);
+            if(dog && companionOn) {
+                const trot = followStep(dogAt, position, Math.min(dt, 0.05));
+                [dogAt.x, dogAt.z] = moveInTown(map, dogAt.x, dogAt.z, trot.x - dogAt.x, trot.z - dogAt.z, 0.4);
+                dogAt.heading = turnToward(dogAt.heading, trot.heading, Math.min(1, dt * 12));
+                dog.object.position.set(dogAt.x, 0, dogAt.z);
+                dog.object.rotation.y = dogAt.heading;
+                dog.update(dt, trot.moving);
+            }
             showPrompt(blocked() ? null : nearestDoor(map, position.x, position.z));
         },
         // Put the marshal somewhere (tests, and a way to fast-travel later). Kept out of walls.
