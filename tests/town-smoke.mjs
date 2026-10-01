@@ -162,10 +162,11 @@ try {
             window.__redWestTown.walk.place(door.x, door.z);
             return window.__redWestTown.walk.position;
         }, id);
-        for(const [id, pattern] of [['furnace', /Ezra Stone opened the armour/], ['channel', /no blasting after dark/]]) {
+        for(const [id, label, pattern] of [['furnace', 'THE FURNACE', /Ezra Stone opened the armour/], ['channel', 'THE CHANNEL LOG', /no blasting after dark/]]) {
             const p = await at(id);
             assert.ok(p.x !== 0 || p.z !== 0);
-            await page.locator('.walk-prompt').waitFor({ state: 'visible' });
+            // Wait for this door's own prompt: the one from the card just closed can show for a frame.
+            await page.locator('.walk-prompt').filter({ hasText: label }).waitFor({ state: 'visible' });
             await page.keyboard.press('e');
             await page.locator('#town-sheet').waitFor({ state: 'visible' });
             assert.match(await page.locator('#town-grid').textContent(), pattern);
@@ -240,14 +241,14 @@ try {
         assert.match(await page.locator('.walk-bubble').textContent(), /Hollow Hill is open/, `${folk} talks of the newest district`);
 
         // The places of the districts that are ground in the town can each be reached and read.
-        for(const [id, pattern] of [['clock', /clock on the tower stopped/], ['grave', /struck out/], ['landing', /played straight/], ['gatling', /one page is missing/], ['piano', /sour notes/], ['den', /wolf pups/], ['bell', /bell rings once at dusk/]]) {
+        for(const [id, label, pattern] of [['clock', 'THE STOPPED CLOCK', /clock on the tower stopped/], ['grave', 'THE OLD STONE', /struck out/], ['landing', 'THE GANGWAY', /played straight/], ['gatling', 'THE GATLING', /one page is missing/], ['piano', 'THE BROKEN PIANO', /sour notes/], ['den', 'THE DEN', /wolf pups/], ['bell', 'THE CHAPEL BELL', /bell rings once at dusk/]]) {
             const door = await page.evaluate(id => {
                 const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
                 window.__redWestTown.walk.place(d.x, d.z);
                 return { x: d.x, z: d.z, at: window.__redWestTown.walk.position };
             }, id);
             assert.ok(Math.hypot(door.at.x - door.x, door.at.z - door.z) < 0.01, `${id}: the marshal can stand at its door (open ground)`);
-            await page.locator('.walk-prompt').waitFor({ state: 'visible' });
+            await page.locator('.walk-prompt').filter({ hasText: label }).waitFor({ state: 'visible' }); // this door's own prompt, not the last one's
             await page.keyboard.press('e');
             await page.locator('#town-sheet').waitFor({ state: 'visible' });
             assert.match(await page.locator('#town-grid').textContent(), pattern);
