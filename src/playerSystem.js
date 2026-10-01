@@ -13,6 +13,7 @@ import { createStepper, advanceStepper } from './steps.js';
 import { weaponKick, muzzleFlash } from './combatMath.js';
 import { enemies } from './state.js';
 import { pickTarget, leadPoint, directionTo, steadyMuzzle, muzzleOffset } from './aimAssist.js';
+import { createTurner, snapTurn, resetTurner } from './turning.js';
 import { getWeapon, defaultWeapon } from './weapons.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { BASE_DASH_TIME, BASE_DASH_COOLDOWN } from './perks.js';
@@ -21,7 +22,6 @@ const QUICK_FIRE_WINDOW = 0.4; // seconds of game time a tap stays live, to wait
 const SHOT_CONVERGE_DISTANCE = 30; // shots leave the gun and meet the aim line this far out: nearly parallel, never crooked
 const TOUCH_AIM_SNAP = false; // when false, dragging or tapping fires where you point/walk; no snapping to the nearest enemy
 const AIM_DISTANCE = 30; // with nothing to snap to, shots meet the aim line this far ahead
-const WALK_TURN_RATE = 14; // how fast the body turns to face the walking direction (about 0.2 s for a full turn)
 
 export function createPlayerSystem(scene, camera, gameState, playerStats) {
     const playerGroup = createPlayerMesh();
@@ -205,6 +205,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
 
     let seenTapAt = 0;
     let quickFireLeft = 0;
+    const walkTurner = createTurner(); // turning to face the way the thumb points (src/turning.js)
     function update(dt, timeInSeconds) {
         if(playerStats.invulnerabilityTimer > 0) {
             playerStats.invulnerabilityTimer = Math.max(0, playerStats.invulnerabilityTimer - dt);
@@ -327,20 +328,22 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             }
             if(faceX !== 0 || faceZ !== 0) {
                 if(!touch.aiming && !target) {
-                    // Facing the way you walk: turn smoothly, so thumb wobble on the stick doesn't twitch the body.
+                    // Facing the way you walk: a quick turn, so a tap fires the way you point, but a thumb that wobbles
+                    // a few degrees does not make the body twitch (src/turning.js). Never turns to an enemy.
                     const facing = new THREE.Vector3(0, 0, 1).applyQuaternion(playerGroup.quaternion);
-                    const current = Math.atan2(facing.x, facing.z);
-                    const wanted = Math.atan2(faceX, faceZ);
-                    const delta = Math.atan2(Math.sin(wanted - current), Math.cos(wanted - current));
-                    const angle = current + delta * (1 - Math.exp(-WALK_TURN_RATE * dt));
+                    const angle = snapTurn(walkTurner, Math.atan2(facing.x, facing.z), Math.atan2(faceX, faceZ), dt);
                     faceX = Math.sin(angle);
                     faceZ = Math.cos(angle);
+                } else {
+                    resetTurner(walkTurner); // the aim stick or a target has the body: the next walk starts fresh
                 }
                 playerGroup.lookAt(pos.x + faceX, pos.y, pos.z + faceZ);
                 if(!aimPoint) {
                     const length = Math.hypot(faceX, faceZ) || 1;
                     aimPoint = { x: pos.x + (faceX / length) * AIM_DISTANCE, z: pos.z + (faceZ / length) * AIM_DISTANCE };
                 }
+            } else {
+                resetTurner(walkTurner); // the thumb is off the stick
             }
             aimLine.visible = touch.aiming;
             if(touch.aiming) {

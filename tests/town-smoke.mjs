@@ -291,6 +291,114 @@ try {
         await context.close();
     }
 
+    // LOOK's quality (src/townQuality.js): a button that goes round auto, high, medium, low; auto steps down on a slow device
+    // and remembers where it ended up.
+    {
+        const { page, errors, context } = await open();
+        const label = () => page.locator('#town-quality-btn').textContent();
+        const look = () => page.evaluate(() => ({ quality: window.__redWestTown.look.quality, auto: window.__redWestTown.look.auto }));
+        await page.waitForFunction(() => window.__redWestTown.look);
+        assert.match(await label(), /^QUALITY: AUTO \((HIGH|MED|LOW)\)$/);
+        for(const [text, quality, auto] of [['QUALITY: HIGH', 'high', false], ['QUALITY: MED', 'medium', false], ['QUALITY: LOW', 'low', false]]) {
+            await page.locator('#town-quality-btn').click();
+            assert.equal(await label(), text);
+            assert.deepEqual(await look(), { quality, auto });
+            await page.waitForTimeout(400); // the town draws a few frames at this level
+        }
+        await page.locator('#town-quality-btn').click();
+        assert.match(await label(), /^QUALITY: AUTO \(HIGH\)$/, 'back to auto starts again at the best look');
+        assert.deepEqual(await look(), { quality: 'high', auto: true });
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('redWestTownQuality.v1')).choice), 'auto');
+
+        // A slow device: feed slow frames (the real ones only add to this) and auto steps down, one level at a time.
+        await page.evaluate(() => { for(let i = 0; i < 150; i++) window.__redWestTown.look.feed(0.1); }); // fifteen seconds at ten frames a second
+        assert.equal((await look()).quality, 'low', 'steps down to low');
+        assert.match(await label(), /^QUALITY: AUTO \(LOW\)$/);
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('redWestTownQuality.v1')).floor), 'low', 'remembers where it ended up');
+        await page.waitForTimeout(500);
+
+        // LOOK off takes the quality button away.
+        await page.locator('#town-look-btn').click();
+        assert.equal(await page.locator('#town-quality-btn').isVisible(), false);
+        await page.locator('#town-look-btn').click();
+        assert.equal(await page.locator('#town-quality-btn').isVisible(), true);
+        assert.equal((await look()).quality, 'low', 'LOOK back on keeps the level');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // The next visit starts from where the device ended up, not from the top.
+        const seed = () => localStorage.setItem('redWestTownQuality.v1', JSON.stringify({ choice: 'auto', floor: 'medium' }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        await page.waitForFunction(() => window.__redWestTown.look);
+        // (It may already have stepped down since: slow headless frames make AUTO do that after a few seconds. What matters is where it started.)
+        assert.deepEqual(await page.evaluate(() => ({ started: window.__redWestTown.look.initialQuality, auto: window.__redWestTown.look.auto })), { started: 'medium', auto: true });
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // ?quality=low is for that page load only: low, and by hand (it never changes by itself).
+        const { page, errors, context } = await open('?quality=low');
+        await page.waitForFunction(() => window.__redWestTown.look);
+        assert.deepEqual(await page.evaluate(() => ({ quality: window.__redWestTown.look.quality, auto: window.__redWestTown.look.auto })), { quality: 'low', auto: false });
+        assert.equal(await page.locator('#town-quality-btn').textContent(), 'QUALITY: LOW');
+        await page.evaluate(() => { for(let i = 0; i < 150; i++) window.__redWestTown.look.feed(0.1); });
+        assert.equal(await page.evaluate(() => window.__redWestTown.look.quality), 'low');
+        assert.equal(await page.evaluate(() => localStorage.getItem('redWestTownQuality.v1')), null, 'the URL choice is not saved');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+
+    // The Arena (src/arena.js): a place in town. Boss fights are an option; a boss opens once beaten on the Wanted Road.
+    {
+        // Nothing beaten: every boss is locked. The overview (?walk=off) opens it by tapping its sign.
+        const { page, errors, context } = await open('?walk=off');
+        await page.locator('.town-label', { hasText: 'ARENA' }).click();
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /BOSS FIGHTS/, 'boss fights are one of the options');
+        assert.equal(await page.locator('[data-arena-fight]').count(), 10, 'all ten outlaws are listed');
+        assert.equal(await page.locator('[data-arena-fight]:not([disabled])').count(), 0, 'none beaten, none open');
+        assert.equal(await page.locator('.arena-row.locked').count(), 10);
+        assert.match(await page.locator('.arena-row').first().textContent(), /Beat them on the Wanted Road/);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // Dusty Pete and Deacon Graves beaten: those two open, the rest stay locked. Walking up to the gate opens the card too.
+        const seed = () => localStorage.setItem('redWestProgress.v1', JSON.stringify({ selected: 3, stars: [7, 0, 1, 0, 0, 0, 0, 0, 0, 0], best: [] }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        await goTo(page, 'arena');
+        await page.locator('.walk-prompt').filter({ hasText: 'ARENA' }).waitFor({ state: 'visible' });
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.deepEqual(await page.evaluate(() => [...document.querySelectorAll('[data-arena-fight]:not([disabled])')].map(b => b.dataset.arenaFight)), ['0', '2']);
+        assert.match(await page.locator('#town-grid').textContent(), /2 \/ 10 OPEN/);
+        // The options switch on and off.
+        assert.match(await page.locator('[data-arena-toggle="invincible"]').textContent(), /CAN'T DIE: OFF/);
+        await page.locator('[data-arena-toggle="invincible"]').click();
+        assert.match(await page.locator('[data-arena-toggle="invincible"]').textContent(), /CAN'T DIE: ON/);
+        // Fight Dusty Pete: the card closes, the run starts as an Arena run, and the town does not stay open behind it.
+        await page.evaluate(async () => { window.__rw = { state: await import('/src/state.js'), arena: (await import('/src/arena.js')).arena }; });
+        await page.locator('[data-arena-fight="0"]').click();
+        await page.waitForFunction(() => window.__rw.state.gameState.isGameStarted, null, { timeout: 90000 });
+        assert.deepEqual(await page.evaluate(() => ({ enabled: window.__rw.arena.enabled, fromTown: window.__rw.arena.fromTown, outlaw: window.__rw.arena.outlaw, invincible: window.__rw.arena.invincible, wave: window.__rw.state.gameState.outlawIndex })),
+            { enabled: true, fromTown: true, outlaw: 0, invincible: true, wave: 0 });
+        assert.equal(await page.locator('#town-screen').isVisible(), false);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // A boss that is locked cannot be started even if asked for (the rule is in the code, not only the greyed button).
+        const { page, errors, context } = await open();
+        const started = await page.evaluate(async () => {
+            const { beginTownFight, arena } = await import('/src/arena.js');
+            const ok = beginTownFight(5, { stars: [7, 7, 7, 7, 7, 0, 0, 0, 0, 0] });
+            return { ok, enabled: arena.enabled };
+        });
+        assert.deepEqual(started, { ok: false, enabled: false });
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
     // Each off on its own from the URL.
     {
         const { page, errors, context } = await open('?walk=off');

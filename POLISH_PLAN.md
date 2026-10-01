@@ -186,6 +186,8 @@ Half-resolution bloom (about 75% fewer pixels for a blur that hides the loss), a
 grade, in one pass if possible. Fall back automatically on a slow device (watch the smoothed frame rate that
 `src/gameLoop.js` already keeps). Keep the pixel-ratio cap.
 
+**Quality switch built for Frontier Town (2026-10-01):** `src/townQuality.js` gives LOOK three levels (high, medium with half-resolution bloom and a capped pixel density, low with no post-processing) and an AUTO mode that steps down when the town runs below about 40 frames a second and remembers where the device ended up; the QUALITY button and `?quality=` set it by hand. What is left: the same pass and switch for the desert and the arena.
+
 **Started for Frontier Town only (2026-09-30):** `src/townLook.js` already does bloom, a colour grade, a vignette, a dusk
 sky and painted shading on the town screen, behind its own LOOK switch (see README, "Walking the town, and the town's
 look"). What is left: the quality switch and automatic fall-back on slow devices, half-resolution bloom (it is full

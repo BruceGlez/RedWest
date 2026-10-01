@@ -161,7 +161,7 @@ try {
     arenaPage.on('pageerror', error => errors.push(error.message));
     await arenaPage.route('https://fonts.googleapis.com/**', route => route.abort());
     await arenaPage.route('https://fonts.gstatic.com/**', route => route.abort());
-    await arenaPage.goto(`${server.resolvedUrls.local[0]}?arena`, { waitUntil: 'commit', timeout: 60000 });
+    await arenaPage.goto(`${server.resolvedUrls.local[0]}?arena=all`, { waitUntil: 'commit', timeout: 60000 });
     await arenaPage.locator('#arena-screen').waitFor({ state: 'visible', timeout: 90000 });
     await arenaPage.evaluate(async () => {
         window.S = await import('/src/state.js');
@@ -194,6 +194,23 @@ try {
     await arenaPage.locator('#restart-msg').waitFor({ state: 'visible' });
     await arenaPage.keyboard.press('KeyR');
     await arenaPage.locator('#arena-screen').waitFor({ state: 'visible' });
+
+    // The full-screen list respects the same locks as the town's Arena: nothing beaten, nothing open; one star opens one boss.
+    const lockPage = await context.newPage();
+    lockPage.setDefaultTimeout(30000);
+    lockPage.on('pageerror', error => errors.push(error.message));
+    await lockPage.route('https://fonts.googleapis.com/**', route => route.abort());
+    await lockPage.route('https://fonts.gstatic.com/**', route => route.abort());
+    await lockPage.goto(`${server.resolvedUrls.local[0]}?arena`, { waitUntil: 'commit', timeout: 60000 });
+    await lockPage.locator('#arena-screen').waitFor({ state: 'visible', timeout: 90000 });
+    assert.equal(await lockPage.locator('.arena-fight').count(), 10);
+    assert.equal(await lockPage.locator('.arena-fight:not([disabled])').count(), 0, 'nothing beaten on the Wanted Road, so every boss is locked');
+    await lockPage.evaluate(() => localStorage.setItem('redWestProgress.v1', JSON.stringify({ selected: 1, stars: [1, 0, 0, 0, 0, 0, 0, 0, 0, 0], best: [] })));
+    await lockPage.reload({ waitUntil: 'commit' });
+    await lockPage.locator('#arena-screen').waitFor({ state: 'visible', timeout: 90000 });
+    assert.equal(await lockPage.locator('.arena-fight:not([disabled])').count(), 1, 'beating Dusty Pete opens Dusty Pete');
+    assert.equal(await lockPage.locator('.arena-fight:not([disabled])').getAttribute('data-arena'), '0');
+    await lockPage.evaluate(() => localStorage.removeItem('redWestProgress.v1'));
 
     assert.deepEqual(errors, [], `page errors: ${errors.join(' | ')}`);
     console.log(`Boss smoke passed: every outlaw's signature attack lands (${landed.join(', ')}), an imported outlaw model, Iron Jack's armour, the Calloways' last-brother bounty, and the Boss Arena.`);

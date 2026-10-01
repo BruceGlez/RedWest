@@ -61,6 +61,16 @@ try {
     const after = await player();
     assert.ok(after.x - before.x > 2, `left stick moves the player right: ${JSON.stringify({ before, after })}`);
 
+    // Turning is quick (src/turning.js): after pushing the stick the opposite way for about 0.15 s of game time he has already
+    // turned all the way round. The slow ease it replaced was still about 20 degrees short at that point.
+    await drag('#stick-move', 150, 250, 90, 250, 150);
+    const turned = await page.evaluate(() => {
+        const p = S.enemies[0].parent.children.find(o => o.userData.type === 'player');
+        const f = p.getWorldDirection(p.position.clone()).setY(0).normalize();
+        return -f.x; // 1 when he faces straight left, the way the stick points
+    });
+    assert.ok(turned > 0.999, `he turns to face the stick almost at once (facing dot ${turned.toFixed(3)})`);
+
     const shotsBefore = await page.evaluate(() => S.gameState.runStats.shotsFired);
     await drag('#stick-aim', 650, 250, 650, 190, 700);
     const shotsAfter = await page.evaluate(() => S.gameState.runStats.shotsFired);

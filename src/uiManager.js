@@ -10,7 +10,7 @@ import { PRODUCTS, nuggetsInMoney } from './products.js';
 import { track } from './analytics.js';
 import { ownsItem } from './profile.js';
 import { purchaseSupport, canRestore } from './purchases.js';
-import { arena } from './arena.js';
+import { arena, arenaRoster } from './arena.js';
 import { assetUrl } from './demo.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 import { CHAPTER_ONE_END, OPENING, ENDING, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
@@ -833,15 +833,15 @@ export function createUIManager(gameState, playerStats) {
         arenaEls.invincible.classList.toggle('active', arena.invincible);
         arenaEls.gang.textContent = `GANG: ${arena.gang ? 'ON' : 'OFF'}`;
         arenaEls.gang.classList.toggle('active', arena.gang);
-        arenaEls.list.innerHTML = OUTLAWS.map((outlaw, i) => `<div class="book-card outlaw arena-card">${portraitHtml(outlaw)}<div class="book-info">`
+        arenaEls.list.innerHTML = arenaRoster(progress, OUTLAWS, { unlockAll: arena.unlockAll }).map(({ index: i, outlaw, unlocked }) => `<div class="book-card outlaw arena-card${unlocked ? '' : ' locked'}">${portraitHtml(outlaw)}<div class="book-info">`
             + `<h4>${outlaw.name}</h4><p class="book-from">Stage ${i + 1} &middot; ${outlaw.title}</p>`
-            + `<p class="book-tip"><b>${outlaw.signature.move}:</b> ${outlaw.signature.detail}</p>`
-            + `<button class="arena-fight" type="button" data-arena="${i}">FIGHT</button></div></div>`).join('');
+            + (unlocked ? `<p class="book-tip"><b>${outlaw.signature.move}:</b> ${outlaw.signature.detail}</p>` : '<p class="book-tip">Beat them on the Wanted Road to open.</p>')
+            + `<button class="arena-fight" type="button" data-arena="${i}"${unlocked ? '' : ' disabled'}>${unlocked ? 'FIGHT' : 'LOCKED'}</button></div></div>`).join('');
     }
 
     function showPracticeResult() {
         els.resultRoad.innerHTML = '';
-        els.resultEarnings.innerHTML = '<p class="earn-title">Boss Arena: practice only, nothing is saved.</p>';
+        els.resultEarnings.innerHTML = '<p class="earn-title">Arena: practice only, nothing is saved.</p>';
     }
 
     function showStartScreen() {

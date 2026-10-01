@@ -31,6 +31,7 @@ reacts. If a feature could just as well be a button, it does not belong here.
 | **C** | Townsfolk with routines and proximity barks, plus a companion that follows the marshal | medium | **built 2026-09-30** (below) |
 | **D** | Art pass for the new districts: modelled buildings, painted textures (`POLISH_PLAN.md`, section 6) | large | parked on purpose |
 | **E** | Districts for the last four outlaws: Vane's Crossing, Tres Rios, the Silver Belle, Fort Pell | medium | **built 2026-10-01** (below) |
+| **G** | The Arena in town, with boss fights as one of its options, locked until beaten on the Wanted Road | small to medium | **built 2026-10-01** (below) |
 | **F** | A town that reacts: a "new district" moment, townsfolk who talk about it, and a day that turns to night | small to medium | **built 2026-10-01** (below) |
 
 ### Step A, as built
@@ -106,6 +107,19 @@ others and joined to the town.
 Draw calls: the overview was pushed over the limit by the extra geometry, so the shut gates, the board's notes and the cash
 box coins are merged and rebuilt only when they change, and townsfolk share materials. Worst case (everything open, overview,
 LOOK on) is about 123, about 110 with LOOK off, and about 80 while walking (the limit is 130).
+
+### Step G, as built
+
+- **The Arena** (`src/arena.js`, the building in `src/townScene.js`): a walled ring of sand with a gate, a flag and an ARENA sign
+  on the south-east side of town. Walk up to the gate (or tap its sign in the overview) and its card opens. It replaces the BOSS
+  ARENA link that sat at the bottom of the home screen.
+- **Options**: the card has a row of options (`ARENA_MODES`). BOSS FIGHTS is the first and, for now, the only one; the list is there
+  so more can be added without changing the card.
+- **Locks**: a boss opens once the first star is earned on the Wanted Road (the same rule as the jail and the districts). Locked
+  rows say so and cannot be started; `beginTownFight` refuses a locked boss too, so the rule is in the code and not only the grey
+  button. CAN'T DIE and GANG work as before. Nothing is saved.
+- **Back home**: a fight from the town is an Arena run only until you are back at the home screen (`endTownFight`).
+- **`?arena`** still shows the same list full-screen for testing and now respects the same locks; `?arena=all` opens every boss.
 
 ### Step D, parked
 

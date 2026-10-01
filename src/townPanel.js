@@ -12,16 +12,18 @@ import { spotLabel, getSpot, jobsLeft } from './townSpots.js';
 import { unlockedDistricts, doorLabel, districtOf, lockedHint, districtAt, getDistrict } from './townDistricts.js';
 import { loadNews, saveNews, newlyOpened, bannerFor, markSeen, markVisited, talkOfTheTown } from './townNews.js';
 import { getFolk, folkLine } from './townFolk.js';
+import { arena, ARENA_MODES, arenaRoster } from './arena.js';
 import { loadCompanion, saveCompanion } from './townCompanion.js';
 import { getJob, ALL_JOBS_BONUS_NUGGETS } from './jobs.js';
-import { featureOn, rememberFeature } from './townFeatures.js';
+import { featureOn, rememberFeature, qualityParam } from './townFeatures.js';
+import { loadQuality, saveQuality, nextChoice, startLevel } from './townQuality.js';
 import { normalizePass, seasonEndsAt, themeFor, tierFor, tierReward, TIERS, POINTS_PER_TIER, POINTS } from './pass.js';
 import { getShopItem } from './cosmetics.js';
 import { purchaseSupport } from './purchases.js';
 
 // The Frontier Town screen (src/town.js has the rules): a 3D town at dusk (src/townScene.js) with a label over
 // each building; tapping a building or its label opens its card in a sheet. Also the TOWN button's badge.
-export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onBuyPass, isChild = () => false, getProgress = () => null }) {
+export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onArenaFight = () => {}, portrait = () => '', onBuyPass, isChild = () => false, getProgress = () => null }) {
     const $ = id => document.getElementById(id);
     const els = {
         button: $('town-btn'),
@@ -33,6 +35,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         touch: $('town-touch'),
         walkButton: $('town-walk-btn'),
         lookButton: $('town-look-btn'),
+        qualityButton: $('town-quality-btn'),
         hint: $('town-hint'),
         news: $('town-news'),
         newsTitle: $('town-news-title'),
@@ -49,6 +52,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     let town3d = null; // built the first time the town opens
     let look = null; // the art direction pass (src/townLook.js), an independent switch
     let walk = null; // the walkable town (src/townWalk.js), an independent switch
+    let quality = loadQuality(); // what the player chose for LOOK's quality, and the best level the device managed
+    let qualityChoice = startLevel(quality, qualityParam()).choice; // for this visit (the URL may override the saved choice)
     let news = loadNews(); // which districts the player has been told about and has walked into, kept on this device
     let newsTimer = null;
     let companion = loadCompanion(); // the dog from the Calloway farm: { adopted, following }, kept on this device
@@ -207,6 +212,26 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             + '</div>';
     }
 
+    // The Arena: practice fights that save nothing. Boss fights are one of its options; a boss opens once you have beaten them
+    // on the Wanted Road (src/arena.js).
+    function arenaCard() {
+        const roster = arenaRoster(getProgress(), OUTLAWS, { unlockAll: arena.unlockAll });
+        const open = roster.filter(r => r.unlocked).length;
+        const modes = ARENA_MODES.map(mode => `<button type="button" class="shop-tab${mode.id === arena.mode ? ' active' : ''}" data-arena-mode="${mode.id}">${mode.name}</button>`).join('');
+        const toggles = `<button type="button" class="shop-tab${arena.invincible ? ' active' : ''}" data-arena-toggle="invincible">CAN'T DIE: ${arena.invincible ? 'ON' : 'OFF'}</button>`
+            + `<button type="button" class="shop-tab${arena.gang ? ' active' : ''}" data-arena-toggle="gang">GANG: ${arena.gang ? 'ON' : 'OFF'}</button>`;
+        const rows = roster.map(({ index, outlaw, unlocked }) => {
+            const picture = portrait(outlaw.id);
+            return `<div class="arena-row${unlocked ? '' : ' locked'}">${picture ? `<img src="${picture}" alt="">` : '<span class="arena-pic"></span>'}`
+                + `<div class="arena-who"><b>${outlaw.name}</b><small>${unlocked ? `Stage ${index + 1} &middot; ${outlaw.title}` : 'Beat them on the Wanted Road to open'}</small></div>`
+                + `<button type="button" class="shop-action" data-arena-fight="${index}"${unlocked ? '' : ' disabled'}>${unlocked ? 'FIGHT' : 'LOCKED'}</button></div>`;
+        }).join('');
+        return `<div class="town-card arena-town" data-building="arena"><div class="town-sign"><span>ARENA</span><span class="town-level">${open} / ${roster.length} OPEN</span></div>`
+            + `<p class="town-blurb">Practice fights. Nothing here is saved.</p>`
+            + `<div class="arena-modes">${modes}</div><div class="arena-toggles">${toggles}</div>`
+            + `<div class="arena-list-town">${rows}</div></div>`;
+    }
+
     // The bounty board in the square: the day's three jobs and how far along each is.
     function boardCard() {
         const list = profile.jobs?.list ?? [];
@@ -247,6 +272,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
 
     function sheetHtml(id) {
         if(districtOf(id)) return districtCard(id);
+        if(id === 'arena') return arenaCard();
         if(id === 'board') return boardCard();
         if(id === 'depot') return eventCard();
         if(id === 'saloon') return passCard();
@@ -396,7 +422,18 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     els.grid.addEventListener('click', event => {
         const button = event.target.closest('button');
         if(!button || button.disabled) return;
-        if(button.hasAttribute('data-companion')) {
+        if(button.hasAttribute('data-arena-fight')) {
+            track('arena_fight');
+            openId = null; // the card closes and the fight begins
+            render();
+            onArenaFight(Number(button.dataset.arenaFight));
+        } else if(button.dataset.arenaToggle) {
+            arena[button.dataset.arenaToggle] = !arena[button.dataset.arenaToggle];
+            render();
+        } else if(button.dataset.arenaMode) {
+            arena.mode = button.dataset.arenaMode;
+            render();
+        } else if(button.hasAttribute('data-companion')) {
             companion = { adopted: true, following: !(companion.adopted && companion.following) };
             saveCompanion(companion);
             walk?.setCompanion(companion.following);
@@ -452,7 +489,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             town3d = createTownScene({ time: featureOn('time') });
             walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot, lineFor: personLine });
             // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
-            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; } };
+            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; }, get look() { return look; } };
         }
         town3d.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
@@ -462,11 +499,37 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         ui.showTown();
         render();
     });
+    // LOOK's quality (src/townQuality.js): AUTO steps down by itself on a slow phone, and remembers where it ended up.
+    const LEVEL_NAMES = { high: 'HIGH', medium: 'MED', low: 'LOW' };
+    function onQualityChange(level, why) {
+        if(why === 'auto' && qualityChoice === 'auto') {
+            quality = { ...quality, floor: level };
+            saveQuality(quality);
+            track('look_quality_auto');
+        }
+        syncTools();
+    }
+    els.qualityButton.addEventListener('click', () => {
+        if(!look) return;
+        qualityChoice = nextChoice(qualityChoice);
+        if(qualityChoice === 'auto') {
+            quality = { choice: 'auto', floor: 'high' }; // back to auto gives the device another chance at the best look
+            look.setQuality('high', true);
+        } else {
+            quality = { choice: qualityChoice, floor: quality.floor };
+            look.setQuality(qualityChoice, false);
+        }
+        saveQuality(quality);
+        syncTools();
+    });
     // WALK and LOOK are separate switches: either can be on without the other.
     function syncTools() {
         const walking = !!walk?.active;
         els.walkButton.setAttribute('aria-pressed', String(walking));
         els.lookButton.setAttribute('aria-pressed', String(!!look?.enabled));
+        els.qualityButton.style.display = (look ? look.enabled : featureOn('look')) ? '' : 'none';
+        const shown = look?.quality ?? startLevel(quality, qualityParam()).level;
+        els.qualityButton.textContent = qualityChoice === 'auto' ? `QUALITY: AUTO (${LEVEL_NAMES[shown]})` : `QUALITY: ${LEVEL_NAMES[qualityChoice]}`;
         els.hint.textContent = walking
             ? ('ontouchstart' in window ? 'Stick to walk. Tap a door to go in.' : 'WASD to walk. E at a door to go in.')
             : 'Drag to look around. Tap a building.';
@@ -597,7 +660,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         },
         frame(renderer, dt) {
             if(!look) { // needs the renderer, which only the loop hands over
-                look = createTownLook(renderer, town3d.scene, town3d.camera, { enabled: featureOn('look') });
+                const start = startLevel(quality, qualityParam());
+                look = createTownLook(renderer, town3d.scene, town3d.camera, { enabled: featureOn('look'), level: start.level, auto: start.auto, onQuality: onQualityChange });
                 look.resize(window.innerWidth, window.innerHeight);
                 syncTools();
             }

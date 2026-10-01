@@ -95,7 +95,6 @@
             PLAYTEST LOG: <span id="run-log-count">0 runs</span>
             <button id="copyRunLogBtn" type="button">COPY</button>
             <button id="clearRunLogBtn" type="button">CLEAR</button>
-            <a class="arena-link" href="?arena">BOSS ARENA</a>
             <span id="run-log-status"></span>
         </div>
     </div>
@@ -157,6 +156,7 @@
         <div class="town-tools">
             <button id="town-walk-btn" class="town-tool" type="button" aria-pressed="true">WALK</button>
             <button id="town-look-btn" class="town-tool" type="button" aria-pressed="true">LOOK</button>
+            <button id="town-quality-btn" class="town-tool town-quality" type="button" aria-pressed="true" title="How much work LOOK does: AUTO steps down by itself on a slow phone">QUALITY: AUTO</button>
         </div>
         <div id="town-news" class="town-news" style="display:none;" role="status">
             <b id="town-news-title"></b>
@@ -228,11 +228,11 @@
     <div id="arena-screen" class="panel-screen" style="display:none;">
         <div class="panel-header">
             <a class="round-btn panel-back" href="./" aria-label="Back to the game">&#8249;</a>
-            <h2>BOSS ARENA</h2>
+            <h2>ARENA</h2>
             <div></div>
         </div>
         <div class="panel-body arena-body">
-            <p class="arena-note">Fight any outlaw right away. Practice only: nothing here is saved.</p>
+            <p class="arena-note">Boss fights: any outlaw you have beaten on the Wanted Road. Practice only: nothing here is saved.</p>
             <div class="shop-tabs arena-options">
                 <button id="arena-invincible" class="shop-tab" type="button">CAN'T DIE: OFF</button>
                 <button id="arena-gang" class="shop-tab" type="button">GANG: OFF</button>
