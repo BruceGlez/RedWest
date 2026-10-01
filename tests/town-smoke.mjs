@@ -449,7 +449,7 @@ try {
         await page.locator('[data-plant="corn"]').click();
         await toast('Planted corn');
         await page.locator('#town-sheet').waitFor({ state: 'hidden' });
-        await prompt('CORN: 1h 30m');
+        await prompt(/CORN: 1h/); // 1h 30m, or 1h 29m if a slow machine has taken a minute
         // The coop has laid eggs while we were away.
         await stand('coop');
         await prompt('COOP: 6 EGGS');
