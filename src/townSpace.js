@@ -43,3 +43,7 @@ export function near(id, x, z) {
 export function moved(id) {
     return [spreadOf(id).x - baseOf(id).x, spreadOf(id).z - baseOf(id).z];
 }
+
+// The town station on the south road (the town train, src/townTravel.js): the line of its rails. The platform is in front of it
+// (toward the road), the green train stands on it, and the marshal boards from the platform.
+export const STATION = { x: 0, z: 25.4 };

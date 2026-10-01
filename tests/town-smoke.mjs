@@ -147,6 +147,9 @@ try {
         await page.locator('#town-sheet').waitFor({ state: 'visible' });
         assert.equal(await page.locator('[data-travel]').count(), 1);
         assert.equal(await page.locator('.farm-crop[disabled]').count(), 10);
+        assert.equal(await page.locator('.town-label.train').count(), 1, 'the town station has its own sign, so the train can be found');
+        const station = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.find(d => d.id === 'platform'));
+        assert.ok(station.z > 15, 'the station is on the south road, near the middle of town');
         assert.match(await page.locator('#town-grid').textContent(), /Beat IRON JACK HARLAN/);
         assert.deepEqual(errors, []);
         await context.close();

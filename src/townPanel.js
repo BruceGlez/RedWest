@@ -320,10 +320,11 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
 
     // ---------- Building labels over the 3D town ----------
     const labelEls = new Map();
-    for(const spot of TOWN_LAYOUT) {
+    const LABELLED = [...TOWN_LAYOUT, { id: 'platform', label: 'TOWN TRAIN' }]; // the buildings, and the town station
+    for(const spot of LABELLED) {
         const label = document.createElement('button');
         label.type = 'button';
-        label.className = `town-label${spot.soon ? ' soon' : ''}${spot.id === 'depot' ? ' event' : ''}`;
+        label.className = `town-label${spot.soon ? ' soon' : ''}${spot.id === 'depot' ? ' event' : ''}${spot.id === 'platform' ? ' train' : ''}`;
         label.dataset.openBuilding = spot.id;
         els.labels.append(label);
         labelEls.set(spot.id, label);
@@ -331,7 +332,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     function renderLabels() {
         const stored = jailStored(profile);
         const full = stored > 0 && stored >= jailCapacity(profile);
-        for(const spot of TOWN_LAYOUT) {
+        for(const spot of LABELLED) {
             const label = labelEls.get(spot.id);
             const building = BUILDINGS.find(b => b.id === spot.id);
             let extra = '';
@@ -705,7 +706,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         els.hint.textContent = place
             ? ('ontouchstart' in window ? 'Stick to walk. Tap the prompt to use what you stand by.' : 'WASD to walk. E to use what you stand by.')
             : walking
-                ? ('ontouchstart' in window ? 'Stick to walk. Tap a door to go in.' : 'WASD to walk. E at a door to go in.')
+                ? ('ontouchstart' in window ? 'Stick to walk. Tap a door to go in. The TOWN TRAIN waits on the south road.' : 'WASD to walk. E at a door to go in. The TOWN TRAIN waits on the south road.')
                 : 'Drag to look around. Tap a building.';
     }
     els.walkButton.addEventListener('click', () => {

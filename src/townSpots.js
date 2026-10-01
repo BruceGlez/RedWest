@@ -5,20 +5,19 @@
 
 // object: where the prop stands (x, z) and the box it blocks (half sizes), or null when something else blocks the way.
 // stand: where the marshal stands to use it; the prompt shows within reach of this point.
-import { near, spread } from './townSpace.js';
+import { near, spread, STATION } from './townSpace.js';
 
 // Each stands where it was designed against its building (the train in front of the depot, the cash box in the jail yard) and
 // moves with that building; the board stands in main street and spreads with the town (src/townSpace.js).
 const train = near('depot', 31, -3.7);
 const cash = near('jail', -10, 9.6);
 const cashStand = near('jail', -10, 11.3);
-const platform = near('depot', 39.5, -3.5);
-const platformStand = near('depot', 37, -3);
+const platformStand = [STATION.x, STATION.z - 3.8]; // on the platform of the town station, in front of the train
 const board = spread(-3.4, -1.6);
 const boardStand = spread(-3.4, 0);
 export const SPOTS = [
     { id: 'train', verb: 'RIDE', object: null, stand: train }, // in front of the locomotive on the depot's rails
-    { id: 'platform', verb: 'RIDE', object: { x: platform[0], z: platform[1], hx: 0.3, hz: 0.3 }, stand: platformStand }, // the town train's stop, beside the depot's rails
+    { id: 'platform', verb: 'RIDE', object: null, stand: platformStand }, // the town train's platform, on the south road (the train itself is drawn in src/townScene.js)
     { id: 'cashbox', verb: 'COLLECT', object: { x: cash[0], z: cash[1], hx: 1.25, hz: 0.85 }, stand: cashStand }, // the jail yard
     { id: 'board', verb: 'READ', object: { x: board[0], z: board[1], hx: 1.7, hz: 0.5 }, stand: boardStand } // main street
 ];

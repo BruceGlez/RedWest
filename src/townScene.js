@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeByMaterial } from './meshMerge.js';
 import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces, getDistrict, districtOffsetById } from './townDistricts.js';
-import { TOWN_LAYOUT, SPREAD, spread, near, moved } from './townSpace.js';
+import { TOWN_LAYOUT, SPREAD, STATION, spread, near, moved } from './townSpace.js';
 import { FOLK, createWalker, stepWalker } from './townFolk.js';
 import { skyAt } from './townTime.js';
 import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
@@ -877,10 +877,47 @@ export function createTownScene(options = {}) {
     cashProp.position.set(cashAt.x, 0, cashAt.z);
     scenery.add(cashProp);
     const trainSign = sign('RIDE OUT', 3.6);
-    const platformAt = getSpot('platform').object; // the town train's stop: a post, a sign and a bench
-    const platformSign = sign('TOWN TRAIN', 3.6);
-    platformSign.position.set(platformAt.x, 4, platformAt.z + 0.1);
-    scenery.add(box(0.25, 3.6, 0.25, C.timberDark, platformAt.x, 1.8, platformAt.z), platformSign, box(2.6, 0.2, 0.7, C.timber, platformAt.x - 2.2, 0.8, platformAt.z + 0.3), box(0.2, 0.8, 0.5, C.timberDark, platformAt.x - 3.3, 0.4, platformAt.z + 0.3), box(0.2, 0.8, 0.5, C.timberDark, platformAt.x - 1.1, 0.4, platformAt.z + 0.3));
+    // The town station on the south road: a platform with a canopy, the rails, and a green train standing at it (the town train,
+    // src/townTravel.js). Large and lit so it is the first thing seen from the south road, and it has its own sign in the overview.
+    {
+        const X = STATION.x, Z = STATION.z;
+        const GREEN = 0x3f5f46, CREAM = 0xe6dcc0;
+        scenery.add(box(30, 0.12, 3.2, C.timber, X, 0.08, Z - 2.8)); // the platform deck
+        scenery.add(box(30, 0.05, 2.6, C.stoneDark, X, 0.04, Z)); // the track bed
+        for(const dz of [-0.75, 0.75]) scenery.add(box(30, 0.12, 0.12, C.iron, X, 0.16, Z + dz));
+        for(let x = -14; x <= 14; x += 1.4) scenery.add(box(0.28, 0.1, 2.2, C.timberDark, X + x, 0.1, Z));
+        for(const x of [-10, -3.5, 3.5, 10]) scenery.add(box(0.28, 3.6, 0.28, C.timberDark, X + x, 1.8, Z - 3.5));
+        scenery.add(box(24, 0.3, 3.8, C.timberDark, X, 3.7, Z - 2.6), roof(24, 3.8, 0.9, C.slate, 3.85).translateZ(Z - 2.6).translateX(X));
+        const stationSign = sign('TOWN TRAIN', 7.5);
+        stationSign.position.set(X, 5.3, Z - 0.6);
+        scenery.add(stationSign, box(0.28, 1.8, 0.28, C.timberDark, X - 3.2, 4.6, Z - 0.7), box(0.28, 1.8, 0.28, C.timberDark, X + 3.2, 4.6, Z - 0.7));
+        scenery.add(lamp(X - 12.5, Z - 4), lamp(X + 12.5, Z - 4), lamp(X - 6.5, Z - 4.4), lamp(X + 6.5, Z - 4.4));
+        // The train: a locomotive and two coaches.
+        const loco = new THREE.Group();
+        loco.add(box(4.6, 2.2, 2.2, C.iron, 0, 1.5, 0), box(1.5, 3.1, 2.2, GREEN, -1.3, 2.3, 0), box(1.8, 0.3, 2.5, C.timberDark, -1.3, 3.95, 0),
+            box(0.8, 1.4, 0.8, C.iron, 1.5, 3.2, 0), box(1.1, 0.35, 1.1, C.brass, 1.5, 4.05, 0), box(0.5, 0.5, 0.5, C.glow, 2.4, 1.6, 0, 1.4));
+        for(const wx of [-1.6, 0, 1.6]) for(const wz of [-1.15, 1.15]) {
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.55, 0.55, 0.18, 12), mat(0x8b0000));
+            wheel.rotation.x = Math.PI / 2;
+            wheel.position.set(wx, 0.6, wz);
+            loco.add(wheel);
+        }
+        loco.position.set(X + 8.5, 0, Z);
+        scenery.add(loco);
+        for(const cx of [1.4, -6.1]) {
+            const coach = new THREE.Group();
+            coach.add(box(6.6, 2.7, 2.4, GREEN, 0, 1.9, 0), box(6.9, 0.25, 2.7, C.timberDark, 0, 3.4, 0), box(6.6, 0.3, 2.45, CREAM, 0, 1.05, 0));
+            for(let i = 0; i < 4; i++) coach.add(box(0.9, 0.8, 0.1, C.glow, -2.4 + i * 1.6, 2.3, 1.24, 0.9));
+            for(const wx of [-2.2, 2.2]) for(const wz of [-1.1, 1.1]) {
+                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.45, 0.45, 0.16, 10), mat(C.iron));
+                wheel.rotation.x = Math.PI / 2;
+                wheel.position.set(wx, 0.5, wz);
+                coach.add(wheel);
+            }
+            coach.position.set(X + cx, 0, Z);
+            scenery.add(coach);
+        }
+    }
     const signPost = near('depot', 34.5, -3.4); // beside the locomotive, so it moves with the depot
     trainSign.position.set(signPost[0], 4, signPost[1] + 0.1);
     scenery.add(box(0.25, 3.6, 0.25, C.timberDark, signPost[0], 1.8, signPost[1]), trainSign);
@@ -987,6 +1024,10 @@ export function createTownScene(options = {}) {
         ...BARRELS.map(([x, z]) => at(x, z, 0.7, 0.7)),
         ...CRATES.map(([x, z]) => at(x, z, 0.75, 0.75)),
         ...LAMPS.map(([x, z]) => at(x, z, 0.3, 0.3)),
+        // The town station: the train on its rails, and the posts of the canopy over the platform.
+        { minX: STATION.x - 9.6, maxX: STATION.x + 11, minZ: STATION.z - 1.3, maxZ: STATION.z + 1.3 },
+        ...[-10, -3.5, 3.5, 10].map(x => at(STATION.x + x, STATION.z - 3.5, 0.3, 0.3)),
+        ...[-12.5, 12.5].map(x => at(STATION.x + x, STATION.z - 4, 0.3, 0.3)), ...[-6.5, 6.5].map(x => at(STATION.x + x, STATION.z - 4.4, 0.3, 0.3)),
         // The locomotive on the depot's rails (the depot builder puts it at (-5, 8.7) from the station), the sign post
         // beside it, and the props of src/townSpots.js. They stand with the depot, so they move with it.
         shiftBox({ minX: 25.4, maxX: 32.7, minZ: -7.8, maxZ: -4.8 }, moved('depot')), at(signPost[0], signPost[1], 0.3, 0.3),
@@ -1254,6 +1295,8 @@ export function createTownScene(options = {}) {
                 projected.copy(b.top).project(camera);
                 out[id] = { x: (projected.x + 1) / 2, y: (1 - projected.y) / 2, visible: projected.z < 1 };
             }
+            projected.set(STATION.x, 6.8, STATION.z - 1).project(camera); // the town train's own sign
+            out.platform = { x: (projected.x + 1) / 2, y: (1 - projected.y) / 2, visible: projected.z < 1 };
             return out;
         }
     };
