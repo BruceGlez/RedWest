@@ -123,7 +123,7 @@ town as an overview, and then the places cannot be entered (they need walking).
 |---|---|---|---|
 | The Calloways | **Calloway Farm** | GROW | **built 2026-10-01** |
 | Iron Jack Harlan | **Foundry Yard** | SMELT | planned |
-| Mad Mesa Morgan | **Morgan's Channel** | WATER | planned |
+| Mad Mesa Morgan | **Morgan's Channel** | WATER | **built 2026-10-05** (waters the farm; placeholder scene) |
 | Silas Vane | **Vane's Crossing** | TRADE | **built 2026-10-05** (order board; placeholder scene) |
 | El Espectro | **Tres Rios** | TEND | planned |
 | Lucky Lou | **The Silver Belle** | MARKET | planned |
@@ -178,7 +178,7 @@ it becomes **iron bars** over time; the furnace glows and smokes while it is lit
 (never required: the plain dollar price always works) and of place upgrades. **Links:** see the table of links; the Foundry
 works fully alone.
 
-### 3. Morgan's Channel: WATER (planned)
+### 3. Morgan's Channel: WATER (built 2026-10-05: the watering; fishing and the warehouse are still to come)
 
 *The dry channel from Redstone Mesa runs here now, with water in it. No blasting after dark.* Opens with Mad Mesa Morgan.
 
@@ -300,7 +300,7 @@ Deacon Graves. North edge, between Tres Rios and the Foundry.
      second day an unfilled order waits one more day, so the board then holds up to six. The first `visit` (or fill) starts the player's days.
    - **Slice 2 (built 2026-10-05): the place.** The gate in the town opens the Crossing (`interior: 'vane'` in `src/townDistricts.js`, shut with a LOCKED sign naming Silas Vane until his first star). `src/vaneLayout.js` is the map (the wagon, the stopped clock, the order board, the way out), `src/places/vane.js` the board card (today's orders, FILL buttons through `wallet.orders`, the first-visit `visit`) and prompts, `src/placeVane.js` a plain box-built **placeholder scene** (the art lane's from here on; a gold lantern floats over the board while orders wait). Tests: `tests/vaneLayout.test.js` and the Crossing walk-through in `tests/town-smoke.mjs`. **Not built yet:** the bounty-board
      pointer, the Channel watering the farm, and real art.
-   - **Deferred (owner's decision):** Morgan's Channel watering the farm. Build the Channel as a real place first, then its watering, with the rule that a link is only a bonus while both ends are open.
+   - **Slice 3 (built 2026-10-05): Morgan's Channel and the watering.** The gate in the town opens the Channel (`interior: 'channel'`, shut with a LOCKED sign naming Mad Mesa Morgan until his first star). `src/farmWater.js` is the rule (10% sooner, `WATER_FACTOR` 0.9, only while the Channel and the farm are both open; `farmWatered(profile)` in `src/farm.js` threads it through `plotState`, so the server and the offline wallet run the same code), `src/channelLayout.js` the map (the channel with a footbridge, the sluice, the warehouse log, the way out), `src/places/channel.js` the sluice card, and `src/placeChannel.js` a plain box-built **placeholder scene** (the art lane's from here on). The water is simply there: no wallet call, no new saved state and nothing to buy or wait for. The farm's crop buttons, plot cards and prompts show the watered times. Tests: `tests/farmWater.test.js` (the link, the cap, the shut state), `tests/farmWater.server.test.js` (the server clock), `tests/channelLayout.test.js`, and the Channel walk-through in `tests/town-smoke.mjs`. **Not built yet:** fishing posts (they are scenery), the warehouse's extra storage, and real art.
    - **Done (contract, kept for reference):** filling an order changes the profile, so it needs a route and a wallet method, like the farm's.
      `server/app.js` (scale): `POST /api/town/orders` calls `ordersAction(user.profile, body, now())` from `src/farmOrders.js`, the same
      way `/api/town/farm` calls `farmAction`, and returns `{ result, profile }`. `src/wallet.js` (shared): `orders(body)` on both wallets,
