@@ -145,7 +145,9 @@ function generate(floor) {
     }
     const main = nodes.length;
 
+    const extras = []; // { kind: 'lobe' | 'gallery', owner, shape }: a second cave shape attached to a chamber (below)
     const clearOfOthers = (x, z, r, ownerA, ownerB, gap) => {
+        for(const e of extras) if(e.owner !== ownerA && sdShape(e.shape, x, z) < r + gap) return false;
         for(let j = 0; j < nodes.length; j++) {
             if(j === ownerA) continue;
             if(Math.hypot(x - nodes[j].x, z - nodes[j].z) < r + nodes[j].r + gap) return false;
@@ -156,6 +158,30 @@ function generate(floor) {
         }
         return true;
     };
+    // Variety of shape: from the second depth a chamber may grow a second round cavern into a twin (a lobe), and from the third a long
+    // gallery may cross it. Both are only more ground joined to the chamber, so they keep to the rules of the map (a chamber is a node, the
+    // shape is more cave), each is checked clear of every other chamber, tunnel and extra, and they come from their own seeded roll.
+    const variety = seededRandom(hashOf(`hollow-claim-variety-${depth}`));
+    for(let i = 1; i < main - 1; i++) {
+        const node = nodes[i];
+        const roll = variety(), around = variety() * Math.PI * 2, size = variety();
+        const awayFromLift = (x, z, r) => Math.hypot(x, z) > r + 16;
+        if(depth >= 2 && roll < Math.min(0.5, 0.15 + 0.05 * depth)) {
+            const r = node.r * (0.55 + 0.2 * size), dist = node.r * 0.7 + r * 0.6;
+            const x = node.x + Math.cos(around) * dist, z = node.z + Math.sin(around) * dist;
+            if(awayFromLift(x, z, r) && clearOfOthers(x, z, r, i, i, 12)) extras.push({ kind: 'lobe', owner: i, shape: circle(x, z, r) });
+        } else if(depth >= 3 && roll > 1 - Math.min(0.4, 0.05 * depth)) {
+            const half = node.r * 1.5, r = 9 + size * 3;
+            const dx = Math.cos(around) * half, dz = Math.sin(around) * half;
+            let ok = true;
+            for(let k = -4; k <= 4 && ok; k++) {
+                const x = node.x + dx * k / 4, z = node.z + dz * k / 4;
+                ok = awayFromLift(x, z, r) && clearOfOthers(x, z, r, i, i, 10);
+            }
+            if(ok) extras.push({ kind: 'gallery', owner: i, shape: capsule(node.x - dx, node.z - dz, node.x + dx, node.z + dz, r) });
+        }
+    }
+
     // Side alcoves (a round pocket off a chamber) and, from the second depth, treasure rooms down a side tunnel of their own.
     const chests = [];
     const sideChance = Math.min(0.85, 0.5 + 0.04 * depth);
@@ -171,6 +197,7 @@ function generate(floor) {
             if(!clearOfOthers(x, z, r, i, i, room ? 14 : 10)) continue;
             // The tunnel to a room must not cross another chamber either.
             if(room && nodes.some((c, j) => j !== i && segmentDistance(c.x, c.z, parent.x, parent.z, x, z) < c.r + 14)) continue;
+            if(room && extras.some(e => e.owner !== i && [0.25, 0.5, 0.75, 1].some(f => sdShape(e.shape, parent.x + (x - parent.x) * f, parent.z + (z - parent.z) * f) < 24))) continue;
             const index = nodes.length;
             nodes.push({ x, z, r, kind: room ? 'room' : 'alcove', parent: i });
             if(room) tunnels.push({ a: i, b: index, r: 11 + rand() * 2, angle: around, length: dist });
@@ -179,12 +206,12 @@ function generate(floor) {
         }
     }
 
-    const shapes = [...nodes.map(n => circle(n.x, n.z, n.r)), ...tunnels.map(t => capsule(nodes[t.a].x, nodes[t.a].z, nodes[t.b].x, nodes[t.b].z, t.r))];
+    const shapes = [...nodes.map(n => circle(n.x, n.z, n.r)), ...tunnels.map(t => capsule(nodes[t.a].x, nodes[t.a].z, nodes[t.b].x, nodes[t.b].z, t.r)), ...extras.map(e => e.shape)];
     const last = nodes[main - 1];
     const shaft = [last.x + Math.cos(heading) * last.r * 0.42, last.z + Math.sin(heading) * last.r * 0.42];
     const rails = [[0, 0], ...nodes.slice(1, main).map(n => [n.x, n.z]), shaft];
     const layout = { id: `depth-${depth}`, depth, name: floorName(depth), shapes, boxes: shapes.map(shapeBox), nodes, tunnels, main, shaft, rails,
-        pillars: [], arches: [], clusters: [], carts: [], chests, spawns: [] };
+        pillars: [], arches: [], clusters: [], carts: [], chests, spawns: [], extras: extras.map(e => ({ kind: e.kind, owner: e.owner })), rockfalls: [] };
 
     // ----- props: each placed on open ground, off the rails, clear of each other, off the lift and the shaft -----
     const props = []; // { x, z, r }
@@ -251,6 +278,21 @@ function generate(floor) {
             place(layout.pillars, node, 0.2, 0.5, 2.3, 1);
         }
     });
+    // A rockfall: a heap that fills the middle of a chamber, so the way through goes round it (it is a fat column to the scene and the
+    // rules; art may dress it as it likes). Kept well off the rails and the walls, so there is always a wide way past on both sides.
+    const fallChance = Math.min(0.5, 0.12 + 0.04 * depth);
+    for(let i = 1; i < main; i++) {
+        if(nodes[i].r < 24 || variety() > fallChance) continue;
+        for(let attempt = 0; attempt < 14; attempt++) {
+            const r = 4.6 + variety() * 2, a = variety() * Math.PI * 2, f = 0.2 + variety() * 0.4;
+            const x = nodes[i].x + Math.cos(a) * nodes[i].r * f, z = nodes[i].z + Math.sin(a) * nodes[i].r * f;
+            if(!clear(x, z, r) || !isOpen(layout, x, z, r + 7)) continue;
+            props.push({ x, z, r });
+            layout.pillars.push([x, z, r]);
+            layout.rockfalls.push([x, z, r]);
+            break;
+        }
+    }
     layout.clusters = layout.clusters.map(([x, z]) => [x, z]); // (a cluster has no radius of its own to the rules)
 
     // ----- the road: how a pursuer finds the marshal through a winding cave, as the next chamber to head for -----

@@ -223,3 +223,39 @@ test('the active floor is what the physics and the spawns look at, and it can be
     assert.equal(activeFloor(), null);
     assert.ok(MAX_CHAMBERS >= 12);
 });
+
+test('floors get twin caverns, long galleries and rockfalls with depth, and the first floor stays plain', () => {
+    const count = (layout, kind) => layout.extras.filter(e => e.kind === kind).length;
+    assert.equal(floorLayout(1).extras.length, 0, 'floor 1 has no extra shapes');
+    let lobes = 0, galleries = 0, falls = 0;
+    for(let floor = 2; floor <= 15; floor++) {
+        const layout = floorLayout(floor);
+        lobes += count(layout, 'lobe');
+        galleries += count(layout, 'gallery');
+        falls += layout.rockfalls.length;
+        assert.equal(layout.shapes.length, layout.nodes.length + layout.tunnels.length + layout.extras.length, `floor ${floor}: every extra is a shape the scene already draws`);
+        for(const e of layout.extras) assert.ok(e.owner > 0 && e.owner < layout.main - 1, `floor ${floor}: never on the lift's chamber or the shaft's`);
+        for(const e of layout.extras.filter(e => e.kind === 'gallery')) assert.ok(floor >= 3, 'galleries start on floor 3');
+        for(const [x, z, r] of layout.rockfalls) {
+            assert.ok(r >= 4.6 && isOpen(layout, x, z, r + 7), `floor ${floor}: a rockfall has a wide way round it`);
+            assert.ok(layout.pillars.some(p => p[0] === x && p[1] === z && p[2] === r), 'and is solid like a column');
+        }
+    }
+    assert.ok(lobes >= 3 && galleries >= 2 && falls >= 4, `a spread of shapes over fifteen floors (${lobes} lobes, ${galleries} galleries, ${falls} rockfalls)`);
+});
+
+test('every floor from 1 to 30 can be walked from the lift to the shaft and to every chest, with the new shapes in', () => {
+    for(let floor = 1; floor <= 30; floor++) {
+        const layout = floorLayout(floor);
+        const cells = reachable(layout, solidsOf(layout), [0, 0]);
+        assert.ok(near(cells, layout.shaft, SHAFT_REACH + 1), `floor ${floor}: the shaft can be reached`);
+        for(const [x, z] of layout.chests) assert.ok(near(cells, [x, z], STEP * 2.5), `floor ${floor}: the chest at ${x.toFixed(0)}, ${z.toFixed(0)} can be reached`);
+        for(const [x, z] of layout.spawns) assert.ok(near(cells, [x, z]), `floor ${floor}: the tunnel mouth at ${x}, ${z} can be reached`);
+        for(const e of layout.extras) {
+            const node = layout.nodes[e.owner];
+            assert.ok(near(cells, [node.x, node.z], STEP * 4), `floor ${floor}: ${e.kind} chamber can be reached`);
+        }
+        assert.ok(isOpen(layout, 0, 0, 12), `floor ${floor}: the lift still has room`);
+        assert.ok(layout.main > 2, `floor ${floor}: still a descent`);
+    }
+});

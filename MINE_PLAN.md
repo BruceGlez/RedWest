@@ -28,6 +28,7 @@ walking back to it brings you up with whatever you got. Deeper is stranger, hard
 | **1b** | Maps made for it: the undertaker's parlour as a place you walk into, and caves with walls, rails, a lift and a shaft you walk to. All drawn in code. | medium | **built 2026-10-05** ("The maps", below) |
 | **1c** | Fate-style depth, after the first playtest: no bottom, caves that grow a lot with every floor, a new monster on every floor, chests, and a shaft that is always open | medium | **built 2026-10-05** ("The descent", below) |
 | **1d** | After the second playtest: the shaft and the lift ask first, and the monsters belong to their chambers (no endless stream; a chamber refills only after you have gone far away) | small | **built 2026-10-05** ("The descent", below) |
+| **1e** | Floor variety: twin caverns, long galleries and rockfalls you walk round, deterministic per depth | small | **built 2026-10-05** ("The maps", below) |
 | **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | planned |
 | **3** | Boss floors (every 5th), more of Mr. Grimsby's talk and rumours, a pet that follows you down | medium | planned |
 | **4** | The art pass for the maps and the monsters: modelled rock, timber, carts, a real lift and shaft, painted textures (`POLISH_PLAN.md`, section 6) | large | parked, like the other art passes. The maps are made of boxes so this can replace them one builder at a time. |
@@ -86,6 +87,15 @@ road (each turning a little from the last and never near an earlier one), joined
 floor, treasure rooms down a tunnel of their own. Each cave also has rock columns for cover, timber arches in the tunnels, crates, ore
 carts parked beside the track, rails from the lift to the shaft, and chests. A cave is a few circles and capsules whose union is the open
 ground; everything else is rock.
+
+**Variety (slice 1e).** Besides round chambers, from the second floor a chamber may grow a *lobe* (a second round cavern joined to it, a twin
+cavern), from the third a long *gallery* (a wide capsule across it), and from the second a *rockfall* (a fat column of rubble, 4.6 to 6.6
+units across, in the middle of a chamber with at least 7 units of way past it). Lobes and galleries are only more ground in the cave's union
+(`layout.extras`, `{ kind, owner }`, with the shapes at the end of `layout.shapes`), never on the lift's or the shaft's chamber, and clear of
+every other chamber, tunnel and room tunnel; rockfalls are in `layout.pillars` and `layout.rockfalls`, so the scene already draws and the
+physics already blocks them. They come from their own seeded roll, so a floor is still the same every time, and the tests walk floors 1 to
+30 to check the shaft, every chest and every tunnel mouth stay reachable. Not done: pits and pools as blockers (the scene has no look for
+a hole or water; art would need one before the layout can use it).
 
 How they work (`src/mineMap.js` is the rules, `src/mineScene.js` the drawing; `tests/mineMap.test.js` checks all of it):
 - Plain chasers walk straight at the marshal, so chambers are wide and roughly round and tunnels are wide enough to fight in. For a
