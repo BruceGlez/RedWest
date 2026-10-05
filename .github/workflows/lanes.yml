@@ -1,0 +1,18 @@
+name: lanes
+on:
+  pull_request:
+jobs:
+  shared-files:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Lanes touched
+        run: node tools/lanes.mjs diff origin/${{ github.base_ref }}
+      - name: Shared files stay small
+        # A PR that deliberately changes shared code carries the `shared-change` label and is allowed past the size limit.
+        run: node tools/lanes.mjs shared origin/${{ github.base_ref }} ${{ contains(github.event.pull_request.labels.*.name, 'shared-change') && '--allow' || '' }}

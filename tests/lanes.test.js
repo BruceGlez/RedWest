@@ -35,3 +35,14 @@ test('every npm script a lane lists exists in package.json', async () => {
         }
     }
 });
+
+test('sharedChanges counts added plus removed lines in shared files only', async () => {
+    const { sharedChanges } = await import('../tools/lanes.mjs');
+    const numstat = ['12\t3\tsrc/gameLoop.js', '40\t0\tsrc/modes/mine.js', '5\t5\tindex.html', '-\t-\tpublic/models/x.glb', '1\t1\tsrc/townPanel.js'].join('\n');
+    assert.deepEqual(sharedChanges(numstat), [
+        { file: 'src/gameLoop.js', lines: 15 },
+        { file: 'index.html', lines: 10 },
+        { file: 'src/townPanel.js', lines: 2 }
+    ]);
+    assert.deepEqual(sharedChanges(''), []);
+});
