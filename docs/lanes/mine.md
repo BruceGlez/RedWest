@@ -10,6 +10,7 @@
 - Put mine-only styles in `styles/mine.css` and import it from `style.css`
 
 ## Rules
+You own the **cave layout, monsters and rules** (`mineMap.js`, `mineMonsters.js`, `src/modes/mine.js`), not the look: `mineScene.js` and the parlour scene (`placeUndertaker.js`) are the art lane's. The scene reads the cave data from `mineMap.js`; if a look needs a different cave shape, change the layout first. See "Art and function on the same area" in `AGENTS.md`.
 The mine never gives stars and never sells speed-ups. Rules live in `mine.js` with no rendering so they can be unit tested.
 
 ## You own

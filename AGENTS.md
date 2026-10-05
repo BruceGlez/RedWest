@@ -48,6 +48,30 @@ of checks to run. Agents in different lanes should almost never touch the same f
   register it in `src/places/index.js`. The place shape and the `host` it is given are at the top of `src/places/registry.js`.
   `townPanel.js` only asks the registry.
 
+## Art and function on the same area (town, farm, mine, and every place to come)
+
+Every area has two kinds of agent working on it at once: the **art agent** (lane `art`) makes it look right, and a **function agent**
+(lane `town` or `mine`) makes it work. They split the area's files like this:
+
+| | Function agent (`town`, `mine`) | Art agent (`art`) |
+|---|---|---|
+| Owns | the **layout** (`farmLayout.js`, `undertakerLayout.js`, `mineMap.js`, `townSpace.js`, `townSpots.js`, `townDistricts.js`), the **rules**, the **cards and prompts** (`src/places/*.js`, `src/modes/*.js`), the tests | the **scene builders** (`placeFarm.js`, `placeUndertaker.js`, `mineScene.js`, `townScene.js`, and every `src/place*.js`), models, textures, materials, lighting, `styles/` for looks |
+| Decides | what is where: ids, doors, plot positions, footprints, what each thing does | how it looks: shapes, models, colours, animation, glow, props that do nothing |
+
+The contract between them:
+
+1. **The scene reads the layout, it never invents it.** Door ids, positions and footprints come from the layout file. The art agent may add
+   decoration anywhere it does not block the walkable map.
+2. **`walkMap()` stays valid.** A scene builder returns the same shape the registry expects (see `src/places/registry.js`), and every
+   door must still be reachable. `npm run test:town` and `npm run test:mine` check this. If a look needs a different footprint, the art agent
+   asks for the layout change (in the PR description or a comment), the function agent changes the layout file first, and the scene follows.
+3. **A new place is a pair.** The function agent's PR adds the layout, rules, card and registry line, and ONE deliberately cross-lane file: a
+   plain box-built placeholder scene (`src/place<Name>.js`), so the place works at once. After that merges, every look change to that
+   scene is the art agent's. Say "cross-lane on purpose: placeholder scene" in that PR.
+4. **Budgets belong to art.** Town about 90 draw calls, a place under about 130, a fight under about 50 (`node tools/perf.mjs`, three runs, middle
+   value). A function agent that adds objects keeps them few and merged (`src/meshMerge.js`).
+5. **Never edit the other's file for a quick fix.** Leave a note in the PR description for the other agent instead.
+
 ## Commands
 
 ```

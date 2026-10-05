@@ -9,6 +9,8 @@
 - Every new asset gets a row in `ASSETS.md` the same day
 
 ## Rules
+You own the **scene builders** of every area (`placeFarm.js`, `placeUndertaker.js`, `mineScene.js`, `townScene.js`, each new `src/place*.js`). The function agents own the layout and rules; read doors, positions and footprints from their layout files and keep `walkMap()` valid. See "Art and function on the same area" in `AGENTS.md`.
+
 Budget: about 90 draw calls in town, under about 50 in a fight. Run `node tools/perf.mjs` three times before and after and take the middle. Original art only.
 
 ## You own

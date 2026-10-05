@@ -46,3 +46,18 @@ test('sharedChanges counts added plus removed lines in shared files only', async
     ]);
     assert.deepEqual(sharedChanges(''), []);
 });
+
+test('art owns the scene builders and the function lanes own the layouts', () => {
+    for(const file of ['src/placeFarm.js', 'src/placeUndertaker.js', 'src/mineScene.js', 'src/townScene.js']) assert.equal(laneOf(file), 'art', file);
+    assert.equal(laneOf('src/farmLayout.js'), 'town');
+    assert.equal(laneOf('src/townSpace.js'), 'town');
+    assert.equal(laneOf('src/undertakerLayout.js'), 'mine');
+    assert.equal(laneOf('src/mineMap.js'), 'mine');
+    assert.equal(laneOf('src/places/farm.js'), 'town', 'the place registry entry is the function agent\'s, not a scene builder');
+    assert.equal(laneOf('src/modes/mine.js'), 'mine');
+});
+
+test('the lane briefs belong to qa and the policy answers to money', () => {
+    assert.equal(laneOf('docs/lanes/art.md'), 'qa');
+    assert.equal(laneOf('docs/POLICY_GENERATOR_ANSWERS.md'), 'money');
+});
