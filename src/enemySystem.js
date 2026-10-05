@@ -364,6 +364,7 @@ function attachEnemyModel(enemy) {
     u.model = instance;
     if(u.muzzle && instance.muzzle) u.muzzle = instance.muzzle; // shots leave from the revolver in the model's hand
     if(u.behavior === 'phantom') prepareFade(enemy);
+    instance.object.visible = modelOnScreen(enemy); // updateEnemies keeps this right from the next frame
 }
 // A skinned model is never frustum-culled (its stored bounds do not follow the animation), so left alone every model in the fight is drawn
 // even when it is off screen, and 15 of them cost twice the draw calls of the box figures (which are culled). The camera is given by main.js
@@ -386,6 +387,7 @@ function modelOnScreen(e) {
 }
 
 function attachMissingEnemyModels() {
+    cullModels();
     for(const enemy of enemies) if(enemy.userData.type !== 'boss' && !enemy.userData.model) attachEnemyModel(enemy);
 }
 
