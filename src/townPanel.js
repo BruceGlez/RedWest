@@ -458,7 +458,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         closeCard: () => { openId = null; },
         leave: leavePlace,
         markVisited: id => { news = markVisited(news, id); saveNews(news); },
-        onDescend: () => onDescend()
+        onDescend: floor => onDescend(floor)
     });
     els.placeBack.addEventListener('click', leavePlace);
 

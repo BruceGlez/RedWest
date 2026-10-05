@@ -10,7 +10,7 @@ import { clearHazards } from '../enemySystem.js';
 import { clearParticles } from '../particleSystem.js';
 import { clearDecals } from '../decals.js';
 import { disposeBaked } from '../meshMerge.js';
-import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, confirmText, resultText, shaftHint, liftHint, MINE_ATMOSPHERE_ID, PRACTICE_NOTE } from '../mine.js';
+import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
 import { showMineFloor, openMineChest, updateMineScene } from '../mineScene.js';
 import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE, SHAFT_REACH, LIFT_REACH } from '../mineMap.js';
 import { MINE_MONSTERS, newOn, isMineMonster, planNode, WAKE_DISTANCE, LEAVE_DISTANCE } from '../mineMonsters.js';
@@ -98,8 +98,10 @@ function openChest(ctx, index, cave) {
     gameState.score += reward.score;
     if(reward.heal) playerStats.hp = Math.min(playerStats.maxHp, playerStats.hp + 1);
     else playerStats.tripleShotTimer = 10;
+    const ore = oreInChest(mine.floor, cave.chests.length);
+    mine.ore += ore; // carried: kept if he rides the lift up, lost if he falls (src/mineProgress.js)
     const [x, z] = cave.chests[index];
-    floatText(`+${reward.score}${reward.heal ? ' +1 HEART' : ' TRIPLE SHOT'}`, new THREE.Vector3(x, 2.5, z), 'hot');
+    floatText(`+${reward.score}${reward.heal ? ' +1 HEART' : ' TRIPLE SHOT'} +${ore} ORE`, new THREE.Vector3(x, 2.5, z), 'hot');
     playSound('powerup');
     ctx.ui.updateHUD();
 }
@@ -149,15 +151,21 @@ export const mineMode = {
         waveLabel: 'DEPTH:',
         wave: () => mine.floor,
         timer: () => shaftHint(mine.shaftDx, mine.shaftDz),
-        status: () => liftHint(mine.liftDx, mine.liftDz)
+        status: () => statusText(mine.liftDx, mine.liftDz, mine.ore)
     },
     previewOutlaw: () => floorStage(1),
     runOutlaw: () => floorStage(1),
     atmosphereId: () => MINE_ATMOSPHERE_ID,
     previewScene: ctx => showMineFloor(ctx.scene, mine.floor), // the cave is there from the first frame
-    begin: ctx => beginFloor(ctx, 1),
+    begin: ctx => beginFloor(ctx, mine.startFloor), // floor 1, or the checkpoint picked at the stairs
     update: updateFlow,
     updateScene: (ctx, t) => updateMineScene(t),
-    resultText: result => resultText(result, mine.floor),
+    resultText: result => resultText(result, mine.floor, mine.ore),
+    // The run is over: report it, so the deepest floor, the checkpoint and the ore are saved (src/mineProgress.js). The result screen's line is
+    // replaced when the answer comes back. A wallet with no mine call, or a failed one, only says so; the run itself never fails.
+    settle: ({ economy, result, seconds }, say) => {
+        if(!economy?.reportMineRun) return;
+        economy.reportMineRun(runSummary(result, seconds)).then(reply => say(savedText(reply.result))).catch(() => say(SAVE_FAILED_NOTE));
+    },
     reset: () => { endMineRun(); }
 };

@@ -1,7 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mine, beginMineRun, endMineRun, nextFloor, MINE_ATMOSPHERE_ID, floorStage, floorWave, floorTitle, floorBanner, descentScore, chestReward,
-    resultText, confirmText, shaftArrow, shaftHint, liftHint, PRACTICE_NOTE } from '../src/mine.js';
+    resultText, confirmText, shaftArrow, shaftHint, liftHint, PRACTICE_NOTE, SAVE_FAILED_NOTE, oreInChest, runSummary, savedText, statusText } from '../src/mine.js';
+import { maxOreOnFloor, applyMineRun, createMineProgress, normalizeMineProgress } from '../src/mineProgress.js';
 import { OUTLAWS } from '../src/outlaws.js';
 import { atmosphereFor, soundFor, MINE_ATMOSPHERE, ATMOSPHERES } from '../src/atmosphere.js';
 import { SURFACES, BEDS } from '../src/soundscape.js';
@@ -39,7 +40,8 @@ test('the words on screen name the depth and the way out', () => {
     assert.match(floorBanner(20), /THE LOST LEVEL 20/);
     assert.deepEqual(resultText('mine-win', 7), ['LIFT UP', 'You rode the lift back up from depth 7.']);
     assert.deepEqual(resultText('died', 3), ['WASTED', 'You fell on depth 3.']);
-    assert.match(PRACTICE_NOTE, /practice only/);
+    assert.match(PRACTICE_NOTE, /no stars and no money/);
+    assert.match(SAVE_FAILED_NOTE, /could not be saved/);
 });
 
 test('going down and opening chests pay by depth', () => {
@@ -84,4 +86,51 @@ test('the shaft and the lift ask first, and say what they will do', () => {
     mine.confirm = 'up';
     endMineRun();
     assert.equal(mine.confirm, null);
+});
+
+test('a run may begin on a checkpoint he has reached, and only on one', () => {
+    const record = normalizeMineProgress({ deepest: 12 });
+    beginMineRun(10, record);
+    assert.deepEqual([mine.floor, mine.startFloor, mine.ore], [10, 10, 0]);
+    beginMineRun(15, record);
+    assert.deepEqual([mine.floor, mine.startFloor], [1, 1], 'a checkpoint he has not reached is floor 1');
+    beginMineRun(7, record);
+    assert.equal(mine.startFloor, 1, 'and so is a floor that is no checkpoint');
+    beginMineRun(10);
+    assert.equal(mine.startFloor, 1, 'with no record there is only floor 1');
+    endMineRun();
+    assert.deepEqual([mine.floor, mine.startFloor, mine.ore], [1, 1, 0]);
+});
+
+test('every chest holds a share of its floor\'s ore, so opening them all never gives more than the floor can hold', () => {
+    for(const floor of [1, 2, 5, 9, 20]) for(const chests of [1, 2, 3, 6, 10]) {
+        assert.ok(oreInChest(floor, chests) >= 1);
+        assert.ok(oreInChest(floor, chests) * chests <= Math.max(maxOreOnFloor(floor), chests), `floor ${floor}, ${chests} chests`);
+    }
+    assert.ok(oreInChest(9, 3) > oreInChest(1, 3), 'deeper chests hold more');
+    assert.equal(oreInChest(3, 0), maxOreOnFloor(3), 'no chests listed: the whole floor in one');
+});
+
+test('the run reports where it began, how deep, the ore carried and how it ended, and the answer reads well', () => {
+    beginMineRun(1);
+    mine.floor = 4;
+    mine.ore = 17;
+    assert.deepEqual(runSummary('mine-win', 123.6), { startFloor: 1, depth: 4, ore: 17, outcome: 'up', seconds: 124 });
+    assert.equal(runSummary('died', -5).outcome, 'fell');
+    assert.equal(runSummary('died', -5).seconds, 0);
+    const record = createMineProgress();
+    const up = applyMineRun(record, runSummary('mine-win', 300));
+    assert.match(savedText(up), /New deepest floor: 4\./);
+    assert.match(savedText(up), /17 ore banked\./);
+    assert.match(savedText(up), /no stars and no money/);
+    mine.floor = 6;
+    const fell = applyMineRun(record, runSummary('died', 400));
+    assert.match(savedText(fell), /Checkpoint: floor 5\./);
+    assert.match(savedText(fell), /17 ore lost in the fall\./);
+    assert.match(savedText({ depth: 2, newDeepest: false, newCheckpoint: 0, carried: 0 }), /Deepest floor kept\./);
+    assert.deepEqual(resultText('died', 6, 17), ['WASTED', 'You fell on depth 6 and lost 17 ore.']);
+    assert.deepEqual(resultText('mine-win', 6, 17), ['LIFT UP', 'You rode the lift back up from depth 6 with 17 ore.']);
+    assert.equal(statusText(0, -50, 0), liftHint(0, -50));
+    assert.equal(statusText(0, -50, 9), `${liftHint(0, -50)}  ORE 9`);
+    endMineRun();
 });

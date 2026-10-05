@@ -4,12 +4,15 @@
 // (the Arena's rule, src/arena.js). The rules live here with no rendering, so they can be unit tested; src/gameLoop.js plays a floor and
 // src/townPanel.js starts the run.
 import { floorName } from './mineMap.js';
+import { maxOreOnFloor, startFloors } from './mineProgress.js';
 
 export const MINE_ATMOSPHERE_ID = 'mine'; // the look of the mine (src/atmosphere.js), not one of the outlaws' stages
 
 export const mine = {
     enabled: false, // the run being started or played is a mine run
     floor: 1,       // the depth being fought
+    startFloor: 1,  // the floor the run began on (floor 1, or a checkpoint of his: src/mineProgress.js)
+    ore: 0,         // the ore carried in this run: kept if he rides the lift up, lost if he falls
     shaftDx: 0,     // where the shaft down and the lift up are from the marshal (src/gameLoop.js keeps these up to date), for the HUD
     shaftDz: 0,
     liftDx: 0,
@@ -22,6 +25,8 @@ export const mine = {
 
 function reset() {
     mine.floor = 1;
+    mine.startFloor = 1;
+    mine.ore = 0;
     mine.shaftDx = mine.shaftDz = mine.liftDx = mine.liftDz = 0;
     mine.liftArmed = false;
     mine.opened = [];
@@ -29,10 +34,13 @@ function reset() {
     mine.blocked = null;
 }
 
-// Start a run at the first floor. endMineRun() puts the game back to the Wanted Road's rules.
-export function beginMineRun() {
+// Start a run on the first floor, or on a checkpoint he has reached (`record` is profile.mine). endMineRun() puts the game back to the Wanted
+// Road's rules.
+export function beginMineRun(floor = 1, record = null) {
     mine.enabled = true;
     reset();
+    const start = startFloors(record ?? { checkpoint: 0 }).includes(Math.floor(floor)) ? Math.floor(floor) : 1;
+    mine.floor = mine.startFloor = start;
 }
 
 export function endMineRun() {
@@ -74,6 +82,11 @@ export function floorBanner(floor) {
 // What the descent pays: a little score for every floor gone down, more the deeper it is.
 export const descentScore = floor => 50 * Math.max(1, Math.floor(floor));
 
+// The ore in one chest: the floor's share, so that opening every chest on it never gives more than the floor can hold (maxOreOnFloor).
+export function oreInChest(floor, chestsOnFloor) {
+    return Math.max(1, Math.floor(maxOreOnFloor(floor) / Math.max(1, chestsOnFloor)));
+}
+
 // What a chest gives: score by depth, and a heart if the marshal is hurt, else a spell of triple shot.
 export function chestReward(floor, hp, maxHp) {
     const heal = hp < maxHp;
@@ -104,9 +117,27 @@ export function confirmText(kind, floor) {
 }
 
 // What the result screen says when the run ends: how deep you got.
-export function resultText(result, floor) {
-    if(result === 'mine-win') return ['LIFT UP', `You rode the lift back up from depth ${floor}.`];
-    return ['WASTED', `You fell on depth ${floor}.`];
+export function resultText(result, floor, ore = 0) {
+    const carried = ore ? ` ${ore} ore` : '';
+    if(result === 'mine-win') return ['LIFT UP', `You rode the lift back up from depth ${floor}${ore ? ` with${carried}` : ''}.`];
+    return ['WASTED', `You fell on depth ${floor}${ore ? ` and lost${carried}` : ''}.`];
 }
 
-export const PRACTICE_NOTE = 'The Hollow Claim: practice only, nothing is saved yet.';
+// What the run reports when it ends (src/mineProgress.js, applyMineRun): where it began, how deep, the ore carried, and how it ended.
+export function runSummary(result, seconds) {
+    return { startFloor: mine.startFloor, depth: mine.floor, ore: mine.ore, outcome: result === 'mine-win' ? 'up' : 'fell', seconds: Math.max(0, Math.round(seconds)) };
+}
+
+// The line under the result once the run is saved (`outcome` is what applyMineRun returned).
+export function savedText(outcome) {
+    const parts = [outcome.newDeepest ? `New deepest floor: ${outcome.depth}.` : `Deepest floor kept.`];
+    if(outcome.newCheckpoint) parts.push(`Checkpoint: floor ${outcome.newCheckpoint}.`);
+    if(outcome.carried) parts.push(outcome.kept ? `${outcome.kept} ore banked.` : `${outcome.lost} ore lost in the fall.`);
+    return `The Hollow Claim gives no stars and no money. ${parts.join(' ')}`;
+}
+
+export const PRACTICE_NOTE = 'The Hollow Claim gives no stars and no money. Saving your deepest floor...';
+export const SAVE_FAILED_NOTE = 'The Hollow Claim gives no stars and no money. Your deepest floor could not be saved this time.';
+
+// The HUD line for the lift, with the ore carried.
+export const statusText = (dx, dz, ore) => ore ? `${liftHint(dx, dz)}  ORE ${ore}` : liftHint(dx, dz);
