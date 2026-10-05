@@ -31,9 +31,9 @@ and the places a player has early are the plain, basic ones; the later ones are 
 
 | Road | Outlaw | Grievance, as the place tells it | Place | Verb | Tier |
 |---|---|---|---|---|---|
-| 1 | Dusty Pete | A saloon street gone to ruin | Copper Bit | COOK | 1: the basics |
-| 2 | Rattlesnake Rosa | A dry canyon and an unlucky pack | Whisper Wash | SCOUT | 1 |
-| 3 | Deacon Graves | A burnt chapel | Hollow Hill | BUILD | 1 |
+| 1 | Dusty Pete | A saloon street gone to ruin | Copper Bit | SERVE | 1: the basics |
+| 2 | Rattlesnake Rosa | A dry canyon and an unlucky pack | Whisper Wash | TAME | 1 |
+| 3 | Deacon Graves | A burnt chapel | Hollow Hill | KEEP | 1 |
 | 4 | The Calloways | A farm lost on the small print | Calloway Farm | GROW | 1 |
 | 5 | Iron Jack Harlan | A man the smithy would not hire | Foundry Yard | SMELT | 2: make and move |
 | 6 | Mad Mesa Morgan | A dry channel | Morgan's Channel | WATER | 2 |
@@ -71,8 +71,8 @@ This is the hard rule, and it holds in both directions:
 3. **A link between two places is a bonus, never a need.** It exists only while both ends are open. Take one end away and the
    other goes back to exactly what it does alone. Each link is a small pure function of "is the other place open", so a test can
    run the place with its partner shut and open and compare.
-4. **Nothing can ask for something that is shut.** Orders name only goods from open places. A project (Hollow Hill) lists what it
-   needs, and a need from a shut place reads "Iron Jack's yard is shut", never blocks the other projects, and always has at least
+4. **Nothing can ask for something that is shut.** Orders name only goods from open places. A chapel piece (Hollow Hill) lists what it
+   can use, and a need from a shut place reads "Iron Jack's yard is shut", never blocks the other projects, and always has at least
    one route that uses only tier 1 places. Prices (Silver Belle) and patrols (Fort Pell) count only open places.
 5. **Shut places add nothing and take nothing away.** They are not in totals, prices or orders, and the town simply shows the
    gate.
@@ -85,13 +85,13 @@ the results must be identical.
 | Link | When both are open | When the other end is shut |
 |---|---|---|
 | Channel to Farm | Crops grow 10% sooner ("watered") | The farm grows at its normal speed |
-| Farm to Copper Bit | Pete cooks with your farm goods; meals sell for more than the goods in them | Pete cooks from his own slow kitchen stock, so cooking still works |
-| Farm to Whisper Wash | Eggs from the coop feed the pups, who grow and scout sooner | The pups eat wild food and grow at the base rate |
+| Farm to Copper Bit | Pete cooks with your farm goods: more dishes on the menu and bigger tips | Pete cooks from his own stock, a smaller menu, so the shift still works |
+| Farm to Whisper Wash | Your pets can follow you out of the Wash, and farm food (eggs) wins trust sooner | The Wash works on wild food; pets stay in the Wash |
 | Foundry to the town | Iron bars lower the dollar cost of an upgrade | Upgrades cost the plain dollars, as now |
 | Foundry to Fort Pell | Patrols also bring back scrap | Patrols pay dollars only, a little more of them |
 | Crossing to everywhere | Orders name goods from the open places | Orders name only the goods you can make |
 | Silver Belle | The price board covers the goods of every open place | It covers the goods of the places that are open |
-| Hollow Hill | Projects use goods from several places, with a route for every tier | Each project shows what it is waiting for and the others go on |
+| Hollow Hill | Other places' goods can speed a chapel piece (meals for the volunteers, finds for the bell) | The hill needs none of them; each piece shows what could help and the others go on |
 
 ### What the player sees
 
@@ -128,9 +128,9 @@ town as an overview, and then the places cannot be entered (they need walking).
 | El Espectro | **Tres Rios** | TEND | planned |
 | Lucky Lou | **The Silver Belle** | MARKET | planned |
 | Colonel Crane | **Fort Pell** | PATROL | planned |
-| Dusty Pete | **Copper Bit** | COOK | the street is built in town (2026-10-01), the place is planned |
-| Rattlesnake Rosa | **Whisper Wash** | SCOUT | the canyon is built in town (2026-10-01), the place is planned |
-| Deacon Graves | **Hollow Hill** | BUILD | the chapel is built in town (2026-10-01), the place is planned |
+| Dusty Pete | **Copper Bit** | SERVE | the street is built in town (2026-10-01), the place is designed below, not built |
+| Rattlesnake Rosa | **Whisper Wash** | TAME | the canyon is built in town (2026-10-01), the place is designed below, not built |
+| Deacon Graves | **Hollow Hill** | KEEP | the chapel is built in town (2026-10-01), the place is designed below, not built |
 
 Until a place is built it is ground you walk on in the town, with one plaque to read (`TOWN_PLAN.md`, steps B and E). Copper
 Bit, Whisper Wash and Hollow Hill were added on 2026-10-01 so that all ten outlaws have a place: they open with the first
@@ -225,37 +225,81 @@ better day to sell. The notice post shows tomorrow's prices.
 dollars and scrap. The board shows what each patrol pays and when the deputies return. Patrols never involve combat on the
 screen, and the number of deputies grows with place upgrades.
 
-### 8. Copper Bit: COOK (street built, place planned)
+### 8. Copper Bit: SERVE (street built; the rules are built 2026-10-05, the place is not)
 
 *Copper Bit's saloon street is open again. Dusty Pete runs the bar; the broken piano stays broken.* Opens with Dusty Pete.
 Southwest of the town (the gate is on the south edge, left of the channel).
 
 **Built now:** a street of weathered false fronts, a SALOON sign, spilled kegs, a hitching rail, and the broken piano, which you
 can read about.
-**The place:** the saloon kitchen. Turn goods into **meals** (bread from wheat, an egg plate, cornbread, pumpkin pie); a
-meal sells for more than the goods in it. With the farm open Pete cooks with your farm goods; without it he cooks from his own
-kitchen stock, a slow trickle, so Copper Bit works on its own. The **piano** is the one game here: a short tune to play on the broken keys, once a
-day, that pays a small tip. It tests timing, not luck, and a bad try only costs the try.
 
-### 9. Whisper Wash: SCOUT (canyon built, place planned)
+**The game: a shift behind Pete's bar** (a serve-the-customers game, played on one screen).
+- A **shift** lasts about two minutes. Customers come in and sit at the bar or the tables. Each shows what they want (a drink,
+  beans, cornbread, pumpkin pie) and a **patience bar** that runs down.
+- You work three stations, the stove, the barrel and the oven, in a few quick steps each (cook, pour, bake), carry the plate to the
+  right seat and take the money. A quick, right serve earns a **tip**, and serving without a miss builds a **combo**.
+- **Nights** are the levels: each one has a bigger crowd, more dishes and more stations. **Regulars** have a favourite dish, and a
+  happy regular tips more and comes back. Reading the room (who is about to leave) is the skill.
+- **Upgrades** are bought with dollars you earned (a better stove, taps, stools). They make a shift smoother, never longer, and
+  never touch combat.
+- **The piano** is a small separate game between shifts: a short tune of timed keys on the broken piano that pays a small tip,
+  once a day. It tests timing, not luck, and a bad try only costs the try.
+- **The farm is a bonus.** With the farm open Pete cooks with your farm goods: more dishes on the menu and bigger tips. Without it
+  he cooks from his own stock with a smaller menu, so Copper Bit works on its own.
+- **The income rule.** The first **three shifts of a day** pay their wages and tips. Further shifts are free practice that still
+  earn stars for the nights but no dollars, the same once-or-twice-a-day check-in the jail and the farm use. The best a day can
+  bank is tested to stay under the jail's top rate. No shift is sold, sped up or bought back.
+
+**Built so far (slice 1, the data contract, 2026-10-05).** `src/saloon.js` has the rules and `profile.town.saloon` the saved state
+(`tests/saloon.test.js`). The shift is played on the client; its summary `{ night, served: [{ dish, tip }] }` is settled by the
+server, which never trusts more than a night's crowd (`crowd(night)`, 3 to 10) or a dish that is not on that night's menu. Prices:
+sarsaparilla $2, beans $3, cornbread $4 (from night 2), egg plate $5 (night 3) and pumpkin pie $8 (night 5) only with the farm open.
+A tip adds 0, a quarter or a half of the price (a fifth more with the farm). Three paid shifts a day, by the server's clock
+(a clock moved back brings none back); later ones pay nothing and still earn the night's stars (half, three quarters, all of the
+crowd). A night opens with a star on the one before. The test holds a whole day's best (3 shifts) to $400, like a farm check-in.
+**Waiting on lanes:** `server/app.js` (scale) `POST /api/town/saloon` calling `saloonAction(user.profile, body, now())`, and
+`saloon(body)` on both wallets in the shared `src/wallet.js`, the same way as `orders`. **Not built yet:** the place
+(`src/places/saloon.js`, the shift screen, the scene), upgrades, regulars and the piano.
+
+### 9. Whisper Wash: TAME (canyon built, place designed 2026-10-05)
 
 *Water runs down the old riverbed again. Rosa's wolf pups sleep in the den under the bank.* Opens with Rattlesnake Rosa.
 West edge, north of the farm.
 
 **Built now:** a dry riverbed with a thread of water, canyon walls, the den, and three pups.
-**The place:** raise the pups. Feed them and they grow (eggs from the farm if it is open make them grow sooner; wild food otherwise); a grown pup can **scout**: it goes out for a set time and returns
-with a find (a trinket to sell, a tool, an arrowhead). The farm can feed the Wash, but the Wash never needs the farm.
 
-### 10. Hollow Hill: BUILD (chapel built, place planned)
+**The game: a sanctuary where you win the trust of wild creatures** (taming and raising).
+- **Many kinds, not only wolves.** Wolf pups first, then coyotes, jackrabbits, owls, lizards, a badger and snakes. Each lives on a
+  different part of the Wash: the riverbed, the canyon wall, the rocks, the den. Rosa's notes say what each one likes to eat.
+- **Taming is trust, never luck.** Feed a creature what it likes and spend quiet time near it. It takes a fixed number of visits for
+  each creature, so there is no roll, no loot box and nothing to buy. A shyer creature needs more trust or one particular food.
+- **Bond levels.** A tamed pet has a bond level. A higher bond means it can scout further and bring back better finds (a trinket to
+  sell, a tool, an arrowhead), and it earns a cosmetic change such as a collar or markings. Scouting takes real time and waits for
+  you; it is never sped up for money.
+- **A pet that follows you.** Once the farm is open, one tamed pet at a time can follow the marshal out of the Wash, in the town and
+  in the other places, as the dog does now. Pets are cosmetic and finders only: they never help in a fight.
+- **The farm is a bonus.** Farm food (eggs) wins a creature's trust sooner and lets a pet leave the Wash. The Wash itself opens on
+  Rosa's star and works on wild food, so the Wash never needs the farm.
+
+### 10. Hollow Hill: KEEP (chapel built, place designed 2026-10-05)
 
 *The Deacon rebuilt the chapel from the burnt beams. The bell rings once at dusk for everyone the road took.* Opens with
 Deacon Graves. North edge, between Tres Rios and the Foundry.
 
 **Built now:** the chapel with a bell tower, the bell on a frame, graves under the hill, and lamps.
-**The place:** a **project board** of things the town builds together: the bell tower, a new pew, a school bench. Each lists the goods it needs (iron bars, wheat, fish) and has a route that uses only the early
-places, so a shut place never blocks a project. A finished project shows in the town for good, and the bell rings at dusk. This
-is the long game that gives goods from every place somewhere to go, and it is where "the town changes because of what you
-did" is clearest.
+
+**The game: the dusk vigil** (a lamplighter puzzle, gentle and fit for every age).
+- Each evening the bell rings once and the hill goes dark. You **walk the hill and light the lanterns** on the paths and graves
+  before the bell's echo fades.
+- The route is the puzzle. Some lanterns need oil from a stand, some are out of reach until you have lit another, and the order
+  changes each night, so you plan a path rather than race.
+- **What it earns.** Each lantern lit adds light to the chapel's rebuilding, and a finished night pays a small amount. The Deacon
+  rebuilds the chapel from the burnt beams one piece at a time: a window, the pews, the bell tower, the roof.
+- **Every finished piece is permanent.** It shows in the town for good and the bell rings at dusk. This is where "the town changes
+  because of what you did" is clearest.
+- **The other places are a bonus.** Pete's meals for the volunteers and the Wash's finds for the bell can speed a piece along, but
+  the hill needs none of them: each piece shows what could help, and the others go on.
+- Nothing is timed for pay. The vigil waits for you each evening, and a missed night costs nothing but the night.
 
 ## Order of work
 
@@ -275,7 +319,7 @@ did" is clearest.
      Errors are `EconomyError` codes `locked`, `no_order`, `not_enough`, `bad_action`. Needs a server test for the lock and the clock.
 3. **H3:** Foundry Yard and Fort Pell, with scrap dropping from fights.
 4. **H4:** Copper Bit, Tres Rios, Whisper Wash.
-5. **H5:** The Silver Belle's price board and Hollow Hill's projects.
+5. **H5:** The Silver Belle's price board and Hollow Hill's chapel.
 
 Each step ships on its own, with its rules tested in `tests/` and a walk-through in `npm run test:town`.
 
