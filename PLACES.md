@@ -225,7 +225,7 @@ better day to sell. The notice post shows tomorrow's prices.
 dollars and scrap. The board shows what each patrol pays and when the deputies return. Patrols never involve combat on the
 screen, and the number of deputies grows with place upgrades.
 
-### 8. Copper Bit: SERVE (street built, place designed 2026-10-05)
+### 8. Copper Bit: SERVE (street built; the rules are built 2026-10-05, the place is not)
 
 *Copper Bit's saloon street is open again. Dusty Pete runs the bar; the broken piano stays broken.* Opens with Dusty Pete.
 Southwest of the town (the gate is on the south edge, left of the channel).
@@ -249,6 +249,17 @@ can read about.
 - **The income rule.** The first **three shifts of a day** pay their wages and tips. Further shifts are free practice that still
   earn stars for the nights but no dollars, the same once-or-twice-a-day check-in the jail and the farm use. The best a day can
   bank is tested to stay under the jail's top rate. No shift is sold, sped up or bought back.
+
+**Built so far (slice 1, the data contract, 2026-10-05).** `src/saloon.js` has the rules and `profile.town.saloon` the saved state
+(`tests/saloon.test.js`). The shift is played on the client; its summary `{ night, served: [{ dish, tip }] }` is settled by the
+server, which never trusts more than a night's crowd (`crowd(night)`, 3 to 10) or a dish that is not on that night's menu. Prices:
+sarsaparilla $2, beans $3, cornbread $4 (from night 2), egg plate $5 (night 3) and pumpkin pie $8 (night 5) only with the farm open.
+A tip adds 0, a quarter or a half of the price (a fifth more with the farm). Three paid shifts a day, by the server's clock
+(a clock moved back brings none back); later ones pay nothing and still earn the night's stars (half, three quarters, all of the
+crowd). A night opens with a star on the one before. The test holds a whole day's best (3 shifts) to $400, like a farm check-in.
+**Waiting on lanes:** `server/app.js` (scale) `POST /api/town/saloon` calling `saloonAction(user.profile, body, now())`, and
+`saloon(body)` on both wallets in the shared `src/wallet.js`, the same way as `orders`. **Not built yet:** the place
+(`src/places/saloon.js`, the shift screen, the scene), upgrades, regulars and the piano.
 
 ### 9. Whisper Wash: TAME (canyon built, place designed 2026-10-05)
 

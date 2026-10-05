@@ -102,6 +102,8 @@
     "src/places/farm.js",
     "src/places/undertaker.js",
     "src/places/vane.js",
+    "src/saloon.js",
+    "tests/saloon.test.js",
     "src/places/channel.js",
     "src/channelLayout.js",
     "tests/channelLayout.test.js",

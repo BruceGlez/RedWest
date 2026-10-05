@@ -46,7 +46,7 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 ### 3. Build next (code)
 - **Places H2 to H5** (`PLACES.md`), each shipped alone with unit, server and `npm run test:town` tests:
   H2 Vane's Crossing orders and Morgan's Channel watering the farm (order rules, the Crossing's order board and Morgan's Channel watering the farm built 2026-10-05, placeholder scenes; the bounty-board pointer, the Channel's fishing and warehouse are still to do, see `PLACES.md`); H3 Foundry Yard and Fort Pell (scrap from fights);
-  H4 Copper Bit (a serve-the-customers shift game), Tres Rios, Whisper Wash (taming many kinds of creature); H5 Silver Belle price board and Hollow Hill (the dusk lantern vigil that rebuilds the chapel); the three early places are designed in `PLACES.md` (2026-10-05).
+  H4 Copper Bit (a serve-the-customers shift game; the rules and saved state are built 2026-10-05, waiting on a server route and wallet method, see `PLACES.md`), Tres Rios, Whisper Wash (taming many kinds of creature); H5 Silver Belle price board and Hollow Hill (the dusk lantern vigil that rebuilds the chapel); the three early places are designed in `PLACES.md` (2026-10-05).
 - **Performance and look:** quality switch and bloom for the desert and arena (town has it); cut fight draw calls further; ground
   detail, wind and horizon pieces.
 - **3D enemies:** the eight enemy models (bandit, gunslinger, rifleman, dynamiter, knifer, duelist, brute, ghost) are in the fight, loaded on demand and hidden off screen; box figures stay as the fallback (`ENEMY_MODELS`, `src/enemyTypes.js`).
