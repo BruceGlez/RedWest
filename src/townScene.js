@@ -98,11 +98,17 @@ function porch(group, { w, z, h = 2.6, color = C.timberDark }) {
 const BUILDERS = {
     jail(level) {
         const g = new THREE.Group();
+        g.add(box(8.2, 0.4, 7.2, C.stoneDark, 0, 0.2, 0)); // foundation ledge
         g.add(box(8, 5, 7, C.stone, 0, 2.5, 0));
         g.add(box(8.4, 0.5, 7.4, C.stoneDark, 0, 5.1, 0));
+        // Corner stone quoins
+        for(const x of [-3.8, 3.8]) for(const z of [-3.3, 3.3]) g.add(box(0.5, 5, 0.5, C.stoneDark, x, 2.5, z));
         g.add(box(1.8, 3, 0.3, C.iron, 0, 1.5, 3.55));
+        // Entrance lantern
+        g.add(box(0.3, 0.4, 0.3, C.glow, 1.3, 2.2, 3.7, 1.2));
         for(const x of [-2.6, 2.6]) {
             g.add(box(1.2, 1.2, 0.2, C.glow, x, 3, 3.55, 0.5));
+            g.add(box(1.4, 0.15, 0.3, C.stoneDark, x, 2.35, 3.65)); // window sill
             for(let b = -1; b <= 1; b++) g.add(box(0.1, 1.3, 0.3, C.iron, x + b * 0.35, 3, 3.62));
         }
         const s = sign('JAIL', 4);
@@ -132,10 +138,15 @@ const BUILDERS = {
     },
     sheriff(level) {
         const g = new THREE.Group();
+        g.add(box(7.2, 0.3, 6.2, C.stoneDark, 0, 0.15, 0)); // foundation base
         g.add(box(7, 5, 6, C.timber, 0, 2.5, 0));
         g.add(box(7, 2, 0.4, C.timberDark, 0, 6, 2.9)); // false front
+        g.add(box(7.4, 0.3, 0.5, C.trim, 0, 7.1, 2.9)); // decorative top cornice
         g.add(box(1.6, 2.8, 0.2, C.trim, 0, 1.4, 3.05));
         windows(g, { w: 7, y: 2.2, z: 3.05, count: 2, lit: 0.9 });
+        // Window sills and lanterns
+        for(const x of [-2.33, 2.33]) g.add(box(1.2, 0.12, 0.25, C.timberDark, x, 1.5, 3.12));
+        g.add(box(0.3, 0.4, 0.3, C.glow, -1.2, 2.4, 3.15, 1.1));
         const star = new THREE.Mesh(new THREE.CylinderGeometry(0.9, 0.9, 0.2, 5), mat(C.brass, 0.3));
         star.rotation.x = Math.PI / 2;
         star.position.set(0, 6.1, 3.15);
@@ -161,10 +172,17 @@ const BUILDERS = {
             rifle.rotation.z = 0.12;
             g.add(rifle, box(0.1, 0.9, 0.12, C.iron, 2.3 + i * 0.35, 2.0, 3.36));
         }
+        g.add(box(6.2, 0.3, 6.2, C.brickDark, 0, 0.15, 0)); // foundation
         g.add(box(6, 4.5, 6, C.timberDark, 0, 2.25, 0));
         g.add(box(6, 1.6, 0.4, C.timber, 0, 5.3, 2.9));
+        // Side chimney
+        g.add(box(1.0, 5.5, 1.0, C.brickDark, -2.8, 2.75, -1.0));
         g.add(box(1.5, 2.6, 0.2, C.trim, -1.5, 1.3, 3.05));
         g.add(box(2.2, 1.4, 0.15, C.glow, 1.3, 2.2, 3.05, 0.8));
+        // Display window shutters & lantern
+        g.add(box(0.3, 1.4, 0.1, C.timber, 0.1, 2.2, 3.1));
+        g.add(box(0.3, 1.4, 0.1, C.timber, 2.5, 2.2, 3.1));
+        g.add(box(0.3, 0.4, 0.3, C.glow, -2.4, 2.2, 3.12, 1.1));
         const s = sign('GUNSMITH', 5);
         s.position.set(0, 5.3, 3.12);
         g.add(s);
@@ -182,25 +200,36 @@ const BUILDERS = {
             head.position.set(x, 2.35, 2.9);
             g.add(box(0.5, 0.9, 0.3, [0x37474f, 0x6b1d1d, 0x3e2723][i], x, 1.75, 2.9), head);
         }
+        g.add(box(6.2, 0.3, 6.2, C.brickDark, 0, 0.15, 0)); // foundation base
         g.add(box(6, 6, 6, C.brick, 0, 3, 0));
         windows(g, { w: 6, y: 4.6, z: 3.05, count: 2, lit: 0.8 });
         g.add(box(3.5, 1.6, 0.15, C.glow, 0.8, 1.8, 3.05, 0.7));
+        g.add(box(3.6, 0.15, 0.4, C.timberDark, 0.8, 0.9, 3.25)); // flower box / display ledge
         g.add(box(1.3, 2.6, 0.2, C.trim, -2, 1.3, 3.05));
+        g.add(box(0.3, 0.4, 0.3, C.glow, -2.8, 2.2, 3.12, 1.1)); // doorway lantern
         g.add(box(6.4, 0.2, 1.6, 0x6b1d1d, 0, 3.1, 3.8)); // awning
         const s = sign('TAILOR', 4.5);
         s.position.set(0, 3.7, 3.1);
         g.add(s);
         g.add(box(6.4, 0.5, 6.4, C.brickDark, 0, 6.2, 0));
+        g.add(box(6.2, 0.3, 0.2, C.trim, 0, 6.5, 3.1)); // roof parapet trim
         return g;
     },
     // The Arena (src/arena.js): a walled ring of sand with a gate and a flag, where practice fights are picked.
     arena() {
         const g = new THREE.Group();
         g.add(box(11, 0.08, 9, 0xb89a64, 0, 0.05, 0)); // the sand
+        g.add(box(11.4, 0.3, 9.4, C.stoneDark, 0, 0.15, 0)); // stone border
         g.add(box(11, 3, 0.4, C.timber, 0, 1.5, -4.3)); // back wall
+        // Weapon rack along back wall
+        g.add(box(2.2, 1.8, 0.2, C.timberDark, -3, 0.9, -4.0));
+        g.add(box(1.8, 0.2, 0.3, C.iron, -3, 1.4, -3.9));
         for(const x of [-5.3, 5.3]) g.add(box(0.4, 3, 9, C.timber, x, 1.5, 0)); // side walls
         for(const x of [-3.75, 3.75]) g.add(box(3.5, 3, 0.4, C.timber, x, 1.5, 4.3)); // front wall, with the gate between
-        for(const x of [-2, 2]) g.add(box(0.5, 5, 0.5, C.timber, x, 2.5, 4.3)); // gateposts
+        for(const x of [-2, 2]) {
+            g.add(box(0.5, 5, 0.5, C.timber, x, 2.5, 4.3)); // gateposts
+            g.add(box(0.35, 0.45, 0.35, C.glow, x, 5.3, 4.3, 1.4)); // torch sconces
+        }
         g.add(box(4.8, 0.4, 0.5, C.timber, 0, 5, 4.3)); // the beam
         const s = sign('ARENA', 4);
         s.position.set(0, 6, 4.6);
@@ -211,14 +240,22 @@ const BUILDERS = {
     },
     saloon() {
         const g = new THREE.Group();
+        g.add(box(10.2, 0.3, 7.2, C.stoneDark, 0, 0.15, 0)); // stone foundation
         g.add(box(10, 8, 7, C.brick, 0, 4, 0));
         g.add(box(10, 2.4, 0.4, C.brickDark, 0, 9.1, 3.3));
+        g.add(box(10.4, 0.3, 0.5, C.trim, 0, 10.4, 3.3)); // decorative top trim
         windows(g, { w: 10, y: 6, z: 3.55, count: 4, lit: 0.8, size: 1.1 });
         g.add(box(2.4, 2.8, 0.2, C.glow, 0, 1.5, 3.55, 0.6)); // swinging doors, lit from inside
+        g.add(box(3.2, 0.18, 0.8, C.timber, 0, 0.09, 3.95)); // entrance steps
         windows(g, { w: 10, y: 2, z: 3.55, count: 2, lit: 1, size: 1.3 });
+        // Entrance lanterns
+        for(const x of [-1.5, 1.5]) g.add(box(0.35, 0.45, 0.35, C.glow, x, 2.2, 3.7, 1.2));
         g.add(box(10, 0.3, 2, C.timberDark, 0, 4.3, 4.5)); // balcony
         g.add(box(10, 0.8, 0.15, C.timber, 0, 4.9, 5.45));
-        for(const x of [-4.7, 4.7]) g.add(box(0.3, 4.3, 0.3, C.timberDark, x, 2.15, 5.3));
+        for(const x of [-4.7, 4.7]) {
+            g.add(box(0.3, 4.3, 0.3, C.timberDark, x, 2.15, 5.3));
+            g.add(box(0.3, 0.6, 0.8, C.timberDark, x, 3.9, 4.1)); // balcony support brackets
+        }
         const s = sign('SALOON', 6);
         s.position.set(0, 9.1, 3.55);
         g.add(s);
@@ -242,10 +279,18 @@ const BUILDERS = {
             clock.position.set(0, 10.8, 2);
             g.add(box(2.4, 2.4, 0.5, C.stoneDark, 0, 10.8, 1.7), clock);
         }
+        g.add(box(7.2, 0.3, 6.2, C.stoneDark, 0, 0.15, 0)); // foundation base
         g.add(box(7, 6, 6, C.stone, 0, 3, 0));
-        for(const x of [-2.6, -0.9, 0.9, 2.6]) g.add(box(0.6, 4.6, 0.6, 0xb8ac98, x, 2.3, 3.3));
+        g.add(box(4.2, 0.2, 0.8, 0xb8ac98, 0, 0.1, 3.4)); // entrance steps
+        for(const x of [-2.6, -0.9, 0.9, 2.6]) {
+            g.add(box(0.6, 4.6, 0.6, 0xb8ac98, x, 2.3, 3.3));
+            g.add(box(0.8, 0.3, 0.8, C.brass, x, 0.15, 3.3)); // column bases
+            g.add(box(0.8, 0.3, 0.8, C.brass, x, 4.45, 3.3)); // column capitals
+        }
         g.add(box(7.6, 1, 1.2, 0xb8ac98, 0, 5.2, 3.2));
         g.add(box(1.8, 2.8, 0.2, C.iron, 0, 1.4, 3.05));
+        g.add(box(0.35, 0.45, 0.35, C.glow, -1.3, 2.4, 3.15, 1.1)); // entrance lamp
+        g.add(box(0.35, 0.45, 0.35, C.glow, 1.3, 2.4, 3.15, 1.1));
         const s = sign('BANK', 3.5);
         s.position.set(0, 5.2, 3.85);
         g.add(s);
@@ -254,10 +299,14 @@ const BUILDERS = {
     },
     depot() {
         const g = new THREE.Group();
+        g.add(box(6.2, 0.3, 5.2, C.stoneDark, 0, 0.15, 0)); // foundation
         g.add(box(6, 4, 5, C.timber, 0, 2, 0));
         g.add(roof(6, 5, 1.6, C.green, 4));
         g.add(box(10, 0.3, 3.5, C.timberDark, 0, 3.4, 4)); // platform canopy
         for(const x of [-4.5, 0, 4.5]) g.add(box(0.25, 3.4, 0.25, C.timberDark, x, 1.7, 5.5));
+        // Platform bench and trunk props
+        g.add(box(3.2, 0.4, 0.8, C.timber, 2.5, 0.5, 3.8));
+        g.add(box(1.2, 0.7, 0.8, C.timberDark, -2.5, 0.5, 3.8));
         windows(g, { w: 6, y: 2, z: 2.55, count: 2, lit: 1 });
         const s = sign('DEPOT', 4);
         s.position.set(0, 5.3, 1.5);
