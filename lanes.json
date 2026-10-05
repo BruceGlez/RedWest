@@ -43,7 +43,9 @@
     "tests/animationClips.test.js",
     "tests/townQuality.test.js",
     "src/particleSystem.js",
-    "tests/characters-smoke.mjs"
+    "tests/characters-smoke.mjs",
+    "src/place*.js",
+    "src/mineScene.js"
    ],
    "checks": [
     "npm test",
@@ -57,7 +59,6 @@
    "doc": "docs/lanes/mine.md",
    "owns": [
     "src/mine*.js",
-    "src/placeUndertaker.js",
     "src/undertakerLayout.js",
     "styles/mine.css",
     "MINE_PLAN.md",
@@ -76,7 +77,6 @@
    "doc": "docs/lanes/town.md",
    "owns": [
     "src/farm*.js",
-    "src/placeFarm.js",
     "src/town.js",
     "src/townWalk*.js",
     "src/townSpots.js",

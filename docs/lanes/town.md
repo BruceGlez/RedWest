@@ -9,6 +9,7 @@
 - The Arena is a run mode in `src/modes/arena.js`
 
 ## Rules
+You own the **layout, rules and cards** of the town and every place, not the look: the scene builders (`placeFarm.js`, `townScene.js`, `src/place*.js`) are the art lane's. A new place's PR adds a plain box-built placeholder scene so it works at once, flagged "cross-lane on purpose"; after that the art agent owns its look. See "Art and function on the same area" in `AGENTS.md`.
 Places change income and goods, never combat. A tended place never earns more than the jail's top rate. No timer is sold.
 
 ## You own
