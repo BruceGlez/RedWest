@@ -29,6 +29,7 @@ walking back to it brings you up with whatever you got. Deeper is stranger, hard
 | **1c** | Fate-style depth, after the first playtest: no bottom, caves that grow a lot with every floor, a new monster on every floor, chests, and a shaft that is always open | medium | **built 2026-10-05** ("The descent", below) |
 | **1d** | After the second playtest: the shaft and the lift ask first, and the monsters belong to their chambers (no endless stream; a chamber refills only after you have gone far away) | small | **built 2026-10-05** ("The descent", below) |
 | **1e** | Floor variety: twin caverns, long galleries and rockfalls you walk round, deterministic per depth | small | **built 2026-10-05** ("The maps", below) |
+| **1f** | Six more monsters for floors 15 to 20, built only from behaviours and looks the game already has (`look` field, see "Deeper monsters") | small | **built 2026-10-05**; own models wait for the art lane |
 | **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | planned |
 | **3** | Boss floors (every 5th), more of Mr. Grimsby's talk and rumours, a pet that follows you down | medium | planned |
 | **4** | The art pass for the maps and the monsters: modelled rock, timber, carts, a real lift and shaft, painted textures (`POLISH_PLAN.md`, section 6) | large | parked, like the other art passes. The maps are made of boxes so this can replace them one builder at a time. |
@@ -112,6 +113,53 @@ How they work (`src/mineMap.js` is the rules, `src/mineScene.js` the drawing; `t
   tens of milliseconds to make, not a second.
 - Everything is boxes, cylinders and a few merged meshes: the floor, the rock, the props (columns, timber arches, crates, carts, rails,
   the lift) and the lantern glow are about five draw calls, plus the shaft and the chests. Slice 4 can replace any one without touching the rules.
+
+## Deeper monsters (slice 1f, floors 15 to 20)
+
+One new monster per floor below the old ladder, in `MINE_MONSTERS` and `MINE_LADDER` (`src/mineMonsters.js`). None needs a new behaviour:
+each runs one the Wanted Road already has, and each borrows an existing model through a `look` field that `spawnEnemy` reads
+(`src/enemySystem.js`, a small separate PR in the combat lane's file). When the art lane makes a model, the monster gets its own mesh in
+`MINE_MESHES` and drops `look`; nothing else changes.
+
+| Floor | Id | Name | Behaviour | Borrowed look | Cost | hp | What is new about it |
+|---|---|---|---|---|---|---|---|
+| 15 | `slagadder` | SLAG ADDER | zigzag | rattler | 1.0 | 2 | A glowing snake: a rattler that takes two hits |
+| 16 | `slaglobber` | SLAG LOBBER | lobber | dynamiter | 2.4 | 3 | A blaster who throws from the dark |
+| 17 | `sentry` | CAIRN SENTRY | sniper | rifleman | 2.6 | 3 | A watcher with a red line |
+| 18 | `hollowhide` | HOLLOWHIDE | charger | stonekin | 3.8 | 11 | The mountain's weight, walking |
+| 19 | `choir` | PALE CHOIR | volley | trooper | 2.8 | 3 | Singing miners, a burst on every beat |
+| 20 | `ghoul` | GALLERY GHOUL | phantom | ghost | 2.4 | 3 | Steps out of the timbers beside you |
+
+Costs, hp and speed stay within about 40% of the monster whose behaviour they use (`tests/mineMonsters.test.js` checks it), so the budget
+of a chamber (`nodeBudget`) still buys a real fight on every floor. Past floor 20 the roster stops growing, as before.
+
+### Art prompts (for the art lane)
+
+Style for all six: the game's low-poly Wild West look (`src/assets.js`, `ASSETS.md`), original design, no real-world brands or characters,
+one figure about 2 world units tall (Hollowhide about 3.5), readable from the high camera at a distance, flat colours with a little
+emissive glow for the mine lighting. Add a row to `ASSETS.md` for each. Each prompt can go to the model tool as is.
+
+1. **SLAG ADDER** (`slagadder`): "Low-poly stylised snake about 1.5 units long, thick body in a loose S shape, head raised. Charcoal
+   black scales with seams of glowing orange like cooling slag along the back and a pale ember glow in the eyes. Small flat forked
+   tongue. Cartoon proportions, chunky shapes, no realistic scales."
+2. **SLAG LOBBER** (`slaglobber`): "Low-poly Wild West miner-blaster, 2 units tall, stocky. Soot-black face scarf, battered hard hat with
+   a dead lamp, canvas vest with sticks of dynamite across the chest, one arm raised holding a lit stick with an orange spark. Dusty
+   brown and charcoal clothing, ash grey skin, orange accents only on the fuse."
+3. **CAIRN SENTRY** (`sentry`): "Low-poly watcher figure, 2.2 units tall, thin and still, built from stacked grey stones like a cairn
+   with a ragged brown poncho and a wide hat made of a flat slate. Holds a long old rifle across its body. Two small pale blue-white
+   glints for eyes. Silhouette must read as a tall narrow figure."
+4. **HOLLOWHIDE** (`hollowhide`): "Low-poly hulking rock giant, 3.5 units tall, broad shoulders, small head sunk between them, arms
+   hanging to the knees. Body of dark slate plates with a cracked hollow in the chest that glows faint amber, old rusted mine-timber
+   braces strapped across it. Heavier and rounder than a plain stone golem, so it is not mistaken for the stonekin."
+5. **PALE CHOIR** (`choir`): "Low-poly undead miner in a long ragged shift coat, 2 units tall, hat in one hand, mouth open as if
+   singing, bone-pale skin and sunken eyes, other arm holding a short carbine at the hip. Washed-out cream and grey with a faded dark
+   red neckerchief. Faint cold-white glow at the mouth."
+6. **GALLERY GHOUL** (`ghoul`): "Low-poly ghoul, 2 units tall, hunched and long-armed, wrapped in rotted timber and rope like it grew
+   out of a mine gallery, splintered planks for ribs, a lantern hook for a hand. Mossy grey-green and bark brown, pale green glow in
+   the eye sockets. Semi-translucent edges are welcome because it fades in and out."
+
+What the combat lane would add later: nothing. Every behaviour above already exists. If a future monster needs a new behaviour it is
+the combat lane's, as before.
 
 ## Open questions
 
