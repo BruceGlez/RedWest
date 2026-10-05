@@ -89,6 +89,8 @@ export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
 
     // The wave director in gameLoop.js always chooses the type.
     const spawnType = requestedType || 'bandit';
+    // A mine monster may borrow another monster's look (and its shot numbers) with `look` until it has its own model (src/mineMonsters.js).
+    const look = MINE_MONSTERS[spawnType]?.look ?? spawnType;
 
     const bossStyle = spawnType === 'boss' ? getOutlaw(gameState.outlawIndex).signature.style : null;
     if (spawnType === 'boss') { 
@@ -109,16 +111,16 @@ export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
         speed = 5 + Math.min(wave * 0.4, 4); 
         type = 'gunslinger'; 
         hp = Math.max(1, Math.floor(wave / 5));
-    } else if (MINE_MESHES[spawnType]) {
+    } else if (MINE_MESHES[look]) {
         const def = MINE_MONSTERS[spawnType];
-        enemy = MINE_MESHES[spawnType]();
+        enemy = MINE_MESHES[look]();
         if(!def.heavy) enemy.scale.setScalar(0.9 + Math.random() * 0.2);
         speed = def.speed * (1 + Math.min(wave * 0.05, 0.3));
         type = spawnType;
         hp = def.hp;
-    } else if (NEW_TYPE_MESHES[spawnType]) {
-        const def = ENEMY_TYPES[spawnType];
-        enemy = NEW_TYPE_MESHES[spawnType]();
+    } else if (NEW_TYPE_MESHES[look]) {
+        const def = ENEMY_TYPES[spawnType] ?? MINE_MONSTERS[spawnType];
+        enemy = NEW_TYPE_MESHES[look]();
         if(!def.heavy) enemy.scale.setScalar(0.9 + Math.random() * 0.2);
         speed = def.speed * (1 + Math.min(wave * 0.05, 0.3));
         type = spawnType;
@@ -152,7 +154,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
     
     // Initialize enemy state
     // The current Wanted Road outlaw sets stage difficulty and signature threats.
-    const shot = SHOT_PROFILE[type];
+    const shot = SHOT_PROFILE[look];
     const stats = applyOutlawToEnemy(type, {
         speed, hp,
         shootCooldown: shot ? shot.cooldown + Math.random() * 0.6 : 2.0 + Math.random(),
@@ -188,8 +190,8 @@ export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
         setupBoss(enemy, bossStyle);
     }
     if(type === 'wolf') attachWolfModel(enemy);
-    if(type === 'ghost' || type === 'wraith') enemy.userData.stateTimer = 1.5 + Math.random();
-    if(type === 'rider') enemy.userData.stateTimer = 2.5 + Math.random() * 1.5;
+    if(look === 'ghost' || look === 'wraith') enemy.userData.stateTimer = 1.5 + Math.random();
+    if(look === 'rider') enemy.userData.stateTimer = 2.5 + Math.random() * 1.5;
 
     scene.add(enemy); 
     enemies.push(enemy);
