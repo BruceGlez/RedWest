@@ -65,7 +65,7 @@ export function createFarmPlace(host) {
         host.closeCard();
         return host.act(async () => {
             const result = await host.wallet.farm(body);
-            host.onProfile(result.host.profile());
+            host.onProfile(result.profile);
             host.track(`farm_${body.action}`);
             host.toast(wording(result.result));
         }, text => host.toast(text, true));
