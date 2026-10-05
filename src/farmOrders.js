@@ -63,27 +63,32 @@ export function ordersForDay(day, goods) {
     });
 }
 
-// Saved state: the newest day seen (a clock moved back never brings an old order back) and the orders filled.
-export const createOrders = (now = new Date()) => ({ day: dayNumber(now), filled: [] });
+// Saved state: the newest day seen (a clock moved back never brings an old order back), the first day the player used the board
+// (null until then: a new player sees only today's three, nothing carried over) and the orders filled.
+export const createOrders = (now = new Date()) => ({ day: dayNumber(now), since: null, filled: [] });
 
 export function normalizeOrders(raw, now = new Date()) {
     const orders = createOrders(now);
     if(!raw || typeof raw !== 'object') return orders;
     const day = Math.floor(Number(raw.day));
     if(Number.isFinite(day) && day > orders.day) orders.day = day;
+    const since = Math.floor(Number(raw.since));
+    if(raw.since != null && Number.isFinite(since) && since <= orders.day) orders.since = since;
     if(Array.isArray(raw.filled)) orders.filled = [...new Set(raw.filled.filter(id => /^\d+:\d$/.test(id) && (d => d >= orders.day - 1 && d <= orders.day)(Number(id.split(':')[0]))))];
     return orders;
 }
 
 const today = (profile, now) => Math.max(dayNumber(now), profile.town.orders?.day | 0);
 
-// Orders on the board now: today's three and yesterday's that were not filled (up to six), newest first.
+// Orders on the board now: today's three, and from the player's second day on, yesterday's that were not filled (up to six), newest first.
 export function openOrders(profile, now = new Date()) {
     if(!crossingOpen(profile)) return [];
     const day = today(profile, now);
     const filled = new Set(profile.town.orders?.filled ?? []);
     const goods = orderGoods(profile);
-    return [day, day - 1].flatMap(d => ordersForDay(d, goods).map(o => ({ ...o, waiting: d < day })))
+    const since = profile.town.orders?.since;
+    const days = since != null && since <= day - 1 ? [day, day - 1] : [day];
+    return days.flatMap(d => ordersForDay(d, goods).map(o => ({ ...o, waiting: d < day })))
         .filter(o => !filled.has(o.id));
 }
 
@@ -98,14 +103,24 @@ export function fillOrder(profile, id, now = new Date()) {
     const store = profile.town.farm.store;
     if(order.wants.some(w => (store[w.good] | 0) < w.count)) throw new EconomyError('not_enough', 'The barn does not have enough for that order.');
     for(const w of order.wants) store[w.good] -= w.count;
-    const orders = profile.town.orders = normalizeOrders({ day: today(profile, now), filled: [...(profile.town.orders?.filled ?? []), order.id] }, now);
+    const orders = profile.town.orders = normalizeOrders({ day: today(profile, now), since: profile.town.orders?.since ?? today(profile, now), filled: [...(profile.town.orders?.filled ?? []), order.id] }, now);
     profile.balances.dollars += order.pays;
     return { dollars: order.pays, day: orders.day };
 }
 
-// One entry point for the wallets and the server: { action: 'fill', order: '20000:1' }.
+// Walking up to the board for the first time starts the player's days (so yesterday's unfilled orders wait for them from then on).
+export function visitBoard(profile, now = new Date()) {
+    if(!crossingOpen(profile)) throw new EconomyError('locked', 'The Crossing is shut until Silas Vane is beaten.');
+    const orders = profile.town.orders ??= createOrders(now);
+    orders.since ??= today(profile, now);
+    orders.day = today(profile, now);
+    return { since: orders.since };
+}
+
+// One entry point for the wallets and the server: { action: 'visit' } or { action: 'fill', order: '20000:1' }.
 export function ordersAction(profile, body, now = new Date()) {
     switch(body?.action) {
+        case 'visit': return visitBoard(profile, now);
         case 'fill': return fillOrder(profile, String(body.order), now);
         default: throw new EconomyError('bad_action', 'That is not something the Crossing does.');
     }

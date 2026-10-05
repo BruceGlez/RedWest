@@ -263,13 +263,14 @@ did" is clearest.
 2. **H2:** orders (Vane's Crossing) and the Channel watering the farm; the bounty board points to waiting orders.
    - **Slice 1 (built 2026-10-05): the order rules.** `src/farmOrders.js`, saved as `town.orders`, tested in `tests/farmOrders.test.js`
      (shut state, refusals, daily orders, waiting a day, a clock moved back, the income cap). Three orders a day from the date,
-     goods of open places only (the farm's, today), $ paid at 1.15 x the stand price; an unfilled order waits one more day, so the
-     board holds up to six. **Not built yet:** the place itself (`src/places/vane.js`, scene, styles, walk test), the bounty-board
+     goods of open places only (the farm's, today), $ paid at 1.15 x the stand price. A new player sees only today's three; from their
+     second day an unfilled order waits one more day, so the board then holds up to six. The first `visit` (or fill) starts the player's days. **Not built yet:** the place itself (`src/places/vane.js`, scene, styles, walk test), the bounty-board
      pointer, and the Channel watering the farm.
+   - **Deferred (owner's decision):** Morgan's Channel watering the farm. Build the Channel as a real place first, then its watering, with the rule that a link is only a bonus while both ends are open.
    - **Waiting on lanes (contract):** filling an order changes the profile, so it needs a route and a wallet method, like the farm's.
      `server/app.js` (scale): `POST /api/town/orders` calls `ordersAction(user.profile, body, now())` from `src/farmOrders.js`, the same
      way `/api/town/farm` calls `farmAction`, and returns `{ result, profile }`. `src/wallet.js` (shared): `orders(body)` on both wallets,
-     offline `ordersAction(profile, body, new Date()); persist()`, online `call('/api/town/orders', body)`. Body: `{ action: 'fill', order: '<day>:<slot>' }`.
+     offline `ordersAction(profile, body, new Date()); persist()`, online `call('/api/town/orders', body)`. Body: `{ action: 'visit' }` (once, when the player first walks in) or `{ action: 'fill', order: '<day>:<slot>' }`.
      Errors are `EconomyError` codes `locked`, `no_order`, `not_enough`, `bad_action`. Needs a server test for the lock and the clock.
 3. **H3:** Foundry Yard and Fort Pell, with scrap dropping from fights.
 4. **H4:** Copper Bit, Tres Rios, Whisper Wash.

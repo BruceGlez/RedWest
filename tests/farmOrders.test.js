@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { ORDERS_PER_DAY, ORDER_BONUS, ORDER_COUNTS, crossingOpen, dayNumber, ordersForDay, openOrders, ordersWaiting, fillOrder, ordersAction, normalizeOrders, createOrders } from '../src/farmOrders.js';
+import { visitBoard, ORDERS_PER_DAY, ORDER_BONUS, ORDER_COUNTS, crossingOpen, dayNumber, ordersForDay, openOrders, ordersWaiting, fillOrder, ordersAction, normalizeOrders, createOrders } from '../src/farmOrders.js';
 import { GOODS, CROPS, EGG, FARM_LEVELS, PLOT_COUNT } from '../src/farm.js';
 import { createProfile, normalizeProfile } from '../src/profile.js';
 import { OUTLAWS } from '../src/outlaws.js';
@@ -24,6 +24,7 @@ test('the Crossing is shut until Silas Vane is beaten, and every action says so'
     assert.equal(crossingOpen(p), false);
     assert.deepEqual(openOrders(p, T0), []);
     assert.throws(() => ordersAction(p, { action: 'fill', order: '1:0' }, T0), { code: 'locked' });
+    assert.throws(() => ordersAction(p, { action: 'visit' }, T0), { code: 'locked' });
     p.stats.stageStars[vane] = 6; // stars without the "beaten" bit do not open it
     assert.equal(crossingOpen(p), false);
     p.stats.stageStars[vane] = 1;
@@ -50,7 +51,11 @@ test('a day brings three orders, the same for everybody, that name only goods of
     const noFarm = profileWith({ farm: false });
     assert.deepEqual(openOrders(noFarm, T0), [], 'with the farm shut, there is nothing to order');
     assert.equal(openOrders(profileWith(), T0).filter(o => !o.waiting).length, ORDERS_PER_DAY);
-    assert.equal(openOrders(profileWith(), T0).filter(o => o.waiting).length, ORDERS_PER_DAY, 'and yesterday\'s three, still waiting');
+    assert.equal(openOrders(profileWith(), T0).length, ORDERS_PER_DAY, 'a new player sees only today\'s three, nothing carried over');
+    const p = profileWith();
+    ordersAction(p, { action: 'visit' }, T0);
+    assert.equal(openOrders(p, T0).length, ORDERS_PER_DAY, 'visiting the board the first day carries nothing over either');
+    assert.equal(openOrders(p, later(24)).length, ORDERS_PER_DAY * 2, 'from the second day on, yesterday\'s three wait');
 });
 
 test('filling an order takes the goods from the barn and pays dollars; refusals change nothing', () => {
@@ -69,13 +74,15 @@ test('filling an order takes the goods from the barn and pays dollars; refusals 
     for(const w of order.wants) assert.equal(p.town.farm.store[w.good], 99 - w.count);
     assert.throws(() => fillOrder(p, order.id, T0), { code: 'no_order' }, 'an order is filled once');
     assert.ok(!openOrders(p, T0).some(o => o.id === order.id));
-    assert.equal(ordersWaiting(p, T0), ORDERS_PER_DAY * 2 - 1, 'today\'s and yesterday\'s, less the one filled');
+    assert.equal(ordersWaiting(p, T0), ORDERS_PER_DAY - 1, 'today\'s three, less the one filled');
+    assert.equal(ordersWaiting(p, later(24)), ORDERS_PER_DAY * 2 - 1, 'the next day: three new and the two unfilled');
 });
 
 test('an unfilled order waits one more day, then is replaced', () => {
     const p = profileWith();
     stock(p, rich);
-    const first = openOrders(p, T0).filter(o => !o.waiting);
+    visitBoard(p, T0);
+    const first = openOrders(p, T0);
     const tomorrow = openOrders(p, later(24));
     assert.equal(tomorrow.length, ORDERS_PER_DAY * 2, 'three new and three waiting');
     assert.deepEqual(tomorrow.filter(o => o.waiting).map(o => o.id).sort(), first.map(o => o.id).sort());
@@ -92,6 +99,7 @@ test('a clock moved backwards brings no old order back and no filled order again
     stock(p, rich);
     const [order] = openOrders(p, later(24 * 5));
     fillOrder(p, order.id, later(24 * 5));
+    assert.equal(p.town.orders.since, dayNumber(later(24 * 5)));
     const back = openOrders(p, T0); // the clock now says five days ago
     assert.ok(back.every(o => o.day >= dayNumber(later(24 * 5)) - 1));
     assert.ok(!back.some(o => o.id === order.id));
@@ -109,6 +117,7 @@ test('saved data is cleaned, and orders survive a round trip through a profile',
     fillOrder(p, order.id, T0);
     const again = normalizeProfile(JSON.parse(JSON.stringify(p)), T0);
     assert.deepEqual(again.town.orders.filled, [order.id]);
+    assert.equal(again.town.orders.since, dayNumber(T0));
     assert.ok(!openOrders(again, T0).some(x => x.id === order.id));
 });
 
