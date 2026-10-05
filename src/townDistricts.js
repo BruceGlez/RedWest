@@ -11,7 +11,7 @@ import { SPREAD } from './townSpace.js';
 // fence: the line across the way in while it is shut, from (x1, z1) to (x2, z2), and where to stand to read the sign.
 // place: the thing to use inside (a plaque), with where it stands and where you stand.
 // interior: a district that is a place of its own (PLACES.md). Its gate opens a whole new map you walk around (the farm's is
-//           src/farmLayout.js, the Crossing's src/vaneLayout.js) and not ground in the town, so it has no walk area and no place here.
+//           src/farmLayout.js, the Crossing's src/vaneLayout.js, the Channel's src/channelLayout.js) and not ground in the town, so it has no walk area and no place here.
 
 // The town's ground, spread out (src/townSpace.js). The districts below are written as originally laid out, against the
 // original edge (x from -38 to 40, z from -21 to 19), and each is then moved out by exactly how far the edge moved at its gate,
@@ -42,11 +42,11 @@ const BASE_DISTRICTS = [
         }
     },
     {
-        id: 'canal', name: "MORGAN'S CHANNEL", outlaw: 'mesa-morgan',
+        id: 'canal', name: "MORGAN'S CHANNEL", outlaw: 'mesa-morgan', interior: 'channel',
         area: { minX: -20, maxX: 24, minZ: 16, maxZ: 44 },
         fence: { from: [-20, 19], to: [24, 19], read: [2, 17.4] },
         ground: 0x7a6346,
-        place: { id: 'channel', verb: 'READ', object: { x: 3.8, z: 34.6, hx: 0.3, hz: 0.3 }, stand: [2, 34.6] },
+        place: null, // the log stands in the Channel you walk into (src/channelLayout.js); from the town it is seen over the fence
         card: {
             title: "MORGAN'S CHANNEL",
             text: 'The dry channel from Redstone Mesa runs here now, with water in it, and a fire crew keeps its buckets by the bridge. The log at the warehouse door has one rule, in Morgan\'s hand: no blasting after dark.'

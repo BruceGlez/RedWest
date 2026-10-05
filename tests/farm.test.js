@@ -206,6 +206,7 @@ test('a shut place never changes another, and another never changes it', () => {
     };
     const alone = OUTLAWS.map(() => 0); alone[calloways] = 1;
     const withAll = OUTLAWS.map(() => 7); withAll[calloways] = 1;
+    withAll[OUTLAWS.findIndex(o => o.id === 'mesa-morgan')] = 0; // the one link: Morgan's Channel waters the farm (tests/farmWater.test.js)
     assert.deepEqual(play(alone), play(withAll), 'the other outlaws change nothing on the farm');
 
     // 3. And the farm changes nothing outside itself: no stars, no jail, no buildings, no other district.

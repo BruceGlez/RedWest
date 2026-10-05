@@ -45,7 +45,7 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 
 ### 3. Build next (code)
 - **Places H2 to H5** (`PLACES.md`), each shipped alone with unit, server and `npm run test:town` tests:
-  H2 Vane's Crossing orders and Morgan's Channel watering the farm (order rules and the Crossing place with its order board built 2026-10-05, placeholder scene; the bounty-board pointer and the Channel are still to do, see `PLACES.md`); H3 Foundry Yard and Fort Pell (scrap from fights);
+  H2 Vane's Crossing orders and Morgan's Channel watering the farm (order rules, the Crossing's order board and Morgan's Channel watering the farm built 2026-10-05, placeholder scenes; the bounty-board pointer, the Channel's fishing and warehouse are still to do, see `PLACES.md`); H3 Foundry Yard and Fort Pell (scrap from fights);
   H4 Copper Bit, Tres Rios, Whisper Wash; H5 Silver Belle price board and Hollow Hill projects.
 - **Performance and look:** quality switch and bloom for the desert and arena (town has it); cut fight draw calls further; ground
   detail, wind and horizon pieces.

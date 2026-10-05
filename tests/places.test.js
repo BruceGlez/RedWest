@@ -24,9 +24,10 @@ test('the farm and the parlour are registered, and each says its own way in', as
     const { createPlaces: create } = await import('../src/places/index.js');
     const host = { screen: null, profile: () => null, progress: () => null, companion: () => ({}), isCardOpen: () => false };
     const places = create(host);
-    assert.deepEqual(places.map(p => p.id).sort(), ['crossing', 'ranch', 'undertaker']);
+    assert.deepEqual(places.map(p => p.id).sort(), ['canal', 'crossing', 'ranch', 'undertaker']);
     assert.equal(places.find(p => p.entrance('enter-ranch')).id, 'ranch');
     assert.equal(places.find(p => p.entrance('enter-crossing')).id, 'crossing');
+    assert.equal(places.find(p => p.entrance('enter-canal')).id, 'canal');
     assert.equal(places.find(p => p.entrance('undertaker')).id, 'undertaker');
     assert.equal(places.find(p => p.entrance('train')), undefined);
     for(const p of places) {

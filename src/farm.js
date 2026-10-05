@@ -1,6 +1,7 @@
 import { EconomyError } from './economyError.js';
 import { OUTLAWS } from './outlaws.js';
 import { starCount } from './progress.js';
+import { channelOpen, growMinutes } from './farmWater.js';
 
 // Calloway Farm, the first place you step into (PLACES.md, TOWN_PLAN.md step H). The rules are here with no
 // rendering, so the server and the offline wallet run the same code and tests/farm.test.js can check them.
@@ -76,18 +77,22 @@ export function farmLevel(profile) {
 }
 export const farmLevelInfo = level => FARM_LEVELS[Math.max(1, Math.min(FARM_LEVELS.length, level)) - 1];
 
+// Morgan's Channel waters the farm while both are open (src/farmWater.js). With either shut the farm is as it is alone.
+export const farmWatered = profile => farmOpen(profile) && channelOpen(profile);
+
 // One plot: 'empty', 'growing' or 'ready'. A clock that moved backwards counts as no time passing (never more than
-// the full growing time left), so moving the clock forward and back gains nothing.
-export function plotState(farm, index, now = new Date()) {
+// the full growing time left), so moving the clock forward and back gains nothing. `watered`: see farmWatered.
+export function plotState(farm, index, now = new Date(), watered = false) {
     const plot = farm.plots[index];
     const crop = plot && getCrop(plot.crop);
     if(!crop) return { state: 'empty', crop: null, minutesLeft: 0, fraction: 0 };
     const elapsed = Math.max(0, (now.getTime() - Date.parse(plot.plantedAt)) / MINUTE);
-    if(elapsed >= crop.minutes) return { state: 'ready', crop, minutesLeft: 0, fraction: 1 };
-    return { state: 'growing', crop, minutesLeft: crop.minutes - elapsed, fraction: elapsed / crop.minutes };
+    const total = growMinutes(crop, watered);
+    if(elapsed >= total) return { state: 'ready', crop, minutesLeft: 0, fraction: 1 };
+    return { state: 'growing', crop, minutesLeft: total - elapsed, fraction: elapsed / total };
 }
 
-export const plotStates = (farm, now = new Date()) => farm.plots.map((_, i) => plotState(farm, i, now));
+export const plotStates = (farm, now = new Date(), watered = false) => farm.plots.map((_, i) => plotState(farm, i, now, watered));
 
 // Eggs waiting in the coop now.
 export function eggsReady(farm, now = new Date(), level = 1) {
@@ -118,7 +123,7 @@ export function plant(profile, index, cropId, now = new Date()) {
     const i = requirePlot(farm, index);
     const crop = getCrop(cropId);
     if(!crop) throw new EconomyError('no_crop', 'There is no such crop.');
-    if(plotState(farm, i, now).state !== 'empty') throw new EconomyError('plot_busy', 'Something is already growing there.');
+    if(plotState(farm, i, now, farmWatered(profile)).state !== 'empty') throw new EconomyError('plot_busy', 'Something is already growing there.');
     farm.plots[i] = { crop: crop.id, plantedAt: now.toISOString() };
     return { crop: crop.id };
 }
@@ -126,7 +131,7 @@ export function plant(profile, index, cropId, now = new Date()) {
 export function harvest(profile, index, now = new Date()) {
     const farm = requireOpen(profile);
     const i = requirePlot(farm, index);
-    const { state, crop } = plotState(farm, i, now);
+    const { state, crop } = plotState(farm, i, now, farmWatered(profile));
     if(state === 'empty') throw new EconomyError('plot_empty', 'Nothing is planted there.');
     if(state === 'growing') throw new EconomyError('not_ready', 'It is not ready yet.');
     farm.plots[i] = { crop: null, plantedAt: null };

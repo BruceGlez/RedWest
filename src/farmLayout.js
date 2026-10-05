@@ -38,8 +38,8 @@ export const plotIndex = id => (/^plot-(\d)$/.test(id) ? Number(id.slice(5)) : -
 
 // What the walk map is made of: ground, walls and doors. `farm` and `now` make the verbs match what a plot or the coop
 // can do right now (a ready crop says HARVEST), so the prompt never offers something that would be refused.
-export function farmMap(farm = null, now = new Date(), level = 1) {
-    const states = farm ? plotStates(farm, now) : PLOTS.map(() => ({ state: 'empty' }));
+export function farmMap(farm = null, now = new Date(), level = 1, watered = false) {
+    const states = farm ? plotStates(farm, now, watered) : PLOTS.map(() => ({ state: 'empty' }));
     const eggs = farm ? eggsReady(farm, now, level) : 0;
     const doors = [
         ...PLOTS.map(p => ({ id: plotId(p.index), label: 'PLOT', verb: { empty: 'PLANT', growing: 'LOOK', ready: 'HARVEST' }[states[p.index].state], x: p.x, z: p.z })),
@@ -52,10 +52,10 @@ export function farmMap(farm = null, now = new Date(), level = 1) {
 }
 
 // The words on the prompt for a door, from the farm's state ("WHEAT: 12m", "CORN READY", "COOP: 3 EGGS").
-export function farmLabel(door, farm = null, now = new Date(), level = 1) {
+export function farmLabel(door, farm = null, now = new Date(), level = 1, watered = false) {
     const index = plotIndex(door.id);
     if(index >= 0) {
-        const plot = farm ? plotStates(farm, now)[index] : { state: 'empty' };
+        const plot = farm ? plotStates(farm, now, watered)[index] : { state: 'empty' };
         if(plot.state === 'empty') return 'EMPTY PLOT';
         if(plot.state === 'ready') return `${plot.crop.name} READY`;
         return `${plot.crop.name}: ${minutesText(plot.minutesLeft)}`;

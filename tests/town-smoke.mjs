@@ -177,13 +177,13 @@ try {
         // Beaten: the Calloways, Iron Jack and Mesa Morgan open the farm, the foundry yard and the channel.
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [0, 0, 0, 7, 7, 7, 0, 0, 0, 0] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
-        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 3); // the town, the foundry yard and the channel: the farm is a place of its own, not ground in the town
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 2); // the town and the foundry yard: the farm, the Channel and the Crossing are places of their own, not ground in the town
         const at = (id) => page.evaluate(id => {
             const door = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
             window.__redWestTown.walk.place(door.x, door.z);
             return window.__redWestTown.walk.position;
         }, id);
-        for(const [id, label, pattern] of [['furnace', 'THE FURNACE', /Ezra Stone opened the armour/], ['channel', 'THE CHANNEL LOG', /no blasting after dark/]]) {
+        for(const [id, label, pattern] of [['furnace', 'THE FURNACE', /Ezra Stone opened the armour/]]) {
             const p = await at(id);
             assert.ok(p.x !== 0 || p.z !== 0);
             // Wait for this door's own prompt: the one from the card just closed can show for a frame.
@@ -245,7 +245,7 @@ try {
     {
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
-        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 9); // the town and eight districts: the farm and the Crossing are places of their own
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 8); // the town and seven districts: the farm, the Crossing and the Channel are places of their own
 
         // You are told once, with a banner, and what was announced is remembered.
         await page.locator('#town-news').waitFor({ state: 'visible' });
@@ -280,7 +280,7 @@ try {
             await page.locator('#town-sheet-close').click();
         }
         // Having walked into all of them, the talk dies down and the usual lines return.
-        for(const [door, district] of [['furnace', 'foundry'], ['channel', 'canal']]) {
+        for(const [door, district] of [['furnace', 'foundry']]) {
             await page.evaluate(id => { const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id); window.__redWestTown.walk.place(d.x, d.z); }, door);
             await page.waitForFunction(id => window.__redWestTown.news.visited.includes(id), district); // a frame has to see him there
         }
@@ -288,10 +288,12 @@ try {
         await page.evaluate(() => { window.__redWestTown.enterPlace('ranch'); });
         await page.waitForFunction(() => window.__redWestTown.place === 'ranch');
         await page.evaluate(() => window.__redWestTown.leavePlace());
-        // So does the Crossing.
-        await page.evaluate(() => { window.__redWestTown.enterPlace('crossing'); });
-        await page.waitForFunction(() => window.__redWestTown.place === 'crossing');
-        await page.evaluate(() => window.__redWestTown.leavePlace());
+        // So do the Crossing and the Channel.
+        for(const id of ['crossing', 'canal']) {
+            await page.evaluate(id => { window.__redWestTown.enterPlace(id); }, id);
+            await page.waitForFunction(id => window.__redWestTown.place === id, id);
+            await page.evaluate(() => window.__redWestTown.leavePlace());
+        }
         await page.waitForFunction(() => window.__redWestTown.news.visited.length === 10);
         await talk();
         await page.locator('.walk-bubble').waitFor({ state: 'visible' });
@@ -624,6 +626,66 @@ try {
         await page.keyboard.press('e');
         await page.waitForFunction(() => window.__redWestTown.place === null);
         assert.equal(await walking(page), true);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    // Morgan's Channel (src/farmWater.js, src/places/channel.js): a place of its own. Shut until Mad Mesa Morgan is beaten; then the
+    // sluice waters the farm, so a wheat plot planted 19 minutes ago is already ready (18 minutes watered, 20 dry).
+    {
+        const { page, errors, context } = await open();
+        const doors = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.map(d => d.id));
+        assert.ok(doors.includes('gate-canal') && !doors.includes('enter-canal'), 'shut: a gate to read, not a way in');
+        await page.evaluate(() => window.__redWestTown.enterPlace('canal'));
+        assert.equal(await page.evaluate(() => window.__redWestTown.place), null, 'it stays shut until Morgan is beaten');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        const seed = () => {
+            const ago = minutes => new Date(Date.now() - minutes * 60000).toISOString();
+            localStorage.setItem('redWestProfile.v1', JSON.stringify({
+                stats: { stageStars: [0, 0, 0, 7, 0, 7, 0, 0, 0, 0] },
+                town: { farm: { plots: [{ crop: 'wheat', plantedAt: ago(19) }], store: {}, coopAt: ago(0) } }
+            }));
+        };
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
+        const stand = (id) => page.evaluate(id => {
+            const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
+            window.__redWestTown.placeWalk.place(d.x, d.z);
+        }, id);
+        await goTo(page, 'enter-canal');
+        await prompt("MORGAN'S CHANNEL");
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === 'canal');
+        assert.equal(await walking(page), false, 'the town waits');
+        await page.waitForTimeout(600);
+        const calls = await page.evaluate(() => window.__redWestRenderer?.info.render.calls ?? 0);
+        assert.ok(calls < 130, `the Channel stays cheap to draw (${calls} draw calls)`);
+        await stand('sluice');
+        await prompt('THE SLUICE: THE FARM IS WATERED');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /10% sooner/);
+        await page.locator('#town-sheet-close').click();
+        await stand('log');
+        await prompt('THE WAREHOUSE LOG');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /no blasting after dark/);
+        await page.locator('#town-sheet-close').click();
+        await stand('leave');
+        await prompt('THE ROAD TO TOWN');
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === null);
+        // On the farm the watered wheat is ready already.
+        await page.evaluate(() => window.__redWestTown.enterPlace('ranch'));
+        await page.waitForFunction(() => window.__redWestTown.place === 'ranch');
+        await page.evaluate(() => {
+            const d = window.__redWestTown.farm3d.walkMap().doors.find(d => d.id === 'plot-0');
+            window.__redWestTown.farmWalk.place(d.x, d.z);
+        });
+        await prompt('WHEAT READY');
         assert.deepEqual(errors, []);
         await context.close();
     }
