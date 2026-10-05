@@ -66,6 +66,21 @@ export function markObstacleGridDirty() {
     obstacleGridDirty = true;
 }
 
+// A mover whose straight step is blocked tries the same step turned aside, a little at a time, on one side (`side`, 1 or -1, the one it
+// went around last time, so it flows round a crate or along a fence instead of shaking between the two). Returns the new spot and the side
+// used, or null when it is boxed in. mx, mz: the step it wanted.
+const DETOUR_ANGLES = [0.6, 1.2, 1.9, 2.6]; // radians: about 35, 70, 110 and 150 degrees
+export function stepAround(x, z, mx, mz, radius, side) {
+    for(const s of [side, -side]) {
+        for(const angle of DETOUR_ANGLES) {
+            const cos = Math.cos(angle * s), sin = Math.sin(angle * s);
+            const nx = x + mx * cos - mz * sin, nz = z + mx * sin + mz * cos;
+            if(!checkCollision(nx, nz, radius)) return { x: nx, z: nz, side: s };
+        }
+    }
+    return null;
+}
+
 export function checkCollision(x, z, radius) {
     // In the mine the rock is blocked everywhere, not only along the wall ring, so nobody can stand, spawn or land in it.
     const cave = activeFloor();

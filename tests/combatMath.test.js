@@ -2,6 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { IMPACTS, impactForObstacle, deathPose, deathLength, weaponKick, muzzleFlash, TUMBLE_SECONDS, POP_SECONDS, MAX_CLIP_SECONDS } from '../src/combatMath.js';
 import { WEAPONS } from '../src/weapons.js';
+import { stepAround, checkCollision, markObstacleGridDirty } from '../src/physics.js';
+import { obstacles } from '../src/state.js';
 
 test('every impact is complete and cheap', () => {
     for(const [name, spec] of Object.entries(IMPACTS)) {
@@ -50,4 +52,60 @@ test('a shotgun kicks harder than a pistol, and every gun stays in range', () =>
     const kick = id => weaponKick(WEAPONS.find(w => w.id === id).stats);
     assert.ok(kick('gun-shotgun') > kick('gun-revolver'));
     for(const w of WEAPONS) { const flash = muzzleFlash(w.stats); assert.ok(flash.size >= 0.9 && flash.size <= 2.4 && flash.life <= 0.1); }
+});
+
+// Walk like the enemy update does: straight on, else round the thing in the way on the side it went round last time.
+function walkTo(from, to, speed = 0.35, steps = 600) {
+    let [x, z] = from, side = 1, detours = 0;
+    for(let i = 0; i < steps; i++) {
+        const dx = to[0] - x, dz = to[1] - z, d = Math.hypot(dx, dz);
+        if(d < 1) return { arrived: true, steps: i, detours };
+        const mx = dx / d * speed, mz = dz / d * speed;
+        if(!checkCollision(x + mx, z + mz, 0.5)) { x += mx; z += mz; continue; }
+        const around = stepAround(x, z, mx, mz, 0.5, side);
+        if(!around) return { arrived: false, steps: i, detours };
+        ({ x, z, side } = around);
+        detours++;
+    }
+    return { arrived: false, steps, detours };
+}
+
+test('an enemy walks round a crate, a column and a fence instead of standing against them', () => {
+    const saved = obstacles.splice(0);
+    try {
+        obstacles.push({ x: 0, z: 10, radius: 3 }); // straight between them
+        markObstacleGridDirty();
+        const crate = walkTo([0, 0], [0, 24]);
+        assert.ok(crate.arrived && crate.detours > 0, 'round a crate that is dead ahead');
+        obstacles.length = 0;
+        for(let x = -14; x <= 14; x += 2) obstacles.push({ x, z: 10, radius: 1.6 }); // a fence 30 units long
+        markObstacleGridDirty();
+        const fence = walkTo([0, 0], [0, 24]);
+        assert.ok(fence.arrived, 'along a fence and round its end');
+        obstacles.length = 0;
+        for(let x = -14; x <= 14; x += 2) obstacles.push({ x, z: 10, radius: 1.6 });
+        obstacles.push({ x: -14, z: 4, radius: 1.6 }, { x: 14, z: 4, radius: 1.6 }); // with the ends turned in, a pocket
+        markObstacleGridDirty();
+        assert.ok(walkTo([0, 0], [0, 24], 0.35, 1500).arrived, 'out of a pocket too');
+        obstacles.length = 0;
+        markObstacleGridDirty();
+        assert.equal(stepAround(0, 0, 0.3, 0, 0.5, 1)?.side, 1, 'nothing in the way: the first angle is free');
+    } finally {
+        obstacles.length = 0;
+        obstacles.push(...saved);
+        markObstacleGridDirty();
+    }
+});
+
+test('a mover boxed in on every side finds no way round, and does not throw', () => {
+    const saved = obstacles.splice(0);
+    try {
+        for(let a = 0; a < 16; a++) obstacles.push({ x: Math.cos(a / 16 * Math.PI * 2) * 2, z: Math.sin(a / 16 * Math.PI * 2) * 2, radius: 1.6 });
+        markObstacleGridDirty();
+        assert.equal(stepAround(0, 0, 0.3, 0.1, 0.5, 1), null);
+    } finally {
+        obstacles.length = 0;
+        obstacles.push(...saved);
+        markObstacleGridDirty();
+    }
 });
