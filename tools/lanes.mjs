@@ -4,6 +4,9 @@
 //   node tools/lanes.mjs who <path>...      the lane of each path
 //   node tools/lanes.mjs diff [base]        the lanes a branch touches against base (default origin/main);
 //                                           add --strict to fail when it touches more than one lane
+//   node tools/lanes.mjs shared [base] [--max N] [--allow]
+//                                           lines changed in shared files against base; fails over N (default 120)
+//                                           unless --allow (CI passes it when the PR has the `shared-change` label)
 import { readFileSync } from 'node:fs';
 import { execFileSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -33,6 +36,20 @@ export function laneOf(path) {
 // Files that every lane may add to without a coordination step (new tests and assets are claimed by pattern above).
 const git = (...args) => execFileSync('git', args, { encoding: 'utf8' }).split('\n').filter(Boolean);
 
+// Lines added plus removed in each shared file, from `git diff --numstat` text. Binary files ("-") count as 0.
+export function sharedChanges(numstat) {
+    const changes = [];
+    for(const line of numstat.split('\n').filter(Boolean)) {
+        const [added, removed, ...rest] = line.split('\t');
+        const file = rest.join('\t');
+        if(laneOf(file) !== 'shared') continue;
+        changes.push({ file, lines: (Number(added) || 0) + (Number(removed) || 0) });
+    }
+    return changes;
+}
+
+export const SHARED_MAX_LINES = 120;
+
 export function unowned(files) { return files.filter(file => laneOf(file) === null); }
 
 function run(argv) {
@@ -58,8 +75,21 @@ function run(argv) {
         const lanes = [...touched.keys()].filter(id => id !== 'shared');
         if(lanes.length > 1) { console.log(`Touches ${lanes.length} lanes (${lanes.join(', ')}): split the PR unless this is a deliberate cross-lane change.`); if(strict) process.exit(1); }
         if(touched.has('shared')) console.log('Touches shared files: keep that part small and say why in the PR.');
+    } else if(command === 'shared') {
+        const base = rest.find(arg => !arg.startsWith('--') && !/^\d+$/.test(arg)) ?? 'origin/main';
+        const maxIndex = rest.indexOf('--max');
+        const max = maxIndex >= 0 ? Number(rest[maxIndex + 1]) : SHARED_MAX_LINES;
+        const changes = sharedChanges(git('diff', '--numstat', `${base}...HEAD`).join('\n'));
+        const total = changes.reduce((sum, change) => sum + change.lines, 0);
+        for(const { file, lines } of changes) console.log(`${String(lines).padStart(5)}  ${file}`);
+        console.log(`${total} line(s) changed in shared files (limit ${max}).`);
+        if(total > max && !rest.includes('--allow')) {
+            console.error(`Too much for shared files. Shared files are where lanes meet: add a small generic hook and keep your lane's logic in your own files (AGENTS.md, rule 3). `
+                + `If this is a deliberate change to shared code, put it in its own PR and add the \`shared-change\` label.`);
+            process.exit(1);
+        }
     } else {
-        console.error('usage: node tools/lanes.mjs list | check | who <path>... | diff [base] [--strict]');
+        console.error('usage: node tools/lanes.mjs list | check | who <path>... | diff [base] [--strict] | shared [base] [--max N] [--allow]');
         process.exit(2);
     }
 }

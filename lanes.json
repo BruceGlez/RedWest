@@ -278,7 +278,8 @@
     "lanes.json",
     "AGENTS.md",
     "docs/lanes/**",
-    "tests/modes.test.js"
+    "tests/modes.test.js",
+    ".github/workflows/lanes.yml"
    ],
    "checks": [
     "npm test",

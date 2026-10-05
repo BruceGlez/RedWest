@@ -26,6 +26,8 @@ of checks to run. Agents in different lanes should almost never touch the same f
 3. **Shared files** (listed under `shared` in `lanes.json`: `main.js`, `gameLoop.js`, `uiManager.js`, `townPanel.js`, `profile.js`,
    `index.html`, `package.json`, ...) are where lanes meet. Change them in a *small separate PR*, only to add a hook your lane needs,
    and rebase on `main` first. Prefer adding a new module and a one-line call over editing the big files.
+   CI enforces this: the `lanes` workflow fails a PR that changes more than 120 lines in shared files (`node tools/lanes.mjs shared`).
+   A PR that deliberately changes shared code goes in on its own and carries the `shared-change` label, which lifts the limit.
 4. **Styles are per area.** `style.css` only lists `@import`s of `styles/*.css`. Add or edit rules in your lane's file; a new area gets a new
    file and one import line. Order of imports matters for the cascade.
 5. **Cross-lane work** (for example the mine saving a floor needs the server) is split: the data contract goes first in the owning lane's PR,
@@ -53,4 +55,5 @@ node tools/lanes.mjs list            the lanes and their checks
 node tools/lanes.mjs check           every tracked file is owned (also run by npm test)
 node tools/lanes.mjs who <path>...   which lane owns a path
 node tools/lanes.mjs diff            which lanes your branch touches
+node tools/lanes.mjs shared          lines changed in shared files (CI limit 120, label `shared-change` lifts it)
 ```
