@@ -245,7 +245,7 @@ try {
     {
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
-        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 8); // the town and seven districts: the farm, the Crossing and the Channel are places of their own
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 7); // the town and six districts: the farm, the Crossing, the Channel and Copper Bit are places of their own
 
         // You are told once, with a banner, and what was announced is remembered.
         await page.locator('#town-news').waitFor({ state: 'visible' });
@@ -266,7 +266,7 @@ try {
         assert.match(await page.locator('.walk-bubble').textContent(), /Hollow Hill is open/, `${folk} talks of the newest district`);
 
         // The places of the districts that are ground in the town can each be reached and read.
-        for(const [id, label, pattern] of [['grave', 'THE OLD STONE', /struck out/], ['landing', 'THE GANGWAY', /played straight/], ['gatling', 'THE GATLING', /one page is missing/], ['piano', 'THE BROKEN PIANO', /sour notes/], ['den', 'THE DEN', /wolf pups/], ['bell', 'THE CHAPEL BELL', /bell rings once at dusk/]]) {
+        for(const [id, label, pattern] of [['grave', 'THE OLD STONE', /struck out/], ['landing', 'THE GANGWAY', /played straight/], ['gatling', 'THE GATLING', /one page is missing/], ['den', 'THE DEN', /wolf pups/], ['bell', 'THE CHAPEL BELL', /bell rings once at dusk/]]) {
             const door = await page.evaluate(id => {
                 const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
                 window.__redWestTown.walk.place(d.x, d.z);
@@ -288,8 +288,8 @@ try {
         await page.evaluate(() => { window.__redWestTown.enterPlace('ranch'); });
         await page.waitForFunction(() => window.__redWestTown.place === 'ranch');
         await page.evaluate(() => window.__redWestTown.leavePlace());
-        // So do the Crossing and the Channel.
-        for(const id of ['crossing', 'canal']) {
+        // So do the Crossing, the Channel and Copper Bit.
+        for(const id of ['crossing', 'canal', 'copper']) {
             await page.evaluate(id => { window.__redWestTown.enterPlace(id); }, id);
             await page.waitForFunction(id => window.__redWestTown.place === id, id);
             await page.evaluate(() => window.__redWestTown.leavePlace());
@@ -686,6 +686,55 @@ try {
             window.__redWestTown.farmWalk.place(d.x, d.z);
         });
         await prompt('WHEAT READY');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    // Copper Bit (src/saloon.js, src/places/saloon.js): a place of its own. Shut until Dusty Pete is beaten; then the street with the bar,
+    // whose card shows the night, the menu and the paid shifts left, and the broken piano.
+    {
+        const { page, errors, context } = await open();
+        const doors = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.map(d => d.id));
+        assert.ok(doors.includes('gate-copper') && !doors.includes('enter-copper'), 'shut: a gate to read, not a way in');
+        await page.evaluate(() => window.__redWestTown.enterPlace('copper'));
+        assert.equal(await page.evaluate(() => window.__redWestTown.place), null, 'it stays shut until Dusty Pete is beaten');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 0, 0, 0, 0, 0, 0, 0, 0, 0] } }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
+        const stand = id => page.evaluate(id => {
+            const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
+            window.__redWestTown.placeWalk.place(d.x, d.z);
+        }, id);
+        await goTo(page, 'enter-copper');
+        await prompt('COPPER BIT');
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === 'copper');
+        assert.equal(await walking(page), false, 'the town waits');
+        await page.waitForTimeout(600);
+        const calls = await page.evaluate(() => window.__redWestRenderer?.info.render.calls ?? 0);
+        assert.ok(calls < 130, `Copper Bit stays cheap to draw (${calls} draw calls)`);
+        await stand('bar');
+        await prompt("DUSTY PETE'S BAR: 3 PAID SHIFTS LEFT");
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        const bar = await page.locator('#town-grid').textContent();
+        assert.match(bar, /night 1 of 10/);
+        assert.match(bar, /BEANS/);
+        await page.locator('#town-sheet-close').click();
+        await stand('piano');
+        await prompt('THE BROKEN PIANO');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /sour notes/);
+        await page.locator('#town-sheet-close').click();
+        await stand('leave');
+        await prompt('THE ROAD TO TOWN');
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === null);
+        assert.equal(await walking(page), true);
         assert.deepEqual(errors, []);
         await context.close();
     }
