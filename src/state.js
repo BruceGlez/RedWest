@@ -20,6 +20,7 @@ export const gameState = {
     heat: createHeatState(),
     bounty: createBountyState(),
     isChoosingBounty: false,
+    isConfirming: false, // the mine is asking whether to go down or ride the lift up
     runWon: false,
     runTime: 0,
     outlawIndex: 0, // stage on the Wanted Road; set when a run starts, kept across resets
@@ -84,6 +85,7 @@ export function resetGameState() {
     gameState.heat = createHeatState();
     gameState.bounty = createBountyState();
     gameState.isChoosingBounty = false;
+    gameState.isConfirming = false;
     gameState.runWon = false;
     gameState.runTime = 0;
     const s = gameState.runStats;

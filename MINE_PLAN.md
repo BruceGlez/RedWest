@@ -27,6 +27,7 @@ walking back to it brings you up with whatever you got. Deeper is stranger, hard
 | **1** | The way down from town, a descent with a lift back up. Saves nothing (practice rules, like the Arena). | small to medium | **built 2026-10-05** |
 | **1b** | Maps made for it: the undertaker's parlour as a place you walk into, and caves with walls, rails, a lift and a shaft you walk to. All drawn in code. | medium | **built 2026-10-05** ("The maps", below) |
 | **1c** | Fate-style depth, after the first playtest: no bottom, caves that grow a lot with every floor, a new monster on every floor, chests, and a shaft that is always open | medium | **built 2026-10-05** ("The descent", below) |
+| **1d** | After the second playtest: the shaft and the lift ask first, and the monsters belong to their chambers (no endless stream; a chamber refills only after you have gone far away) | small | **built 2026-10-05** ("The descent", below) |
 | **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | planned |
 | **3** | Boss floors (every 5th), more of Mr. Grimsby's talk and rumours, a pet that follows you down | medium | planned |
 | **4** | The art pass for the maps and the monsters: modelled rock, timber, carts, a real lift and shaft, painted textures (`POLISH_PLAN.md`, section 6) | large | parked, like the other art passes. The maps are made of boxes so this can replace them one builder at a time. |
@@ -53,14 +54,19 @@ Now nothing has to be cleared. There is no budget gate and no locked shaft; the 
   5 rifleman, 6 dynamiter, **7 stonekin** (a slab of the mountain that shakes, then charges), 8 brute, **9 lantern wraith** (a miner's
   ghost that fades and reappears), 10 rider, 11 duelist, 12 ghost, 13 knifer, 14 trooper. The floor's banner names a new mine monster.
   The newest monster is sent more often on its own floor. Past the eighth floor anything that takes more than one hit takes more.
-- **A pursuit with no waves.** The cave keeps a measure of danger (the sum of the costs of everyone chasing) around the marshal and
-  tops it up: more danger and faster top-ups with depth (`mineWave`). Pursuers come out of tunnel mouths in a ring around him, not far
-  across the cave, and are asleep when he is more than 64 units away.
-- **The way down is always open.** The shaft is a pit with a ladder, a ring of light on the floor and a beam of light 46 units tall that
-  shows over the rock from far away. The HUD always says how far it is and which way (`SHAFT 237 m ->`). Walking into it goes down a
-  floor and pays a little score (50 x depth).
-- **The lift always brings you back.** It is where you arrive. It works once you have walked 20 units away from it (so you do not
-  ride up by accident), and the HUD says how far it is (`LIFT UP 96 m <-`). Riding up ends the run with the depth you reached.
+- **Monsters belong to their chambers, and are not endless.** Every chamber, alcove and treasure room has its own monsters
+  (`planNode`, `src/mineMonsters.js`): a fixed amount of danger by its size (a treasure room is guarded harder, an alcove less, the chamber
+  you land in is quiet and nobody is put within about 20 units of the lift). They are there when you come within 45 units of the chamber's edge.
+  Kill them and nothing new comes while you stay. Once you have gone more than 100 units away, the survivors go back to sleep and the
+  chamber fills again for the next time you come. Monsters more than 64 units from you are asleep, and they come out a couple a frame,
+  so a big chamber does not hitch.
+- **The way down is always open, and it asks first.** The shaft is a pit with a ladder, a ring of light on the floor and a beam of light 46
+  units tall that shows over the rock from far away. The HUD always says how far it is and which way (`SHAFT 237 m ->`). Walking into it
+  stops the game and asks `GO DOWN?` (ENTER, E or Y to go; ESC, X or Backspace, or a tap on STAY, to stay). Yes goes down a floor and pays a
+  little score (50 x depth). No stays, and it does not ask again until you have stepped away from the shaft.
+- **The lift always brings you back, and it asks first.** It is where you arrive. It works once you have walked 20 units away from it (so
+  you do not ride up by accident), and the HUD says how far it is (`LIFT UP 96 m <-`). Walking onto it asks `RIDE THE LIFT UP?`; yes
+  ends the run with the depth you reached, and no works like the shaft's.
 - **Chests.** Each side alcove and treasure room has a chest. Walking up to one opens it: score by depth (100 x depth) and a heart if
   you are hurt, else ten seconds of triple shot.
 - **What is saved:** nothing. The run log, stars, earnings and leaderboards are not touched. Dying or riding up shows a practice result

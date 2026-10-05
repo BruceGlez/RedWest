@@ -370,6 +370,7 @@ ui.bindControlHandlers({
     onRestartRun: () => gameLoop.resetGame(),
     onBankBounty: () => gameLoop.bankAndLeave(),
     onRideOn: () => gameLoop.rideOnToBonus(),
+    onMineAnswer: yes => gameLoop.answerMine(yes),
     // The arena starts a fight at once, so it waits for that outlaw's model first.
     onPlay: async () => {
         if(arena.enabled) await ensureOutlawModel(arena.outlaw);

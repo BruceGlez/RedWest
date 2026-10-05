@@ -20,10 +20,10 @@ import { markSeen, recordKills } from './progress.js';
 import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
 import { recordRun, saveProgress } from './progress.js';
 import { arena, endTownFight } from './arena.js';
-import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, MINE_ATMOSPHERE_ID, PRACTICE_NOTE } from './mine.js';
+import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, confirmText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE } from './mine.js';
 import { showMineFloor, openMineChest, updateMineScene } from './mineScene.js';
-import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE } from './mineMap.js';
-import { MINE_MONSTERS, mineWave, newOn, isMineMonster, monsterDef, monsterCost } from './mineMonsters.js';
+import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE, SHAFT_REACH, LIFT_REACH } from './mineMap.js';
+import { MINE_MONSTERS, newOn, isMineMonster, planNode, WAKE_DISTANCE, LEAVE_DISTANCE } from './mineMonsters.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 import { clearCombatFx, updateCombatFx } from './combatFx.js';
 import { disposeBaked } from './meshMerge.js';
@@ -92,8 +92,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     };
 
     // Spawn and record first sightings for the Bounty Book (with a NEW ENEMY card in play).
-    function spawn(type) {
-        spawnEnemy(scene, playerSystem.playerGroup.position, type);
+    function spawn(type, at = null) {
+        spawnEnemy(scene, playerSystem.playerGroup.position, type, at);
         if(type !== 'boss' && markSeen(progress, type)) {
             saveProgress(progress);
             ui.showNewEnemy(type);
@@ -331,35 +331,47 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         gameState.isIntermission = false;
         gameState.intermissionTimer = 0;
         gameState.waveBossSpawned = false;
-        gameState.enemySpawnTimer = 1.5; // a breath on the lift before the first one comes
+        mineNodes = activeFloor().nodes.map(() => false); // no chamber has been filled yet
+        minePending = [];
+        mineCheckIn = 0;
         gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, floor);
         // Each floor says what is new on it. A monster of the Wanted Road shows its own NEW ENEMY card when it first appears.
         const fresh = newOn(floor).filter(isMineMonster).map(id => `\nNEW: ${MINE_MONSTERS[id].name}`).join('');
         ui.showWaveBanner(`${floorBanner(floor)}${fresh}`, floor === 1 ? 2800 : 2400);
     }
 
-    // A pursuit with no waves: the cave keeps a measure of danger around the marshal and tops it up (mineWave).
-    function mineSpawnTick(dt) {
-        gameState.enemySpawnTimer -= dt;
-        if(gameState.enemySpawnTimer > 0) return;
-        const wave = mineWave(mine.floor);
-        gameState.enemySpawnTimer = wave.interval / heatSpawnMultiplier(gameState.heat.level);
+    // Who lives where (src/mineMonsters.js, planNode): each chamber fills when the marshal comes near, stays quiet once he has killed what is
+    // in it while he stays, and fills again after he has gone far away. No endless stream: a chamber's monsters are the chamber's.
+    let mineNodes = [];   // per chamber of the floor on show: is it full?
+    let minePending = []; // monsters waiting their turn to come out (a couple a frame, so a big chamber does not hitch)
+    let mineCheckIn = 0;
+    function updateMinePopulation(dt) {
+        for(let k = 0; k < 2 && minePending.length; k++) {
+            const next = minePending.shift();
+            spawn(next.type, next);
+            enemies.at(-1).userData.mineNode = next.node;
+        }
+        mineCheckIn -= dt;
+        if(mineCheckIn > 0) return;
+        mineCheckIn = 0.5;
+        const cave = activeFloor();
         const at = playerSystem.playerGroup.position;
-        let threat = 0;
-        const active = {};
-        for(const e of enemies) {
-            if(Math.hypot(e.position.x - at.x, e.position.z - at.z) < 110) threat += monsterCost(e.userData.type);
-            active[e.userData.type] = (active[e.userData.type] || 0) + 1;
-        }
-        const room = wave.threatCap - threat;
-        const candidates = [];
-        for(const type of Object.keys(wave.weights)) {
-            if((active[type] || 0) >= wave.caps[type] || monsterCost(type) > room) continue;
-            const danger = monsterDef(type)?.danger ?? 1;
-            candidates.push({ type, weight: wave.weights[type] * (danger >= 2 ? 1 + gameState.heat.level * 0.2 : 1) });
-        }
-        const chosen = chooseWeightedType(candidates);
-        if(chosen) spawn(chosen);
+        cave.nodes.forEach((node, i) => {
+            const edge = Math.hypot(at.x - node.x, at.z - node.z) - node.r;
+            if(!mineNodes[i] && edge < WAKE_DISTANCE) {
+                mineNodes[i] = true;
+                for(const m of planNode(cave, i, mine.floor)) minePending.push({ ...m, node: i });
+            } else if(mineNodes[i] && edge > LEAVE_DISTANCE) {
+                mineNodes[i] = false; // he has gone: what is left goes back to sleep, and the chamber fills again for next time
+                minePending = minePending.filter(m => m.node !== i);
+                for(let n = enemies.length - 1; n >= 0; n--) {
+                    if(enemies[n].userData.mineNode !== i) continue;
+                    scene.remove(enemies[n]);
+                    disposeBaked(enemies[n]);
+                    enemies.splice(n, 1);
+                }
+            }
+        });
     }
 
     // A chest: it opens when the marshal walks up to it, for score and either a heart or a spell of triple shot.
@@ -376,6 +388,33 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         ui.updateHUD();
     }
 
+    // The shaft and the lift ask first: the game stops, and nothing happens until the answer is yes.
+    function askMine(kind) {
+        mine.confirm = kind;
+        gameState.isConfirming = true;
+        playerStats.invulnerabilityTimer = Math.max(playerStats.invulnerabilityTimer, 0.5);
+        ui.showMineConfirm(confirmText(kind, mine.floor));
+    }
+
+    function answerMine(yes) {
+        if(!gameState.isConfirming) return;
+        const kind = mine.confirm;
+        gameState.isConfirming = false;
+        mine.confirm = null;
+        keys.confirmYes = keys.confirmNo = false;
+        ui.hideMineConfirm();
+        if(!yes) {
+            mine.blocked = kind; // not asked again until the marshal has stepped away from it
+            return;
+        }
+        if(kind === 'up') {
+            finishRun('mine-win');
+        } else {
+            gameState.score += descentScore(mine.floor);
+            beginFloor(nextFloor());
+        }
+    }
+
     function updateMineFlow(dt) {
         const cave = activeFloor();
         const at = playerSystem.playerGroup.position;
@@ -383,21 +422,17 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         mine.shaftDz = cave.shaft[1] - at.z;
         mine.liftDx = -at.x;
         mine.liftDz = -at.z;
-        // The way down is always open: walk into the shaft and the next floor begins.
-        if(shaftReached(cave, at.x, at.z)) {
-            gameState.score += descentScore(mine.floor);
-            beginFloor(nextFloor());
-            return;
-        }
-        // The lift brings the marshal back up, once he has walked away from it.
+        // After a no, the shaft or the lift asks again only once the marshal has walked away from it.
+        if(mine.blocked === 'down' && Math.hypot(mine.shaftDx, mine.shaftDz) > SHAFT_REACH + 3) mine.blocked = null;
+        if(mine.blocked === 'up' && Math.hypot(at.x, at.z) > LIFT_REACH + 3) mine.blocked = null;
+        // The lift works once the marshal has walked away from it, so he does not ride up by accident on arriving.
         if(!mine.liftArmed && Math.hypot(at.x, at.z) > LIFT_ARM_DISTANCE) mine.liftArmed = true;
-        if(mine.liftArmed && liftReached(at.x, at.z)) {
-            finishRun('mine-win');
-            return;
-        }
+        // The way down is always open, and so is the way up: walk into either and it asks.
+        if(shaftReached(cave, at.x, at.z) && mine.blocked !== 'down') { askMine('down'); return; }
+        if(mine.liftArmed && liftReached(at.x, at.z) && mine.blocked !== 'up') { askMine('up'); return; }
         const chest = chestWithin(cave, at.x, at.z, mine.opened);
         if(chest >= 0) openChest(chest, cave);
-        mineSpawnTick(dt);
+        updateMinePopulation(dt);
     }
 
     function beginIntermission() {
@@ -434,7 +469,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     }
 
     function pauseGame() {
-        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty) return;
+        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty || gameState.isConfirming) return;
         gameState.isPaused = true;
         ui.showPauseOverlay();
     }
@@ -448,7 +483,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     }
 
     function openSettings() {
-        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty) return;
+        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty || gameState.isConfirming) return;
         if(gameState.isSettingsOpen) return;
         pausedBeforeSettings = gameState.isPaused;
         gameState.isPaused = true;
@@ -558,6 +593,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     function resetGame() {
         endTownFight(); // a fight started from the town's Arena is over: the home screen is the home screen again
         endMineRun(); // so is a run down the mine
+        ui.hideMineConfirm();
         hotMusic = false;
         bountyChoiceAt = 0;
         gameState.event = null;
@@ -638,11 +674,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         handlePauseToggle();
         handleSettingsToggle();
         handleAudioToggles();
-        // B / C only answer the bounty choice; ignore presses made before it opens.
+        // B / C only answer the bounty choice; ignore presses made before it opens. The same for the mine's question.
         if(!gameState.isChoosingBounty) {
             keys.bankRequested = false;
             keys.rideOnRequested = false;
         }
+        if(!gameState.isConfirming) keys.confirmYes = keys.confirmNo = false;
 
         // Frontier Town open: draw the town instead of the desert (src/townPanel.js).
         if(!gameState.isGameStarted && lobbyView?.isActive()) {
@@ -703,6 +740,14 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             return;
         }
 
+        if(gameState.isConfirming) { // the mine is asking: the world waits for the answer
+            if(keys.confirmYes) answerMine(true);
+            else if(keys.confirmNo) answerMine(false);
+            renderer.render(scene, camera);
+            emitDebug(realDt);
+            return;
+        }
+
         if(gameState.isPaused || gameState.isSettingsOpen) {
             renderer.render(scene, camera);
             ui.updateHUD();
@@ -735,11 +780,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();
         // Sub-step bullets on slow frames so fast shots cannot skip past a target between frames.
         const bulletSteps = Math.max(1, Math.ceil(dt / 0.02));
-        for(let step = 0; step < bulletSteps && !gameState.isGameOver && !gameState.isChoosingBounty; step++) {
+        for(let step = 0; step < bulletSteps && !gameState.isGameOver && !gameState.isChoosingBounty && !gameState.isConfirming; step++) {
             updateBullets(dt / bulletSteps, scene, playerSystem.playerGroup, callbacks);
         }
         // A bullet can end the run or open the bounty choice; freeze the rest of this frame if so.
-        const stillFighting = () => !gameState.isGameOver && !gameState.isChoosingBounty;
+        const stillFighting = () => !gameState.isGameOver && !gameState.isChoosingBounty && !gameState.isConfirming;
         if(stillFighting()) updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
         if(stillFighting()) updateHazards(dt, scene, playerSystem.playerGroup, callbacks);
         if(stillFighting()) playerSystem.update(dt, timeInSeconds);
@@ -773,6 +818,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         closeSettings,
         bankAndLeave,
         rideOnToBonus,
+        answerMine,
         setLobbyView: view => { lobbyView = view; }
     };
 }

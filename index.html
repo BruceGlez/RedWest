@@ -329,6 +329,22 @@
         </div>
     </div>
 
+    <!-- The Hollow Claim asks before it takes you down the shaft or up the lift (src/mine.js, confirmText). -->
+    <div id="mine-confirm" class="modal-overlay" style="display:none;">
+        <div class="modal-content bounty-content mine-confirm">
+            <h1 id="mine-confirm-title" class="western-title">GO DOWN?</h1>
+            <p id="mine-confirm-text" class="bounty-lead"></p>
+            <div class="bounty-options">
+                <button id="mine-confirm-yes" type="button" class="bounty-card risky">
+                    <strong><span id="mine-confirm-yes-label">DESCEND</span> <span class="key-highlight desktop-only-inline">ENTER</span></strong>
+                </button>
+                <button id="mine-confirm-no" type="button" class="bounty-card safe">
+                    <strong><span id="mine-confirm-no-label">STAY</span> <span class="key-highlight desktop-only-inline">ESC</span></strong>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <!-- Playable ad only (src/demo.js): tap to start, then an end card with the store link. -->
     <div id="demo-start" class="demo-overlay" style="display:none;">
         <div class="demo-logo">RED WEST</div>

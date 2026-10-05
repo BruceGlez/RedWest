@@ -2,6 +2,7 @@
 // ladder interleaves the Wanted Road's own enemies with four that live only down here (cave bats, crawlers, stonekin, lantern wraiths).
 // No rendering here, so the rules and tests/mineMonsters.test.js use it as it is; src/assets.js draws them and src/enemySystem.js runs them.
 import { ENEMY_TYPES } from './enemyTypes.js';
+import { isOpen } from './mineMap.js';
 
 // Mine-only monsters. Behaviours are the ones the Wanted Road's enemies already have (src/enemySystem.js): a bat flits (zigzag), a
 // crawler rushes (chase), stonekin charge after a shake (charger), a wraith fades and reappears beside you (phantom).
@@ -47,8 +48,8 @@ export function mineRoster(floor) {
     return [...BASE_ROSTER, ...MINE_LADDER.slice(0, depth).flat()];
 }
 
-// How the pursuit is run on a floor: not in waves but all the time. `threatCap` is how much danger (the sum of the costs of
-// everyone chasing) the cave keeps around the marshal; `interval` is how often it tops that up. New monsters come more often.
+// What a floor holds: how much danger (the sum of the costs of the monsters) a chamber of the standard size has, and how often each kind
+// comes. New monsters come more often on their own floor.
 export function mineWave(floor) {
     const depth = Math.max(1, Math.floor(floor));
     const fresh = new Set(newOn(depth));
@@ -64,7 +65,6 @@ export function mineWave(floor) {
     }
     return {
         threatCap: Math.min(110, 13 + depth * 5),
-        interval: Math.max(0.55, 1.5 - depth * 0.06),
         weights, caps
     };
 }
@@ -72,4 +72,50 @@ export function mineWave(floor) {
 // Tougher below the Wanted Road's own ladder: one more hit for anything that takes more than one, every few floors past the eighth.
 export function mineHpBonus(floor) {
     return Math.max(0, Math.floor((Math.floor(floor) - 5) / 4));
+}
+
+// ---------- who lives where ----------
+// Each chamber, alcove and treasure room has its own monsters. They are there when the marshal comes near (WAKE_DISTANCE from its edge),
+// and they do not come back while he stays: kill them and the chamber is quiet. When he has gone far away (LEAVE_DISTANCE) the survivors
+// go back to sleep and the chamber fills again for the next time he comes. So there is no endless stream, and nowhere is ever cleared for good.
+export const WAKE_DISTANCE = 45;
+export const LEAVE_DISTANCE = 100;
+const SAFE_LANDING = 20; // nobody is put closer than this to the lift
+
+// How much danger a chamber holds: more in a bigger one, more in a treasure room (it is guarded), less in an alcove, and little around the
+// lift, where the marshal arrives.
+export function nodeBudget(layout, index, floor) {
+    const node = layout.nodes[index];
+    const size = (node.r / 30) ** 2;
+    const kind = node.kind === 'room' ? 1.3 : node.kind === 'alcove' ? 0.5 : 1;
+    const landing = index === 0 ? 0.35 : 1;
+    return mineWave(floor).threatCap * 0.55 * size * kind * landing;
+}
+
+// The monsters to put in one chamber, as [{ type, x, z }]: the budget spent on kinds of the floor's roster by its weights and caps, each
+// at one of the chamber's open mouths.
+export function planNode(layout, index, floor, rand = Math.random) {
+    const wave = mineWave(floor);
+    const sites = layout.spawns.filter(([x, z, node]) => node === index && Math.hypot(x, z) >= SAFE_LANDING);
+    if(!sites.length) return [];
+    let remaining = nodeBudget(layout, index, floor);
+    const placed = [];
+    const count = {};
+    for(let guard = 0; guard < 60; guard++) {
+        const candidates = Object.keys(wave.weights).filter(id => monsterCost(id) <= remaining && (count[id] || 0) < wave.caps[id]);
+        if(!candidates.length) break;
+        let roll = rand() * candidates.reduce((sum, id) => sum + wave.weights[id], 0);
+        let type = candidates[candidates.length - 1];
+        for(const id of candidates) { roll -= wave.weights[id]; if(roll <= 0) { type = id; break; } }
+        const [sx, sz] = sites[Math.floor(rand() * sites.length)];
+        let x = sx, z = sz;
+        for(let attempt = 0; attempt < 4; attempt++) { // a little scatter, never into the rock
+            const tx = sx + (rand() - 0.5) * 6, tz = sz + (rand() - 0.5) * 6;
+            if(isOpen(layout, tx, tz, 4)) { x = tx; z = tz; break; }
+        }
+        placed.push({ type, x, z });
+        count[type] = (count[type] || 0) + 1;
+        remaining -= monsterCost(type);
+    }
+    return placed;
 }
