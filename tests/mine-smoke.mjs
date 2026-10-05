@@ -77,6 +77,7 @@ try {
         window.S = await import('/src/state.js');
         window.M = await import('/src/mine.js');
         window.MM = await import('/src/mineMap.js');
+        window.MMON = await import('/src/mineMonsters.js');
     });
     await page.keyboard.press('e');
     await page.locator('#town-screen').waitFor({ state: 'hidden' });
@@ -180,9 +181,27 @@ try {
             // Monsters are not endless: the chamber's own are the chamber's. Kill them all and nothing comes while the marshal stays ...
             await put(10, 0);
             await page.waitForTimeout(2500);
-            await page.evaluate(() => { for(const e of S.enemies.splice(0)) e.parent.remove(e); });
+            // The chambers that have woken for him: within WAKE_DISTANCE of their edge (src/modes/mine.js). A chamber farther off may wake while
+            // we wait, and that is fine; only these must stay quiet. Monsters still queued to come out (a couple a frame, slower on a slow
+            // machine) are the chamber's own, so clear until a round brings none, and only then start counting.
+            const woken = await page.evaluate(() => {
+                const c = MM.activeFloor(), at = window.__redWest.playerGroup.position;
+                return c.nodes.map((n, i) => Math.hypot(at.x - n.x, at.z - n.z) - n.r < MMON.WAKE_DISTANCE ? i : -1).filter(i => i >= 0);
+            });
+            const clearWoken = () => page.evaluate(ids => {
+                let n = 0;
+                for(let i = S.enemies.length - 1; i >= 0; i--) {
+                    if(ids.includes(S.enemies[i].userData.mineNode)) { S.enemies[i].parent.remove(S.enemies[i]); S.enemies.splice(i, 1); n++; }
+                }
+                return n;
+            }, woken);
+            await clearWoken();
+            for(let round = 0; round < 12; round++) {
+                await page.waitForTimeout(1000);
+                if(await clearWoken() === 0) break;
+            }
             await page.waitForTimeout(3500);
-            assert.equal(await page.evaluate(() => S.enemies.length), 0, 'nothing new comes out while he stays: the chamber is quiet');
+            assert.equal(await clearWoken(), 0, 'nothing new comes out while he stays: the chamber is quiet');
             // ... but once he has gone far away, it fills again for next time.
             await page.evaluate(() => { const c = MM.activeFloor(); const n = c.nodes[c.main - 1]; window.__redWest.playerGroup.position.set(n.x - 20, 0, n.z); });
             await page.waitForTimeout(2500);
