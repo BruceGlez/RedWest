@@ -6,7 +6,7 @@ import { createExplosion } from './particleSystem.js';
 import { addScorch } from './decals.js';
 import { addShake, haptic } from './feedback.js';
 import { gameState, enemies, playerStats } from './state.js';
-import { checkCollision } from './physics.js';
+import { checkCollision, stepAround } from './physics.js';
 import { activeFloor, isOpen, spawnPoint, steerTarget, AGGRO_DISTANCE } from './mineMap.js';
 import { mine } from './mine.js';
 import { MINE_MONSTERS, mineHpBonus, mineRoster } from './mineMonsters.js';
@@ -930,9 +930,18 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
                 e.position.x += moveX;
                 e.position.z += moveZ;
                 isMoving = true;
-            } else if(activeFloor() && u.state !== 'charge') {
-                // A cave wall: slide along it instead of standing against it.
-                if(!checkCollision(e.position.x + moveX, e.position.z, colRad)) { e.position.x += moveX; isMoving = true; }
+            } else if(u.state !== 'charge') {
+                // Something is in the way (a crate, a column, a wall): go round it on one side, the same side for a little while, so it
+                // flows past instead of standing against it or shaking between the two ways.
+                if(timeInSeconds > (u.detourUntil ?? 0)) u.detourSide = Math.random() < 0.5 ? 1 : -1;
+                const around = stepAround(e.position.x, e.position.z, moveX, moveZ, colRad, u.detourSide);
+                if(around) {
+                    e.position.x = around.x;
+                    e.position.z = around.z;
+                    u.detourSide = around.side;
+                    u.detourUntil = timeInSeconds + 0.8;
+                    isMoving = true;
+                } else if(!checkCollision(e.position.x + moveX, e.position.z, colRad)) { e.position.x += moveX; isMoving = true; }
                 else if(!checkCollision(e.position.x, e.position.z + moveZ, colRad)) { e.position.z += moveZ; isMoving = true; }
             } else if(u.state === 'charge') {
                 const recovers = u.behavior === 'charger' || u.behavior === 'boss';
