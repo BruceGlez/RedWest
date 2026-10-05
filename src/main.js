@@ -139,7 +139,7 @@ const town = createTownPanel({
         await ensureOutlawModel(index);
         keys.startRequested = true;
     },
-    // The undertaker's cellar hatch: the Hollow Claim, from floor 1. It needs no outlaw model; the mine sends no outlaw.
+    // The cellar stairs in Mr. Grimsby's parlour: the Hollow Claim, from floor 1. It needs no outlaw model; the mine sends no outlaw.
     onDescend: () => {
         beginMineRun();
         ui.hidePanels();

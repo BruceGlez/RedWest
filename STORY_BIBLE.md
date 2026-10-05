@@ -322,8 +322,8 @@ tailor, the station master and the jail, chosen from progress and shown on each 
 the **opening** (four panels: Red West with the Drifter as a rumour, Cinder Creek, the star, Lantern Rock) and the **ending**
 (three panels: the court, the seal, the poster). Both read from the Case File in the Bounty Book (the opening is marked NEW
 until read; the ending opens with all ten pages). Each panel has a picture (2026-09-30, `tools/story-picture.mjs` with the prompts in `tools/story-prompts.mjs`, made with the OpenAI Images API; the full-size
-originals are in `art/story/`, the phone-sized ones in `public/story/`, about 30 KB each). Not built: barks for the stable and the undertaker (scenery,
-not tappable), re-recorded voice lines.
+originals are in `art/story/`, the phone-sized ones in `public/story/`, about 30 KB each). Not built: barks for the stable (scenery,
+not tappable), re-recorded voice lines. Mr. Grimsby has a parlour you walk into (`MINE_PLAN.md`) and one line for how many outlaws you have beaten.
 
 ## 9. Suggested order
 

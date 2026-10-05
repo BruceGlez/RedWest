@@ -6,7 +6,7 @@ import { TOWN_AREA } from '../src/townDistricts.js';
 import { UNDERTAKER_AT } from '../src/townSpace.js';
 
 test('the five places exist, with a verb each', () => {
-    assert.deepEqual(SPOTS.map(s => s.id), ['train', 'platform', 'cashbox', 'board', 'hatch']);
+    assert.deepEqual(SPOTS.map(s => s.id), ['train', 'platform', 'cashbox', 'board', 'undertaker']);
     for(const spot of SPOTS) assert.ok(spot.verb && getSpot(spot.id) === spot);
     assert.equal(getSpot('nope'), null);
 });
@@ -39,7 +39,7 @@ test('the prompts name what you will get', () => {
     assert.equal(spotLabel('cashbox', { stored: 1234.4 }), 'COLLECT $1,234');
     assert.equal(spotLabel('board', { jobsLeft: 2 }), 'BOUNTY BOARD: 2 LEFT');
     assert.equal(spotLabel('board', { jobsLeft: 0 }), 'BOUNTY BOARD');
-    assert.equal(spotLabel('hatch'), 'THE HOLLOW CLAIM: FLOOR 1');
+    assert.equal(spotLabel('undertaker'), 'MR. GRIMSBY, UNDERTAKER');
 });
 
 test('coins show what is stored: none when empty, one at the first dollar, all when full', () => {
@@ -64,9 +64,9 @@ test('the board pins a note for each job left today, at most three', () => {
     assert.equal(jobsLeft(null), 0);
 });
 
-test('the cellar hatch stands beside the undertaker and says DESCEND', () => {
-    const hatch = getSpot('hatch');
-    assert.equal(hatch.verb, 'DESCEND');
-    assert.ok(Math.hypot(hatch.object.x - UNDERTAKER_AT[0], hatch.object.z - UNDERTAKER_AT[1]) < 8, 'beside the undertaker');
-    assert.ok(Math.abs(hatch.object.x - UNDERTAKER_AT[0]) > 2.8 + hatch.object.hx, 'clear of the undertaker\'s walk box (2.8 each way)');
+test('the undertaker\'s door is in front of his building and says ENTER', () => {
+    const door = getSpot('undertaker');
+    assert.equal(door.verb, 'ENTER');
+    assert.equal(door.object, null, 'the building itself blocks the way');
+    assert.ok(Math.abs(door.stand[0] - UNDERTAKER_AT[0]) < 5 && door.stand[1] - UNDERTAKER_AT[1] > 2.8 + 0.6, 'in front of it, outside its walk box (2.8 each way)');
 });

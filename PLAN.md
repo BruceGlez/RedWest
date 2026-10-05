@@ -51,7 +51,7 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
   detail, wind and horizon pieces.
 - **Polish:** UI consistency (count-ups, reward reveals, safe areas), accessibility (text size, reduced motion, colour-blind aim
   line), hot-loop crossfade, barks for the stable and undertaker, weekly event rank titles.
-- **The Undertaker's Mine** (`MINE_PLAN.md`): slice 1 is built (cellar hatch in town, floors 1 to 5 on a reused map, practice rules). Next: a saved deepest floor, checkpoints and ore (slice 2), then boss floors and Grimsby's barks (slice 3).
+- **The Undertaker's Mine** (`MINE_PLAN.md`): slices 1 and 1b are built (the undertaker's parlour as a place, five caves with walls, rails, a lift and a shaft you walk to; practice rules). Next: a saved deepest floor, checkpoints and ore (slice 2), then boss floors and Grimsby's barks (slice 3).
 - **Story** (`STORY_BIBLE.md`): story cards, the Case File, town barks and opening/ending panels are built. Open: chapter-two hook, story props in town, and the Drifter legend (decided, not built).
 
 ### 4. Later

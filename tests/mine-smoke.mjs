@@ -27,15 +27,51 @@ try {
     await page.waitForTimeout(800);
     const shot = async name => { if(process.env.SHOTS) await page.screenshot({ path: `${process.env.SHOTS}/${name}.png` }); };
 
-    // The hatch: the prompt names the mine and the verb, and using it closes the town and starts the descent.
+    // The undertaker's door opens Mr. Grimsby's parlour; the cellar stairs at the back go down to the mine.
     await page.evaluate(() => {
-        const door = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === 'hatch');
+        const door = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === 'undertaker');
         window.__redWestTown.walk.place(door.x, door.z);
     });
-    await page.locator('.walk-prompt').filter({ hasText: 'THE HOLLOW CLAIM' }).waitFor({ state: 'visible' });
-    assert.match(await page.locator('.walk-prompt').textContent(), /DESCEND/);
+    await page.locator('.walk-prompt').filter({ hasText: 'MR. GRIMSBY, UNDERTAKER' }).waitFor({ state: 'visible' });
+    assert.match(await page.locator('.walk-prompt').textContent(), /ENTER/);
     await page.waitForTimeout(1500);
-    await shot('town-hatch');
+    await shot('town-door');
+    await page.keyboard.press('e');
+    await page.waitForFunction(() => window.__redWestTown.place === 'undertaker');
+    assert.match(await page.locator('#town-title').textContent(), /GRIMSBY/);
+    await page.waitForTimeout(1500);
+    await shot('parlour');
+
+    // Mr. Grimsby talks, in a card.
+    const goTo = id => page.evaluate(id => {
+        const door = window.__redWestTown.parlour3d.walkMap().doors.find(d => d.id === id);
+        window.__redWestTown.parlourWalk.place(door.x, door.z);
+    }, id);
+    await goTo('grimsby');
+    await page.locator('.walk-prompt').filter({ hasText: 'MR. GRIMSBY, UNDERTAKER' }).waitFor({ state: 'visible' });
+    assert.match(await page.locator('.walk-prompt').textContent(), /TALK/);
+    await page.keyboard.press('e');
+    await page.locator('#town-sheet').waitFor({ state: 'visible' });
+    assert.match(await page.locator('#town-grid').textContent(), /Marshal|Company|ledger|claim|week/i);
+    await page.waitForTimeout(500);
+    await shot('parlour-talk');
+    await page.locator('#town-sheet-close').click();
+
+    // Out through the door and back in again: the town waits where the marshal stood.
+    await goTo('leave');
+    await page.locator('.walk-prompt').filter({ hasText: 'BACK TO THE STREET' }).waitFor({ state: 'visible' });
+    await page.keyboard.press('e');
+    await page.waitForFunction(() => window.__redWestTown.place === null);
+    await page.locator('.walk-prompt').filter({ hasText: 'MR. GRIMSBY, UNDERTAKER' }).waitFor({ state: 'visible' });
+    await page.keyboard.press('e');
+    await page.waitForFunction(() => window.__redWestTown.place === 'undertaker');
+
+    // The stairs at the back: the prompt names the mine, and using it closes the town and starts the descent.
+    await goTo('cellar');
+    await page.locator('.walk-prompt').filter({ hasText: 'HOLLOW CLAIM' }).waitFor({ state: 'visible' });
+    assert.match(await page.locator('.walk-prompt').textContent(), /DESCEND/);
+    await page.waitForTimeout(1200);
+    await shot('parlour-stairs');
     await page.evaluate(async () => {
         window.S = await import('/src/state.js');
         window.M = await import('/src/mine.js');

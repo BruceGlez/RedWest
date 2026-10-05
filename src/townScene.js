@@ -876,21 +876,6 @@ export function createTownScene(options = {}) {
     cashProp.add(cashSign);
     cashProp.position.set(cashAt.x, 0, cashAt.z);
     scenery.add(cashProp);
-    // The cellar hatch beside the undertaker's: a stone curb, two slanted doors, a lantern. It leads down to the Hollow Claim.
-    const hatchAt = getSpot('hatch').object;
-    const hatchProp = new THREE.Group();
-    hatchProp.add(box(2.7, 0.5, 1.9, C.stoneDark, 0, 0.25, 0), box(0.14, 0.14, 1.7, C.iron, 0, 0.78, 0));
-    for(const side of [-1, 1]) {
-        const leaf = box(1.25, 0.12, 1.7, C.timber, side * 0.62, 0.66, 0);
-        leaf.rotation.z = -side * 0.3;
-        hatchProp.add(leaf);
-    }
-    hatchProp.add(box(0.14, 1.3, 0.14, C.timberDark, -1.6, 0.65, 0.9), box(0.26, 0.26, 0.26, C.glow, -1.6, 1.42, 0.9, 1.4));
-    const hatchSign = sign('THE CLAIM', 1.8);
-    hatchSign.position.set(0, 0.28, 0.96);
-    hatchProp.add(hatchSign);
-    hatchProp.position.set(hatchAt.x, 0, hatchAt.z);
-    scenery.add(hatchProp);
     const trainSign = sign('RIDE OUT', 3.6);
     // The town station on the south road: a platform with a canopy, the rails, and a green train standing at it (the town train,
     // src/townTravel.js). Large and lit so it is the first thing seen from the south road, and it has its own sign in the overview.

@@ -49,11 +49,6 @@ export function floorTitle(floor) {
     return `FLOOR ${floor} / ${MINE_FLOORS}`;
 }
 
-// The prompt on the cellar hatch in town.
-export function hatchLabel() {
-    return 'THE HOLLOW CLAIM: FLOOR 1';
-}
-
 export function floorBanner(floor) {
     return `${floorTitle(floor)}\nTHE HOLLOW CLAIM`;
 }

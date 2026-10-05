@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mine, beginMineRun, endMineRun, MINE_FLOORS, MINE_ATMOSPHERE_ID, floorStage, floorWave, floorCleared, isLastFloor,
-    floorTitle, hatchLabel, floorBanner, clearedBanner, resultText, shaftArrow, shaftHint } from '../src/mine.js';
+    floorTitle, floorBanner, clearedBanner, resultText, shaftArrow, shaftHint } from '../src/mine.js';
 import { OUTLAWS, outlawDifficulty } from '../src/outlaws.js';
 import { rosterFor, featuredFor } from '../src/enemyTypes.js';
 import { atmosphereFor, soundFor, MINE_ATMOSPHERE, ATMOSPHERES } from '../src/atmosphere.js';
@@ -49,7 +49,6 @@ test('only the last floor ends the run', () => {
 
 test('the words on screen name the floor and the way out', () => {
     assert.equal(floorTitle(2), 'FLOOR 2 / 5');
-    assert.equal(hatchLabel(), 'THE HOLLOW CLAIM: FLOOR 1');
     assert.match(floorBanner(3), /FLOOR 3 \/ 5/);
     assert.match(clearedBanner(1), /FLOOR 1 CLEARED/);
     assert.match(clearedBanner(MINE_FLOORS), /LAST FLOOR/);
