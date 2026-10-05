@@ -5,6 +5,7 @@ import { validateName, isGeneratedName } from '../src/names.js';
 import { AGE_BANDS } from '../src/privacy.js';
 import { collectJail, upgradeBuilding } from '../src/town.js';
 import { farmAction } from '../src/farm.js';
+import { ordersAction } from '../src/farmOrders.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 import { createApple, AppleError } from './apple.js';
 
@@ -404,6 +405,12 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 // Calloway Farm (src/farm.js): the server clock decides what has grown.
                 if(url.pathname === '/api/town/farm' && req.method === 'POST') {
                     const result = farmAction(user.profile, body, now());
+                    save();
+                    return send(res, 200, { result, profile: user.profile });
+                }
+                // Vane's Crossing orders (src/farmOrders.js): the server clock decides which day's orders are on the board.
+                if(url.pathname === '/api/town/orders' && req.method === 'POST') {
+                    const result = ordersAction(user.profile, body, now());
                     save();
                     return send(res, 200, { result, profile: user.profile });
                 }
