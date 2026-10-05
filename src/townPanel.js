@@ -413,8 +413,9 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         toastTimer = setTimeout(() => { els.toast.style.display = 'none'; }, 2800);
     }
     // ---------- Places you step into (src/places/): the farm, the undertaker's parlour, and the places to come ----------
+    const byId = id => places.find(p => p.id === id);
     function enterPlace(target) {
-        if(place || !profile || !target.canEnter()) return;
+        if(place || !profile || !target?.canEnter()) return;
         target.ensure();
         track('place_enter');
         target.prepare?.();
@@ -590,7 +591,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             town3d = createTownScene({ time: featureOn('time') });
             walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot, lineFor: personLine });
             // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
-            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; }, get look() { return look; }, get place() { return place; }, get farm3d() { return farm3d; }, get farmWalk() { return farmWalk; }, get parlour3d() { return parlour3d; }, get parlourWalk() { return parlourWalk; }, enterPlace, enterParlour, leavePlace };
+            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; }, get look() { return look; }, get place() { return place?.id ?? null; }, get farm3d() { return byId('ranch')?.scene3d; }, get farmWalk() { return byId('ranch')?.walk; }, get parlour3d() { return byId('undertaker')?.scene3d; }, get parlourWalk() { return byId('undertaker')?.walk; }, enterPlace: id => enterPlace(byId(id)), enterParlour: () => enterPlace(byId('undertaker')), leavePlace };
         }
         town3d.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
