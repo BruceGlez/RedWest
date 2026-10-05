@@ -28,10 +28,46 @@ test('the monsters of the mine are all on the ladder, and the ladder mixes them 
     for(const id of onLadder) assert.ok(ENEMY_TYPES[id] || MINE_MONSTERS[id], `${id} exists`);
     assert.ok(onLadder.some(id => ENEMY_TYPES[id]) && onLadder.some(isMineMonster), 'both kinds');
     assert.ok(isMineMonster('bat') && !isMineMonster('bandit'));
-    assert.equal(Object.keys(MINE_MONSTERS).length, 4);
+    assert.equal(Object.keys(MINE_MONSTERS).length, 10);
     for(const id of Object.keys(MINE_MONSTERS)) assert.ok(!(id in ENEMY_TYPES), `${id} stays out of the Bounty Book's list`);
     // Strange things come early: one of the mine's own by the second floor, and another within three floors of each.
     assert.ok(isMineMonster(newOn(2)[0]));
+});
+
+// The looks src/enemySystem.js can build today (MINE_MESHES and NEW_TYPE_MESHES). A monster without its own model borrows one with `look`.
+const LOOKS = ['bat', 'crawler', 'stonekin', 'wraith', 'rattler', 'rifleman', 'dynamiter', 'brute', 'rider', 'duelist', 'ghost', 'knifer', 'trooper'];
+
+test('the monsters below the old ladder arrive one per floor, from their own floor, and borrow a look the game can draw', () => {
+    const deep = ['slagadder', 'slaglobber', 'sentry', 'hollowhide', 'choir', 'ghoul'];
+    deep.forEach((id, i) => {
+        const floor = 15 + i;
+        assert.deepEqual(newOn(floor), [id], `${id} is new on floor ${floor}`);
+        assert.ok(isMineMonster(id) && !(id in ENEMY_TYPES));
+        assert.ok(!mineRoster(floor - 1).includes(id), `${id} is not met before floor ${floor}`);
+        assert.ok(mineRoster(floor).includes(id) && mineRoster(30).includes(id));
+        const def = MINE_MONSTERS[id];
+        assert.ok(LOOKS.includes(def.look), `${id}: look ${def.look} exists`);
+        assert.equal(def.behavior, (ENEMY_TYPES[def.look] ?? MINE_MONSTERS[def.look]).behavior, `${id}: behaves as the look it borrows`);
+        assert.ok(mineWave(floor).weights[id] > def.weight * 2, `${id} is sent more often on its own floor`);
+        assert.equal(Object.values(mineWave(floor - 1).weights).length + 1, Object.values(mineWave(floor).weights).length);
+    });
+});
+
+test('the deep monsters are priced like the ones whose behaviour they borrow, and every floor can still be filled', () => {
+    for(const id of ['slagadder', 'slaglobber', 'sentry', 'hollowhide', 'choir', 'ghoul']) {
+        const def = MINE_MONSTERS[id], base = ENEMY_TYPES[def.look] ?? MINE_MONSTERS[def.look];
+        assert.ok(def.cost >= base.cost * 0.9 && def.cost <= base.cost * 1.4, `${id}: cost ${def.cost} near ${base.cost}`);
+        assert.ok(def.hp >= base.hp && def.hp <= Math.max(base.hp * 1.6, base.hp + 1), `${id}: hp near the original`);
+        assert.ok(def.speed <= base.speed * 1.2, `${id}: not much faster than the original`);
+    }
+    for(const floor of [15, 17, 20, 25]) {
+        const layout = floorLayout(floor);
+        for(let i = 1; i < layout.nodes.length; i++) {
+            const plan = planNode(layout, i, floor, seeded(40 + i));
+            assert.ok(plan.length <= 60, `floor ${floor} node ${i}: a sane crowd`);
+            if(layout.nodes[i].kind === 'chamber' && layout.spawns.some(([x, z, n]) => n === i && Math.hypot(x, z) >= 20)) assert.ok(plan.length >= 1, `floor ${floor} node ${i}: something lives there`);
+        }
+    }
 });
 
 test('every monster has what the director and the spawner need', () => {

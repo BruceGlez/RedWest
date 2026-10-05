@@ -26,12 +26,45 @@ export const MINE_MONSTERS = {
         name: 'LANTERN WRAITH', cost: 2.2, weight: 1.0, cap: 3, hp: 2, speed: 7, behavior: 'phantom', danger: 3,
         blurb: 'What is left of a miner who went looking for the way up. It carries a light and it fades from sight.',
         tip: 'Bullets pass through while it is faded. Fire when it flickers back.'
+    },
+    // Deeper still (floors 15 to 20). These have no model of their own yet: `look` borrows an existing one (src/enemySystem.js) and the
+    // behaviour is the one named. The art prompts for their own models are in MINE_PLAN.md.
+    slagadder: {
+        name: 'SLAG ADDER', cost: 1.0, weight: 1.6, cap: 7, hp: 2, speed: 13.5, behavior: 'zigzag', danger: 2, look: 'rattler', hitRadius: 1.5,
+        blurb: 'A snake that crawled into the smelter and came out glowing. It strikes from side to side.',
+        tip: 'It takes two hits. Back up and shoot where it will be.'
+    },
+    slaglobber: {
+        name: 'SLAG LOBBER', cost: 2.4, weight: 1.1, cap: 2, hp: 3, speed: 5, behavior: 'lobber', danger: 3, look: 'dynamiter',
+        blurb: 'A blaster who never left the face. He throws lit charges from the dark.',
+        tip: 'Leave the ring before the fuse runs out.'
+    },
+    sentry: {
+        name: 'CAIRN SENTRY', cost: 2.6, weight: 1.0, cap: 2, hp: 3, speed: 4, behavior: 'sniper', danger: 3, look: 'rifleman',
+        blurb: 'A watcher posted at the old gallery. The red line shows where it will fire.',
+        tip: 'Step off the line before the shot.'
+    },
+    hollowhide: {
+        name: 'HOLLOWHIDE', cost: 3.8, weight: 0.8, cap: 2, hp: 11, speed: 3.4, behavior: 'charger', danger: 3, heavy: true, hitRadius: 2.4, look: 'stonekin',
+        blurb: 'The mountain\'s own weight, walking. It shakes, then comes straight through whatever is in the way.',
+        tip: 'When it shakes, sidestep. It cannot turn mid-charge.'
+    },
+    choir: {
+        name: 'PALE CHOIR', cost: 2.8, weight: 1.0, cap: 3, hp: 3, speed: 5.5, behavior: 'volley', danger: 3, look: 'trooper',
+        blurb: 'Miners who still sing the shift change, and fire on every beat.',
+        tip: 'Close in between bursts: they reload before the next.'
+    },
+    ghoul: {
+        name: 'GALLERY GHOUL', cost: 2.4, weight: 1.1, cap: 3, hp: 3, speed: 7.5, behavior: 'phantom', danger: 3, look: 'ghost',
+        blurb: 'It fades into the timbers of the gallery and steps out beside you.',
+        tip: 'Bullets pass through while it is faded. Fire when it flickers back.'
     }
 };
 
 // What is new on each floor (index = floor - 1). Floor 1 is the Wanted Road's three first enemies; every floor below brings one more.
 export const MINE_LADDER = [
-    [], ['bat'], ['rattler'], ['crawler'], ['rifleman'], ['dynamiter'], ['stonekin'], ['brute'], ['wraith'], ['rider'], ['duelist'], ['ghost'], ['knifer'], ['trooper']
+    [], ['bat'], ['rattler'], ['crawler'], ['rifleman'], ['dynamiter'], ['stonekin'], ['brute'], ['wraith'], ['rider'], ['duelist'], ['ghost'], ['knifer'], ['trooper'],
+    ['slagadder'], ['slaglobber'], ['sentry'], ['hollowhide'], ['choir'], ['ghoul']
 ];
 export const BASE_ROSTER = ['bandit', 'wolf', 'gunslinger'];
 
