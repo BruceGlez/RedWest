@@ -5,10 +5,12 @@ import { createFarmPlace } from './farm.js';
 import { createUndertakerPlace } from './undertaker.js';
 import { createVanePlace } from './vane.js';
 import { createChannelPlace } from './channel.js';
+import { createSaloonPlace } from './saloon.js';
 
 registerPlace(createFarmPlace);
 registerPlace(createUndertakerPlace);
 registerPlace(createVanePlace);
 registerPlace(createChannelPlace);
+registerPlace(createSaloonPlace);
 
 export { createPlaces } from './registry.js';
