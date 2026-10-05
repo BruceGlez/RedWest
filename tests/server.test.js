@@ -4,6 +4,7 @@ import { createServer } from 'node:http';
 import { createHmac } from 'node:crypto';
 import { createApp, verifyStripeSignature } from '../server/app.js';
 import { createMemoryStore } from '../server/store.js';
+import { OUTLAWS } from '../src/outlaws.js';
 
 const ENV = {
     REVENUECAT_WEBHOOK_AUTH: 'Bearer rc-secret',
@@ -404,6 +405,32 @@ test('Calloway Farm is shut until the Calloways are beaten, then crops grow on t
         assert.equal((await farm({ action: 'sell', good: 'all' })).data.code, 'nothing_to_sell');
         assert.equal((await farm({ action: 'plant', plot: 99, crop: 'wheat' })).data.code, 'no_plot');
         assert.equal((await farm({})).status, 400, 'no action, no farm');
+    } finally {
+        await s.close();
+    }
+});
+
+test('Vane\'s Crossing is shut until Silas Vane is beaten, then the orders follow the server clock', async () => {
+    const s = await startAdminServer();
+    try {
+        const a = await s.account();
+        const orders = body => s.call('/api/town/orders', { token: a.token, body });
+        assert.equal((await orders({ action: 'visit' })).data.code, 'locked');
+        assert.equal((await orders({ action: 'fill', order: '1:0' })).data.code, 'locked');
+        const vane = OUTLAWS.findIndex(o => o.id === 'silas-vane');
+        for(let outlawIndex = 0; outlawIndex <= vane; outlawIndex++) {
+            await s.call('/api/run', { token: a.token, body: { score: 900, seconds: 120, outlawIndex, bounty: 'banked', kills: {} } });
+            s.advanceDays(1 / 24);
+        }
+        const visit = await orders({ action: 'visit' });
+        assert.equal(visit.status, 200);
+        assert.equal(visit.data.profile.town.orders.since, visit.data.result.since);
+        const id = `${visit.data.result.since}:0`;
+        assert.equal((await orders({ action: 'fill', order: id })).data.code, 'not_enough', 'today\'s order is on the board, and the barn is empty');
+        assert.equal((await orders({ action: 'fill', order: 'nope' })).data.code, 'no_order');
+        s.advanceDays(3);
+        assert.equal((await orders({ action: 'fill', order: id })).data.code, 'no_order', 'three days later the order is gone');
+        assert.equal((await orders({})).status, 400, 'no action, no orders');
     } finally {
         await s.close();
     }
