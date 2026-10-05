@@ -124,6 +124,14 @@ async function download(url, file) {
 }
 
 async function main() {
+    try { process.loadEnvFile(); } catch {}
+    if(!process.env.MESHY_API_KEY && process.platform === 'win32') {
+        try {
+            const { execSync } = await import('node:child_process');
+            const userKey = execSync("powershell -NoProfile -Command \"[System.Environment]::GetEnvironmentVariable('MESHY_API_KEY', 'User')\"", { stdio: ['ignore', 'pipe', 'ignore'] }).toString().trim();
+            if(userKey) process.env.MESHY_API_KEY = userKey;
+        } catch {}
+    }
     if(!process.env.MESHY_API_KEY) throw new Error('MESHY_API_KEY is not set. Add it in the environment settings (never paste it into code or chat).');
     const options = parseArgs(process.argv.slice(2));
     await mkdir(CACHE, { recursive: true });
