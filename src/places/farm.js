@@ -4,8 +4,9 @@
 import { createFarmScene } from '../placeFarm.js';
 import { DAY_SKY } from '../townLook.js';
 import { createTownWalk } from '../townWalk.js';
-import { CROPS, GOODS, EGG, getCrop, plotStates, eggsReady, minutesToNextEgg, minutesText, farmLevel, farmLevelInfo } from '../farm.js';
+import { farmWatered, CROPS, GOODS, EGG, getCrop, plotStates, eggsReady, minutesToNextEgg, minutesText, farmLevel, farmLevelInfo } from '../farm.js';
 import { FARM_START, farmLabel, plotIndex } from '../farmLayout.js';
+import { growMinutes } from '../farmWater.js';
 import { unlockedDistricts, getDistrict } from '../townDistricts.js';
 
 export function createFarmPlace(host) {
@@ -23,9 +24,9 @@ export function createFarmPlace(host) {
         const index = plotIndex(id);
         const card = (title, body, actions = '') => `<div class="town-card" data-building="${id}"><div class="town-sign"><span>${title}</span></div>${body}${actions ? `<div class="town-actions farm-actions">${actions}</div>` : ''}</div>`;
         if(index >= 0) {
-            const plot = plotStates(farm, now)[index];
+            const plot = plotStates(farm, now, farmWatered(host.profile()))[index];
             if(plot.state === 'empty') {
-                const buttons = CROPS.map(c => `<button type="button" class="shop-action collect farm-crop" data-plant="${c.id}" data-plot="${index}">${c.name}<small>${minutesText(c.minutes)} · ${c.yield} x $${c.price}</small></button>`).join('');
+                const buttons = CROPS.map(c => `<button type="button" class="shop-action collect farm-crop" data-plant="${c.id}" data-plot="${index}">${c.name}<small>${minutesText(growMinutes(c, farmWatered(host.profile())))} · ${c.yield} x $${c.price}</small></button>`).join('');
                 return card(`PLOT ${index + 1}`, '<p class="town-blurb">Pick a crop. It grows while you are away and waits for you, however long that is.</p>', buttons);
             }
             return card(`PLOT ${index + 1}`, `<p class="town-blurb">${plot.crop.name}: ${minutesText(plot.minutesLeft)} to go.</p>`
@@ -75,7 +76,7 @@ export function createFarmPlace(host) {
         if(id === 'leave') return host.leave();
         const farm = host.profile()?.town.farm;
         const index = plotIndex(id);
-        if(farm && index >= 0 && plotStates(farm)[index].state === 'ready') {
+        if(farm && index >= 0 && plotStates(farm, new Date(), farmWatered(host.profile()))[index].state === 'ready') {
             return farmDo({ action: 'harvest', plot: index }, r => `Harvested ${r.amount} ${GOODS.find(g => g.id === r.good).name.toLowerCase()}.`);
         }
         if(farm && id === 'coop' && eggsReady(farm, new Date(), Math.max(1, farmLevel(host.profile()))) > 0) return farmDo({ action: 'eggs' }, r => `Collected ${r.amount} ${r.amount === 1 ? 'egg' : 'eggs'}.`);
@@ -96,10 +97,10 @@ export function createFarmPlace(host) {
             scene3d = createFarmScene();
             walk = createTownWalk({
                 town3d: scene3d, host: host.screen, onOpen: useFarm, blocked: () => host.isCardOpen(), start: FARM_START,
-                describe: door => farmLabel(door, host.profile()?.town.farm, new Date(), host.profile() ? Math.max(1, farmLevel(host.profile())) : 1)
+                describe: door => farmLabel(door, host.profile()?.town.farm, new Date(), host.profile() ? Math.max(1, farmLevel(host.profile())) : 1, !!host.profile() && farmWatered(host.profile()))
             });
         },
-        sync() { scene3d?.setFarm(host.profile().town.farm, new Date(), Math.max(1, farmLevel(host.profile()))); },
+        sync() { scene3d?.setFarm(host.profile().town.farm, new Date(), Math.max(1, farmLevel(host.profile())), farmWatered(host.profile())); },
         prepare() { this.sync(); },
         entered() { host.markVisited('ranch'); },
         resize: (w, h) => scene3d?.resize(w, h),

@@ -158,15 +158,16 @@ export function createFarmScene() {
     // ---------- What changes: the crops in the beds, the eggs at the coop ----------
     let farm = null;
     let level = 1;
+    let watered = false; // Morgan's Channel waters the farm (src/farmWater.js)
     let now = new Date();
     let shown = null; // the mesh now in the scene
     let shownKey = '';
     function cropsKey() {
-        const states = plotStates(farm, now);
+        const states = plotStates(farm, now, watered);
         return states.map(s => (s.state === 'empty' ? '-' : `${s.crop.id}${s.state === 'ready' ? 'R' : Math.min(2, Math.floor(s.fraction * 3))}`)).join('|') + `#${eggsReady(farm, now, level)}`;
     }
     function rebuild() {
-        const states = plotStates(farm, now);
+        const states = plotStates(farm, now, watered);
         const group = new THREE.Group();
         states.forEach((s, i) => {
             if(s.state === 'empty') return;
@@ -209,9 +210,10 @@ export function createFarmScene() {
         folk: [],
         talkTo() {},
         // The farm's state (src/farm.js): rebuilt only when something a player can see has changed.
-        setFarm(next, at = new Date(), nextLevel = 1) {
+        setFarm(next, at = new Date(), nextLevel = 1, nextWatered = false) {
             farm = next;
             level = nextLevel;
+            watered = nextWatered;
             now = at;
             if(!farm) return;
             const key = cropsKey();
@@ -244,7 +246,7 @@ export function createFarmScene() {
             camera.updateProjectionMatrix();
             placeCamera();
         },
-        walkMap() { return farmMap(farm, new Date(), level); },
+        walkMap() { return farmMap(farm, new Date(), level, watered); },
         follow(x, z) {
             const upright = viewSize[0] < viewSize[1];
             view.pitch = upright ? 1.1 : 0.98;
