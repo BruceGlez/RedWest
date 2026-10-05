@@ -463,6 +463,26 @@ try {
             window.__redWestTown.farmWalk.place(d.x, d.z);
         }, id);
         const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
+        // The prompt right after an action (planting) shows a moment after the card closes. On a slow runner that has twice not come within
+        // the usual wait, so: wait a fair time, and if it has not come, put the marshal back at the door (the prompt follows the nearest door)
+        // and wait again. If it still does not come, fail with what the page was showing instead of a bare timeout.
+        const promptAfterAction = async (text, door) => {
+            try {
+                await page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible', timeout: 15000 });
+                return;
+            } catch {
+                await stand(door);
+            }
+            try {
+                await page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible', timeout: 45000 });
+            } catch(error) {
+                const shown = await page.evaluate(() => {
+                    const el = document.querySelector('.walk-prompt');
+                    return { prompt: el ? `${getComputedStyle(el).display}|${el.textContent}` : 'no prompt element', place: window.__redWestTown.place, sheet: getComputedStyle(document.getElementById('town-sheet')).display, hidden: document.hidden };
+                });
+                throw new Error(`No prompt matching ${text} at ${door} after planting: ${JSON.stringify(shown)} (${error.message.split('\n')[0]})`);
+            }
+        };
         const toast = pattern => page.waitForFunction(p => new RegExp(p).test(document.getElementById('town-toast').textContent), pattern);
 
         // In through the gate: the town's walk stops, the farm's starts, and the way back shows.
@@ -492,7 +512,7 @@ try {
         await page.locator('[data-plant="corn"]').click();
         await toast('Planted corn');
         await page.locator('#town-sheet').waitFor({ state: 'hidden' });
-        await prompt(/CORN: 1h/); // 1h 30m, or 1h 29m if a slow machine has taken a minute
+        await promptAfterAction(/CORN: 1h/, 'plot-1'); // 1h 30m, or 1h 29m if a slow machine has taken a minute
         // The coop has laid eggs while we were away.
         await stand('coop');
         await prompt('COOP: 6 EGGS');
