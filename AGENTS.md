@@ -36,6 +36,16 @@ of checks to run. Agents in different lanes should almost never touch the same f
    first priority.
 8. **Docs:** update `PLAN.md` (status) and your own plan doc in the same PR as the change. Do not create new top-level plan files.
 
+## Adding a run mode or a place (no edits to the big files)
+
+- **A run mode** (the Wanted Road, the Arena, the mine, a future farm-defence mode): write `src/modes/<name>.js` exporting one object and
+  register it in `src/modes/index.js`. The hooks (HUD words, look, begin, update, result text, reset, ...) are listed at the top of
+  `src/modes/registry.js`; anything a mode leaves out comes from the Wanted Road (`src/modes/road.js`). `gameLoop.js` and `uiManager.js`
+  only ask `activeMode()`.
+- **A place you walk into** (Foundry Yard, Fort Pell, ...): write `src/places/<name>.js` exporting a factory `createXPlace(host)` and
+  register it in `src/places/index.js`. The place shape and the `host` it is given are at the top of `src/places/registry.js`.
+  `townPanel.js` only asks the registry.
+
 ## Commands
 
 ```

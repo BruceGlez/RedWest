@@ -6,6 +6,7 @@
 - Slice 2: saved deepest floor, checkpoints, ore (needs a server field: coordinate with scale and money)
 - Slice 3: boss floors
 - More monsters and floor variety in `mineMonsters.js` and `mineMap.js`
+- Mine flow is `src/modes/mine.js` (a run mode, see `src/modes/registry.js`): begin a floor, spawn, chests, shaft, lift. Add new floor kinds or boss floors there; do not edit `gameLoop.js`
 - Put mine-only styles in `styles/mine.css` and import it from `style.css`
 
 ## Rules

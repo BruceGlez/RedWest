@@ -5,7 +5,8 @@
 ## Backlog (from `PLAN.md`)
 - Places H2 to H5: Vane's Crossing orders, Morgan's Channel water, Foundry Yard, Fort Pell, Copper Bit, Tres Rios, Whisper Wash, Silver Belle, Hollow Hill
 - Farm second field and levels
-- New places go in their own `place*.js` and `styles/` file; `townPanel.js` is shared, so add a place there in one small PR
+- New places are one file in `src/places/<name>.js` (a factory, shape in `src/places/registry.js`) plus one `registerPlace` line in `src/places/index.js`, a scene in `src/place<Name>.js`, and a `styles/` file. `townPanel.js` is no longer edited for a new place
+- The Arena is a run mode in `src/modes/arena.js`
 
 ## Rules
 Places change income and goods, never combat. A tended place never earns more than the jail's top rate. No timer is sold.

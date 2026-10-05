@@ -11,7 +11,7 @@ import { track } from './analytics.js';
 import { ownsItem } from './profile.js';
 import { purchaseSupport, canRestore } from './purchases.js';
 import { arena, arenaRoster } from './arena.js';
-import { mine, resultText, shaftHint, liftHint } from './mine.js';
+import { activeMode } from './modes/registry.js';
 import { assetUrl } from './demo.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 import { CHAPTER_ONE_END, OPENING, ENDING, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
@@ -143,8 +143,9 @@ export function createUIManager(gameState, playerStats) {
         }
         els.health.innerHTML = hearts.join('');
         els.score.innerText = gameState.score;
-        els.waveLabel.innerText = mine.enabled ? 'DEPTH:' : 'PURSUIT:';
-        els.wave.innerText = mine.enabled ? mine.floor : gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
+        const mode = activeMode(); // the Wanted Road, the Arena, the mine: each says its own HUD words (src/modes/)
+        els.waveLabel.innerText = mode.hud.waveLabel;
+        els.wave.innerText = mode.hud.wave(gameState);
         const held = getWeapon(playerStats.guns[playerStats.weapon]) || defaultWeapon(playerStats.weapon);
         els.weaponLabel.innerText = held.short;
         if(els.swapBtn && els.swapBtn.dataset.weapon !== held.id) {
@@ -167,15 +168,15 @@ export function createUIManager(gameState, playerStats) {
             els.bonusHud.innerHTML = `SURVIVE <b>${Math.ceil(Math.max(0, gameState.waveTimer))}s</b> <span>${gameState.bounty.amount} BOUNTY AT STAKE</span>`;
         }
 
-        els.waveTimer.innerText = mine.enabled ? shaftHint(mine.shaftDx, mine.shaftDz) : (gameState.waveBossSpawned && gameState.waveTimer <= 0)
+        els.waveTimer.innerText = mode.hud.timer(gameState) ?? ((gameState.waveBossSpawned && gameState.waveTimer <= 0)
             ? 'OUTLAW'
-            : `${Math.ceil(Math.max(0, gameState.waveTimer))}s`;
+            : `${Math.ceil(Math.max(0, gameState.waveTimer))}s`);
         if(playerStats.tripleShotTimer > 0) {
             els.status.className = 'status-power';
             els.status.innerText = `TRIPLE SHOT: ${Math.ceil(playerStats.tripleShotTimer)}s`;
         } else {
             els.status.className = '';
-            els.status.innerText = mine.enabled ? liftHint(mine.liftDx, mine.liftDz) : '';
+            els.status.innerText = mode.hud.status() ?? '';
         }
     }
 
@@ -279,7 +280,7 @@ export function createUIManager(gameState, playerStats) {
         els.bonusHud.style.display = 'none';
         hidePauseOverlay();
         hideSettingsModal();
-        const [title, detail] = mine.enabled ? resultText(result, mine.floor) : (RESULT_TEXT[result] || RESULT_TEXT.died);
+        const [title, detail] = activeMode().resultText(result) ?? (RESULT_TEXT[result] || RESULT_TEXT.died);
         els.resultTitle.textContent = title;
         els.resultTitle.classList.toggle('wasted-text', result === 'died');
         els.resultDetail.textContent = gameState.bounty.status === 'forfeited'
