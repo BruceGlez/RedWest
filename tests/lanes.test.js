@@ -56,3 +56,8 @@ test('art owns the scene builders and the function lanes own the layouts', () =>
     assert.equal(laneOf('src/places/farm.js'), 'town', 'the place registry entry is the function agent\'s, not a scene builder');
     assert.equal(laneOf('src/modes/mine.js'), 'mine');
 });
+
+test('the lane briefs belong to qa and the policy answers to money', () => {
+    assert.equal(laneOf('docs/lanes/art.md'), 'qa');
+    assert.equal(laneOf('docs/POLICY_GENERATOR_ANSWERS.md'), 'money');
+});

@@ -243,7 +243,7 @@
     "src/economyError.js",
     "MONETIZATION.md",
     "IOS.md",
-    "docs/**",
+    "docs/POLICY_GENERATOR_ANSWERS.md",
     "capacitor.config.json",
     "ios/**",
     "tests/apple.test.js",
