@@ -8,3 +8,8 @@ art/characters/*.png
 dist-demo/
 *.blend
 *.blend1
+
+# Local secrets: API keys live in the environment, never in the repo
+.env
+.env.*
+!.env.example
