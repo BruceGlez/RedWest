@@ -1,13 +1,15 @@
 import * as THREE from 'three';
 import { createBossMesh, createWolfMesh, createGunslingerMesh, createEnemyMesh, createRattlerMesh, createRiflemanMesh,
-    createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh, createKniferMesh, createTrooperMesh, addAimLaser } from './assets.js';
+    createDynamiterMesh, createBruteMesh, createRiderMesh, createDuelistMesh, createGhostMesh, createKniferMesh, createTrooperMesh, createBatMesh, createCrawlerMesh, createStonekinMesh, createWraithMesh, addAimLaser } from './assets.js';
 import { ENEMY_TYPES } from './enemyTypes.js';
 import { createExplosion } from './particleSystem.js';
 import { addScorch } from './decals.js';
 import { addShake, haptic } from './feedback.js';
 import { gameState, enemies, playerStats } from './state.js';
 import { checkCollision } from './physics.js';
-import { activeFloor, isOpen, spawnPoint } from './mineMap.js';
+import { activeFloor, isOpen, spawnPoint, steerTarget, AGGRO_DISTANCE } from './mineMap.js';
+import { mine } from './mine.js';
+import { MINE_MONSTERS, mineHpBonus } from './mineMonsters.js';
 import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
@@ -68,6 +70,9 @@ const NEW_TYPE_MESHES = {
     trooper: createTrooperMesh
 };
 
+// The monsters that live only in the Hollow Claim (src/mineMonsters.js).
+const MINE_MESHES = { bat: createBatMesh, crawler: createCrawlerMesh, stonekin: createStonekinMesh, wraith: createWraithMesh };
+
 // Per-type shooting numbers (outlaw modifiers are applied on top).
 const SHOT_PROFILE = {
     rifleman: { cooldown: 3.4, projectileSpeed: 85, aimSpread: 0 },
@@ -104,6 +109,13 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
         speed = 5 + Math.min(wave * 0.4, 4); 
         type = 'gunslinger'; 
         hp = Math.max(1, Math.floor(wave / 5));
+    } else if (MINE_MESHES[spawnType]) {
+        const def = MINE_MONSTERS[spawnType];
+        enemy = MINE_MESHES[spawnType]();
+        if(!def.heavy) enemy.scale.setScalar(0.9 + Math.random() * 0.2);
+        speed = def.speed * (1 + Math.min(wave * 0.05, 0.3));
+        type = spawnType;
+        hp = def.hp;
     } else if (NEW_TYPE_MESHES[spawnType]) {
         const def = ENEMY_TYPES[spawnType];
         enemy = NEW_TYPE_MESHES[spawnType]();
@@ -145,13 +157,14 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
         projectileSpeed: shot ? shot.projectileSpeed : 40,
         aimSpread: shot ? shot.aimSpread : 2.0
     }, gameState.outlawIndex);
-    const def = ENEMY_TYPES[type];
+    const def = ENEMY_TYPES[type] ?? MINE_MONSTERS[type];
+    const depthHp = mine.enabled && stats.hp > 1 ? mineHpBonus(mine.floor) : 0; // below the eighth floor everything takes more hits
 
     Object.assign(enemy.userData, { 
         speed: stats.speed, 
         type: type, 
-        hp: stats.hp, 
-        maxHp: stats.hp, 
+        hp: stats.hp + depthHp, 
+        maxHp: stats.hp + depthHp, 
         shootTimer: Math.random() * 2,
         shootCooldown: stats.shootCooldown,
         projectileSpeed: stats.projectileSpeed,
@@ -173,7 +186,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
         setupBoss(enemy, bossStyle);
     }
     if(type === 'wolf') attachWolfModel(enemy);
-    if(type === 'ghost') enemy.userData.stateTimer = 1.5 + Math.random();
+    if(type === 'ghost' || type === 'wraith') enemy.userData.stateTimer = 1.5 + Math.random();
     if(type === 'rider') enemy.userData.stateTimer = 2.5 + Math.random() * 1.5;
 
     scene.add(enemy); 
@@ -828,6 +841,20 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         }
         default:
             break;
+        }
+
+        // In a cave: anyone far from the marshal is asleep, and anyone who cannot see him heads along the road of chambers instead of
+        // pressing against the rock (src/mineMap.js). Backing away (a gunman keeping his range) is left alone.
+        if(cave && moveDir) {
+            if(dist > AGGRO_DISTANCE) {
+                moveDir = null;
+            } else if(dist > 6 && u.state !== 'charge' && moveDir.dot(dir) > 0) {
+                const aim = steerTarget(cave, e.position, playerPos);
+                if(aim.x !== playerPos.x || aim.z !== playerPos.z) {
+                    moveDir = new THREE.Vector3(aim.x - e.position.x, 0, aim.z - e.position.z).normalize();
+                    if(faceDir) faceDir = moveDir;
+                }
+            }
         }
 
         // --- MOVEMENT ---

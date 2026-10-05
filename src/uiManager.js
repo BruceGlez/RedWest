@@ -11,7 +11,7 @@ import { track } from './analytics.js';
 import { ownsItem } from './profile.js';
 import { purchaseSupport, canRestore } from './purchases.js';
 import { arena, arenaRoster } from './arena.js';
-import { mine, MINE_FLOORS, resultText, shaftHint } from './mine.js';
+import { mine, resultText, shaftHint, liftHint } from './mine.js';
 import { assetUrl } from './demo.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 import { CHAPTER_ONE_END, OPENING, ENDING, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
@@ -143,8 +143,8 @@ export function createUIManager(gameState, playerStats) {
         }
         els.health.innerHTML = hearts.join('');
         els.score.innerText = gameState.score;
-        els.waveLabel.innerText = mine.enabled ? 'FLOOR:' : 'PURSUIT:';
-        els.wave.innerText = mine.enabled ? `${mine.floor} / ${MINE_FLOORS}` : gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
+        els.waveLabel.innerText = mine.enabled ? 'DEPTH:' : 'PURSUIT:';
+        els.wave.innerText = mine.enabled ? mine.floor : gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
         const held = getWeapon(playerStats.guns[playerStats.weapon]) || defaultWeapon(playerStats.weapon);
         els.weaponLabel.innerText = held.short;
         if(els.swapBtn && els.swapBtn.dataset.weapon !== held.id) {
@@ -154,9 +154,9 @@ export function createUIManager(gameState, playerStats) {
         updateHeat(gameState.heat);
 
         if(gameState.isIntermission) {
-            els.waveTimer.innerText = mine.enabled ? shaftHint(mine.shaftDx, mine.shaftDz) : `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
+            els.waveTimer.innerText = `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
             els.status.className = '';
-            els.status.innerText = mine.enabled ? 'THE SHAFT IS OPEN: WALK TO IT' : 'GET READY FOR NEXT WAVE';
+            els.status.innerText = 'GET READY FOR NEXT WAVE';
             return;
         }
 
@@ -167,7 +167,7 @@ export function createUIManager(gameState, playerStats) {
             els.bonusHud.innerHTML = `SURVIVE <b>${Math.ceil(Math.max(0, gameState.waveTimer))}s</b> <span>${gameState.bounty.amount} BOUNTY AT STAKE</span>`;
         }
 
-        els.waveTimer.innerText = mine.enabled ? 'CLEAR THE FLOOR' : (gameState.waveBossSpawned && gameState.waveTimer <= 0)
+        els.waveTimer.innerText = mine.enabled ? shaftHint(mine.shaftDx, mine.shaftDz) : (gameState.waveBossSpawned && gameState.waveTimer <= 0)
             ? 'OUTLAW'
             : `${Math.ceil(Math.max(0, gameState.waveTimer))}s`;
         if(playerStats.tripleShotTimer > 0) {
@@ -175,7 +175,7 @@ export function createUIManager(gameState, playerStats) {
             els.status.innerText = `TRIPLE SHOT: ${Math.ceil(playerStats.tripleShotTimer)}s`;
         } else {
             els.status.className = '';
-            els.status.innerText = '';
+            els.status.innerText = mine.enabled ? liftHint(mine.liftDx, mine.liftDz) : '';
         }
     }
 

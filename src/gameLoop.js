@@ -20,9 +20,10 @@ import { markSeen, recordKills } from './progress.js';
 import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
 import { recordRun, saveProgress } from './progress.js';
 import { arena, endTownFight } from './arena.js';
-import { mine, endMineRun, floorStage, floorWave, floorCleared, isLastFloor, floorBanner, clearedBanner, MINE_ATMOSPHERE_ID, PRACTICE_NOTE } from './mine.js';
-import { showMineFloor, setShaftOpen, updateMineScene } from './mineScene.js';
-import { activeFloor, shaftReached } from './mineMap.js';
+import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, MINE_ATMOSPHERE_ID, PRACTICE_NOTE } from './mine.js';
+import { showMineFloor, openMineChest, updateMineScene } from './mineScene.js';
+import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE } from './mineMap.js';
+import { MINE_MONSTERS, mineWave, newOn, isMineMonster, monsterDef, monsterCost } from './mineMonsters.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 import { clearCombatFx, updateCombatFx } from './combatFx.js';
 import { disposeBaked } from './meshMerge.js';
@@ -298,8 +299,10 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         }
     }
 
-    // Going down: the last floor's pickups, footprints and flying things stay behind.
+    // Going down: the last floor's monsters, pickups, footprints and flying things stay behind.
     function leaveFloorBehind() {
+        for(const e of enemies) { scene.remove(e); disposeBaked(e); }
+        enemies.length = 0;
         for(const l of loots) scene.remove(l);
         loots.length = 0;
         clearBullets(scene);
@@ -308,9 +311,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         clearDecals();
     }
 
-    // A mine floor (src/mine.js): its cave (src/mineMap.js), then the wave director with the stage and pursuit of that depth, and no
-    // timer. It is cleared when its budget is spent and no enemy is left; the shaft down then opens and the marshal walks to it
-    // (updateMineFlow). Every floor starts with the marshal on its lift.
+    // A mine floor (src/mine.js): its cave (src/mineMap.js), then a pursuit that never ends and gets stranger with depth (src/mineMonsters.js).
+    // There is nothing to clear: the shaft down is always open, and the lift you came on is always a walk back. Every floor starts with the
+    // marshal standing on its lift.
     function beginFloor(floor) {
         if(floor > 1) {
             leaveFloorBehind();
@@ -319,6 +322,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         }
         showMineFloor(scene, floor);
         mine.floor = floor;
+        mine.liftArmed = false;
+        mine.opened = [];
         gameState.outlawIndex = floorStage(floor);
         gameState.waveNumber = floorWave(floor);
         gameState.waveDuration = 1;
@@ -326,41 +331,73 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         gameState.isIntermission = false;
         gameState.intermissionTimer = 0;
         gameState.waveBossSpawned = false;
-        gameState.waveBudgetRemaining = getOutlawWave(gameState.waveNumber).budget;
-        gameState.enemySpawnTimer = 0.55;
+        gameState.enemySpawnTimer = 1.5; // a breath on the lift before the first one comes
         gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, floor);
-        // Each floor opens by showing off its new enemy, as each stage does.
-        const featured = featuredFor(gameState.outlawIndex);
-        const introductions = floor === 1 ? ['bandit'] : ['wolf', 'gunslinger'];
-        if(featured) introductions.push(featured);
-        for(const type of introductions) {
-            spawn(type);
-            gameState.waveBudgetRemaining -= enemyCost(type);
+        // Each floor says what is new on it. A monster of the Wanted Road shows its own NEW ENEMY card when it first appears.
+        const fresh = newOn(floor).filter(isMineMonster).map(id => `\nNEW: ${MINE_MONSTERS[id].name}`).join('');
+        ui.showWaveBanner(`${floorBanner(floor)}${fresh}`, floor === 1 ? 2800 : 2400);
+    }
+
+    // A pursuit with no waves: the cave keeps a measure of danger around the marshal and tops it up (mineWave).
+    function mineSpawnTick(dt) {
+        gameState.enemySpawnTimer -= dt;
+        if(gameState.enemySpawnTimer > 0) return;
+        const wave = mineWave(mine.floor);
+        gameState.enemySpawnTimer = wave.interval / heatSpawnMultiplier(gameState.heat.level);
+        const at = playerSystem.playerGroup.position;
+        let threat = 0;
+        const active = {};
+        for(const e of enemies) {
+            if(Math.hypot(e.position.x - at.x, e.position.z - at.z) < 110) threat += monsterCost(e.userData.type);
+            active[e.userData.type] = (active[e.userData.type] || 0) + 1;
         }
-        ui.showWaveBanner(floorBanner(floor), floor === 1 ? 2500 : 1800);
+        const room = wave.threatCap - threat;
+        const candidates = [];
+        for(const type of Object.keys(wave.weights)) {
+            if((active[type] || 0) >= wave.caps[type] || monsterCost(type) > room) continue;
+            const danger = monsterDef(type)?.danger ?? 1;
+            candidates.push({ type, weight: wave.weights[type] * (danger >= 2 ? 1 + gameState.heat.level * 0.2 : 1) });
+        }
+        const chosen = chooseWeightedType(candidates);
+        if(chosen) spawn(chosen);
+    }
+
+    // A chest: it opens when the marshal walks up to it, for score and either a heart or a spell of triple shot.
+    function openChest(index, cave) {
+        mine.opened.push(index);
+        openMineChest(index);
+        const reward = chestReward(mine.floor, playerStats.hp, playerStats.maxHp);
+        gameState.score += reward.score;
+        if(reward.heal) playerStats.hp = Math.min(playerStats.maxHp, playerStats.hp + 1);
+        else playerStats.tripleShotTimer = 10;
+        const [x, z] = cave.chests[index];
+        floatText(`+${reward.score}${reward.heal ? ' +1 HEART' : ' TRIPLE SHOT'}`, new THREE.Vector3(x, 2.5, z), 'hot');
+        playSound('powerup');
+        ui.updateHUD();
     }
 
     function updateMineFlow(dt) {
-        if(gameState.isIntermission) {
-            // Cleared: the shaft is open. Walk to it to go down (or, on the last floor, up the lift).
-            const cave = activeFloor();
-            const at = playerSystem.playerGroup.position;
-            mine.shaftDx = cave.shaft[0] - at.x;
-            mine.shaftDz = cave.shaft[1] - at.z;
-            if(shaftReached(cave, at.x, at.z)) {
-                if(isLastFloor(mine.floor)) finishRun('mine-win');
-                else beginFloor(mine.floor + 1);
-            }
+        const cave = activeFloor();
+        const at = playerSystem.playerGroup.position;
+        mine.shaftDx = cave.shaft[0] - at.x;
+        mine.shaftDz = cave.shaft[1] - at.z;
+        mine.liftDx = -at.x;
+        mine.liftDz = -at.z;
+        // The way down is always open: walk into the shaft and the next floor begins.
+        if(shaftReached(cave, at.x, at.z)) {
+            gameState.score += descentScore(mine.floor);
+            beginFloor(nextFloor());
             return;
         }
-        if(floorCleared({ budgetRemaining: gameState.waveBudgetRemaining, enemyCount: enemies.length, minCost: MIN_ENEMY_COST })) {
-            gameState.isIntermission = true;
-            setShaftOpen(true);
-            clearBullets(scene);
-            ui.showWaveBanner(clearedBanner(mine.floor), 3200);
+        // The lift brings the marshal back up, once he has walked away from it.
+        if(!mine.liftArmed && Math.hypot(at.x, at.z) > LIFT_ARM_DISTANCE) mine.liftArmed = true;
+        if(mine.liftArmed && liftReached(at.x, at.z)) {
+            finishRun('mine-win');
             return;
         }
-        directorTick(dt);
+        const chest = chestWithin(cave, at.x, at.z, mine.opened);
+        if(chest >= 0) openChest(chest, cave);
+        mineSpawnTick(dt);
     }
 
     function beginIntermission() {
