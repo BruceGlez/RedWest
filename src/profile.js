@@ -7,6 +7,7 @@ import { EconomyError } from './economyError.js';
 import { createTown, normalizeTown, buildingEffects } from './town.js';
 import { eventForWeek, createEventProgress, normalizeEventProgress, recordEventScore, eventTitle } from './events.js';
 import { createPass, normalizePass, payPassRewards, pointsForRun, tierReward } from './pass.js';
+import { createMineProgress, normalizeMineProgress } from './mineProgress.js';
 
 // The player's economy profile: balances, owned cosmetics, loadout and daily jobs. These pure
 // functions are shared by the in-browser playtest wallet and the server (server/), so both apply
@@ -31,6 +32,7 @@ export function createProfile(now = new Date()) {
         town: createTown(now), // Frontier Town buildings and the Jail's last collection (src/town.js)
         event: createEventProgress(weekKey(now)), // this week's Most Wanted event (src/events.js)
         pass: createPass(now), // this season's Wanted Poster Pass (src/pass.js)
+        mine: createMineProgress(), // the Hollow Claim: deepest floor, checkpoint and ore (src/mineProgress.js)
         // Account records, also the source for online leaderboards.
         // stageChar and weekly.character: who the player was playing as for that best run (shown on the boards).
         stats: {
@@ -70,6 +72,7 @@ export function normalizeProfile(raw, now = new Date()) {
     profile.town = normalizeTown(raw.town, now);
     profile.event = normalizeEventProgress(raw.event, weekKey(now));
     profile.pass = normalizePass(raw.pass, now);
+    profile.mine = normalizeMineProgress(raw.mine);
     if(raw.name && validateName(raw.name).ok) profile.name = validateName(raw.name).name;
     const s = raw.stats || {};
     const num = v => Math.max(0, Math.floor(Number(v)) || 0);

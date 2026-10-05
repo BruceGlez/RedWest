@@ -30,7 +30,7 @@ walking back to it brings you up with whatever you got. Deeper is stranger, hard
 | **1d** | After the second playtest: the shaft and the lift ask first, and the monsters belong to their chambers (no endless stream; a chamber refills only after you have gone far away) | small | **built 2026-10-05** ("The descent", below) |
 | **1e** | Floor variety: twin caverns, long galleries and rockfalls you walk round, deterministic per depth | small | **built 2026-10-05** ("The maps", below) |
 | **1f** | Six more monsters for floors 15 to 20, built only from behaviours and looks the game already has (`look` field, see "Deeper monsters") | small | **built 2026-10-05**; own models wait for the art lane |
-| **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | planned |
+| **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | **2a built 2026-10-06** (the data contract, below); **2b planned** (the endpoint, then the mine-side consumer) |
 | **3** | Boss floors (every 5th), more of Mr. Grimsby's talk and rumours, a pet that follows you down | medium | planned |
 | **4** | The art pass for the maps and the monsters: modelled rock, timber, carts, a real lift and shaft, painted textures (`POLISH_PLAN.md`, section 6) | large | parked, like the other art passes. The maps are made of boxes so this can replace them one builder at a time. |
 
@@ -161,9 +161,34 @@ emissive glow for the mine lighting. Add a row to `ASSETS.md` for each. Each pro
 What the combat lane would add later: nothing. Every behaviour above already exists. If a future monster needs a new behaviour it is
 the combat lane's, as before.
 
+## Slice 2: what the mine remembers (2a, the data contract)
+
+Split by lane (`AGENTS.md`, rule 5): **2a** is the contract, in the mine lane's `src/mineProgress.js` plus three lines in the shared `src/profile.js`.
+It is pure rules, like `src/town.js`, shared by the browser wallet and the server. **2b** is the consumer, after 2a merges.
+
+`profile.mine` is `{ version: 1, deepest, checkpoint, ore, runs }`:
+- **deepest**: the deepest floor ever reached (0 before the first run). It only grows.
+- **checkpoint**: derived from `deepest`, never trusted from input: the highest multiple of 5 not deeper than it (`CHECKPOINT_EVERY`). A run may begin
+  on floor 1 or any checkpoint reached (`startFloors`). A checkpoint only lets you start lower; it gives no power and no items.
+- **ore**: banked ore, up to `MAX_ORE`. It is found on the way down. **Riding the lift up keeps what the run carried; falling loses it all**
+  (`FALL_KEEPS = 0`, the one number to tune from playtests; this settles the open question below for now). Banked ore is never lost.
+- **runs**: mine runs finished.
+
+`applyMineRun(profile.mine, { startFloor, depth, ore, outcome: 'up' | 'fell', seconds })` is the one write. It changes `profile.mine` only (tested), and
+the client is not trusted: a start floor that is not one of his checkpoints is floor 1, a depth no walk could reach (`MIN_SECONDS_PER_FLOOR`) is cut,
+and ore beyond what the floors hold (`maxOreForRun`) is cut. Nothing is rejected.
+
+House rules (tests/mineProgress.test.js): the mine gives no stars, dollars, score records or leaderboard entries; ore is not in `CURRENCIES`, no product
+or shop item grants or sells it, and a normal Wanted Road run does not touch it. What ore is spent on is a later question and will be cosmetic only.
+
+**Waiting on (2b):** the **scale/server lane** for `POST /api/mine/run` in `server/app.js` (auth like `/api/run`: apply `applyMineRun` to the user's
+`profile.mine`, answer with the result and the profile; no purchase or webhook code is involved), and the **shared** `profile.js` hook in this PR. The
+browser wallet needs the same call (`src/wallet.js`, shared). Then the mine lane's consumer: pick the start floor at the stairs, count ore in
+`src/modes/mine.js`, send the summary when the run ends, and show the result.
+
 ## Open questions
 
-- How much ore a fall costs (slice 2): a share of what was carried, or all of it. To tune from playtests.
+- How much ore a fall costs: 2a starts with all of the run's carried ore (`FALL_KEEPS`). To tune from playtests.
 - How big is too big: floor 5 is about 900 units from lift to shaft. At the marshal's speed that is a minute of walking without a fight.
   If it feels long on a phone, the chamber spacing in `generate` is the one number to bring in.
 - Whether the mine gets its own leaderboard (deepest floor). Not before the server and the policy exist (`MONETIZATION.md`).
