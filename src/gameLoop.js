@@ -19,11 +19,8 @@ import { ENEMY_TYPES, rosterWave, featuredFor, enemyCost } from './enemyTypes.js
 import { markSeen, recordKills } from './progress.js';
 import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
 import { recordRun, saveProgress } from './progress.js';
-import { arena, endTownFight } from './arena.js';
-import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, MINE_ATMOSPHERE_ID, PRACTICE_NOTE } from './mine.js';
-import { showMineFloor, openMineChest, updateMineScene } from './mineScene.js';
-import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE } from './mineMap.js';
-import { MINE_MONSTERS, mineWave, newOn, isMineMonster, monsterDef, monsterCost } from './mineMonsters.js';
+import { activeMode, resetModes } from './modes/index.js';
+import { chooseWeightedType } from './weighted.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 import { clearCombatFx, updateCombatFx } from './combatFx.js';
 import { disposeBaked } from './meshMerge.js';
@@ -65,18 +62,6 @@ function getActiveEnemyCounts() {
     return counts;
 }
 
-function chooseWeightedType(candidates) {
-    let totalWeight = 0;
-    for(const c of candidates) totalWeight += c.weight;
-    if(totalWeight <= 0) return null;
-    let r = Math.random() * totalWeight;
-    for(const c of candidates) {
-        r -= c.weight;
-        if(r <= 0) return c.type;
-    }
-    return candidates[candidates.length - 1]?.type || null;
-}
-
 export function createGameLoop(scene, camera, renderer, playerSystem, ui, progress, economy = null) {
     let lastTime = 0;
     let debugElapsed = 0;
@@ -90,6 +75,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         const base = touch.enabled ? CAMERA_OFFSET_PHONE : CAMERA_OFFSET_DESKTOP;
         return window.innerHeight > window.innerWidth ? base.clone().multiplyScalar(1.6) : base;
     };
+
+    // What a run mode (src/modes/registry.js) may use of this loop. Function declarations below are hoisted, so this can sit up here.
+    const modeCtx = { scene, camera, playerSystem, ui, cameraOffset, spawn, finishRun, beginWave, updateWaveFlow, openBountyChoice };
 
     // Spawn and record first sightings for the Bounty Book (with a NEW ENEMY card in play).
     function spawn(type) {
@@ -117,7 +105,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         } else if(result === 'mine-win') {
             playSound('bounty');
         }
-        if(arena.enabled || mine.enabled) {
+        const mode = activeMode();
+        if(mode.practice) {
             // Practice: show the result, record nothing. (The mine saves nothing yet: MINE_PLAN.md, slice 2.)
             gameState.runWon = result !== 'died';
             gameState.isGameOver = true;
@@ -125,7 +114,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             if(result === 'died') playerSystem.die();
             ui.hideBountyChoice();
             ui.showGameOver(result, null);
-            ui.showPracticeResult(mine.enabled ? PRACTICE_NOTE : undefined);
+            ui.showPracticeResult(mode.practice.note);
             return;
         }
         if(result === 'died') gameState.score = forfeitBounty(gameState.bounty, gameState.score);
@@ -249,8 +238,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 addShake(0.12);
                 haptic('light');
                 if(position) floatText(`+${points}`, position, gameState.heat.level >= 2 ? 'hot' : '');
-                // A hot streak lengthens a pursuit; in the mine a floor is a fixed budget, so it cannot go on forever.
-                if(!mine.enabled) gameState.waveBudgetRemaining += Math.min(1.2, gameState.heat.level * 0.3);
+                // A hot streak lengthens a pursuit (a mode can opt out: a mine floor is a fixed budget, so it cannot go on forever).
+                if(activeMode().lengthensPursuit) gameState.waveBudgetRemaining += Math.min(1.2, gameState.heat.level * 0.3);
             }
             ui.updateHUD();
         }
@@ -297,107 +286,6 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 : `${boss}${boss.endsWith('S') ? "'" : "'S"} GANG — `;
             ui.showWaveBanner(`${gang}PURSUIT ${waveNumber} / ${FINAL_WAVE}`, waveNumber === 1 ? 2500 : 1800);
         }
-    }
-
-    // Going down: the last floor's monsters, pickups, footprints and flying things stay behind.
-    function leaveFloorBehind() {
-        for(const e of enemies) { scene.remove(e); disposeBaked(e); }
-        enemies.length = 0;
-        for(const l of loots) scene.remove(l);
-        loots.length = 0;
-        clearBullets(scene);
-        clearHazards(scene);
-        clearParticles(scene);
-        clearDecals();
-    }
-
-    // A mine floor (src/mine.js): its cave (src/mineMap.js), then a pursuit that never ends and gets stranger with depth (src/mineMonsters.js).
-    // There is nothing to clear: the shaft down is always open, and the lift you came on is always a walk back. Every floor starts with the
-    // marshal standing on its lift.
-    function beginFloor(floor) {
-        if(floor > 1) {
-            leaveFloorBehind();
-            playerSystem.playerGroup.position.set(0, 0, 0);
-            camera.position.copy(cameraOffset());
-        }
-        showMineFloor(scene, floor);
-        mine.floor = floor;
-        mine.liftArmed = false;
-        mine.opened = [];
-        gameState.outlawIndex = floorStage(floor);
-        gameState.waveNumber = floorWave(floor);
-        gameState.waveDuration = 1;
-        gameState.waveTimer = 0;
-        gameState.isIntermission = false;
-        gameState.intermissionTimer = 0;
-        gameState.waveBossSpawned = false;
-        gameState.enemySpawnTimer = 1.5; // a breath on the lift before the first one comes
-        gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, floor);
-        // Each floor says what is new on it. A monster of the Wanted Road shows its own NEW ENEMY card when it first appears.
-        const fresh = newOn(floor).filter(isMineMonster).map(id => `\nNEW: ${MINE_MONSTERS[id].name}`).join('');
-        ui.showWaveBanner(`${floorBanner(floor)}${fresh}`, floor === 1 ? 2800 : 2400);
-    }
-
-    // A pursuit with no waves: the cave keeps a measure of danger around the marshal and tops it up (mineWave).
-    function mineSpawnTick(dt) {
-        gameState.enemySpawnTimer -= dt;
-        if(gameState.enemySpawnTimer > 0) return;
-        const wave = mineWave(mine.floor);
-        gameState.enemySpawnTimer = wave.interval / heatSpawnMultiplier(gameState.heat.level);
-        const at = playerSystem.playerGroup.position;
-        let threat = 0;
-        const active = {};
-        for(const e of enemies) {
-            if(Math.hypot(e.position.x - at.x, e.position.z - at.z) < 110) threat += monsterCost(e.userData.type);
-            active[e.userData.type] = (active[e.userData.type] || 0) + 1;
-        }
-        const room = wave.threatCap - threat;
-        const candidates = [];
-        for(const type of Object.keys(wave.weights)) {
-            if((active[type] || 0) >= wave.caps[type] || monsterCost(type) > room) continue;
-            const danger = monsterDef(type)?.danger ?? 1;
-            candidates.push({ type, weight: wave.weights[type] * (danger >= 2 ? 1 + gameState.heat.level * 0.2 : 1) });
-        }
-        const chosen = chooseWeightedType(candidates);
-        if(chosen) spawn(chosen);
-    }
-
-    // A chest: it opens when the marshal walks up to it, for score and either a heart or a spell of triple shot.
-    function openChest(index, cave) {
-        mine.opened.push(index);
-        openMineChest(index);
-        const reward = chestReward(mine.floor, playerStats.hp, playerStats.maxHp);
-        gameState.score += reward.score;
-        if(reward.heal) playerStats.hp = Math.min(playerStats.maxHp, playerStats.hp + 1);
-        else playerStats.tripleShotTimer = 10;
-        const [x, z] = cave.chests[index];
-        floatText(`+${reward.score}${reward.heal ? ' +1 HEART' : ' TRIPLE SHOT'}`, new THREE.Vector3(x, 2.5, z), 'hot');
-        playSound('powerup');
-        ui.updateHUD();
-    }
-
-    function updateMineFlow(dt) {
-        const cave = activeFloor();
-        const at = playerSystem.playerGroup.position;
-        mine.shaftDx = cave.shaft[0] - at.x;
-        mine.shaftDz = cave.shaft[1] - at.z;
-        mine.liftDx = -at.x;
-        mine.liftDz = -at.z;
-        // The way down is always open: walk into the shaft and the next floor begins.
-        if(shaftReached(cave, at.x, at.z)) {
-            gameState.score += descentScore(mine.floor);
-            beginFloor(nextFloor());
-            return;
-        }
-        // The lift brings the marshal back up, once he has walked away from it.
-        if(!mine.liftArmed && Math.hypot(at.x, at.z) > LIFT_ARM_DISTANCE) mine.liftArmed = true;
-        if(mine.liftArmed && liftReached(at.x, at.z)) {
-            finishRun('mine-win');
-            return;
-        }
-        const chest = chestWithin(cave, at.x, at.z, mine.opened);
-        if(chest >= 0) openChest(chest, cave);
-        mineSpawnTick(dt);
     }
 
     function beginIntermission() {
@@ -556,8 +444,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     let hotMusic = false;
 
     function resetGame() {
-        endTownFight(); // a fight started from the town's Arena is over: the home screen is the home screen again
-        endMineRun(); // so is a run down the mine
+        resetModes(); // a fight started from the town's Arena or a run down the mine is over: the home screen is the home screen again
         hotMusic = false;
         bountyChoiceAt = 0;
         gameState.event = null;
@@ -607,7 +494,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             return;
         }
 
-        if(arena.enabled && !arena.gang) return; // arena: just the outlaw (and anyone they call in)
+        if(!activeMode().reinforcements()) return; // e.g. the arena: just the outlaw (and anyone they call in)
         directorTick(dt);
     }
 
@@ -651,8 +538,9 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         }
         if(!gameState.isGameStarted) {
             // The desert behind the start screen wears the look of the outlaw the player is about to face.
-            setAtmosphere(scene, mine.enabled ? MINE_ATMOSPHERE_ID : getOutlaw(arena.enabled ? arena.outlaw : progress.selected).id);
-            if(mine.enabled) showMineFloor(scene, mine.floor); // the cave is there from the first frame
+            const mode = activeMode();
+            setAtmosphere(scene, mode.atmosphereId(mode.previewOutlaw(progress)));
+            mode.previewScene(modeCtx);
             updateAmbience(realDt, timeInSeconds, playerSystem.playerGroup.position);
             // Slow orbit, tilted up enough to show the stage's sky and skyline behind the start screen.
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 11, Math.cos(timeInSeconds * 0.5) * 30);
@@ -666,12 +554,13 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 track('run_start');
                 gameState.isGameStarted = true;
                 // A Most Wanted event run (picked in Frontier Town) fights that week's outlaw with its twist.
-                const event = arena.enabled || mine.enabled ? null : gameState.pendingEvent;
+                const mode = activeMode();
+                const event = mode.usesEvent ? gameState.pendingEvent : null;
                 gameState.pendingEvent = null;
                 gameState.event = event || null;
                 setEventModifiers(event?.twist.modifiers);
-                gameState.outlawIndex = mine.enabled ? floorStage(1) : arena.enabled ? arena.outlaw : event ? event.outlaw : progress.selected;
-                setAtmosphere(scene, mine.enabled ? MINE_ATMOSPHERE_ID : getOutlaw(gameState.outlawIndex).id);
+                gameState.outlawIndex = mode.runOutlaw({ event, progress });
+                setAtmosphere(scene, mode.atmosphereId(gameState.outlawIndex));
                 sessionRun++;
                 ui.hideStartScreen();
                 camera.position.copy(cameraOffset());
@@ -679,8 +568,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 resumeAudio();
                 playVoice('marshal-start');
                 // The arena goes straight to the outlaw; the mine starts at its first floor.
-                if(mine.enabled) beginFloor(1);
-                else beginWave(arena.enabled ? FINAL_WAVE : 1);
+                mode.begin(modeCtx);
             }
             return;
         }
@@ -712,13 +600,13 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
         if(bountyChoiceAt && performance.now() >= bountyChoiceAt) {
             bountyChoiceAt = 0;
-            if(arena.enabled) finishRun('arena-win');
-            else openBountyChoice();
+            activeMode().afterOutlawDown(modeCtx);
             renderer.render(scene, camera);
             return;
         }
 
-        if(arena.enabled && arena.invincible) playerStats.hp = playerStats.maxHp;
+        const mode = activeMode();
+        if(mode.invincible()) playerStats.hp = playerStats.maxHp;
         gameState.runTime += dt;
         if(DEMO && gameState.runTime > DEMO_SECONDS) {
             gameState.isGameOver = true;
@@ -743,8 +631,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         if(stillFighting()) updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
         if(stillFighting()) updateHazards(dt, scene, playerSystem.playerGroup, callbacks);
         if(stillFighting()) playerSystem.update(dt, timeInSeconds);
-        if(stillFighting()) (mine.enabled ? updateMineFlow : updateWaveFlow)(dt);
-        if(mine.enabled) updateMineScene(timeInSeconds);
+        if(stillFighting()) mode.update(modeCtx, dt);
+        mode.updateScene(modeCtx, timeInSeconds);
         ui.updateHUD();
 
         const dashPct = Math.max(0, 1 - (playerStats.dashCooldown / (playerStats.perk?.dashCooldown || 2.0)));

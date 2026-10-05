@@ -62,7 +62,8 @@
     "styles/mine.css",
     "MINE_PLAN.md",
     "tests/mine*",
-    "tests/undertakerLayout.test.js"
+    "tests/undertakerLayout.test.js",
+    "src/modes/mine.js"
    ],
    "checks": [
     "npm test",
@@ -97,7 +98,11 @@
     "tests/farm*",
     "tests/town*",
     "tests/arena.test.js",
-    "tests/steps.test.js"
+    "tests/steps.test.js",
+    "src/places/farm.js",
+    "src/places/undertaker.js",
+    "src/modes/arena.js",
+    "tests/places.test.js"
    ],
    "checks": [
     "npm test",
@@ -272,7 +277,8 @@
     ".github/workflows/checks.yml",
     "lanes.json",
     "AGENTS.md",
-    "docs/lanes/**"
+    "docs/lanes/**",
+    "tests/modes.test.js"
    ],
    "checks": [
     "npm test",
@@ -325,6 +331,12 @@
   "PLAN.md",
   ".gitignore",
   ".mcp.json",
-  ".github/workflows/pages.yml"
+  ".github/workflows/pages.yml",
+  "src/modes/registry.js",
+  "src/modes/road.js",
+  "src/modes/index.js",
+  "src/places/registry.js",
+  "src/places/index.js",
+  "src/weighted.js"
  ]
 }
