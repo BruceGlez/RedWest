@@ -11,7 +11,7 @@ import { SPREAD } from './townSpace.js';
 // fence: the line across the way in while it is shut, from (x1, z1) to (x2, z2), and where to stand to read the sign.
 // place: the thing to use inside (a plaque), with where it stands and where you stand.
 // interior: a district that is a place of its own (PLACES.md). Its gate opens a whole new map you walk around (the farm's is
-//           src/farmLayout.js) and not ground in the town, so it has no walk area and no place here.
+//           src/farmLayout.js, the Crossing's src/vaneLayout.js) and not ground in the town, so it has no walk area and no place here.
 
 // The town's ground, spread out (src/townSpace.js). The districts below are written as originally laid out, against the
 // original edge (x from -38 to 40, z from -21 to 19), and each is then moved out by exactly how far the edge moved at its gate,
@@ -53,11 +53,11 @@ const BASE_DISTRICTS = [
         }
     },
     {
-        id: 'crossing', name: "VANE'S CROSSING", outlaw: 'silas-vane',
+        id: 'crossing', name: "VANE'S CROSSING", outlaw: 'silas-vane', interior: 'vane',
         area: { minX: 37, maxX: 82, minZ: -12, maxZ: 10 },
         fence: { from: [40, -12], to: [40, 10], read: [38.4, -1] },
         ground: 0x8c7653,
-        place: { id: 'clock', verb: 'READ', object: { x: 75, z: -1, hx: 1.5, hz: 1.5 }, stand: [71.2, -1] },
+        place: null, // the clock stands in the Crossing you walk into (src/vaneLayout.js); from the town it is seen over the fence
         card: {
             title: "VANE'S CROSSING",
             text: 'The Crossing is open again, and wagons use it. Silas Vane left the clock on the tower stopped at the hour the Company paid him to close the road. He says it should stay stopped, so that nobody forgets what the road cost.'

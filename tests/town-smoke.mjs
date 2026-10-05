@@ -245,7 +245,7 @@ try {
     {
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
-        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 10); // the town and nine districts: the farm is a place of its own
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 9); // the town and eight districts: the farm and the Crossing are places of their own
 
         // You are told once, with a banner, and what was announced is remembered.
         await page.locator('#town-news').waitFor({ state: 'visible' });
@@ -266,7 +266,7 @@ try {
         assert.match(await page.locator('.walk-bubble').textContent(), /Hollow Hill is open/, `${folk} talks of the newest district`);
 
         // The places of the districts that are ground in the town can each be reached and read.
-        for(const [id, label, pattern] of [['clock', 'THE STOPPED CLOCK', /clock on the tower stopped/], ['grave', 'THE OLD STONE', /struck out/], ['landing', 'THE GANGWAY', /played straight/], ['gatling', 'THE GATLING', /one page is missing/], ['piano', 'THE BROKEN PIANO', /sour notes/], ['den', 'THE DEN', /wolf pups/], ['bell', 'THE CHAPEL BELL', /bell rings once at dusk/]]) {
+        for(const [id, label, pattern] of [['grave', 'THE OLD STONE', /struck out/], ['landing', 'THE GANGWAY', /played straight/], ['gatling', 'THE GATLING', /one page is missing/], ['piano', 'THE BROKEN PIANO', /sour notes/], ['den', 'THE DEN', /wolf pups/], ['bell', 'THE CHAPEL BELL', /bell rings once at dusk/]]) {
             const door = await page.evaluate(id => {
                 const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
                 window.__redWestTown.walk.place(d.x, d.z);
@@ -287,6 +287,10 @@ try {
         // The farm counts as walked into once he has stepped inside it.
         await page.evaluate(() => { window.__redWestTown.enterPlace('ranch'); });
         await page.waitForFunction(() => window.__redWestTown.place === 'ranch');
+        await page.evaluate(() => window.__redWestTown.leavePlace());
+        // So does the Crossing.
+        await page.evaluate(() => { window.__redWestTown.enterPlace('crossing'); });
+        await page.waitForFunction(() => window.__redWestTown.place === 'crossing');
         await page.evaluate(() => window.__redWestTown.leavePlace());
         await page.waitForFunction(() => window.__redWestTown.news.visited.length === 10);
         await talk();
@@ -556,6 +560,70 @@ try {
         const stayed = await page.evaluate(() => window.__redWestTown.walk.position);
         const gateAt = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.find(d => d.id === 'enter-ranch'));
         assert.ok(Math.hypot(stayed.x - gateAt.x, stayed.z - gateAt.z) < 3.5, `back at the farm gate (${stayed.x.toFixed(1)}, ${stayed.z.toFixed(1)})`);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    // Vane's Crossing (src/farmOrders.js, src/places/vane.js): a place of its own. Shut until Silas Vane is beaten; then the order
+    // board: open the gate, read the board, fill an order from the barn, and leave.
+    {
+        const { page, errors, context } = await open();
+        const doors = await page.evaluate(() => window.__redWestTown.town3d.walkMap().doors.map(d => d.id));
+        assert.ok(doors.includes('gate-crossing') && !doors.includes('enter-crossing'), 'shut: a gate to read, not a way in');
+        await page.evaluate(() => window.__redWestTown.enterPlace('crossing'));
+        assert.equal(await page.evaluate(() => window.__redWestTown.place), null, 'it stays shut until Silas Vane is beaten');
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
+    {
+        // The barn holds plenty of everything, so whichever three orders today brings, the first can be filled.
+        const seed = () => {
+            localStorage.setItem('redWestProfile.v1', JSON.stringify({
+                stats: { stageStars: [0, 0, 0, 7, 0, 0, 7, 0, 0, 0] },
+                town: { farm: { plots: [], store: { wheat: 20, corn: 20, pumpkin: 20, egg: 20 } } }
+            }));
+        };
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
+        await goTo(page, 'enter-crossing');
+        await prompt("VANE'S CROSSING");
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === 'crossing');
+        assert.equal(await walking(page), false, 'the town waits');
+        assert.equal(await page.evaluate(() => window.__redWestTown.placeWalk.active), true);
+        await page.waitForTimeout(600);
+        const calls = await page.evaluate(() => window.__redWestRenderer?.info.render.calls ?? 0);
+        assert.ok(calls < 130, `the Crossing stays cheap to draw (${calls} draw calls)`);
+        // The stopped clock is read here now, inside the Crossing.
+        await page.evaluate(() => {
+            const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === 'clock');
+            window.__redWestTown.placeWalk.place(d.x, d.z);
+        });
+        await prompt('THE STOPPED CLOCK');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.match(await page.locator('#town-grid').textContent(), /clock on the tower stopped/);
+        await page.locator('#town-sheet-close').click();
+        await page.evaluate(() => {
+            const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === 'board');
+            window.__redWestTown.placeWalk.place(d.x, d.z);
+        });
+        await prompt('THE ORDER BOARD: 3 ORDERS');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        assert.equal(await page.locator('[data-order]').count(), 3);
+        const before = Number((await page.locator('#town-dollars').textContent()).replace(/,/g, ''));
+        await page.locator('[data-order]').first().click();
+        await page.waitForFunction(() => /Order filled for \$/.test(document.getElementById('town-toast').textContent));
+        const after = Number((await page.locator('#town-dollars').textContent()).replace(/,/g, ''));
+        assert.ok(after > before, 'the order paid into the wallet');
+        await page.evaluate(() => {
+            const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === 'leave');
+            window.__redWestTown.placeWalk.place(d.x, d.z);
+        });
+        await prompt('THE ROAD TO TOWN');
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === null);
+        assert.equal(await walking(page), true);
         assert.deepEqual(errors, []);
         await context.close();
     }

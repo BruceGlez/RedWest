@@ -78,8 +78,10 @@ test('every outlaw has a district: ten of them, one for each', () => {
     assert.deepEqual(DISTRICTS.map(d => d.id).sort(), ['belle', 'canal', 'chapel', 'copper', 'crossing', 'fort', 'foundry', 'ranch', 'tresrios', 'wash']);
 });
 
-test('the farm is the one place so far you step into; the others are ground in the town', () => {
-    assert.deepEqual(DISTRICTS.filter(d => d.interior).map(d => d.id), ['ranch']);
+test('the farm and the Crossing are the places so far you step into; the others are ground in the town', () => {
+    assert.deepEqual(DISTRICTS.filter(d => d.interior).map(d => d.id).sort(), ['crossing', 'ranch']);
+    assert.equal(getDistrict('crossing').place, null);
+    assert.equal(doorLabel('enter-crossing'), "VANE'S CROSSING");
     assert.equal(getDistrict('ranch').place, null);
     assert.equal(doorLabel('enter-ranch'), 'CALLOWAY FARM');
     assert.equal(districtOf('enter-ranch'), getDistrict('ranch'));
