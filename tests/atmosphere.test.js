@@ -51,7 +51,8 @@ test('every stage has its own ground, its own props, and no two stages look alik
             assert.ok(count + 4 <= KIT_CAPACITY[kind], `${id}: ${kind} leaves room to respawn`);
             total += count;
         }
-        assert.ok(total >= 60 && total <= 150, `${id}: ${total} props keeps the arena playable and cheap`);
+        // The mine scatters nothing: each floor is laid out by hand (src/mineMap.js).
+        if(id !== 'mine') assert.ok(total >= 60 && total <= 150, `${id}: ${total} props keeps the arena playable and cheap`);
         assert.equal(palette.rock.length, 2, `${id}: two rock colours`);
         seen.add(JSON.stringify([terrain.base, kit]));
     }

@@ -20,7 +20,9 @@ import { markSeen, recordKills } from './progress.js';
 import { addShake, shakeOffset, hitStop, timeScale, haptic, floatText, updateFeedback, resetFeedback } from './feedback.js';
 import { recordRun, saveProgress } from './progress.js';
 import { arena, endTownFight } from './arena.js';
-import { mine, endMineRun, floorStage, floorWave, floorCleared, isLastFloor, floorBanner, clearedBanner, MINE_ATMOSPHERE_ID, FLOOR_BREAK_SECONDS, PRACTICE_NOTE } from './mine.js';
+import { mine, endMineRun, floorStage, floorWave, floorCleared, isLastFloor, floorBanner, clearedBanner, MINE_ATMOSPHERE_ID, PRACTICE_NOTE } from './mine.js';
+import { showMineFloor, setShaftOpen, updateMineScene } from './mineScene.js';
+import { activeFloor, shaftReached } from './mineMap.js';
 import { FINAL_PURSUIT, BONUS_PURSUIT_SECONDS, offerBounty, bankBounty, rideOn, escapeWithBounty, forfeitBounty } from './bounty.js';
 import { clearCombatFx, updateCombatFx } from './combatFx.js';
 import { disposeBaked } from './meshMerge.js';
@@ -296,9 +298,26 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         }
     }
 
-    // A mine floor (src/mine.js): the wave director with the stage and pursuit of that depth, and no timer. It is cleared when its
-    // budget is spent and no enemy is left (updateMineFlow).
+    // Going down: the last floor's pickups, footprints and flying things stay behind.
+    function leaveFloorBehind() {
+        for(const l of loots) scene.remove(l);
+        loots.length = 0;
+        clearBullets(scene);
+        clearHazards(scene);
+        clearParticles(scene);
+        clearDecals();
+    }
+
+    // A mine floor (src/mine.js): its cave (src/mineMap.js), then the wave director with the stage and pursuit of that depth, and no
+    // timer. It is cleared when its budget is spent and no enemy is left; the shaft down then opens and the marshal walks to it
+    // (updateMineFlow). Every floor starts with the marshal on its lift.
     function beginFloor(floor) {
+        if(floor > 1) {
+            leaveFloorBehind();
+            playerSystem.playerGroup.position.set(0, 0, 0);
+            camera.position.copy(cameraOffset());
+        }
+        showMineFloor(scene, floor);
         mine.floor = floor;
         gameState.outlawIndex = floorStage(floor);
         gameState.waveNumber = floorWave(floor);
@@ -323,19 +342,22 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
     function updateMineFlow(dt) {
         if(gameState.isIntermission) {
-            gameState.intermissionTimer -= dt;
-            if(gameState.intermissionTimer <= 0) beginFloor(mine.floor + 1);
+            // Cleared: the shaft is open. Walk to it to go down (or, on the last floor, up the lift).
+            const cave = activeFloor();
+            const at = playerSystem.playerGroup.position;
+            mine.shaftDx = cave.shaft[0] - at.x;
+            mine.shaftDz = cave.shaft[1] - at.z;
+            if(shaftReached(cave, at.x, at.z)) {
+                if(isLastFloor(mine.floor)) finishRun('mine-win');
+                else beginFloor(mine.floor + 1);
+            }
             return;
         }
         if(floorCleared({ budgetRemaining: gameState.waveBudgetRemaining, enemyCount: enemies.length, minCost: MIN_ENEMY_COST })) {
-            if(isLastFloor(mine.floor)) {
-                finishRun('mine-win');
-                return;
-            }
             gameState.isIntermission = true;
-            gameState.intermissionTimer = FLOOR_BREAK_SECONDS;
+            setShaftOpen(true);
             clearBullets(scene);
-            ui.showWaveBanner(clearedBanner(mine.floor), 2200);
+            ui.showWaveBanner(clearedBanner(mine.floor), 3200);
             return;
         }
         directorTick(dt);
@@ -593,6 +615,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         if(!gameState.isGameStarted) {
             // The desert behind the start screen wears the look of the outlaw the player is about to face.
             setAtmosphere(scene, mine.enabled ? MINE_ATMOSPHERE_ID : getOutlaw(arena.enabled ? arena.outlaw : progress.selected).id);
+            if(mine.enabled) showMineFloor(scene, mine.floor); // the cave is there from the first frame
             updateAmbience(realDt, timeInSeconds, playerSystem.playerGroup.position);
             // Slow orbit, tilted up enough to show the stage's sky and skyline behind the start screen.
             camera.position.set(Math.sin(timeInSeconds * 0.5) * 30, 11, Math.cos(timeInSeconds * 0.5) * 30);
@@ -684,6 +707,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         if(stillFighting()) updateHazards(dt, scene, playerSystem.playerGroup, callbacks);
         if(stillFighting()) playerSystem.update(dt, timeInSeconds);
         if(stillFighting()) (mine.enabled ? updateMineFlow : updateWaveFlow)(dt);
+        if(mine.enabled) updateMineScene(timeInSeconds);
         ui.updateHUD();
 
         const dashPct = Math.max(0, 1 - (playerStats.dashCooldown / (playerStats.perk?.dashCooldown || 2.0)));

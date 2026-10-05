@@ -117,6 +117,7 @@ ui.updateDashBar(1);
 if(arena.enabled) ui.showStartScreen(); // the Boss Arena list replaces the home screen
 
 const playerSystem = createPlayerSystem(scene, camera, gameState, playerStats);
+if(import.meta.env?.DEV) window.__redWest = { scene, camera, playerGroup: playerSystem.playerGroup }; // for the browser tests (tests/mine-smoke.mjs)
 // ---------- Economy: wallet, outfit, purchases ----------
 const wallet = createWallet();
 let profile = cachedProfile();

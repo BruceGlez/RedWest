@@ -202,16 +202,16 @@ export const MINE_ATMOSPHERE = {
     mood: 'lantern dark',
     sky: [0x0d0907, 0x1a120d, 0x2a1d14, 0x3b2a1c],
     fog: { color: 0x3a281a, near: 34, far: 90 },
-    hemi: { sky: 0xe0bd90, ground: 0x9a7650, intensity: 1.55 },
-    sun: { color: 0xffb86a, intensity: 1.8, offset: [-14, 40, -10] },
-    ground: 0xb09478, props: 0xc8b098,
+    hemi: { sky: 0xd9c4a6, ground: 0x8a7458, intensity: 1.55 },
+    sun: { color: 0xffc27a, intensity: 1.8, offset: [-14, 40, -10] },
+    ground: 0xb09478, props: 0xc8b098, // the ground plane is the rock mass beyond the walls: dark; each floor lays its own cave floor over it (src/mineScene.js)
     wind: 0.1, weeds: 0,
     motes: { color: 0xd8b078, size: 0.3, opacity: 0.35, count: 60, speed: 0.5, fall: 0.4 },
-    horizon: { style: 'peaks', height: 1.4, strength: 0.7 },
+    horizon: { style: 'flat', height: 0.6, strength: 0.2 },
     hero: null,
-    terrain: { ...SAND, base: '#93795a', blotchDark: 'rgba(50, 36, 24, 0.22)', blotchLight: 'rgba(205, 172, 128, 0.32)', grain: ['rgba(50, 36, 24, 0.18)', 'rgba(215, 185, 140, 0.2)'],
-        crack: 'rgba(40, 28, 18, 0.35)', cracks: 26, pebble: 'rgba(70, 56, 44, 0.7)', pebbleHi: 'rgba(220, 190, 145, 0.45)', pebbles: 420, scrubs: 0 },
-    kit: { rock: 66, tree: 0, crate: 12, cactus: 0, fence: 0, barrel: 14, tombstone: 0, haystack: 0, spire: 16, wall: 8 },
+    terrain: { ...SAND, base: '#33291f', blotchDark: 'rgba(10, 7, 4, 0.35)', blotchLight: 'rgba(110, 88, 64, 0.22)', grain: ['rgba(10, 7, 4, 0.3)', 'rgba(120, 96, 70, 0.14)'],
+        crack: 'rgba(8, 5, 3, 0.5)', cracks: 30, pebble: 'rgba(20, 15, 11, 0.8)', pebbleHi: 'rgba(130, 105, 78, 0.35)', pebbles: 300, scrubs: 0 },
+    kit: { rock: 0, tree: 0, crate: 0, cactus: 0, fence: 0, barrel: 0, tombstone: 0, haystack: 0, spire: 0, wall: 0 }, // nothing is scattered: the floors are laid out in src/mineMap.js
     palette: { ...NO_TINT, rock: [0x6a5d52, 0x877868], crate: 0xb08a60 }
 };
 const MINE_SOUND = { surface: 'rock', bed: 'night' };

@@ -11,7 +11,7 @@ import { track } from './analytics.js';
 import { ownsItem } from './profile.js';
 import { purchaseSupport, canRestore } from './purchases.js';
 import { arena, arenaRoster } from './arena.js';
-import { mine, MINE_FLOORS, resultText } from './mine.js';
+import { mine, MINE_FLOORS, resultText, shaftHint } from './mine.js';
 import { assetUrl } from './demo.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 import { CHAPTER_ONE_END, OPENING, ENDING, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
@@ -154,9 +154,9 @@ export function createUIManager(gameState, playerStats) {
         updateHeat(gameState.heat);
 
         if(gameState.isIntermission) {
-            els.waveTimer.innerText = `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
+            els.waveTimer.innerText = mine.enabled ? shaftHint(mine.shaftDx, mine.shaftDz) : `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
             els.status.className = '';
-            els.status.innerText = mine.enabled ? 'THE SHAFT DOWN IS OPEN' : 'GET READY FOR NEXT WAVE';
+            els.status.innerText = mine.enabled ? 'THE SHAFT IS OPEN: WALK TO IT' : 'GET READY FOR NEXT WAVE';
             return;
         }
 

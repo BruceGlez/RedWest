@@ -1,0 +1,346 @@
+import * as THREE from 'three';
+import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
+import { obstacles } from './state.js';
+import { markObstacleGridDirty } from './physics.js';
+import { toonVertexColorMaterial } from './assets.js';
+import { floorLayout, bounds, distance, wallCircles, propCircles, setActiveFloor } from './mineMap.js';
+
+// Draws one floor of the Hollow Claim (src/mineMap.js has the shape of the cave and every rule). It is all built from simple shapes
+// in code, like the rest of the game, in five draw calls or so: the cave floor, the rock walls, the props (pillars, timber arches,
+// crates, carts, rails), the lantern glow, and the lift and the shaft, which change. The art pass (MINE_PLAN.md, slice 4) can replace
+// any of these builders without touching the rules.
+//
+// The walls rise as they go back from the cave: low at the edge (so the marshal is never hidden behind them from the camera, which
+// stands to the south and high) and tall in the rock behind. Past the last block the ground is plain dark rock, seen as the roof.
+
+const ROCK_NEAR = 0x746a5e, ROCK_FAR = 0x2a231e, FLOOR = 0x82765f, TIMBER = 0x6b4a2f, TIMBER_DARK = 0x45301f, IRON = 0x34343a, STONE = 0x5b5249;
+const LANTERN = 0xffc260;
+
+const seededRandom = seed => { let a = seed >>> 0; return () => { a = (a + 0x6D2B79F5) >>> 0; let t = a; t = Math.imul(t ^ (t >>> 15), t | 1); t ^= t + Math.imul(t ^ (t >>> 7), t | 61); return ((t ^ (t >>> 14)) >>> 0) / 4294967296; }; };
+const hashOf = text => { let h = 2166136261; for(const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619); return h >>> 0; };
+
+// Every static shape carries a colour per vertex (position, normal and colour only, so they all merge into one geometry).
+function paint(geometry, hex, shade = 1) {
+    const g = geometry.index ? geometry.toNonIndexed() : geometry;
+    g.deleteAttribute('uv');
+    const color = new THREE.Color(hex).multiplyScalar(shade);
+    const colors = new Float32Array(g.attributes.position.count * 3);
+    for(let i = 0; i < g.attributes.position.count; i++) color.toArray(colors, i * 3);
+    g.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    return g;
+}
+
+// A box at (x, y, z), turned about the vertical by `yaw`: a direction (cos a, sin a) on the ground is yaw = -a.
+function boxAt(w, h, d, hex, x, y, z, yaw = 0, shade = 1) {
+    const g = new THREE.BoxGeometry(w, h, d);
+    g.rotateY(yaw);
+    g.translate(x, y, z);
+    return paint(g, hex, shade);
+}
+
+// A shape given as a local geometry, turned about the vertical and stood at (x, z).
+function placed(geometry, hex, x, y, z, yaw = 0, shade = 1) {
+    geometry.rotateY(yaw);
+    geometry.translate(x, y, z);
+    return paint(geometry, hex, shade);
+}
+
+// ---------- the cave floor and the rock around it ----------
+
+function buildFloor(layout, rand) {
+    const b = bounds(layout, 6);
+    const TILE = 3;
+    const positions = [], normals = [], colors = [];
+    const color = new THREE.Color();
+    for(let x = b.minX; x < b.maxX; x += TILE) for(let z = b.minZ; z < b.maxZ; z += TILE) {
+        const cx = x + TILE / 2, cz = z + TILE / 2;
+        const d = distance(layout, cx, cz);
+        if(d > 2.5) continue;
+        // Darker toward the walls (the light does not reach), a little different from tile to tile.
+        const shade = (0.55 + 0.45 * Math.min(1, Math.max(0, -d / 8))) * (0.92 + rand() * 0.16);
+        color.set(FLOOR).multiplyScalar(shade);
+        const h = TILE / 2 + 0.08;
+        const y = 0.04;
+        for(const [px, pz] of [[-h, -h], [h, h], [h, -h], [-h, -h], [-h, h], [h, h]]) { // counter-clockwise seen from above, so the floor faces the camera
+            positions.push(cx + px, y, cz + pz);
+            normals.push(0, 1, 0);
+            colors.push(color.r, color.g, color.b);
+        }
+    }
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(positions, 3));
+    geometry.setAttribute('normal', new THREE.Float32BufferAttribute(normals, 3));
+    geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+    return geometry;
+}
+
+// Blocks of rock on a grid, tall and tilted, rising with the distance from the cave. Merged into one mesh.
+function buildRock(layout, rand) {
+    const b = bounds(layout, 12);
+    const STEP = 4, REACH = 20;
+    const parts = [];
+    for(let x = b.minX; x < b.maxX; x += STEP) for(let z = b.minZ; z < b.maxZ; z += STEP) {
+        const px = x + (rand() - 0.5) * 2.2, pz = z + (rand() - 0.5) * 2.2;
+        const d = distance(layout, px, pz);
+        if(d < -0.4 || d > REACH) continue;
+        const height = Math.min(11, 1.3 + Math.max(d, 0) * 0.5 + rand() * 2.4);
+        const width = 4.6 + rand() * 2.2;
+        const g = new THREE.BoxGeometry(width, height, width * (0.85 + rand() * 0.35));
+        g.rotateX((rand() - 0.5) * 0.18);
+        g.rotateZ((rand() - 0.5) * 0.18);
+        g.rotateY(rand() * Math.PI);
+        g.translate(px, height / 2 - 0.3, pz);
+        // The face is lit near the cave and falls away into the dark behind it; the top catches a little light.
+        const geometry = g.toNonIndexed();
+        geometry.deleteAttribute('uv');
+        const colors = new Float32Array(geometry.attributes.position.count * 3);
+        const near = new THREE.Color(ROCK_NEAR), far = new THREE.Color(ROCK_FAR), c = new THREE.Color();
+        const depth = Math.min(1, Math.max(0, d / REACH));
+        const tint = 0.85 + rand() * 0.3;
+        for(let i = 0; i < geometry.attributes.position.count; i++) {
+            const k = Math.min(1, Math.max(0, (geometry.attributes.position.getY(i) + 0.3) / height));
+            c.copy(far).lerp(near, (1 - depth) * (0.35 + 0.65 * k)).multiplyScalar(tint);
+            c.toArray(colors, i * 3);
+        }
+        geometry.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+        parts.push(geometry);
+    }
+    return mergeGeometries(parts, false);
+}
+
+// ---------- what stands in the cave ----------
+
+function pillarParts(layout, rand) {
+    return layout.pillars.flatMap(([x, z, r]) => [
+        placed(new THREE.CylinderGeometry(r * 0.62, r * 1.12, 6.2, 7), ROCK_NEAR, x, 3.1, z, rand() * 3, 0.9),
+        placed(new THREE.CylinderGeometry(r * 1.25, r * 0.7, 0.9, 7), ROCK_NEAR, x, 6.4, z, rand() * 3, 0.78), // the capital under the roof
+        placed(new THREE.DodecahedronGeometry(r * 0.55, 0), ROCK_FAR, x + r * 0.9, r * 0.25, z + r * 0.4, rand() * 3, 1.5) // rubble at the foot
+    ]);
+}
+
+// A timber frame across a passage: two posts, a lintel, braces, and a lantern hung from the middle.
+function archParts(layout, glow) {
+    const parts = [];
+    for(const [x, z, angle, half] of layout.arches) {
+        const yaw = -angle;
+        const ux = Math.cos(angle), uz = Math.sin(angle);
+        for(const side of [-1, 1]) {
+            const px = x + ux * half * side, pz = z + uz * half * side;
+            parts.push(boxAt(0.8, 4.8, 0.8, TIMBER, px, 2.4, pz, yaw));
+            parts.push(boxAt(0.5, 0.5, 1.3, TIMBER_DARK, px, 0.25, pz, yaw)); // the sill
+            const bx = x + ux * (half - 1.1) * side, bz = z + uz * (half - 1.1) * side;
+            parts.push(boxAt(0.35, 1.9, 0.35, TIMBER_DARK, bx, 4.15, bz, yaw)); // a short strut under the lintel
+        }
+        parts.push(boxAt(half * 2 + 1.8, 0.7, 0.9, TIMBER, x, 4.9, z, yaw));
+        parts.push(boxAt(0.12, 0.9, 0.12, IRON, x, 4.0, z, yaw)); // the chain
+        glow.push(boxAt(0.5, 0.6, 0.5, LANTERN, x, 3.4, z, yaw));
+    }
+    return parts;
+}
+
+// Stacked crates and barrels, as a few of them stood up against a wall or a pillar.
+function clusterParts(layout, rand, glow) {
+    const parts = [];
+    for(const [x, z] of layout.clusters) {
+        const yaw = rand() * 3;
+        parts.push(boxAt(2.2, 2.0, 2.2, 0xa07a4c, x - 0.9, 1.0, z, yaw));
+        parts.push(boxAt(2.2, 2.0, 2.2, 0x946e44, x + 1.2, 1.0, z + 0.4, yaw + 0.3));
+        parts.push(boxAt(2.0, 1.8, 2.0, 0xa98150, x + 0.1, 2.9, z + 0.1, yaw + 0.15));
+        parts.push(boxAt(2.3, 0.22, 0.22, TIMBER_DARK, x - 0.9, 2.05, z + 1.12, yaw)); // a band across the first crate
+        parts.push(placed(new THREE.CylinderGeometry(0.75, 0.75, 1.6, 8), TIMBER, x - 1.1, 0.8, z - 1.9, 0));
+        parts.push(placed(new THREE.CylinderGeometry(0.8, 0.8, 0.14, 8), IRON, x - 1.1, 1.2, z - 1.9, 0));
+        glow.push(boxAt(0.32, 0.4, 0.32, LANTERN, x + 0.1, 4.0, z + 0.1, yaw)); // a lantern left on top
+    }
+    return parts;
+}
+
+// An ore cart on the rails, facing along them, heaped with ore.
+function cartParts(layout, rand) {
+    const parts = [];
+    for(const [x, z, angle] of layout.carts) {
+        const yaw = -angle;
+        const at = (lx, lz) => [x + Math.cos(angle) * lx - Math.sin(angle) * lz, z + Math.sin(angle) * lx + Math.cos(angle) * lz];
+        parts.push(boxAt(3.2, 1.0, 1.9, IRON, x, 0.95, z, yaw));
+        parts.push(boxAt(3.5, 0.2, 2.2, 0x4d4d56, x, 1.5, z, yaw)); // the rim
+        for(const lx of [-1.0, 1.0]) for(const lz of [-1.0, 1.0]) {
+            const [wx, wz] = at(lx, lz * 0.95);
+            parts.push(placed(new THREE.CylinderGeometry(0.42, 0.42, 0.22, 8).rotateX(Math.PI / 2), 0x222226, wx, 0.42, wz, yaw));
+        }
+        for(let i = 0; i < 3; i++) {
+            const [ox, oz] = at((i - 1) * 0.9, (rand() - 0.5) * 0.6);
+            parts.push(placed(new THREE.DodecahedronGeometry(0.6 + rand() * 0.25, 0), 0x5a5750, ox, 1.7, oz, rand() * 3, 0.9 + rand() * 0.3));
+        }
+    }
+    return parts;
+}
+
+// Rails: two bars on timber ties along each leg of the polyline.
+function railParts(layout) {
+    const parts = [];
+    for(let i = 0; i < layout.rails.length - 1; i++) {
+        const [x1, z1] = layout.rails[i], [x2, z2] = layout.rails[i + 1];
+        const length = Math.hypot(x2 - x1, z2 - z1);
+        const angle = Math.atan2(z2 - z1, x2 - x1);
+        const yaw = -angle;
+        const ux = Math.cos(angle), uz = Math.sin(angle);
+        const mx = (x1 + x2) / 2, mz = (z1 + z2) / 2;
+        for(const side of [-0.7, 0.7]) parts.push(boxAt(length, 0.16, 0.18, IRON, mx - uz * side, 0.14, mz + ux * side, yaw));
+        for(let t = 0.75; t < length; t += 1.6) {
+            parts.push(boxAt(0.4, 0.1, 2.0, TIMBER_DARK, x1 + ux * t, 0.09, z1 + uz * t, yaw));
+        }
+    }
+    return parts;
+}
+
+// ---------- the lift and the shaft ----------
+
+function liftParts(glow) {
+    const parts = [placed(new THREE.CylinderGeometry(4.6, 4.9, 0.34, 10), 0x7a5a3c, 0, 0.17, 0, 0.3)];
+    for(let i = 0; i < 6; i++) {
+        const x = -3.5 + i * 1.4;
+        parts.push(boxAt(0.12, 0.05, 2 * Math.sqrt(4.5 * 4.5 - x * x), TIMBER_DARK, x, 0.36, 0, 0)); // plank seams, within the round deck
+    }
+    for(const [px, pz] of [[-5.6, -5.0], [5.6, -5.0], [-5.6, 5.0], [5.6, 5.0]]) {
+        parts.push(boxAt(0.45, 2.6, 0.45, TIMBER_DARK, px, 1.3, pz));
+        glow.push(boxAt(0.4, 0.5, 0.4, LANTERN, px, 2.85, pz));
+    }
+    // The hoist frame behind the platform, with the cable going up into the dark.
+    parts.push(boxAt(0.7, 7.5, 0.7, TIMBER, -3.2, 3.75, -8), boxAt(0.7, 7.5, 0.7, TIMBER, 3.2, 3.75, -8), boxAt(7.6, 0.7, 0.9, TIMBER, 0, 7.4, -8));
+    parts.push(boxAt(0.14, 6.6, 0.14, IRON, 0, 4.1, -8));
+    return parts;
+}
+
+// The shaft: a pit with a stone curb, boards across it while the floor is not cleared, a beam of light when it is.
+function buildShaft(layout, glow) {
+    const [sx, sz] = layout.shaft;
+    const group = new THREE.Group();
+    group.position.set(sx, 0, sz);
+
+    const pit = new THREE.Mesh(new THREE.CircleGeometry(3.3, 16).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x050403 }));
+    pit.position.y = 0.07;
+    const curbParts = [];
+    for(let i = 0; i < 12; i++) {
+        const a = (i / 12) * Math.PI * 2;
+        curbParts.push(boxAt(2.1, 0.7, 1.0, STONE, Math.cos(a) * 3.8, 0.35, Math.sin(a) * 3.8, -a + Math.PI / 2));
+    }
+    for(const [px, pz] of [[-6.3, 0], [6.3, 0], [0, -6.3], [0, 6.3]]) {
+        curbParts.push(boxAt(0.4, 2.2, 0.4, TIMBER_DARK, px, 1.1, pz));
+        glow.push(boxAt(0.4, 0.5, 0.4, LANTERN, sx + px, 2.45, sz + pz));
+    }
+    const curb = new THREE.Mesh(mergeGeometries(curbParts, false), toonVertexColorMaterial());
+    curb.castShadow = curb.receiveShadow = true;
+
+    const boards = [];
+    for(let i = 0; i < 7; i++) boards.push(boxAt(7.4, 0.26, 0.95, TIMBER, 0, 0.78, -3 + i * 1.0, 0, 0.85 + (i % 2) * 0.2));
+    boards.push(boxAt(0.5, 0.34, 7.0, IRON, 0, 0.92, 0), boxAt(0.9, 0.5, 0.9, 0x8a6a30, 0, 1.15, 0)); // the strap and the lock
+    const hatch = new THREE.Mesh(mergeGeometries(boards, false), toonVertexColorMaterial());
+    hatch.castShadow = true;
+
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 3.1, 18, 16, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xffd28a, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    beam.position.y = 9;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(3.4, 5.4, 24).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0xffc260, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
+    ring.position.y = 0.12;
+
+    group.add(pit, curb, hatch, beam, ring);
+    const shaft = {
+        x: sx, z: sz, open: false, group, beam, ring, hatch,
+        setOpen(open) {
+            shaft.open = open;
+            hatch.visible = !open;
+            beam.visible = open;
+            ring.visible = open;
+        }
+    };
+    shaft.setOpen(false);
+    return shaft;
+}
+
+// ---------- a whole floor ----------
+
+let current = null; // { floor, layout, group, shaft, markers }
+
+const kindOfType = { wall: 'wall', pillar: 'spire', post: 'fence', cluster: 'crate', cart: 'crate' }; // for the impact sparks (src/combatMath.js)
+
+function solidMarkers(layout) {
+    const markers = [];
+    for(const c of [...wallCircles(layout), ...propCircles(layout)]) {
+        // Never destroyed and never respawned (destructible: false); the marker is only what the physics and the bullets look at.
+        const mesh = new THREE.Object3D();
+        mesh.position.set(c.x, 0, c.z);
+        mesh.userData.mine = true;
+        const entry = { mesh, x: c.x, z: c.z, radius: c.r, destructible: false, type: kindOfType[c.kind] ?? 'wall' };
+        markers.push(entry);
+    }
+    return markers;
+}
+
+// Builds floor `floor` (a no-op when it is already the floor on show). The marshal always starts on the lift at (0, 0).
+export function showMineFloor(scene, floor) {
+    if(current?.floor === floor) return current;
+    clearMineFloor(scene);
+    const layout = floorLayout(floor);
+    const rand = seededRandom(hashOf(layout.id));
+    const group = new THREE.Group();
+    group.name = 'mine-floor';
+    const glow = [];
+
+    const solid = (geometry, { cast = false, receive = true } = {}) => {
+        const mesh = new THREE.Mesh(geometry, toonVertexColorMaterial());
+        mesh.castShadow = cast;
+        mesh.receiveShadow = receive;
+        group.add(mesh);
+        return mesh;
+    };
+    solid(buildFloor(layout, rand));
+    solid(buildRock(layout, rand), { cast: true });
+    const props = [...pillarParts(layout, rand), ...archParts(layout, glow), ...clusterParts(layout, rand, glow), ...cartParts(layout, rand), ...railParts(layout), ...liftParts(glow)];
+    solid(mergeGeometries(props, false), { cast: true });
+
+    const shaft = buildShaft(layout, glow);
+    group.add(shaft.group);
+    // The lantern glow is one unlit mesh, so it stays bright whatever the light does.
+    group.add(new THREE.Mesh(mergeGeometries(glow, false), new THREE.MeshBasicMaterial({ vertexColors: true })));
+
+    scene.add(group);
+    const markers = solidMarkers(layout);
+    obstacles.push(...markers);
+    markObstacleGridDirty();
+    setActiveFloor(layout);
+    current = { floor, layout, group, shaft, markers };
+    return current;
+}
+
+export function clearMineFloor(scene) {
+    if(!current) { setActiveFloor(null); return; }
+    scene.remove(current.group);
+    current.group.traverse(o => {
+        if(!o.isMesh) return;
+        o.geometry.dispose();
+        o.material.dispose();
+    });
+    for(const marker of current.markers) {
+        const i = obstacles.indexOf(marker);
+        if(i > -1) obstacles.splice(i, 1);
+    }
+    markObstacleGridDirty();
+    setActiveFloor(null);
+    current = null;
+}
+
+export const mineFloorOnShow = () => current;
+
+// The shaft opens when the floor is cleared (src/gameLoop.js).
+export function setShaftOpen(open) {
+    current?.shaft.setOpen(open);
+}
+
+// The beam breathes while the shaft is open.
+export function updateMineScene(timeInSeconds) {
+    const shaft = current?.shaft;
+    if(!shaft?.open) return;
+    const pulse = 0.5 + 0.5 * Math.sin(timeInSeconds * 2.4);
+    shaft.beam.material.opacity = 0.16 + pulse * 0.1;
+    shaft.ring.material.opacity = 0.28 + pulse * 0.22;
+}
