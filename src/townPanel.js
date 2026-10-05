@@ -8,6 +8,9 @@ import { remindersSupported, remindersEnabled, remindersAsked, enableReminders, 
 import { createTownScene, TOWN_LAYOUT } from './townScene.js';
 import { createTownLook, DAY_SKY } from './townLook.js';
 import { createFarmScene } from './placeFarm.js';
+import { createUndertakerScene } from './placeUndertaker.js';
+import { parlourLabel, grimsbyLine, PARLOUR_START } from './undertakerLayout.js';
+import { MINE_FLOORS } from './mine.js';
 import { CROPS, GOODS, EGG, getCrop, plotStates, eggsReady, minutesToNextEgg, minutesText, farmLevel, farmLevelInfo } from './farm.js';
 import { FARM_START, farmLabel, plotIndex } from './farmLayout.js';
 import { createTownWalk } from './townWalk.js';
@@ -27,7 +30,7 @@ import { purchaseSupport } from './purchases.js';
 
 // The Frontier Town screen (src/town.js has the rules): a 3D town at dusk (src/townScene.js) with a label over
 // each building; tapping a building or its label opens its card in a sheet. Also the TOWN button's badge.
-export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onArenaFight = () => {}, portrait = () => '', onBuyPass, isChild = () => false, getProgress = () => null }) {
+export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onArenaFight = () => {}, onDescend = () => {}, portrait = () => '', onBuyPass, isChild = () => false, getProgress = () => null }) {
     const $ = id => document.getElementById(id);
     const els = {
         button: $('town-btn'),
@@ -62,7 +65,12 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     let walk = null; // the walkable town (src/townWalk.js), an independent switch
     let farm3d = null; // Calloway Farm, a place of its own (src/placeFarm.js), built the first time you go in
     let farmWalk = null; // walking on the farm: the same walking code, on the farm's map
-    let place = null; // the district you are inside (its id), or null while you are in the town
+    let parlour3d = null; // Mr. Grimsby's parlour, a place of its own (src/placeUndertaker.js), built the first time you go in
+    let parlourWalk = null; // walking in the parlour
+    let place = null; // the place you are inside ('ranch' for the farm, 'undertaker' for the parlour), or null while you are in the town
+    const PARLOUR_SKY = { top: '#0c0807', middle: '#150e0b', horizon: '#241912' };
+    const placeScene = () => (place === 'undertaker' ? parlour3d : farm3d); // the scene and the walk of the place you are in
+    const placeWalk = () => (place === 'undertaker' ? parlourWalk : farmWalk);
     let quality = loadQuality(); // what the player chose for LOOK's quality, and the best level the device managed
     let qualityChoice = startLevel(quality, qualityParam()).choice; // for this visit (the URL may override the saved choice)
     let news = loadNews(); // which districts the player has been told about and has walked into, kept on this device
@@ -305,6 +313,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     }
 
     function sheetHtml(id) {
+        if(place === 'undertaker') return parlourCard(id);
         if(place) return farmCard(id);
         if(id === 'platform') return trainCard();
         if(districtOf(id)) return districtCard(id);
@@ -484,6 +493,42 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         if(farm && id === 'coop' && eggsReady(farm, new Date(), Math.max(1, farmLevel(profile))) > 0) return farmDo({ action: 'eggs' }, r => `Collected ${r.amount} ${r.amount === 1 ? 'egg' : 'eggs'}.`);
         openBuilding(id);
     }
+    // Mr. Grimsby's parlour (src/undertakerLayout.js has the map and what he says).
+    function parlourCard(id) {
+        if(id !== 'grimsby') return '';
+        const beaten = getProgress() ? getProgress().stars.filter(mask => (mask & 1) !== 0).length : 0;
+        return `<div class="town-card" data-building="grimsby"><div class="town-sign"><span>MR. GRIMSBY</span></div>`
+            + `<p class="town-blurb">&ldquo;${grimsbyLine(beaten)}&rdquo;</p>`
+            + `<p class="town-stat">The cellar stairs are behind the coffins: the Hollow Claim, ${MINE_FLOORS} floors down. Nothing is saved down there yet.</p></div>`;
+    }
+    // Walking up to something in the parlour (src/townWalk.js, the parlour's own instance).
+    function useParlour(id) {
+        if(id === 'leave') return leavePlace();
+        if(id === 'cellar') return onDescend(); // the stairs: the Hollow Claim, floor 1 (src/mine.js)
+        openBuilding(id);
+    }
+    function enterParlour() {
+        if(place || !profile) return;
+        if(!parlour3d) {
+            parlour3d = createUndertakerScene();
+            parlourWalk = createTownWalk({
+                town3d: parlour3d, host: els.screen, onOpen: useParlour, blocked: () => !!openId, start: PARLOUR_START, describe: parlourLabel
+            });
+        }
+        track('place_enter');
+        walk?.exit(); // the town stops where the marshal stood, in front of the door
+        place = 'undertaker';
+        parlour3d.resize(window.innerWidth, window.innerHeight);
+        look?.setScene(parlour3d.scene, parlour3d.camera, { sky: PARLOUR_SKY });
+        parlourWalk.setCompanion(companion.following);
+        parlourWalk.place(PARLOUR_START[0], PARLOUR_START[1]); // every visit starts inside the door, not on the exit prompt
+        parlourWalk.enter();
+        els.labels.style.display = 'none';
+        els.title.textContent = "MR. GRIMSBY'S PARLOUR";
+        openId = null;
+        syncTools();
+        render();
+    }
     function enterPlace(id) {
         const district = getDistrict(id);
         if(!district?.interior || !profile || place || !unlockedDistricts(profile.stats.stageStars).includes(id)) return;
@@ -512,7 +557,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     }
     function leavePlace() {
         if(!place) return;
-        farmWalk.exit();
+        placeWalk().exit();
         place = null;
         look?.setScene(town3d.scene, town3d.camera);
         els.labels.style.display = '';
@@ -527,13 +572,15 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     els.placeBack.addEventListener('click', leavePlace);
 
     // Walking up to a door or a place (src/townWalk.js). The places of src/townSpots.js are not buildings:
-    // the train starts the next hunt, the cash box pays the jail's money at once, the board shows the day's jobs.
+    // the train starts the next hunt, the cash box pays the jail's money at once, the board shows the day's jobs, the undertaker's door opens his parlour.
     function useSpot(id) {
         if(id.startsWith('enter-')) {
             enterPlace(id.slice(6));
         } else if(id === 'train') {
             track('train_ride');
             onBoardTrain();
+        } else if(id === 'undertaker') {
+            enterParlour(); // the undertaker's door: Mr. Grimsby's parlour, and the cellar stairs behind it
         } else if(id === 'cashbox') {
             track('town_collect_box');
             openBuilding('jail'); // the result shows on the jail's card
@@ -606,7 +653,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         } else if(button.hasAttribute('data-companion')) {
             companion = { adopted: true, following: !(companion.adopted && companion.following) };
             saveCompanion(companion);
-            (place ? farmWalk : walk)?.setCompanion(companion.following);
+            (place ? placeWalk() : walk)?.setCompanion(companion.following);
             track(companion.following ? 'companion_on' : 'companion_off');
             render();
         } else if(button.hasAttribute('data-collect')) {
@@ -660,7 +707,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
             town3d = createTownScene({ time: featureOn('time') });
             walk = createTownWalk({ town3d, host: els.screen, onOpen: useSpot, blocked: () => !!openId, describe: describeSpot, lineFor: personLine });
             // Dev builds only: lets tests/town-smoke.mjs put the marshal at a door.
-            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; }, get look() { return look; }, get place() { return place; }, get farm3d() { return farm3d; }, get farmWalk() { return farmWalk; }, enterPlace, leavePlace };
+            if(import.meta.env?.DEV) window.__redWestTown = { walk, town3d, get companion() { return companion; }, get hasProfile() { return !!profile; }, get news() { return news; }, get look() { return look; }, get place() { return place; }, get farm3d() { return farm3d; }, get farmWalk() { return farmWalk; }, get parlour3d() { return parlour3d; }, get parlourWalk() { return parlourWalk; }, enterPlace, enterParlour, leavePlace };
         }
         town3d.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
@@ -733,6 +780,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         headerBottom = 0;
         town3d?.resize(window.innerWidth, window.innerHeight);
         farm3d?.resize(window.innerWidth, window.innerHeight);
+        parlour3d?.resize(window.innerWidth, window.innerHeight);
         look?.resize(window.innerWidth, window.innerHeight);
     });
 
@@ -839,12 +887,12 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
                 const start = startLevel(quality, qualityParam());
                 look = createTownLook(renderer, town3d.scene, town3d.camera, { enabled: featureOn('look'), level: start.level, auto: start.auto, onQuality: onQualityChange });
                 look.resize(window.innerWidth, window.innerHeight);
-                if(place) look.setScene(farm3d.scene, farm3d.camera, { sky: DAY_SKY });
+                if(place) look.setScene(placeScene().scene, placeScene().camera, { sky: place === 'undertaker' ? PARLOUR_SKY : DAY_SKY });
                 syncTools();
             }
             if(place) { // inside a place: its own map is drawn and walked, and the town waits
-                farm3d.update(dt);
-                farmWalk.update(dt);
+                placeScene().update(dt);
+                placeWalk().update(dt);
                 look.render(dt);
                 return;
             }

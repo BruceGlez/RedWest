@@ -7,6 +7,7 @@ import { addScorch } from './decals.js';
 import { addShake, haptic } from './feedback.js';
 import { gameState, enemies, playerStats } from './state.js';
 import { checkCollision } from './physics.js';
+import { activeFloor, isOpen, spawnPoint } from './mineMap.js';
 import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
@@ -118,15 +119,20 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
         hp = 1; 
     }
 
-    // Find a valid position (not inside an obstacle)
+    // Find a valid position (not inside an obstacle). In the mine they come out of the tunnel mouths instead (src/mineMap.js).
     let ex, ez, attempts = 0;
-    do {
-        const angle = Math.random() * Math.PI * 2; 
-        const dist = 50 + Math.random() * 20; // Spawn 50-70 units away
-        ex = playerPos.x + Math.cos(angle) * dist;
-        ez = playerPos.z + Math.sin(angle) * dist;
-        attempts++;
-    } while(checkCollision(ex, ez, 2.0) && attempts < 10);
+    const cave = activeFloor();
+    if(cave) {
+        ({ x: ex, z: ez } = spawnPoint(cave, playerPos));
+    } else {
+        do {
+            const angle = Math.random() * Math.PI * 2; 
+            const dist = 50 + Math.random() * 20; // Spawn 50-70 units away
+            ex = playerPos.x + Math.cos(angle) * dist;
+            ez = playerPos.z + Math.sin(angle) * dist;
+            attempts++;
+        } while(checkCollision(ex, ez, 2.0) && attempts < 10);
+    }
 
     enemy.position.set(ex, 0, ez);
     
@@ -638,6 +644,12 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
     for(let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
         const u = e.userData;
+        // Safety net for the mine: anyone found inside the rock comes out of a tunnel mouth again.
+        const cave = activeFloor();
+        if(cave && !isOpen(cave, e.position.x, e.position.z)) {
+            const back = spawnPoint(cave, playerPos);
+            e.position.set(back.x, 0, back.z);
+        }
         const toPlayer = new THREE.Vector3().subVectors(playerPos, e.position).setY(0);
         const dist = toPlayer.length();
         const dir = toPlayer.clone().normalize();
@@ -827,6 +839,10 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
                 e.position.x += moveX;
                 e.position.z += moveZ;
                 isMoving = true;
+            } else if(activeFloor() && u.state !== 'charge') {
+                // A cave wall: slide along it instead of standing against it.
+                if(!checkCollision(e.position.x + moveX, e.position.z, colRad)) { e.position.x += moveX; isMoving = true; }
+                else if(!checkCollision(e.position.x, e.position.z + moveZ, colRad)) { e.position.z += moveZ; isMoving = true; }
             } else if(u.state === 'charge') {
                 const recovers = u.behavior === 'charger' || u.behavior === 'boss';
                 u.state = recovers ? 'recover' : 'move';
@@ -852,7 +868,9 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         const big = u.heavy || u.type === 'boss';
         const reach = u.type === 'boss' ? 3.4 : u.heavy ? 3.2 : u.type === 'rattler' ? 2.2 : 2.5;
         if(!u.faded && e.position.distanceTo(playerPos) < reach && damagePlayer(callbacks)) {
-            e.position.add(dir.clone().multiplyScalar(big ? -2.5 : -5));
+            const knock = dir.clone().multiplyScalar(big ? -2.5 : -5);
+            // In the mine a knock-back never carries anyone into the rock.
+            if(!activeFloor() || isOpen(activeFloor(), e.position.x + knock.x, e.position.z + knock.z, 1)) e.position.add(knock);
             if(u.state === 'charge') {
                 u.state = u.behavior === 'charger' || u.behavior === 'boss' ? 'recover' : 'move';
                 u.stateTimer = 1;

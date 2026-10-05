@@ -32,6 +32,9 @@ export const TOWN_LAYOUT = BASE_LAYOUT.map(spot => {
 const baseOf = id => BASE_LAYOUT.find(spot => spot.id === id);
 const spreadOf = id => TOWN_LAYOUT.find(spot => spot.id === id);
 
+// The undertaker's (scenery beside the stable, src/townScene.js): the cellar hatch to the mine stands beside it (src/townSpots.js).
+export const UNDERTAKER_AT = spread(-31, 6);
+
 // A point that belongs to a building: where it was relative to the building, kept relative to the building's new place.
 export function near(id, x, z) {
     const before = baseOf(id);

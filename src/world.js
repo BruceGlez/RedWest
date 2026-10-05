@@ -9,6 +9,8 @@ import { setupAmbience, setAmbienceLook } from './ambience.js';
 import { setDecalColor } from './decals.js';
 import { setHorizon, updateHorizon } from './horizon.js';
 import { createHero } from './heroProps.js';
+import { mine, MINE_ATMOSPHERE_ID } from './mine.js';
+import { clearMineFloor } from './mineScene.js';
 
 let sunLight = null;
 let hemiLight = null;
@@ -17,6 +19,7 @@ let appliedAtmosphere = null;
 let currentSurface = 'sand';
 let currentHero = DEFAULT_ATMOSPHERE.hero;
 let currentKit = DEFAULT_ATMOSPHERE.kit; // what generateMap builds: the current stage's props
+let currentIsMine = false; // the look is the mine's: its floors are built one at a time by src/gameLoop.js (showMineFloor), not scattered
 const SUN_OFFSET = new THREE.Vector3(-26, 44, -18);
 
 export function setupScene(scene, camera, renderer) {
@@ -87,6 +90,8 @@ export function setAtmosphere(scene, outlawId) {
     currentSurface = sound.surface;
     setBed(bedFor(sound, look.wind));
     currentHero = look.hero;
+    currentIsMine = outlawId === MINE_ATMOSPHERE_ID;
+    clearMineFloor(scene);
     clearScenery(scene);
     generateMap(scene);
 }
@@ -114,6 +119,11 @@ function getRandomPos(minDist) {
 
 // The map for the current stage: how many of each prop (its `kit` in atmosphere.js), scattered over 240 x 240.
 export function generateMap(scene) {
+    // The mine has no scattered props: a floor is built when a run reaches it. Anything left from the last run goes.
+    if(currentIsMine) {
+        if(!mine.enabled) clearMineFloor(scene);
+        return;
+    }
     const kit = currentKit;
     if(currentHero) createHero(scene, currentHero.id, ...currentHero.at);
     const scatter = (count, minDist, create) => { for(let i = 0; i < count; i++) { const p = getRandomPos(minDist); create(scene, p.x, p.z); } };

@@ -1,4 +1,5 @@
 import { obstacles } from './state.js';
+import { activeFloor, isOpen } from './mineMap.js';
 
 const CELL_SIZE = 12;
 const OBSTACLE_QUERY_PADDING = 4;
@@ -66,6 +67,9 @@ export function markObstacleGridDirty() {
 }
 
 export function checkCollision(x, z, radius) {
+    // In the mine the rock is blocked everywhere, not only along the wall ring, so nobody can stand, spawn or land in it.
+    const cave = activeFloor();
+    if(cave && !isOpen(cave, x, z)) return true;
     ensureObstacleGrid();
     const near = queryGrid(obstacleGrid, x, z, radius + OBSTACLE_QUERY_PADDING);
     for(const obs of near) {

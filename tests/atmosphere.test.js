@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { HEROES } from '../src/heroProps.js';
-import { ATMOSPHERES, DEFAULT_ATMOSPHERE, KIT_CAPACITY, atmosphereFor } from '../src/atmosphere.js';
+import { ATMOSPHERES, DEFAULT_ATMOSPHERE, KIT_CAPACITY, MINE_ATMOSPHERE, atmosphereFor } from '../src/atmosphere.js';
 import { OUTLAWS } from '../src/outlaws.js';
 
 const isHex = value => Number.isInteger(value) && value >= 0 && value <= 0xffffff;
@@ -13,7 +13,7 @@ test('every outlaw has a stage atmosphere, and none is left over', () => {
 });
 
 test('atmospheres are complete, and the fight stays readable', () => {
-    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
+    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ['mine', MINE_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
         assert.equal(look.sky.length, 4, `${id}: four sky stops`);
         for(const hex of [...look.sky, look.fog.color, look.hemi.sky, look.hemi.ground, look.sun.color, look.ground, look.props]) {
             assert.ok(isHex(hex), `${id}: colours are hex numbers`);
@@ -38,7 +38,7 @@ test('a stage without an atmosphere falls back to the default', () => {
 
 test('every stage has its own ground, its own props, and no two stages look alike', () => {
     const seen = new Set();
-    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
+    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ['mine', MINE_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
         const { terrain, kit, palette } = look;
         assert.ok(/^#[0-9a-f]{6}$/i.test(terrain.base), `${id}: ground base colour`);
         assert.ok(terrain.grain.length === 2 && terrain.cracks >= 0 && terrain.pebbles >= 0 && terrain.scrubs >= 0, `${id}: ground counts`);
@@ -51,15 +51,16 @@ test('every stage has its own ground, its own props, and no two stages look alik
             assert.ok(count + 4 <= KIT_CAPACITY[kind], `${id}: ${kind} leaves room to respawn`);
             total += count;
         }
-        assert.ok(total >= 60 && total <= 150, `${id}: ${total} props keeps the arena playable and cheap`);
+        // The mine scatters nothing: each floor is laid out by hand (src/mineMap.js).
+        if(id !== 'mine') assert.ok(total >= 60 && total <= 150, `${id}: ${total} props keeps the arena playable and cheap`);
         assert.equal(palette.rock.length, 2, `${id}: two rock colours`);
         seen.add(JSON.stringify([terrain.base, kit]));
     }
-    assert.equal(seen.size, Object.keys(ATMOSPHERES).length + 1, 'every stage has a different ground and prop mix');
+    assert.equal(seen.size, Object.keys(ATMOSPHERES).length + 2, 'every stage and the mine have a different ground and prop mix');
 });
 
 test('every stage has a skyline', () => {
-    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
+    for(const [id, look] of [['default', DEFAULT_ATMOSPHERE], ['mine', MINE_ATMOSPHERE], ...Object.entries(ATMOSPHERES)]) {
         assert.ok(['mesa', 'peaks', 'hills', 'stacks', 'flat'].includes(look.horizon.style), `${id}: known skyline`);
         assert.ok(look.horizon.height > 0 && look.horizon.height <= 2 && look.horizon.strength >= 0 && look.horizon.strength <= 1, `${id}: skyline numbers`);
     }

@@ -11,6 +11,7 @@ import { track } from './analytics.js';
 import { ownsItem } from './profile.js';
 import { purchaseSupport, canRestore } from './purchases.js';
 import { arena, arenaRoster } from './arena.js';
+import { mine, MINE_FLOORS, resultText, shaftHint } from './mine.js';
 import { assetUrl } from './demo.js';
 import { isUnlocked, totalStars, starsForRun, starCount } from './progress.js';
 import { CHAPTER_ONE_END, OPENING, ENDING, storyFor, unlockedCards, hasPage, caseComplete } from './story.js';
@@ -36,6 +37,7 @@ export function createUIManager(gameState, playerStats) {
     const els = {
         score: document.getElementById('score'),
         wave: document.getElementById('wave'),
+        waveLabel: document.getElementById('wave-label'),
         waveTimer: document.getElementById('wave-timer'),
         weaponLabel: document.getElementById('weapon-label'),
         heatLevel: document.getElementById('heat-level'),
@@ -141,7 +143,8 @@ export function createUIManager(gameState, playerStats) {
         }
         els.health.innerHTML = hearts.join('');
         els.score.innerText = gameState.score;
-        els.wave.innerText = gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
+        els.waveLabel.innerText = mine.enabled ? 'FLOOR:' : 'PURSUIT:';
+        els.wave.innerText = mine.enabled ? `${mine.floor} / ${MINE_FLOORS}` : gameState.waveNumber > FINAL_PURSUIT ? 'BONUS' : gameState.waveNumber;
         const held = getWeapon(playerStats.guns[playerStats.weapon]) || defaultWeapon(playerStats.weapon);
         els.weaponLabel.innerText = held.short;
         if(els.swapBtn && els.swapBtn.dataset.weapon !== held.id) {
@@ -151,9 +154,9 @@ export function createUIManager(gameState, playerStats) {
         updateHeat(gameState.heat);
 
         if(gameState.isIntermission) {
-            els.waveTimer.innerText = `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
+            els.waveTimer.innerText = mine.enabled ? shaftHint(mine.shaftDx, mine.shaftDz) : `BREAK ${Math.ceil(gameState.intermissionTimer)}s`;
             els.status.className = '';
-            els.status.innerText = 'GET READY FOR NEXT WAVE';
+            els.status.innerText = mine.enabled ? 'THE SHAFT IS OPEN: WALK TO IT' : 'GET READY FOR NEXT WAVE';
             return;
         }
 
@@ -164,7 +167,7 @@ export function createUIManager(gameState, playerStats) {
             els.bonusHud.innerHTML = `SURVIVE <b>${Math.ceil(Math.max(0, gameState.waveTimer))}s</b> <span>${gameState.bounty.amount} BOUNTY AT STAKE</span>`;
         }
 
-        els.waveTimer.innerText = (gameState.waveBossSpawned && gameState.waveTimer <= 0)
+        els.waveTimer.innerText = mine.enabled ? 'CLEAR THE FLOOR' : (gameState.waveBossSpawned && gameState.waveTimer <= 0)
             ? 'OUTLAW'
             : `${Math.ceil(Math.max(0, gameState.waveTimer))}s`;
         if(playerStats.tripleShotTimer > 0) {
@@ -276,7 +279,7 @@ export function createUIManager(gameState, playerStats) {
         els.bonusHud.style.display = 'none';
         hidePauseOverlay();
         hideSettingsModal();
-        const [title, detail] = RESULT_TEXT[result] || RESULT_TEXT.died;
+        const [title, detail] = mine.enabled ? resultText(result, mine.floor) : (RESULT_TEXT[result] || RESULT_TEXT.died);
         els.resultTitle.textContent = title;
         els.resultTitle.classList.toggle('wasted-text', result === 'died');
         els.resultDetail.textContent = gameState.bounty.status === 'forfeited'
@@ -306,7 +309,7 @@ export function createUIManager(gameState, playerStats) {
         const kit = PRODUCTS.find(p => p.id === 'starter_pack');
         let offered = true;
         try { offered = !!localStorage.getItem(STARTER_OFFERED_KEY); } catch { /* storage blocked: do not offer */ }
-        if(result === 'died' || offered || childMode || profile?.bought?.includes(kit.id) || !purchaseSupport(kit.id).available) return;
+        if(result === 'died' || result === 'mine-win' || offered || childMode || profile?.bought?.includes(kit.id) || !purchaseSupport(kit.id).available) return;
         try { localStorage.setItem(STARTER_OFFERED_KEY, '1'); } catch { /* fine */ }
         box.innerHTML = `<p><b>${kit.label}</b>: ${kit.items.map(id => getShopItem(id).name).join(', ')} and &#9670;${kit.nuggets}, ${kit.price}. `
             + 'One per player; it stays in the shop.</p><button type="button" class="shop-tab" data-see-kit>SEE IT IN THE SHOP</button>';
@@ -839,9 +842,9 @@ export function createUIManager(gameState, playerStats) {
             + `<button class="arena-fight" type="button" data-arena="${i}"${unlocked ? '' : ' disabled'}>${unlocked ? 'FIGHT' : 'LOCKED'}</button></div></div>`).join('');
     }
 
-    function showPracticeResult() {
+    function showPracticeResult(note = 'Arena: practice only, nothing is saved.') {
         els.resultRoad.innerHTML = '';
-        els.resultEarnings.innerHTML = '<p class="earn-title">Arena: practice only, nothing is saved.</p>';
+        els.resultEarnings.innerHTML = `<p class="earn-title">${note}</p>`;
     }
 
     function showStartScreen() {

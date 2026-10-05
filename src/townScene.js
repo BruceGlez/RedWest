@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeByMaterial } from './meshMerge.js';
 import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces, getDistrict, districtOffsetById } from './townDistricts.js';
-import { TOWN_LAYOUT, SPREAD, STATION, spread, near, moved } from './townSpace.js';
+import { TOWN_LAYOUT, SPREAD, STATION, UNDERTAKER_AT, spread, near, moved } from './townSpace.js';
 import { FOLK, createWalker, stepWalker } from './townFolk.js';
 import { skyAt } from './townTime.js';
 import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
@@ -814,7 +814,7 @@ export function createTownScene(options = {}) {
     const undertakerSign = sign('UNDERTAKER', 4.4);
     undertakerSign.position.set(0, 3.6, 2.6);
     undertaker.add(undertakerSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
-    const undertakerAt = spread(-31, 6);
+    const undertakerAt = UNDERTAKER_AT;
     undertaker.position.set(undertakerAt[0], 0, undertakerAt[1]);
     scenery.add(undertaker);
 
