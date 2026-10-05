@@ -24,3 +24,8 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 ## Before you open a PR
 - `npm test`
 - `npm run test:store`
+
+## Built: hosting-ready
+- `GET /healthz`: process up and `store.ping()` answers (the file store checks its folder is writable). 200 `{ ok, store }` or 503; no auth, no paths or secrets. `/health` stays for Render.
+- `Dockerfile` (non-root, `NODE_ENV=production`, `/data` volume, `HEALTHCHECK` on `/healthz`) and `.dockerignore`. The image holds only `server/` and `src/`; the web game is still a static build elsewhere.
+- `docs/DEPLOY.md`: Coolify steps, env var names, volume, backups, verifying the first deploy. Run one instance until the store is not a JSON file.

@@ -28,7 +28,7 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 ## Plan, in order
 
 ### 1. Launch blockers (needs the owner's accounts, not code)
-- Host the server (Render Blueprint is ready), set `VITE_API_BASE`.
+- Host the server (Render Blueprint is ready; a `Dockerfile` and `docs/DEPLOY.md` cover a Coolify VPS, with `GET /healthz` to check the first deploy), set `VITE_API_BASE`.
 - Generate and publish privacy policy and terms (`docs/POLICY_GENERATOR_ANSWERS.md`), set `VITE_PRIVACY_URL`, `VITE_TERMS_URL`,
   `VITE_SUPPORT_EMAIL`. Lawyer review before the first sale. Trademark search. Stripe Tax.
 - Apple Developer, App Store Connect products (3 nugget packs, starter pack, season pass), RevenueCat, Stripe links, webhook
