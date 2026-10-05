@@ -7,7 +7,7 @@
 // (src/ambience.js): dust, ash, embers, mist or snow. speed drifts them with the wind, fall drops them (a
 // negative fall lifts them), count is out of 120 and size is in world units.
 // All numbers are first guesses for the eye and for playtesting on a phone.
-
+import { MINE_ATMOSPHERE_ID } from './mine.js';
 
 // horizon: the skyline beyond the fog (src/horizon.js): a style (mesa, peaks, hills, stacks, flat) and how tall, how strongly
 // it shows against the haze (0 to 1). terrain: how the ground looks (drawn once per stage by createGroundTexture in textures.js). kit: how many of
@@ -196,10 +196,32 @@ export const SOUND = {
     'colonel-crane': { surface: 'snow', bed: 'wind' }
 };
 
+// The Hollow Claim (src/mine.js, MINE_PLAN.md): lantern light in a dark cut. It is not an outlaw's stage, so it lives apart from
+// ATMOSPHERES (which has one entry per outlaw). The light stays above the floor every stage keeps, so the fight reads on a phone.
+export const MINE_ATMOSPHERE = {
+    mood: 'lantern dark',
+    sky: [0x0d0907, 0x1a120d, 0x2a1d14, 0x3b2a1c],
+    fog: { color: 0x3a281a, near: 34, far: 90 },
+    hemi: { sky: 0xe0bd90, ground: 0x9a7650, intensity: 1.55 },
+    sun: { color: 0xffb86a, intensity: 1.8, offset: [-14, 40, -10] },
+    ground: 0xb09478, props: 0xc8b098,
+    wind: 0.1, weeds: 0,
+    motes: { color: 0xd8b078, size: 0.3, opacity: 0.35, count: 60, speed: 0.5, fall: 0.4 },
+    horizon: { style: 'peaks', height: 1.4, strength: 0.7 },
+    hero: null,
+    terrain: { ...SAND, base: '#93795a', blotchDark: 'rgba(50, 36, 24, 0.22)', blotchLight: 'rgba(205, 172, 128, 0.32)', grain: ['rgba(50, 36, 24, 0.18)', 'rgba(215, 185, 140, 0.2)'],
+        crack: 'rgba(40, 28, 18, 0.35)', cracks: 26, pebble: 'rgba(70, 56, 44, 0.7)', pebbleHi: 'rgba(220, 190, 145, 0.45)', pebbles: 420, scrubs: 0 },
+    kit: { rock: 66, tree: 0, crate: 12, cactus: 0, fence: 0, barrel: 14, tombstone: 0, haystack: 0, spire: 16, wall: 8 },
+    palette: { ...NO_TINT, rock: [0x6a5d52, 0x877868], crate: 0xb08a60 }
+};
+const MINE_SOUND = { surface: 'rock', bed: 'night' };
+
 export function soundFor(outlawId) {
+    if(outlawId === MINE_ATMOSPHERE_ID) return MINE_SOUND;
     return SOUND[outlawId] ?? SOUND.default;
 }
 
 export function atmosphereFor(outlawId) {
+    if(outlawId === MINE_ATMOSPHERE_ID) return MINE_ATMOSPHERE;
     return ATMOSPHERES[outlawId] ?? DEFAULT_ATMOSPHERE;
 }

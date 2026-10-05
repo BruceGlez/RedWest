@@ -27,7 +27,7 @@ import { purchaseSupport } from './purchases.js';
 
 // The Frontier Town screen (src/town.js has the rules): a 3D town at dusk (src/townScene.js) with a label over
 // each building; tapping a building or its label opens its card in a sheet. Also the TOWN button's badge.
-export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onArenaFight = () => {}, portrait = () => '', onBuyPass, isChild = () => false, getProgress = () => null }) {
+export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain = () => {}, onArenaFight = () => {}, onDescend = () => {}, portrait = () => '', onBuyPass, isChild = () => false, getProgress = () => null }) {
     const $ = id => document.getElementById(id);
     const els = {
         button: $('town-btn'),
@@ -527,13 +527,15 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     els.placeBack.addEventListener('click', leavePlace);
 
     // Walking up to a door or a place (src/townWalk.js). The places of src/townSpots.js are not buildings:
-    // the train starts the next hunt, the cash box pays the jail's money at once, the board shows the day's jobs.
+    // the train starts the next hunt, the cash box pays the jail's money at once, the board shows the day's jobs, the cellar hatch goes down the mine.
     function useSpot(id) {
         if(id.startsWith('enter-')) {
             enterPlace(id.slice(6));
         } else if(id === 'train') {
             track('train_ride');
             onBoardTrain();
+        } else if(id === 'hatch') {
+            onDescend(); // the cellar hatch: the Hollow Claim, floor 1 (src/mine.js)
         } else if(id === 'cashbox') {
             track('town_collect_box');
             openBuilding('jail'); // the result shows on the jail's card

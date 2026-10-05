@@ -12,6 +12,7 @@ import { loadProgress, saveProgress, isUnlocked } from './progress.js';
 import { renderOutlawPortraits, renderEnemyPortraits, renderEnemyModelPortrait, renderPlayerPreview, renderCharacterPortrait } from './portraits.js';
 import { OUTLAWS } from './outlaws.js';
 import { arena, beginTownFight } from './arena.js';
+import { beginMineRun } from './mine.js';
 import { createWallet, cachedProfile, legacyName } from './wallet.js';
 import { createRecordsPanel } from './recordsPanel.js';
 import { buyProduct, waitForCredit, restorePurchases, lastCredit } from './purchases.js';
@@ -135,6 +136,12 @@ const town = createTownPanel({
         if(!beginTownFight(index, progress)) return;
         ui.hidePanels();
         await ensureOutlawModel(index);
+        keys.startRequested = true;
+    },
+    // The undertaker's cellar hatch: the Hollow Claim, from floor 1. It needs no outlaw model; the mine sends no outlaw.
+    onDescend: () => {
+        beginMineRun();
+        ui.hidePanels();
         keys.startRequested = true;
     },
     // The train at the depot: the same hunt as PLAY, for the outlaw the Wanted Road has selected.
