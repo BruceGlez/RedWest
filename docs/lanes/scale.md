@@ -8,6 +8,9 @@
 - Load tests in `tools/loadtest/`, monitoring, alerts, backups
 - Idempotent purchases and webhooks; keep paid balances server-authoritative
 
+## Done
+- `POST /api/mine/run`: applies `applyMineRun` (src/mineProgress.js) to `profile.mine`. Same 20 s minimum between reports as `/api/run`, tracked separately (`user.lastMineRunAt`) so the mine and the Wanted Road do not block each other. Touches nothing but `profile.mine`.
+
 ## Rules
 The store interface in `server/store.js` is the seam: `app.js` only talks to it. Change both ends together and keep `tests/server.test.js` green. Anything touching purchases is shared with the money lane: say so in the PR.
 
