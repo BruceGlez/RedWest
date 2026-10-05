@@ -6,7 +6,7 @@ source docs (linked), which are specs and records, not to-do lists.
 ## Where we are
 
 A free-to-play, mobile-first Western arena shooter (Three.js, Vite, Capacitor iOS, Node server). Direction changed from the
-paid-desktop plan (`REFACTOR_PLAN.md`) to **free-to-play with fair monetization** (`GROWTH_PLAN.md`, `MONETIZATION.md`).
+paid-desktop plan (merged below) to **free-to-play with fair monetization** (`GROWTH_PLAN.md`, `MONETIZATION.md`).
 
 **Built:** ten-outlaw Wanted Road with signature bosses and enemies, Heat and bank/ride-on, stars, Bounty Book, Records and
 leaderboards, store (Bounty Dollars, cosmetics, guns, daily jobs, starter pack, season pass), playable outlaws, weekly event,
@@ -65,12 +65,20 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 models). `node tools/perf.mjs` gives draw calls and frame times (run three times, take the middle). Blender rigging for animals
 is documented in `tools/blender/README.md`.
 
-## Housekeeping
-- `TODO_V1.md`, `STAGE0_BASELINE.md` and `REFACTOR_PLAN.md` describe the old paid-desktop prototype and are historical. Safe to
-  archive or delete once you agree; this file replaces them as the plan.
-- `RELEASE_CHECKLIST.md` keeps the wave-era wording; its open items are folded into section 2 above.
+## Core design and history (merged from the old plans)
+- **Pitch:** hunt a notorious outlaw through short, escalating Western shootouts; bank the bounty and escape, or ride on for more
+  score and more danger. Signature system: **Heat** (accurate kill chains raise score and pressure; misses and hits cool it).
+  Keep manual aim, dash and short sessions. Original direction; nothing copied from other games.
+- **Heat balance guesses to tune:** 4 s chain window, 2 kills per Heat level (max 4, x1.5 score each), 5 s decay per level,
+  50-point base bounty, 30 s ride-on, dying while riding on forfeits the bounty. Record how often testers ride on and at what Heat.
+  Note each tester's aim mode (assist makes chains easier) and loadout.
+- **Original paid-desktop idea (set aside):** 15 to 20 minute contract runs, three encounters, reward choices, six weapons, 18 to 24
+  run upgrades, Steam page ($100 fee, 30-day wait). Revisit only if free-to-play fails; gate any price on demo playtests.
+- **Excluded for now:** multiplayer, open world, procedural levels, custom engine, ads.
+- **Size budget:** character models under about 1.5 MB after `tools/optimize-model.mjs`.
+- Docs removed on merge: `TODO_V1.md` (old wave-survival scope), `STAGE0_BASELINE.md`, `REFACTOR_PLAN.md`. Their history is in git.
 
 ## Source docs
-`REFACTOR_PLAN` (old direction), `GROWTH_PLAN` (retention, events, monetization), `MONETIZATION` (store setup),
+`GROWTH_PLAN` (retention, events, monetization), `MONETIZATION` (store setup),
 `POLISH_PLAN` (look, feel, audio), `TOWN_PLAN` and `PLACES` (town and districts), `STORY_BIBLE`, `IOS`, `ASSETS`,
-`RELEASE_CHECKLIST`, `README`, `STAGE0_BASELINE`, `TODO_V1`, `docs/POLICY_GENERATOR_ANSWERS`, `tools/blender/README`.
+`RELEASE_CHECKLIST`, `README`, `docs/POLICY_GENERATOR_ANSWERS`, `tools/blender/README`.

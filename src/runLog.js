@@ -1,7 +1,7 @@
 import { FINAL_PURSUIT } from './bounty.js';
 import { getOutlaw } from './outlaws.js';
 
-// Playtest run log (REFACTOR_PLAN.md Stage 1 gate). One record per finished run, kept in this
+// Playtest run log (PLAN.md validation gate). One record per finished run, kept in this
 // browser so an observer can copy the rows into a sheet after each tester.
 const RUN_LOG_KEY = 'redWestRunLog.v1';
 const MAX_RUNS = 200;

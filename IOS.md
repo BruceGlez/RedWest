@@ -56,7 +56,7 @@ Run `npm run ios:sync` again after any change to the game before building in Xco
 
 - The **playtest log** (COPY / CLEAR on the start screen) is useful on TestFlight but looks like debug UI to
   store players; hide it for the store build.
-- App Review expects a complete game, not a prototype. REFACTOR_PLAN.md's Stage 2–4 gates (full bounty run,
+- App Review expects a complete game, not a prototype. PLAN.md's validation gates (full bounty run,
   more content, polish) are the realistic bar for a paid release; TestFlight is the right place for the
   current Stage 1 build.
 - Consider iOS extras players expect from App Store games: haptics on hits and Heat changes, Game Center

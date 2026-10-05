@@ -1,6 +1,6 @@
 # Red West
 
-Red West is a browser-based Western arena shooter. `main` contains the Stage 1 Heat prototype described in [REFACTOR_PLAN.md](REFACTOR_PLAN.md). The original endless-survival build is commit `a0a68e5` in the history (`git checkout a0a68e5`) if you need it for comparison.
+Red West is a browser-based Western arena shooter. `main` contains the Stage 1 Heat prototype described in [PLAN.md](PLAN.md). The original endless-survival build is commit `a0a68e5` in the history (`git checkout a0a68e5`) if you need it for comparison.
 
 ## Run locally
 

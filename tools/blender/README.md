@@ -63,7 +63,7 @@ humanoids only; animals must stay in place on their own).
 
 - `idle`, `run`, `dead` exist and `run` has no forward drift.
 - Skinned mesh count is 1 per character (horse and rider count as 2).
-- File under about 1.5 MB after `optimize-model.mjs` (phone performance, see `STAGE0_BASELINE.md`).
+- File under about 1.5 MB after `optimize-model.mjs` (phone performance, see `PLAN.md`).
 - Open it in the game or `tools/render-portraits.mjs`, and look at idle and run from the side.
 
 ## Status

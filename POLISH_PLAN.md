@@ -237,7 +237,7 @@ PBR. The toon style is the right call for phones.
 
 These are not polish; they were found while checking the docs on 2026-09-29.
 
-**Gates before Stage 2 or a release** (`STAGE0_BASELINE.md`, `RELEASE_CHECKLIST.md`):
+**Gates before Stage 2 or a release** (`PLAN.md`, `RELEASE_CHECKLIST.md`):
 - Observe 12 first-time players: at least 8 understand the Heat tradeoff and at least 6 replay on their own.
 - Real frame pacing on a target phone, and a listening check for audio clipping and broken loops.
 - Three uninterrupted full runs; a known-issues list; the build marked as a candidate.

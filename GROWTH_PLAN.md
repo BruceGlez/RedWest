@@ -3,7 +3,7 @@
 **Prepared:** 2026-09-29
 **Status:** Decisions made (see the end). Phase 0 in progress.
 **Assumes:** Red West becomes a free-to-play mobile game (iOS app plus the web build), with the paid-desktop
-plan in [REFACTOR_PLAN.md](REFACTOR_PLAN.md) set aside. If it stays a paid game, only the Frontier Town,
+plan in [PLAN.md](PLAN.md) set aside. If it stays a paid game, only the Frontier Town,
 playable outlaws, weekly event and analytics apply.
 
 > **Not legal advice.** This plan is written to stay clear of the known legal problems in mobile games, but
