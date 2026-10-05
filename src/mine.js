@@ -15,7 +15,9 @@ export const mine = {
     liftDx: 0,
     liftDz: 0,
     liftArmed: false, // the lift only works once the marshal has walked away from it (he arrives standing on it)
-    opened: []        // the chests opened on this floor
+    opened: [],       // the chests opened on this floor
+    confirm: null,    // 'down' or 'up' while the game is asking whether to take the shaft or the lift
+    blocked: null     // 'down' or 'up' after the answer was no: it is not asked again until the marshal has stepped away
 };
 
 function reset() {
@@ -23,6 +25,8 @@ function reset() {
     mine.shaftDx = mine.shaftDz = mine.liftDx = mine.liftDz = 0;
     mine.liftArmed = false;
     mine.opened = [];
+    mine.confirm = null;
+    mine.blocked = null;
 }
 
 // Start a run at the first floor. endMineRun() puts the game back to the Wanted Road's rules.
@@ -43,6 +47,8 @@ export function nextFloor() {
     mine.floor += 1;
     mine.liftArmed = false;
     mine.opened = [];
+    mine.confirm = null;
+    mine.blocked = null;
     return mine.floor;
 }
 
@@ -89,6 +95,12 @@ export function shaftHint(dx, dz) {
 }
 export function liftHint(dx, dz) {
     return `LIFT UP ${meters(dx, dz)}`;
+}
+
+// What the mine asks at the shaft and at the lift. Nothing happens until the answer is yes.
+export function confirmText(kind, floor) {
+    if(kind === 'up') return { title: 'RIDE THE LIFT UP?', text: `Ride back up from depth ${floor}. This ends the run, and the monsters stay where they are.`, yes: 'RIDE UP', no: 'STAY' };
+    return { title: 'GO DOWN?', text: `Take the shaft down to depth ${floor + 1}. Everything on this floor stays behind.`, yes: 'DESCEND', no: 'STAY' };
 }
 
 // What the result screen says when the run ends: how deep you got.

@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { mine, beginMineRun, endMineRun, nextFloor, MINE_ATMOSPHERE_ID, floorStage, floorWave, floorTitle, floorBanner, descentScore, chestReward,
-    resultText, shaftArrow, shaftHint, liftHint, PRACTICE_NOTE } from '../src/mine.js';
+    resultText, confirmText, shaftArrow, shaftHint, liftHint, PRACTICE_NOTE } from '../src/mine.js';
 import { OUTLAWS } from '../src/outlaws.js';
 import { atmosphereFor, soundFor, MINE_ATMOSPHERE, ATMOSPHERES } from '../src/atmosphere.js';
 import { SURFACES, BEDS } from '../src/soundscape.js';
@@ -65,4 +65,23 @@ test('the mine has its own look and sound, apart from the outlaws\' stages', () 
     assert.equal(atmosphereFor(MINE_ATMOSPHERE_ID), MINE_ATMOSPHERE);
     assert.ok(!(MINE_ATMOSPHERE_ID in ATMOSPHERES), 'not an outlaw stage');
     assert.ok(SURFACES[soundFor(MINE_ATMOSPHERE_ID).surface] && BEDS[soundFor(MINE_ATMOSPHERE_ID).bed], 'a known footstep surface and bed');
+});
+
+test('the shaft and the lift ask first, and say what they will do', () => {
+    assert.deepEqual(confirmText('down', 3), { title: 'GO DOWN?', text: 'Take the shaft down to depth 4. Everything on this floor stays behind.', yes: 'DESCEND', no: 'STAY' });
+    const up = confirmText('up', 6);
+    assert.equal(up.title, 'RIDE THE LIFT UP?');
+    assert.match(up.text, /depth 6/);
+    assert.match(up.text, /ends the run/);
+    assert.equal(up.yes, 'RIDE UP');
+    assert.equal(up.no, 'STAY');
+    beginMineRun();
+    mine.confirm = 'down';
+    mine.blocked = 'up';
+    nextFloor();
+    assert.equal(mine.confirm, null, 'a new floor asks nothing yet');
+    assert.equal(mine.blocked, null);
+    mine.confirm = 'up';
+    endMineRun();
+    assert.equal(mine.confirm, null);
 });

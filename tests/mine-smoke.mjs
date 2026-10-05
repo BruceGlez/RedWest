@@ -95,8 +95,9 @@ try {
         return { depth: M.mine.floor, cave: cave.id, at: [p.x, p.z], open: MM.isOpen(cave, p.x, p.z, 8), obstacles: S.obstacles.length, mapSize: S.gameState.MAP_SIZE,
             area: (b.maxX - b.minX) * (b.maxZ - b.minZ), reach: Math.max(-b.minX, b.maxX, -b.minZ, b.maxZ), shaft: Math.hypot(...cave.shaft), score: S.gameState.score };
     });
-    const put = (x, z) => page.evaluate(([x, z]) => window.__redWest.playerGroup.position.set(x, 0, z), [x, z]);
-    const toShaft = () => page.evaluate(() => { const c = MM.activeFloor(); window.__redWest.playerGroup.position.set(c.shaft[0], 0, c.shaft[1]); });
+    // (The marshal is kept alive: monsters now wait in every chamber, and this test is about the cave, not the fight.)
+    const put = (x, z) => page.evaluate(([x, z]) => { S.playerStats.hp = S.playerStats.maxHp; S.playerStats.invulnerabilityTimer = 60; window.__redWest.playerGroup.position.set(x, 0, z); }, [x, z]);
+    const toShaft = () => page.evaluate(() => { const c = MM.activeFloor(); S.playerStats.hp = S.playerStats.maxHp; S.playerStats.invulnerabilityTimer = 60; window.__redWest.playerGroup.position.set(c.shaft[0], 0, c.shaft[1]); });
 
     let lastArea = 0;
     for(let depth = 1; depth <= 4; depth++) {
@@ -110,20 +111,19 @@ try {
         assert.ok(state.shaft >= 180, `depth ${depth}: the shaft is a real walk away (${Math.round(state.shaft)} units)`);
         assert.ok(state.area > lastArea * 1.3, `depth ${depth}: the map is a lot larger than the one above`);
         lastArea = state.area;
-        assert.equal(await page.evaluate(() => S.enemies.length), 0, `depth ${depth}: the monsters of the floor above stayed there`);
         if(depth > 1) assert.match(await page.locator('#wave-banner').textContent(), new RegExp(`DEPTH ${depth}`));
         if(depth === 2) assert.match(await page.locator('#wave-banner').textContent(), /NEW: CAVE BAT/, 'the new monster is announced');
         await page.waitForTimeout(2200);
         await shot(`depth-${depth}`);
 
-        // Monsters come out of the dark, in open ground, near the marshal and not on top of him.
+        // Monsters come out of the dark, in open ground (planNode keeps them 20 units off the lift; by now they have started to close in).
         await page.waitForFunction(() => S.enemies.length > 0, null, { timeout: 60000 });
         const spawned = await page.evaluate(() => {
             const p = window.__redWest.playerGroup.position;
             return S.enemies.map(e => ({ open: MM.isOpen(MM.activeFloor(), e.position.x, e.position.z), d: Math.hypot(e.position.x - p.x, e.position.z - p.z), type: e.userData.type }));
         });
         assert.ok(spawned.every(e => e.open), `depth ${depth}: everyone stands in open ground`);
-        assert.ok(spawned.every(e => e.d > 15), `depth ${depth}: nobody comes out on top of the marshal`);
+        assert.ok(await page.evaluate(() => S.enemies.every(e => e.userData.mineNode !== undefined)), `depth ${depth}: every monster belongs to a chamber`);
 
         if(depth === 1) {
             // The four monsters that live only down here spawn, wear their own look, and run their behaviours without a fault.
@@ -176,6 +176,23 @@ try {
             await put(10, 0);
             await page.waitForTimeout(300);
             assert.equal(await page.evaluate(() => S.gameState.isGameOver), false, 'the lift is not the way out while you are still near it');
+
+            // Monsters are not endless: the chamber's own are the chamber's. Kill them all and nothing comes while the marshal stays ...
+            await put(10, 0);
+            await page.waitForTimeout(2500);
+            await page.evaluate(() => { for(const e of S.enemies.splice(0)) e.parent.remove(e); });
+            await page.waitForTimeout(3500);
+            assert.equal(await page.evaluate(() => S.enemies.length), 0, 'nothing new comes out while he stays: the chamber is quiet');
+            // ... but once he has gone far away, it fills again for next time.
+            await page.evaluate(() => { const c = MM.activeFloor(); const n = c.nodes[c.main - 1]; window.__redWest.playerGroup.position.set(n.x - 20, 0, n.z); });
+            await page.waitForTimeout(2500);
+            assert.equal(await page.evaluate(() => S.enemies.some(e => e.userData.mineNode === 0)), false, 'the landing chamber is empty while he is far away');
+            const around = await page.evaluate(() => ({ n: S.enemies.length, over: S.gameState.isGameOver, asking: S.gameState.isConfirming, hp: S.playerStats.hp, paused: S.gameState.isPaused }));
+            assert.ok(around.n > 0, `and the chambers around him have filled (${JSON.stringify(around)})`);
+            await put(22, 0);
+            await page.waitForFunction(() => S.enemies.some(e => e.userData.mineNode === 0), null, { timeout: 15000 });
+            await put(10, 0);
+            await page.waitForTimeout(1500);
         }
 
         // The way down is always open: walk into the shaft, whatever is chasing.
@@ -185,7 +202,30 @@ try {
         assert.match(await page.locator('#wave-timer').textContent(), /SHAFT 1\d m/);
         const before = (await here()).score;
         await toShaft();
+        // It asks first, and the game waits for the answer.
+        await page.waitForFunction(() => S.gameState.isConfirming);
+        assert.match(await page.locator('#mine-confirm-title').textContent(), /GO DOWN/);
+        assert.match(await page.locator('#mine-confirm-text').textContent(), new RegExp(`depth ${depth + 1}`));
+        assert.equal(await page.evaluate(() => M.mine.floor), depth, 'still on this floor while it asks');
+        await shot(`confirm-down-${depth}`);
+        if(depth === 1) {
+            // No: it stays, and does not ask again while he is standing at the shaft.
+            await page.keyboard.press('Escape');
+            await page.waitForFunction(() => !S.gameState.isConfirming);
+            assert.equal(await page.evaluate(() => M.mine.floor), depth, 'a no stays');
+            assert.equal(await page.locator('#mine-confirm').isVisible(), false);
+            await page.waitForTimeout(600);
+            assert.equal(await page.evaluate(() => S.gameState.isConfirming), false, 'it does not ask again while he stands there');
+            await page.evaluate(() => { const c = MM.activeFloor(); window.__redWest.playerGroup.position.set(c.shaft[0] - 8, 0, c.shaft[1]); });
+            await page.waitForFunction(() => M.mine.blocked === null);
+            await toShaft(); // stepped away and back: it asks again
+            await page.waitForFunction(() => S.gameState.isConfirming);
+            await page.keyboard.press('Enter');
+        } else {
+            await page.locator('#mine-confirm-yes').click();
+        }
         await page.waitForFunction(d => M.mine.floor === d + 1, depth, { timeout: 30000 });
+        assert.equal(await page.locator('#mine-confirm').isVisible(), false);
         assert.ok((await here()).score >= before + 50 * depth, `depth ${depth}: going down pays`);
     }
 
@@ -194,6 +234,19 @@ try {
     await put(22, 0);
     await page.waitForFunction(() => M.mine.liftArmed);
     await put(0, 0);
+    await page.waitForFunction(() => S.gameState.isConfirming);
+    assert.match(await page.locator('#mine-confirm-title').textContent(), /RIDE THE LIFT UP/);
+    assert.equal(await page.evaluate(() => S.gameState.isGameOver), false, 'it asks before the run ends');
+    await page.locator('#mine-confirm-no').click(); // a tap on STAY
+    await page.waitForFunction(() => !S.gameState.isConfirming);
+    assert.equal(await page.evaluate(() => S.gameState.isGameOver), false);
+    await put(14, 0);
+    await page.waitForFunction(() => M.mine.blocked === null); // (a slow frame at this depth: wait for it to notice he has stepped away)
+    await put(0, 0); // stepped away and back: it asks again, and this time the answer is yes
+    await page.waitForFunction(() => S.gameState.isConfirming, null, { timeout: 8000 }).catch(async error => {
+        throw new Error(`the lift did not ask again: ${JSON.stringify(await page.evaluate(() => ({ blocked: M.mine.blocked, armed: M.mine.liftArmed, confirm: M.mine.confirm, over: S.gameState.isGameOver, at: [window.__redWest.playerGroup.position.x, window.__redWest.playerGroup.position.z], floor: M.mine.floor })))}`);
+    });
+    await page.locator('#mine-confirm-yes').click();
     await page.waitForFunction(() => S.gameState.isGameOver, null, { timeout: 30000 });
     assert.equal(await page.evaluate(() => S.gameState.runWon), true);
     assert.match(await page.locator('#result-title').textContent(), /LIFT UP/);

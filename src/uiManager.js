@@ -109,6 +109,7 @@ export function createUIManager(gameState, playerStats) {
         jobsReset: document.getElementById('jobs-reset'),
         resultEarnings: document.getElementById('result-earnings'),
         bountyChoice: document.getElementById('bounty-choice'),
+        mineConfirm: document.getElementById('mine-confirm'),
         bountyAmount: document.getElementById('bounty-amount'),
         bountyHeat: document.getElementById('bounty-heat'),
         bonusSeconds: document.getElementById('bonus-seconds'),
@@ -342,6 +343,21 @@ export function createUIManager(gameState, playerStats) {
 
     function hideBountyChoice() {
         if(els.bountyChoice) els.bountyChoice.style.display = 'none';
+    }
+
+    // The mine asks before the shaft or the lift takes the marshal (src/mine.js, confirmText).
+    function showMineConfirm({ title, text, yes, no }) {
+        hidePauseOverlay();
+        hideSettingsModal();
+        document.getElementById('mine-confirm-title').textContent = title;
+        document.getElementById('mine-confirm-text').textContent = text;
+        document.getElementById('mine-confirm-yes-label').textContent = yes;
+        document.getElementById('mine-confirm-no-label').textContent = no;
+        els.mineConfirm.style.display = 'flex';
+    }
+
+    function hideMineConfirm() {
+        if(els.mineConfirm) els.mineConfirm.style.display = 'none';
     }
 
     // ---------- Home screen and Wanted Road (all markup below comes from static outlaw data) ----------
@@ -968,6 +984,8 @@ export function createUIManager(gameState, playerStats) {
         });
         if(els.bankBountyBtn) els.bankBountyBtn.addEventListener('click', handlers.onBankBounty);
         if(els.rideOnBtn) els.rideOnBtn.addEventListener('click', handlers.onRideOn);
+        document.getElementById('mine-confirm-yes')?.addEventListener('click', () => handlers.onMineAnswer?.(true));
+        document.getElementById('mine-confirm-no')?.addEventListener('click', () => handlers.onMineAnswer?.(false));
         els.copyRunLogBtn?.addEventListener('click', () => copyRunLog(els.copyRunLogBtn));
         els.resultCopyLogBtn?.addEventListener('click', () => copyRunLog(els.resultCopyLogBtn));
         els.clearRunLogBtn?.addEventListener('click', () => {
@@ -1040,6 +1058,8 @@ Grid dirty: ${debugData.obstacleGridDirty ? 'yes' : 'no'}`;
         refreshShop: () => { if(profile && els.panels[4].style.display !== 'none') { renderShop(); updatePreview(); } },
         showNewEnemy,
         hideBountyChoice,
+        showMineConfirm,
+        hideMineConfirm,
         hideGameOverScreen,
         showStartScreen,
         hideStartScreen,

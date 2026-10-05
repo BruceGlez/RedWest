@@ -77,15 +77,35 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     };
 
     // What a run mode (src/modes/registry.js) may use of this loop. Function declarations below are hoisted, so this can sit up here.
-    const modeCtx = { scene, camera, playerSystem, ui, cameraOffset, spawn, finishRun, beginWave, updateWaveFlow, openBountyChoice };
+    const modeCtx = { scene, camera, playerSystem, ui, cameraOffset, spawn, finishRun, beginWave, updateWaveFlow, openBountyChoice, ask };
 
     // Spawn and record first sightings for the Bounty Book (with a NEW ENEMY card in play).
-    function spawn(type) {
-        spawnEnemy(scene, playerSystem.playerGroup.position, type);
+    function spawn(type, at = null) { // `at`: a place to put it (the mine fills each chamber with its own), else the mode's usual way
+        spawnEnemy(scene, playerSystem.playerGroup.position, type, at);
         if(type !== 'boss' && markSeen(progress, type)) {
             saveProgress(progress);
             ui.showNewEnemy(type);
         }
+    }
+
+    // A question a mode may ask the player (the mine asks before the shaft or the lift): the game stops until the answer. options: { title,
+    // text, yes, no }. onAnswer(true | false) runs once. ENTER, E or Y answer yes; ESC, X or Backspace answer no (src/input.js); so do the two buttons.
+    let question = null;
+    function ask(options, onAnswer) {
+        if(question) return;
+        question = { onAnswer };
+        gameState.isConfirming = true;
+        playerStats.invulnerabilityTimer = Math.max(playerStats.invulnerabilityTimer, 0.5);
+        ui.showMineConfirm(options);
+    }
+    function answerQuestion(yes) {
+        if(!question) return;
+        const { onAnswer } = question;
+        question = null;
+        gameState.isConfirming = false;
+        keys.confirmYes = keys.confirmNo = false;
+        ui.hideMineConfirm();
+        onAnswer(yes);
     }
 
     // result: 'died' | 'banked' | 'escaped'
@@ -322,7 +342,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     }
 
     function pauseGame() {
-        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty) return;
+        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty || gameState.isConfirming) return;
         gameState.isPaused = true;
         ui.showPauseOverlay();
     }
@@ -336,7 +356,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     }
 
     function openSettings() {
-        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty) return;
+        if(!gameState.isGameStarted || gameState.isGameOver || gameState.isChoosingBounty || gameState.isConfirming) return;
         if(gameState.isSettingsOpen) return;
         pausedBeforeSettings = gameState.isPaused;
         gameState.isPaused = true;
@@ -445,6 +465,8 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
 
     function resetGame() {
         resetModes(); // a fight started from the town's Arena or a run down the mine is over: the home screen is the home screen again
+        question = null;
+        ui.hideMineConfirm();
         hotMusic = false;
         bountyChoiceAt = 0;
         gameState.event = null;
@@ -525,11 +547,12 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         handlePauseToggle();
         handleSettingsToggle();
         handleAudioToggles();
-        // B / C only answer the bounty choice; ignore presses made before it opens.
+        // B / C only answer the bounty choice; ignore presses made before it opens. The same for a mode's question.
         if(!gameState.isChoosingBounty) {
             keys.bankRequested = false;
             keys.rideOnRequested = false;
         }
+        if(!gameState.isConfirming) keys.confirmYes = keys.confirmNo = false;
 
         // Frontier Town open: draw the town instead of the desert (src/townPanel.js).
         if(!gameState.isGameStarted && lobbyView?.isActive()) {
@@ -591,6 +614,14 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             return;
         }
 
+        if(gameState.isConfirming) { // a mode is asking (the mine at the shaft or the lift): the world waits for the answer
+            if(keys.confirmYes) answerQuestion(true);
+            else if(keys.confirmNo) answerQuestion(false);
+            renderer.render(scene, camera);
+            emitDebug(realDt);
+            return;
+        }
+
         if(gameState.isPaused || gameState.isSettingsOpen) {
             renderer.render(scene, camera);
             ui.updateHUD();
@@ -623,11 +654,11 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         if(updateLoots(dt, scene, playerSystem.playerGroup)) ui.updateHUD();
         // Sub-step bullets on slow frames so fast shots cannot skip past a target between frames.
         const bulletSteps = Math.max(1, Math.ceil(dt / 0.02));
-        for(let step = 0; step < bulletSteps && !gameState.isGameOver && !gameState.isChoosingBounty; step++) {
+        for(let step = 0; step < bulletSteps && !gameState.isGameOver && !gameState.isChoosingBounty && !gameState.isConfirming; step++) {
             updateBullets(dt / bulletSteps, scene, playerSystem.playerGroup, callbacks);
         }
         // A bullet can end the run or open the bounty choice; freeze the rest of this frame if so.
-        const stillFighting = () => !gameState.isGameOver && !gameState.isChoosingBounty;
+        const stillFighting = () => !gameState.isGameOver && !gameState.isChoosingBounty && !gameState.isConfirming;
         if(stillFighting()) updateEnemies(dt, scene, playerSystem.playerGroup, callbacks);
         if(stillFighting()) updateHazards(dt, scene, playerSystem.playerGroup, callbacks);
         if(stillFighting()) playerSystem.update(dt, timeInSeconds);
@@ -661,6 +692,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         closeSettings,
         bankAndLeave,
         rideOnToBonus,
+        answerQuestion,
         setLobbyView: view => { lobbyView = view; }
     };
 }

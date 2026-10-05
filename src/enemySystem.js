@@ -82,7 +82,7 @@ const SHOT_PROFILE = {
     trooper: { cooldown: 3.0, projectileSpeed: 60, aimSpread: 0 }
 };
 
-export function spawnEnemy(scene, playerPos, requestedType = null) {
+export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
     let enemy, speed, type, hp;
     const randomScale = 0.85 + Math.random() * 0.3;
     const wave = gameState.waveNumber;
@@ -134,7 +134,9 @@ export function spawnEnemy(scene, playerPos, requestedType = null) {
     // Find a valid position (not inside an obstacle). In the mine they come out of the tunnel mouths instead (src/mineMap.js).
     let ex, ez, attempts = 0;
     const cave = activeFloor();
-    if(cave) {
+    if(at) {
+        ({ x: ex, z: ez } = at); // the mine puts each monster in its own chamber (src/mineMonsters.js, planNode)
+    } else if(cave) {
         ({ x: ex, z: ez } = spawnPoint(cave, playerPos));
     } else {
         do {

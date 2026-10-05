@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MINE_MONSTERS, MINE_LADDER, BASE_ROSTER, monsterDef, isMineMonster, monsterCost, newOn, mineRoster, mineWave, mineHpBonus } from '../src/mineMonsters.js';
+import { MINE_MONSTERS, MINE_LADDER, BASE_ROSTER, monsterDef, isMineMonster, monsterCost, newOn, mineRoster, mineWave, mineHpBonus, nodeBudget, planNode, WAKE_DISTANCE, LEAVE_DISTANCE } from '../src/mineMonsters.js';
+import { floorLayout, isOpen } from '../src/mineMap.js';
 import { ENEMY_TYPES } from '../src/enemyTypes.js';
 
 // The behaviours src/enemySystem.js knows how to run.
@@ -45,14 +46,12 @@ test('every monster has what the director and the spawner need', () => {
     assert.equal(monsterDef('nope'), null);
 });
 
-test('the pursuit grows with depth: more danger, kept topped up faster, and the newest monster comes most', () => {
-    let lastCap = 0, lastInterval = Infinity;
+test('the floors grow more dangerous with depth, and the newest monster comes most', () => {
+    let lastCap = 0;
     for(let floor = 1; floor <= 30; floor++) {
         const wave = mineWave(floor);
         assert.ok(wave.threatCap >= lastCap && wave.threatCap <= 110, `floor ${floor}: threat grows and stops at 110`);
-        assert.ok(wave.interval <= lastInterval && wave.interval >= 0.55, `floor ${floor}: topped up faster, never faster than 0.55 s`);
         lastCap = wave.threatCap;
-        lastInterval = wave.interval;
         assert.deepEqual(Object.keys(wave.weights).sort(), mineRoster(floor).sort(), `floor ${floor}: a weight for everyone who can appear`);
         for(const id of mineRoster(floor)) assert.ok(wave.weights[id] > 0 && wave.caps[id] >= 1, `floor ${floor}: ${id} can spawn`);
         // The cheapest of them always fits in the room the cave keeps.
@@ -70,4 +69,53 @@ test('deep down, anything that takes more than one hit takes more', () => {
     assert.deepEqual([9, 12].map(mineHpBonus), [1, 1]);
     assert.equal(mineHpBonus(13), 2);
     assert.ok(mineHpBonus(100) > mineHpBonus(20));
+});
+
+function seeded(seed) { let a = seed; return () => { a = (a * 16807) % 2147483647; return a / 2147483647; }; }
+
+test('each chamber holds a fixed amount of danger: more when bigger, more when guarded, little by the lift', () => {
+    for(const floor of [1, 3, 6]) {
+        const layout = floorLayout(floor);
+        const budgets = layout.nodes.map((n, i) => nodeBudget(layout, i, floor));
+        assert.ok(budgets.every(b => b > 0 && b < 400), `floor ${floor}: sane budgets`);
+        const landing = budgets[0] / (layout.nodes[0].r / 30) ** 2;
+        const normal = budgets[layout.nodes.findIndex((n, i) => i > 0 && n.kind === 'chamber')] / (layout.nodes.find((n, i) => i > 0 && n.kind === 'chamber').r / 30) ** 2;
+        assert.ok(landing < normal * 0.5, `floor ${floor}: the chamber you land in is quiet`);
+        const alcove = layout.nodes.findIndex(n => n.kind === 'alcove'), room = layout.nodes.findIndex(n => n.kind === 'room');
+        if(alcove >= 0 && room >= 0) assert.ok(budgets[room] / layout.nodes[room].r ** 2 > budgets[alcove] / layout.nodes[alcove].r ** 2, `floor ${floor}: a treasure room is guarded harder than an alcove`);
+    }
+    assert.ok(nodeBudget(floorLayout(8), 2, 8) > nodeBudget(floorLayout(1), 2, 1), 'deeper chambers hold more');
+});
+
+test('a chamber\'s monsters are of the floor\'s kinds, spend about its budget, and stand in its open ground', () => {
+    for(const floor of [1, 2, 5, 9]) {
+        const layout = floorLayout(floor);
+        const roster = new Set(mineRoster(floor));
+        const wave = mineWave(floor);
+        for(let i = 0; i < layout.nodes.length; i++) {
+            const plan = planNode(layout, i, floor, seeded(1000 + i));
+            const spent = plan.reduce((sum, m) => sum + monsterCost(m.type), 0);
+            assert.ok(spent <= nodeBudget(layout, i, floor) + 1e-9, `floor ${floor} node ${i}: within its budget`);
+            assert.ok(plan.length <= 60);
+            const counts = {};
+            for(const m of plan) {
+                assert.ok(roster.has(m.type), `${m.type} is one of floor ${floor}'s kinds`);
+                counts[m.type] = (counts[m.type] || 0) + 1;
+                assert.ok(isOpen(layout, m.x, m.z, 2), `floor ${floor} node ${i}: in open ground`);
+                assert.ok(Math.hypot(m.x, m.z) >= 15, `floor ${floor} node ${i}: never on the lift's doorstep (placed 20 off, scattered by up to 4)`);
+            }
+            for(const [id, n] of Object.entries(counts)) assert.ok(n <= wave.caps[id], `floor ${floor} node ${i}: no more ${id} than the cap`);
+        }
+        const main = planNode(layout, 1, floor, seeded(5));
+        assert.ok(main.length >= 5, `floor ${floor}: a chamber is a real fight (${main.length})`);
+        assert.deepEqual(planNode(layout, 1, floor, seeded(5)), main, 'the same dice make the same chamber');
+        assert.notDeepEqual(planNode(layout, 1, floor, seeded(6)), main, 'other dice make another');
+    }
+    assert.ok(planNode(floorLayout(2), 0, 2, seeded(3)).length < planNode(floorLayout(2), 1, 2, seeded(3)).length, 'the landing has fewer than the next chamber');
+    assert.deepEqual(planNode({ nodes: [{ r: 30, kind: 'chamber' }], spawns: [] }, 0, 1), [], 'a chamber with no mouths holds nobody');
+});
+
+test('they come when the marshal is near, and go back to sleep only when he is far', () => {
+    assert.ok(WAKE_DISTANCE > 20 && WAKE_DISTANCE < LEAVE_DISTANCE, 'a chamber fills well before he is in it and empties only once he is much farther');
+    assert.ok(LEAVE_DISTANCE - WAKE_DISTANCE >= 40, 'room to stand at the edge without it flickering');
 });
