@@ -478,9 +478,12 @@ try {
             } catch(error) {
                 const shown = await page.evaluate(() => {
                     const el = document.querySelector('.walk-prompt');
-                    return { prompt: el ? `${getComputedStyle(el).display}|${el.textContent}` : 'no prompt element', place: window.__redWestTown.place, sheet: getComputedStyle(document.getElementById('town-sheet')).display, hidden: document.hidden };
+                    let saved = null;
+                    try { saved = JSON.parse(localStorage.getItem('redWestProfile.v1')).town.farm.plots; } catch { /* unreadable */ }
+                    // What the page is showing, and what was actually saved: if the corn is saved, the screen is stale; if not, the planting was lost.
+                    return { prompt: el ? `${getComputedStyle(el).display}|${el.textContent}` : 'no prompt element', place: window.__redWestTown.place, sheet: getComputedStyle(document.getElementById('town-sheet')).display, hidden: document.hidden, savedPlots: saved };
                 });
-                throw new Error(`No prompt matching ${text} at ${door} after planting: ${JSON.stringify(shown)} (${error.message.split('\n')[0]})`);
+                throw new Error(`No prompt matching ${text} at ${door} after planting: ${JSON.stringify(shown)}, page errors: ${JSON.stringify(errors)} (${error.message.split('\n')[0]})`);
             }
         };
         const toast = pattern => page.waitForFunction(p => new RegExp(p).test(document.getElementById('town-toast').textContent), pattern);
