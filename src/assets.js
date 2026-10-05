@@ -498,6 +498,58 @@ export function createGhostMesh() {
     return group;
 }
 
+// ---------- Monsters of the Hollow Claim (src/mineMonsters.js) ----------
+// A cave bat: a small furred body with two wings, which flap (animation.js).
+export function createBatMesh() {
+    const group = new THREE.Group();
+    const fur = colorMat(0x3a2f45), wing = colorMat(0x2a2236), eye = colorMat(0xff5252);
+    group.add(box(0.9, 0.8, 1.3, fur, 0, 1.5, 0), box(0.7, 0.6, 0.6, fur, 0, 1.6, 0.85));
+    group.add(box(0.18, 0.4, 0.18, fur, -0.25, 2.0, 0.85), box(0.18, 0.4, 0.18, fur, 0.25, 2.0, 0.85));
+    group.add(box(0.14, 0.14, 0.14, eye, -0.2, 1.7, 1.17), box(0.14, 0.14, 0.14, eye, 0.2, 1.7, 1.17));
+    for(const side of [-1, 1]) {
+        const w = box(2.2, 0.14, 1.3, wing, side * 1.5, 1.65, -0.1);
+        w.name = side < 0 ? 'wingL' : 'wingR';
+        group.add(w);
+    }
+    group.userData = { type: 'bat' };
+    bakeEnemy(group, ['wingL', 'wingR']);
+    return group;
+}
+
+// A crawler: a low pale shell on six legs, four of which move (the same names as a wolf's, so they scuttle).
+export function createCrawlerMesh() {
+    const group = new THREE.Group();
+    const shell = colorMat(0x4a4553), belly = colorMat(0x6b5f78), glow = colorMat(0x9cff57);
+    group.add(box(1.7, 0.8, 2.2, shell, 0, 0.8, -0.1), box(1.0, 0.65, 0.9, belly, 0, 0.75, 1.3), box(1.2, 0.6, 1.0, belly, 0, 0.8, -1.6));
+    for(const x of [-0.25, 0.25]) group.add(box(0.16, 0.16, 0.16, glow, x, 0.95, 1.78), box(0.12, 0.12, 0.12, glow, x * 1.7, 0.85, 1.7));
+    group.add(box(0.4, 0.14, 0.4, glow, 0, 1.25, -1.4)); // a glowing spot on the back
+    for(const x of [-1, 1]) group.add(box(0.25, 0.7, 0.25, shell, x * 1.0, 0.4, -0.2)); // the middle pair, which do not move
+    for(const [name, x, z] of [['fl', -1.0, 0.7], ['fr', 1.0, 0.7], ['bl', -1.0, -1.0], ['br', 1.0, -1.0]]) {
+        const leg = box(0.25, 0.75, 0.25, shell, x, 0.4, z);
+        leg.name = name;
+        group.add(leg);
+    }
+    group.userData = { type: 'crawler', quadruped: true };
+    bakeEnemy(group, QUADRUPED_BONES);
+    return group;
+}
+
+// Stonekin: a heavy grey man-shaped slab with a hood of rock, bigger than a brute.
+export function createStonekinMesh() {
+    const group = createHumanoid({ type: 'stonekin', coat: 0x6b645b, vest: 0x8c8478, hat: 0x4a453e, pants: 0x5a544b, skinMat: colorMat(0x8c8478), hatStyle: 'hood', weapon: null, bulk: 1.55 });
+    return bakeHumanoid(group);
+}
+
+// A lantern wraith: a ghost in a miner's colours that fades and reappears like the Wanted Road's own ghosts.
+export function createWraithMesh() {
+    const plain = hex => new THREE.MeshToonMaterial({ color: hex, emissive: new THREE.Color(hex).multiplyScalar(0.3) });
+    const group = createHumanoid({ type: 'wraith', coat: 0x5fb7a8, hat: 0x3a8f84, pants: 0x4aa396, bandana: 0xffc860, materials: plain, skinMat: plain(0xcff7ee), weapon: null, hatStyle: 'hood' });
+    const fade = new THREE.MeshToonMaterial({ vertexColors: true, gradientMap: TOON_GRADIENT, transparent: true, opacity: 1 });
+    bakeHumanoid(group, fade);
+    group.userData.fadeMaterials = [fade];
+    return group;
+}
+
 export function createRiderMesh() {
     const group = new THREE.Group();
     const horse = colorMat(0x6d4c41);

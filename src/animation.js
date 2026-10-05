@@ -3,6 +3,15 @@ import * as THREE from 'three';
 export function animateCharacter(mesh, time, isMoving) {
     const type = mesh.userData.type || 'bandit';
     
+    // BAT: the wings flap, and it bobs in the air
+    if(type === 'bat') {
+        const flap = Math.sin(time * 24 + (mesh.userData.phase ?? 0)) * 0.8;
+        const left = mesh.getObjectByName('wingL'), right = mesh.getObjectByName('wingR');
+        if(left) left.rotation.z = flap;
+        if(right) right.rotation.z = -flap;
+        return;
+    }
+
     // FOUR-LEGGED ANIMATION (wolves, horses)
     if(type === 'wolf' || mesh.userData.quadruped) {
         const fl = mesh.getObjectByName('fl'); const fr = mesh.getObjectByName('fr');

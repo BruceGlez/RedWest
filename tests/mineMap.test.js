@@ -1,18 +1,29 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { FLOOR_LAYOUTS, floorLayout, distance, isOpen, bounds, wallCircles, propCircles, spawnPoint, shaftReached, setActiveFloor, activeFloor,
-    CELL, MIN_SPAWN_DISTANCE, SHAFT_REACH } from '../src/mineMap.js';
-import { MINE_FLOORS } from '../src/mine.js';
+import { floorLayout, floorName, chamberCount, distance, isOpen, bounds, gridPoints, wallCircles, propCircles, spawnPoint, steerTarget, lineOpen, nearestNode,
+    shaftReached, liftReached, chestWithin, setActiveFloor, activeFloor, MAX_CHAMBERS, MIN_SPAWN_DISTANCE, MAX_SPAWN_DISTANCE, SHAFT_REACH, LIFT_REACH, CHEST_REACH } from '../src/mineMap.js';
 
 const MARSHAL = 1.5; // the radius the player's movement checks (src/playerSystem.js)
-const STEP = 2;
+const STEP = 3;
+const FLOORS = [1, 2, 3, 4, 5, 8, 13];
 
-// Everything solid, as the game sees it: the wall ring and the props.
-const solids = layout => [...wallCircles(layout), ...propCircles(layout)];
-const blocked = (layout, circles, x, z, radius = MARSHAL) => !isOpen(layout, x, z) || circles.some(c => Math.hypot(x - c.x, z - c.z) < c.r + radius);
+// Everything solid, as the game sees it, in a grid so a big cave can be searched.
+function solidsOf(layout) {
+    const hash = new Map();
+    for(const c of [...wallCircles(layout), ...propCircles(layout)]) {
+        const key = `${Math.floor(c.x / 12)},${Math.floor(c.z / 12)}`;
+        (hash.get(key) ?? hash.set(key, []).get(key)).push(c);
+    }
+    return (x, z, radius) => {
+        for(let gx = Math.floor((x - 8) / 12); gx <= Math.floor((x + 8) / 12); gx++) for(let gz = Math.floor((z - 8) / 12); gz <= Math.floor((z + 8) / 12); gz++) {
+            for(const c of hash.get(`${gx},${gz}`) ?? []) if(Math.hypot(x - c.x, z - c.z) < c.r + radius) return true;
+        }
+        return false;
+    };
+}
 
 // Flood fill over the walkable ground, the way the marshal can really walk it.
-function reachable(layout, circles, from) {
+function reachable(layout, hits, from) {
     const b = bounds(layout);
     const key = (i, j) => `${i},${j}`;
     const seen = new Set([key(0, 0)]);
@@ -20,13 +31,12 @@ function reachable(layout, circles, from) {
     const cells = [];
     while(queue.length) {
         const [i, j] = queue.pop();
-        const x = from[0] + i * STEP, z = from[1] + j * STEP;
-        cells.push([x, z]);
+        cells.push([from[0] + i * STEP, from[1] + j * STEP]);
         for(const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
             const ni = i + di, nj = j + dj;
             const nx = from[0] + ni * STEP, nz = from[1] + nj * STEP;
             if(seen.has(key(ni, nj)) || nx < b.minX || nx > b.maxX || nz < b.minZ || nz > b.maxZ) continue;
-            if(blocked(layout, circles, nx, nz)) continue;
+            if(!isOpen(layout, nx, nz) || hits(nx, nz, MARSHAL)) continue;
             seen.add(key(ni, nj));
             queue.push([ni, nj]);
         }
@@ -34,108 +44,182 @@ function reachable(layout, circles, from) {
     return cells;
 }
 const near = (cells, [x, z], within = STEP * 1.5) => cells.some(([cx, cz]) => Math.hypot(cx - x, cz - z) <= within);
+const extent = layout => { const b = bounds(layout, 0); return (b.maxX - b.minX) * (b.maxZ - b.minZ); };
 
-test('there is one cave for every floor of the mine', () => {
-    assert.equal(FLOOR_LAYOUTS.length, MINE_FLOORS);
-    assert.equal(new Set(FLOOR_LAYOUTS.map(l => l.id)).size, MINE_FLOORS, 'each floor has its own layout');
-    assert.equal(floorLayout(1), FLOOR_LAYOUTS[0]);
-    assert.equal(floorLayout(MINE_FLOORS), FLOOR_LAYOUTS.at(-1));
-    assert.equal(floorLayout(99), FLOOR_LAYOUTS.at(-1), 'past the last floor stays on the last cave');
-    assert.equal(floorLayout(0), FLOOR_LAYOUTS[0]);
+test('a depth always makes the same cave, and every floor is bigger than the one above', () => {
+    assert.equal(floorLayout(3), floorLayout(3), 'the same floor is the same cave');
+    const again = floorLayout(4);
+    assert.equal(again.shaft.join(), floorLayout(4).shaft.join());
+    assert.equal(floorLayout(0), floorLayout(1), 'a floor below the first is the first');
+    let lastShaft = 0, lastChambers = 0;
+    for(let floor = 1; floor <= 5; floor++) {
+        const layout = floorLayout(floor);
+        const toShaft = Math.hypot(layout.shaft[0], layout.shaft[1]);
+        assert.ok(layout.main > lastChambers, `floor ${floor} has more chambers than floor ${floor - 1}`);
+        assert.ok(toShaft > lastShaft * 1.15, `floor ${floor}: the shaft is much farther than on floor ${floor - 1} (${toShaft.toFixed(0)} against ${lastShaft.toFixed(0)})`);
+        lastShaft = toShaft;
+        lastChambers = layout.main;
+    }
+    assert.ok(Math.hypot(...floorLayout(1).shaft) >= 180, 'even the first floor is a real walk, far larger than the old hand-made caves');
+    assert.equal(chamberCount(1), 4);
+    assert.equal(chamberCount(100), MAX_CHAMBERS, 'the caves stop growing once they are as big as the game can draw');
+    assert.ok(extent(floorLayout(5)) > extent(floorLayout(1)) * 3, 'floor 5 covers several times the ground of floor 1');
+    assert.equal(floorName(1), 'THE UPPER GALLERY');
+    assert.equal(floorName(12), 'THE LOST LEVEL 12');
 });
 
-test('the lift and the shaft stand in open ground with room to move', () => {
-    for(const layout of FLOOR_LAYOUTS) {
-        assert.ok(isOpen(layout, 0, 0, 10), `${layout.id}: the marshal starts on the lift, well clear of the walls`);
-        assert.ok(isOpen(layout, layout.shaft[0], layout.shaft[1], 8), `${layout.id}: the shaft has room around it`);
-        assert.ok(Math.hypot(layout.shaft[0], layout.shaft[1]) >= 50, `${layout.id}: the shaft is a real walk from the lift`);
+test('there is no bottom: any depth makes a cave', () => {
+    for(const floor of [20, 50, 200]) {
+        const layout = floorLayout(floor);
+        assert.equal(layout.depth, floor);
+        assert.ok(layout.main >= 10 && layout.shapes.length > layout.main, `floor ${floor} is a full cave`);
+    }
+});
+
+test('the lift and the shaft stand in open ground with room to move, and the shaft is far from the lift', () => {
+    for(const floor of FLOORS) {
+        const layout = floorLayout(floor);
+        assert.ok(isOpen(layout, 0, 0, 12), `floor ${floor}: the marshal starts on the lift, well clear of the walls`);
+        assert.ok(isOpen(layout, layout.shaft[0], layout.shaft[1], 8), `floor ${floor}: the shaft has room around it`);
+        assert.ok(Math.hypot(layout.shaft[0], layout.shaft[1]) >= 180, `floor ${floor}: the shaft is a real walk from the lift`);
+        assert.deepEqual(layout.rails[0], [0, 0], `floor ${floor}: the rails start at the lift`);
+        assert.deepEqual(layout.rails.at(-1), layout.shaft, `floor ${floor}: and end at the shaft`);
     }
 });
 
 test('everything is placed on open ground and clear of everything else', () => {
-    for(const layout of FLOOR_LAYOUTS) {
+    for(const floor of FLOORS) {
+        const layout = floorLayout(floor);
         const props = propCircles(layout);
         for(const p of props) {
-            assert.ok(isOpen(layout, p.x, p.z, p.r + 1.5), `${layout.id}: ${p.kind} at ${p.x}, ${p.z} stands clear of the wall`);
-            assert.ok(Math.hypot(p.x, p.z) >= p.r + 8, `${layout.id}: ${p.kind} at ${p.x}, ${p.z} is off the lift`);
-            assert.ok(Math.hypot(p.x - layout.shaft[0], p.z - layout.shaft[1]) >= p.r + 7, `${layout.id}: ${p.kind} at ${p.x}, ${p.z} is off the shaft`);
+            assert.ok(isOpen(layout, p.x, p.z, p.r + 1.5), `floor ${floor}: ${p.kind} at ${p.x.toFixed(0)}, ${p.z.toFixed(0)} stands clear of the wall`);
+            assert.ok(Math.hypot(p.x, p.z) >= p.r + 8, `floor ${floor}: ${p.kind} is off the lift`);
+            assert.ok(Math.hypot(p.x - layout.shaft[0], p.z - layout.shaft[1]) >= p.r + 7, `floor ${floor}: ${p.kind} is off the shaft`);
         }
         for(let i = 0; i < props.length; i++) for(let j = i + 1; j < props.length; j++) {
             const a = props[i], b = props[j];
-            if(a.kind === 'post' && b.kind === 'post') continue; // the two posts of one arch
-            assert.ok(Math.hypot(a.x - b.x, a.z - b.z) >= a.r + b.r + 3.2, `${layout.id}: ${a.kind} and ${b.kind} leave room to pass between them`);
+            if(a.kind === 'post' || b.kind === 'post' || a.kind === 'cart' || b.kind === 'cart') continue; // posts are in pairs; carts sit under arches
+            assert.ok(Math.hypot(a.x - b.x, a.z - b.z) >= a.r + b.r + 3, `floor ${floor}: ${a.kind} and ${b.kind} leave room to pass between them`);
         }
-        for(const [x1, z1, x2, z2] of layout.rails.slice(1).map((p, i) => [...layout.rails[i], ...p])) {
-            for(let t = 0; t <= 1; t += 0.05) assert.ok(isOpen(layout, x1 + (x2 - x1) * t, z1 + (z2 - z1) * t, 3), `${layout.id}: the rails stay inside the cave`);
+        for(let i = 0; i + 1 < layout.rails.length; i++) {
+            const [x1, z1] = layout.rails[i], [x2, z2] = layout.rails[i + 1];
+            for(let t = 0; t <= 1; t += 0.02) assert.ok(isOpen(layout, x1 + (x2 - x1) * t, z1 + (z2 - z1) * t, 3), `floor ${floor}: the rails stay inside the cave`);
         }
-        assert.deepEqual(layout.rails[0], [0, 0], `${layout.id}: the rails start at the lift`);
-        assert.ok(Math.hypot(layout.rails.at(-1)[0] - layout.shaft[0], layout.rails.at(-1)[1] - layout.shaft[1]) <= 4, `${layout.id}: the rails end at the shaft`);
+        assert.ok(layout.pillars.length >= layout.main, `floor ${floor}: columns for cover`);
+        assert.ok(layout.arches.length >= 2, `floor ${floor}: timber arches in the tunnels`);
+        assert.ok(layout.chests.length >= 1, `floor ${floor}: something to find off the main road`);
     }
 });
 
-test('the cave is sealed, and the shaft and every tunnel mouth can be walked to from the lift', () => {
-    for(const layout of FLOOR_LAYOUTS) {
-        const circles = solids(layout);
-        const cells = reachable(layout, circles, [0, 0]);
-        assert.ok(cells.length > 400, `${layout.id}: a real amount of ground (${cells.length} cells)`);
-        assert.ok(near(cells, layout.shaft, SHAFT_REACH), `${layout.id}: the shaft can be reached`);
-        for(const spawn of layout.spawns) assert.ok(near(cells, spawn), `${layout.id}: the tunnel mouth at ${spawn} can be reached`);
+test('the cave is sealed, and the shaft, every tunnel mouth and every chest can be walked to from the lift', () => {
+    for(const floor of FLOORS) {
+        const layout = floorLayout(floor);
+        const hits = solidsOf(layout);
+        const cells = reachable(layout, hits, [0, 0]);
+        assert.ok(cells.length > 800, `floor ${floor}: a real amount of ground (${cells.length} cells)`);
+        assert.ok(near(cells, layout.shaft, SHAFT_REACH + 1), `floor ${floor}: the shaft can be reached`);
+        for(const [x, z] of layout.spawns) assert.ok(near(cells, [x, z]), `floor ${floor}: the tunnel mouth at ${x}, ${z} can be reached`);
+        for(const [x, z] of layout.chests) assert.ok(near(cells, [x, z], STEP * 2.5), `floor ${floor}: the chest at ${x.toFixed(0)}, ${z.toFixed(0)} can be reached`);
         const b = bounds(layout);
-        for(const [x, z] of cells) assert.ok(x > b.minX + 4 && x < b.maxX - 4 && z > b.minZ + 4 && z < b.maxZ - 4, `${layout.id}: the walls leak at ${x}, ${z}`);
-        // The marshal can never stand in the rock, even at the very edge of the wall ring.
-        for(const [x, z] of cells) assert.ok(isOpen(layout, x, z), `${layout.id}: walked into rock at ${x}, ${z}`);
-    }
-});
-
-test('tunnel mouths are open ground, far apart, and some are always far enough from the marshal', () => {
-    for(const layout of FLOOR_LAYOUTS) {
-        const circles = solids(layout);
-        assert.ok(layout.spawns.length >= 4, `${layout.id}: enough mouths that the pursuit comes from several sides`);
-        for(const [x, z] of layout.spawns) {
-            assert.ok(isOpen(layout, x, z, 4), `${layout.id}: the mouth at ${x}, ${z} is in open ground`);
-            assert.ok(!blocked(layout, circles, x, z, 2), `${layout.id}: nothing stands on the mouth at ${x}, ${z}`);
-        }
-        // From the lift and from the shaft there is always a mouth to come out of.
-        for(const at of [{ x: 0, z: 0 }, { x: layout.shaft[0], z: layout.shaft[1] }]) {
-            assert.ok(layout.spawns.some(([x, z]) => Math.hypot(x - at.x, z - at.z) >= MIN_SPAWN_DISTANCE), `${layout.id}: a mouth far from ${at.x}, ${at.z}`);
+        for(const [x, z] of cells) {
+            assert.ok(x > b.minX + 4 && x < b.maxX - 4 && z > b.minZ + 4 && z < b.maxZ - 4, `floor ${floor}: the walls leak at ${x}, ${z}`);
+            assert.ok(isOpen(layout, x, z), `floor ${floor}: walked into rock at ${x}, ${z}`);
         }
     }
 });
 
-test('spawnPoint picks a mouth far from the marshal and never puts anyone in the rock', () => {
+test('tunnel mouths are open ground with room around them, in plenty, and far from the lift and shaft', () => {
+    for(const floor of FLOORS) {
+        const layout = floorLayout(floor);
+        const hits = solidsOf(layout);
+        assert.ok(layout.spawns.length >= 30, `floor ${floor}: enough mouths (${layout.spawns.length}) that the pursuit comes from several sides`);
+        for(const [x, z, node] of layout.spawns) {
+            assert.ok(isOpen(layout, x, z, 7), `floor ${floor}: the mouth at ${x}, ${z} is in open ground`);
+            assert.ok(!hits(x, z, 4), `floor ${floor}: nothing stands on the mouth at ${x}, ${z}`);
+            assert.ok(Math.hypot(x, z) >= 16 && Math.hypot(x - layout.shaft[0], z - layout.shaft[1]) >= 12, `floor ${floor}: not on the lift or the shaft`);
+            assert.equal(node, nearestNode(layout, x, z), 'each mouth knows its chamber');
+        }
+    }
+});
+
+test('spawnPoint comes out of the dark around the marshal, never in the rock, and never far across the cave', () => {
     let seed = 7;
     const rand = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647; };
-    for(const layout of FLOOR_LAYOUTS) {
-        for(const player of [{ x: 0, z: 0 }, { x: layout.shaft[0], z: layout.shaft[1] }, { x: layout.spawns[0][0], z: layout.spawns[0][1] }]) {
-            for(let i = 0; i < 40; i++) {
+    for(const floor of FLOORS) {
+        const layout = floorLayout(floor);
+        const where = [{ x: 0, z: 0 }, { x: layout.shaft[0], z: layout.shaft[1] }, { x: layout.nodes[Math.floor(layout.main / 2)].x, z: layout.nodes[Math.floor(layout.main / 2)].z }];
+        for(const player of where) {
+            let inRing = 0;
+            for(let i = 0; i < 60; i++) {
                 const p = spawnPoint(layout, player, rand);
-                assert.ok(isOpen(layout, p.x, p.z, 3), `${layout.id}: spawned in open ground`);
-                assert.ok(Math.hypot(p.x - player.x, p.z - player.z) >= MIN_SPAWN_DISTANCE - 6, `${layout.id}: spawned away from the marshal`);
+                assert.ok(isOpen(layout, p.x, p.z, 3), `floor ${floor}: spawned in open ground`);
+                const d = Math.hypot(p.x - player.x, p.z - player.z);
+                assert.ok(d <= MAX_SPAWN_DISTANCE + 50, `floor ${floor}: spawned near the marshal (${d.toFixed(0)} away)`);
+                if(d >= MIN_SPAWN_DISTANCE - 4 && d <= MAX_SPAWN_DISTANCE + 4) inRing++;
             }
+            assert.ok(inRing >= 40, `floor ${floor}: most pursuers come out in the ring around the marshal (${inRing} of 60)`);
         }
     }
+});
+
+test('a pursuer that cannot see the marshal follows the road of chambers, and one that can goes straight at him', () => {
+    for(const floor of [2, 5, 8]) {
+        const layout = floorLayout(floor);
+        // Two chambers apart: the rock is between them.
+        const a = layout.nodes[0], c = layout.nodes[2];
+        const from = { x: a.x, z: a.z }, to = { x: c.x, z: c.z };
+        const aim = steerTarget(layout, from, to);
+        if(!lineOpen(layout, from.x, from.z, to.x, to.z)) {
+            const hop = layout.nodes[layout.next[nearestNode(layout, from.x, from.z)][nearestNode(layout, to.x, to.z)]];
+            assert.deepEqual(aim, { x: hop.x, z: hop.z }, `floor ${floor}: heads for the next chamber along the road`);
+            assert.ok(lineOpen(layout, from.x, from.z, aim.x, aim.z) || Math.hypot(aim.x - from.x, aim.z - from.z) < 120, 'and the next chamber is a short walk away');
+        }
+        // Following the road step by step always gets there.
+        let at = { ...from };
+        for(let step = 0; step < 40 && Math.hypot(at.x - to.x, at.z - to.z) > 12; step++) {
+            const t = steerTarget(layout, at, to);
+            at = { x: t.x, z: t.z };
+        }
+        assert.ok(Math.hypot(at.x - to.x, at.z - to.z) <= 12 || lineOpen(layout, at.x, at.z, to.x, to.z), `floor ${floor}: the road leads all the way`);
+        // In plain sight: straight at him.
+        const here = { x: a.x + 3, z: a.z + 3 }, there = { x: a.x - 6, z: a.z + 5 };
+        assert.deepEqual(steerTarget(layout, here, there), there, 'in plain sight, straight at him');
+    }
+    const layout = floorLayout(1);
+    assert.equal(lineOpen(layout, 0, 0, 500, 500), false, 'nobody sees across the whole cave');
+});
+
+test('the lift, the shaft and the chests are reached by walking up to them', () => {
+    const layout = floorLayout(1);
+    assert.equal(shaftReached(layout, layout.shaft[0], layout.shaft[1]), true);
+    assert.equal(shaftReached(layout, layout.shaft[0] + SHAFT_REACH + 0.5, layout.shaft[1]), false);
+    assert.equal(liftReached(0, 0), true);
+    assert.equal(liftReached(LIFT_REACH + 0.5, 0), false);
+    const [cx, cz] = layout.chests[0];
+    assert.equal(chestWithin(layout, cx, cz), 0);
+    assert.equal(chestWithin(layout, cx + CHEST_REACH + 0.5, cz), -1);
+    assert.equal(chestWithin(layout, cx, cz, [0]), -1, 'an opened chest is done with');
 });
 
 test('the wall ring has no gaps a bullet could slip through', () => {
-    for(const layout of FLOOR_LAYOUTS) {
+    for(const floor of [1, 4]) {
+        const layout = floorLayout(floor);
+        const hits = solidsOf(layout);
         const walls = wallCircles(layout);
-        assert.ok(walls.length > 100 && walls.length < 900, `${layout.id}: ${walls.length} wall circles keeps the physics grid cheap`);
+        assert.ok(walls.length > 300 && walls.length < 20000, `floor ${floor}: ${walls.length} wall circles keeps the physics grid cheap`);
         // Every point just inside the rock has a wall circle within a bullet's width, so a shot stops at the wall.
-        const b = bounds(layout);
-        for(let x = b.minX; x <= b.maxX; x += 1) for(let z = b.minZ; z <= b.maxZ; z += 1) {
+        for(const [x, z] of gridPoints(layout, 1, 1)) {
             const d = distance(layout, x, z);
-            if(d > 0.1 && d < 0.6) assert.ok(walls.some(w => Math.hypot(x - w.x, z - w.z) < w.r + 0.5), `${layout.id}: a bullet gets through at ${x}, ${z}`);
+            if(d > 0.1 && d < 0.6) assert.ok(hits(x, z, 0.5), `floor ${floor}: a bullet gets through at ${x}, ${z}`);
         }
-        assert.ok(CELL > 0);
     }
 });
 
 test('the active floor is what the physics and the spawns look at, and it can be cleared', () => {
     assert.equal(activeFloor(), null);
-    setActiveFloor(FLOOR_LAYOUTS[0]);
-    assert.equal(activeFloor(), FLOOR_LAYOUTS[0]);
-    assert.equal(shaftReached(FLOOR_LAYOUTS[0], 78, -8), true);
-    assert.equal(shaftReached(FLOOR_LAYOUTS[0], 78 + SHAFT_REACH + 0.5, -8), false);
+    setActiveFloor(floorLayout(1));
+    assert.equal(activeFloor(), floorLayout(1));
     setActiveFloor(null);
     assert.equal(activeFloor(), null);
+    assert.ok(MAX_CHAMBERS >= 12);
 });

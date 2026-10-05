@@ -1,9 +1,9 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
-import { obstacles } from './state.js';
+import { obstacles, gameState } from './state.js';
 import { markObstacleGridDirty } from './physics.js';
 import { toonVertexColorMaterial } from './assets.js';
-import { floorLayout, bounds, distance, wallCircles, propCircles, setActiveFloor } from './mineMap.js';
+import { floorLayout, bounds, distance, gridPoints, wallCircles, propCircles, setActiveFloor } from './mineMap.js';
 
 // Draws one floor of the Hollow Claim (src/mineMap.js has the shape of the cave and every rule). It is all built from simple shapes
 // in code, like the rest of the game, in five draw calls or so: the cave floor, the rock walls, the props (pillars, timber arches,
@@ -48,12 +48,10 @@ function placed(geometry, hex, x, y, z, yaw = 0, shade = 1) {
 // ---------- the cave floor and the rock around it ----------
 
 function buildFloor(layout, rand) {
-    const b = bounds(layout, 6);
     const TILE = 3;
     const positions = [], normals = [], colors = [];
     const color = new THREE.Color();
-    for(let x = b.minX; x < b.maxX; x += TILE) for(let z = b.minZ; z < b.maxZ; z += TILE) {
-        const cx = x + TILE / 2, cz = z + TILE / 2;
+    for(const [cx, cz] of gridPoints(layout, TILE, 4)) {
         const d = distance(layout, cx, cz);
         if(d > 2.5) continue;
         // Darker toward the walls (the light does not reach), a little different from tile to tile.
@@ -76,10 +74,9 @@ function buildFloor(layout, rand) {
 
 // Blocks of rock on a grid, tall and tilted, rising with the distance from the cave. Merged into one mesh.
 function buildRock(layout, rand) {
-    const b = bounds(layout, 12);
     const STEP = 4, REACH = 20;
     const parts = [];
-    for(let x = b.minX; x < b.maxX; x += STEP) for(let z = b.minZ; z < b.maxZ; z += STEP) {
+    for(const [x, z] of gridPoints(layout, STEP, REACH + 3)) {
         const px = x + (rand() - 0.5) * 2.2, pz = z + (rand() - 0.5) * 2.2;
         const d = distance(layout, px, pz);
         if(d < -0.4 || d > REACH) continue;
@@ -210,7 +207,8 @@ function liftParts(glow) {
     return parts;
 }
 
-// The shaft: a pit with a stone curb, boards across it while the floor is not cleared, a beam of light when it is.
+// The shaft down: a pit with a stone curb, a ring of light on the floor and a tall beam of light that shows over the rock from far away.
+// It is always open: the way down is never locked, it is only a walk away.
 function buildShaft(layout, glow) {
     const [sx, sz] = layout.shaft;
     const group = new THREE.Group();
@@ -227,41 +225,46 @@ function buildShaft(layout, glow) {
         curbParts.push(boxAt(0.4, 2.2, 0.4, TIMBER_DARK, px, 1.1, pz));
         glow.push(boxAt(0.4, 0.5, 0.4, LANTERN, sx + px, 2.45, sz + pz));
     }
+    // A ladder down the shaft: two rails and rungs, going into the dark.
+    for(const side of [-1, 1]) curbParts.push(boxAt(0.14, 0.14, 2.6, TIMBER, side * 0.5, 0.9, -1.6));
+    for(let i = 0; i < 5; i++) curbParts.push(boxAt(1.2, 0.1, 0.1, TIMBER, 0, 0.9 - i * 0.02, -2.6 + i * 0.6));
     const curb = new THREE.Mesh(mergeGeometries(curbParts, false), toonVertexColorMaterial());
     curb.castShadow = curb.receiveShadow = true;
 
-    const boards = [];
-    for(let i = 0; i < 7; i++) boards.push(boxAt(7.4, 0.26, 0.95, TIMBER, 0, 0.78, -3 + i * 1.0, 0, 0.85 + (i % 2) * 0.2));
-    boards.push(boxAt(0.5, 0.34, 7.0, IRON, 0, 0.92, 0), boxAt(0.9, 0.5, 0.9, 0x8a6a30, 0, 1.15, 0)); // the strap and the lock
-    const hatch = new THREE.Mesh(mergeGeometries(boards, false), toonVertexColorMaterial());
-    hatch.castShadow = true;
-
-    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 3.1, 18, 16, 1, true),
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.7, 3.1, 46, 16, 1, true),
         new THREE.MeshBasicMaterial({ color: 0xffd28a, transparent: true, opacity: 0.2, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
-    beam.position.y = 9;
+    beam.position.y = 23;
     const ring = new THREE.Mesh(new THREE.RingGeometry(3.4, 5.4, 24).rotateX(-Math.PI / 2),
         new THREE.MeshBasicMaterial({ color: 0xffc260, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
     ring.position.y = 0.12;
 
-    group.add(pit, curb, hatch, beam, ring);
-    const shaft = {
-        x: sx, z: sz, open: false, group, beam, ring, hatch,
-        setOpen(open) {
-            shaft.open = open;
-            hatch.visible = !open;
-            beam.visible = open;
-            ring.visible = open;
-        }
-    };
-    shaft.setOpen(false);
-    return shaft;
+    group.add(pit, curb, beam, ring);
+    return { x: sx, z: sz, group, beam, ring };
+}
+
+// A treasure chest: a box with a lid that lifts when it is opened, brass bands, and a gold glow while it is shut.
+function buildChest(x, z, yaw) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.rotation.y = yaw;
+    const body = new THREE.Mesh(mergeGeometries([boxAt(2.4, 1.2, 1.6, 0x7a4f2a, 0, 0.6, 0), boxAt(2.5, 0.14, 1.7, 0xc8a050, 0, 0.35, 0), boxAt(2.5, 0.14, 1.7, 0xc8a050, 0, 1.0, 0)], false), toonVertexColorMaterial());
+    const lidPivot = new THREE.Group();
+    lidPivot.position.set(0, 1.2, -0.8);
+    const lid = new THREE.Mesh(mergeGeometries([boxAt(2.4, 0.5, 1.6, 0x8a5a30, 0, 0.25, 0.8), boxAt(0.4, 0.5, 0.12, 0xc8a050, 0, 0.12, 1.64)], false), toonVertexColorMaterial());
+    lidPivot.add(lid);
+    const glow = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0xffd060 }));
+    glow.position.set(0, 1.9, 0);
+    for(const m of [body, lid]) m.castShadow = true;
+    group.add(body, lidPivot, glow);
+    return { group, lidPivot, glow, open: false };
 }
 
 // ---------- a whole floor ----------
 
-let current = null; // { floor, layout, group, shaft, markers }
+let current = null; // { floor, layout, group, shaft, chests, markers }
+const DEFAULT_MAP_SIZE = gameState.MAP_SIZE; // how far the marshal may walk in the open arena; a cave sets its own, larger, limit
 
-const kindOfType = { wall: 'wall', pillar: 'spire', post: 'fence', cluster: 'crate', cart: 'crate' }; // for the impact sparks (src/combatMath.js)
+const kindOfType = { wall: 'wall', pillar: 'spire', post: 'fence', cluster: 'crate', cart: 'crate', chest: 'crate' }; // for the impact sparks (src/combatMath.js)
 
 function solidMarkers(layout) {
     const markers = [];
@@ -293,6 +296,11 @@ export function showMineFloor(scene, floor) {
         group.add(mesh);
         return mesh;
     };
+    // The rock mass under everything: a dark plane far larger than the cave, so a big cave never runs off the arena's ground.
+    const reach = bounds(layout, 300);
+    const mass = new THREE.Mesh(new THREE.PlaneGeometry(reach.maxX - reach.minX, reach.maxZ - reach.minZ).rotateX(-Math.PI / 2), new THREE.MeshBasicMaterial({ color: 0x17120e }));
+    mass.position.set((reach.minX + reach.maxX) / 2, -0.1, (reach.minZ + reach.maxZ) / 2);
+    group.add(mass);
     solid(buildFloor(layout, rand));
     solid(buildRock(layout, rand), { cast: true });
     const props = [...pillarParts(layout, rand), ...archParts(layout, glow), ...clusterParts(layout, rand, glow), ...cartParts(layout, rand), ...railParts(layout), ...liftParts(glow)];
@@ -300,6 +308,11 @@ export function showMineFloor(scene, floor) {
 
     const shaft = buildShaft(layout, glow);
     group.add(shaft.group);
+    const chests = layout.chests.map(([x, z], i) => {
+        const chest = buildChest(x, z, (i * 2.1) % 6.28);
+        group.add(chest.group);
+        return chest;
+    });
     // The lantern glow is one unlit mesh, so it stays bright whatever the light does.
     group.add(new THREE.Mesh(mergeGeometries(glow, false), new THREE.MeshBasicMaterial({ vertexColors: true })));
 
@@ -308,7 +321,9 @@ export function showMineFloor(scene, floor) {
     obstacles.push(...markers);
     markObstacleGridDirty();
     setActiveFloor(layout);
-    current = { floor, layout, group, shaft, markers };
+    const b = bounds(layout, 0);
+    gameState.MAP_SIZE = Math.ceil(Math.max(-b.minX, b.maxX, -b.minZ, b.maxZ)) + 40; // the marshal can walk the whole cave
+    current = { floor, layout, group, shaft, chests, markers };
     return current;
 }
 
@@ -320,27 +335,32 @@ export function clearMineFloor(scene) {
         o.geometry.dispose();
         o.material.dispose();
     });
-    for(const marker of current.markers) {
-        const i = obstacles.indexOf(marker);
-        if(i > -1) obstacles.splice(i, 1);
-    }
+    const gone = new Set(current.markers);
+    for(let i = obstacles.length - 1; i >= 0; i--) if(gone.has(obstacles[i])) obstacles.splice(i, 1);
     markObstacleGridDirty();
     setActiveFloor(null);
+    gameState.MAP_SIZE = DEFAULT_MAP_SIZE;
     current = null;
 }
 
 export const mineFloorOnShow = () => current;
 
-// The shaft opens when the floor is cleared (src/gameLoop.js).
-export function setShaftOpen(open) {
-    current?.shaft.setOpen(open);
+// Opens chest `index` (the lid lifts, the glow goes out).
+export function openMineChest(index) {
+    const chest = current?.chests[index];
+    if(!chest || chest.open) return false;
+    chest.open = true;
+    chest.lidPivot.rotation.x = -1.1;
+    chest.glow.visible = false;
+    return true;
 }
 
-// The beam breathes while the shaft is open.
+// The shaft's beam and ring breathe.
 export function updateMineScene(timeInSeconds) {
     const shaft = current?.shaft;
-    if(!shaft?.open) return;
+    if(!shaft) return;
     const pulse = 0.5 + 0.5 * Math.sin(timeInSeconds * 2.4);
     shaft.beam.material.opacity = 0.16 + pulse * 0.1;
     shaft.ring.material.opacity = 0.28 + pulse * 0.22;
+    for(const chest of current.chests) if(!chest.open) chest.glow.rotation.y = timeInSeconds * 1.5;
 }

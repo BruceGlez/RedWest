@@ -10,7 +10,6 @@ import { createTownLook, DAY_SKY } from './townLook.js';
 import { createFarmScene } from './placeFarm.js';
 import { createUndertakerScene } from './placeUndertaker.js';
 import { parlourLabel, grimsbyLine, PARLOUR_START } from './undertakerLayout.js';
-import { MINE_FLOORS } from './mine.js';
 import { CROPS, GOODS, EGG, getCrop, plotStates, eggsReady, minutesToNextEgg, minutesText, farmLevel, farmLevelInfo } from './farm.js';
 import { FARM_START, farmLabel, plotIndex } from './farmLayout.js';
 import { createTownWalk } from './townWalk.js';
@@ -499,7 +498,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         const beaten = getProgress() ? getProgress().stars.filter(mask => (mask & 1) !== 0).length : 0;
         return `<div class="town-card" data-building="grimsby"><div class="town-sign"><span>MR. GRIMSBY</span></div>`
             + `<p class="town-blurb">&ldquo;${grimsbyLine(beaten)}&rdquo;</p>`
-            + `<p class="town-stat">The cellar stairs are behind the coffins: the Hollow Claim, ${MINE_FLOORS} floors down. Nothing is saved down there yet.</p></div>`;
+            + `<p class="town-stat">The cellar stairs are behind the coffins: the Hollow Claim, a mine with no bottom: every floor is bigger than the last, and stranger. The way down is always open and the lift always brings you back. Nothing is saved down there yet.</p></div>`;
     }
     // Walking up to something in the parlour (src/townWalk.js, the parlour's own instance).
     function useParlour(id) {
