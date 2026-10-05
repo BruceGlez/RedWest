@@ -11,7 +11,7 @@ paid-desktop plan (`REFACTOR_PLAN.md`) to **free-to-play with fair monetization*
 **Built:** ten-outlaw Wanted Road with signature bosses and enemies, Heat and bank/ride-on, stars, Bounty Book, Records and
 leaderboards, store (Bounty Dollars, cosmetics, guns, daily jobs, starter pack, season pass), playable outlaws, weekly event,
 Frontier Town (walkable, jail income, bank, arena, ten districts, train, townsfolk, day/night), Calloway Farm (first full
-place), phone controls, haptics, reminders, recorded audio, own look per stage, instanced scenery and baked enemies for draw
+place), phone controls, haptics, reminders, recorded audio, story cards and barks, own look per stage, instanced scenery and baked enemies for draw
 calls, town quality switch, privacy and age handling, account deletion, analytics, refund handling, playable ad build.
 
 **Not live:** real-money sales (server, store products and policy missing), App Store release, rewarded ads (decided no).
@@ -51,13 +51,19 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
   detail, wind and horizon pieces.
 - **Polish:** UI consistency (count-ups, reward reveals, safe areas), accessibility (text size, reduced motion, colour-blind aim
   line), hot-loop crossfade, barks for the stable and undertaker, weekly event rank titles.
-- **Story:** `STORY_BIBLE.md` beats are only partly in the game (home grounds, taunts, bios). Add short skippable story screens.
+- **Story** (`STORY_BIBLE.md`): story cards, the Case File, town barks and opening/ending panels are built. Open: chapter-two hook, story props in town, and the Drifter legend (decided, not built).
 
 ### 4. Later
 - Art coherence: one-page style guide, then modelled town buildings and restyled characters (parked by the owner). Rig the snake
   and horse in Blender.
 - Growth: vertical videos recorded on a phone; Android via the same RevenueCat setup; Game Center and controller support.
 - Tech health: KTX2 and meshopt compression if downloads matter.
+
+## How to verify
+`npm test`, `npm run build`, then the browser smokes: `test:smoke`, `test:static`, `test:mobile`, `test:enemies`, `test:store`,
+`test:bosses`, `test:characters`, `test:event`, `test:story`, `test:town`, `test:demo` (known to fail on main: the ad fetches outlaw
+models). `node tools/perf.mjs` gives draw calls and frame times (run three times, take the middle). Blender rigging for animals
+is documented in `tools/blender/README.md`.
 
 ## Housekeeping
 - `TODO_V1.md`, `STAGE0_BASELINE.md` and `REFACTOR_PLAN.md` describe the old paid-desktop prototype and are historical. Safe to
@@ -67,4 +73,4 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 ## Source docs
 `REFACTOR_PLAN` (old direction), `GROWTH_PLAN` (retention, events, monetization), `MONETIZATION` (store setup),
 `POLISH_PLAN` (look, feel, audio), `TOWN_PLAN` and `PLACES` (town and districts), `STORY_BIBLE`, `IOS`, `ASSETS`,
-`RELEASE_CHECKLIST`, `docs/POLICY_GENERATOR_ANSWERS`.
+`RELEASE_CHECKLIST`, `README`, `STAGE0_BASELINE`, `TODO_V1`, `docs/POLICY_GENERATOR_ANSWERS`, `tools/blender/README`.
