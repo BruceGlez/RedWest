@@ -101,6 +101,9 @@
     "tests/steps.test.js",
     "src/places/farm.js",
     "src/places/undertaker.js",
+    "src/places/vane.js",
+    "src/vaneLayout.js",
+    "tests/vaneLayout.test.js",
     "src/modes/arena.js",
     "tests/places.test.js"
    ],

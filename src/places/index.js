@@ -3,8 +3,10 @@
 import { registerPlace } from './registry.js';
 import { createFarmPlace } from './farm.js';
 import { createUndertakerPlace } from './undertaker.js';
+import { createVanePlace } from './vane.js';
 
 registerPlace(createFarmPlace);
 registerPlace(createUndertakerPlace);
+registerPlace(createVanePlace);
 
 export { createPlaces } from './registry.js';

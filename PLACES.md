@@ -124,7 +124,7 @@ town as an overview, and then the places cannot be entered (they need walking).
 | The Calloways | **Calloway Farm** | GROW | **built 2026-10-01** |
 | Iron Jack Harlan | **Foundry Yard** | SMELT | planned |
 | Mad Mesa Morgan | **Morgan's Channel** | WATER | planned |
-| Silas Vane | **Vane's Crossing** | TRADE | planned |
+| Silas Vane | **Vane's Crossing** | TRADE | **built 2026-10-05** (order board; placeholder scene) |
 | El Espectro | **Tres Rios** | TEND | planned |
 | Lucky Lou | **The Silver Belle** | MARKET | planned |
 | Colonel Crane | **Fort Pell** | PATROL | planned |
@@ -188,7 +188,7 @@ and neither needs the other. Cast
 from a fishing post and the line pays out after a while: **fish** are goods, sold or cooked at Copper Bit. The warehouse stores
 goods beyond the barn's cap.
 
-### 4. Vane's Crossing: TRADE (planned)
+### 4. Vane's Crossing: TRADE (built 2026-10-05)
 
 *The Crossing is open again, and wagons use it. The clock on the tower stays stopped.* Opens with Silas Vane.
 
@@ -264,10 +264,11 @@ did" is clearest.
    - **Slice 1 (built 2026-10-05): the order rules.** `src/farmOrders.js`, saved as `town.orders`, tested in `tests/farmOrders.test.js`
      (shut state, refusals, daily orders, waiting a day, a clock moved back, the income cap). Three orders a day from the date,
      goods of open places only (the farm's, today), $ paid at 1.15 x the stand price. A new player sees only today's three; from their
-     second day an unfilled order waits one more day, so the board then holds up to six. The first `visit` (or fill) starts the player's days. **Not built yet:** the place itself (`src/places/vane.js`, scene, styles, walk test), the bounty-board
-     pointer, and the Channel watering the farm.
+     second day an unfilled order waits one more day, so the board then holds up to six. The first `visit` (or fill) starts the player's days.
+   - **Slice 2 (built 2026-10-05): the place.** The gate in the town opens the Crossing (`interior: 'vane'` in `src/townDistricts.js`, shut with a LOCKED sign naming Silas Vane until his first star). `src/vaneLayout.js` is the map (the wagon, the stopped clock, the order board, the way out), `src/places/vane.js` the board card (today's orders, FILL buttons through `wallet.orders`, the first-visit `visit`) and prompts, `src/placeVane.js` a plain box-built **placeholder scene** (the art lane's from here on; a gold lantern floats over the board while orders wait). Tests: `tests/vaneLayout.test.js` and the Crossing walk-through in `tests/town-smoke.mjs`. **Not built yet:** the bounty-board
+     pointer, the Channel watering the farm, and real art.
    - **Deferred (owner's decision):** Morgan's Channel watering the farm. Build the Channel as a real place first, then its watering, with the rule that a link is only a bonus while both ends are open.
-   - **Waiting on lanes (contract):** filling an order changes the profile, so it needs a route and a wallet method, like the farm's.
+   - **Done (contract, kept for reference):** filling an order changes the profile, so it needs a route and a wallet method, like the farm's.
      `server/app.js` (scale): `POST /api/town/orders` calls `ordersAction(user.profile, body, now())` from `src/farmOrders.js`, the same
      way `/api/town/farm` calls `farmAction`, and returns `{ result, profile }`. `src/wallet.js` (shared): `orders(body)` on both wallets,
      offline `ordersAction(profile, body, new Date()); persist()`, online `call('/api/town/orders', body)`. Body: `{ action: 'visit' }` (once, when the player first walks in) or `{ action: 'fill', order: '<day>:<slot>' }`.
