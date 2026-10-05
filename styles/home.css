@@ -1,0 +1,76 @@
+/* ---------- Home screen (game-lobby style) ---------- */
+.home-screen {
+    position: fixed; inset: 0; z-index: 20; display: flex; flex-direction: column; box-sizing: border-box;
+    padding: calc(14px + env(safe-area-inset-top)) calc(20px + env(safe-area-inset-right)) calc(10px + env(safe-area-inset-bottom)) calc(20px + env(safe-area-inset-left));
+    background: radial-gradient(ellipse at 50% 55%, rgba(255, 170, 60, 0.10) 0%, rgba(60, 22, 8, 0.55) 60%, rgba(25, 10, 4, 0.9) 100%);
+    font-family: 'Roboto Mono', monospace; color: #fff; touch-action: auto;
+}
+.home-top { display: flex; justify-content: space-between; align-items: center; }
+.home-logo {
+    font-family: 'Rye', serif; font-size: 46px; color: #ffcc33; transform: rotate(-2deg);
+    -webkit-text-stroke: 2px #3b1d00; text-shadow: 0 5px 0 #6b2d0f, 0 8px 14px rgba(0, 0, 0, 0.6);
+}
+.home-top-right { display: flex; gap: 10px; align-items: center; }
+.home-chip {
+    background: rgba(20, 10, 5, 0.75); border: 2px solid #ffcc33; border-radius: 999px; padding: 6px 14px;
+    font-weight: 700; font-size: 16px; box-shadow: 0 3px 0 #3b1d00;
+}
+.chip-star { color: #ffc107; }
+.round-btn {
+    width: 44px; height: 44px; border-radius: 50%; border: 3px solid #1b1208; background: linear-gradient(#6d4c33, #3e2723);
+    color: #ffcc33; font-size: 22px; line-height: 1; cursor: pointer; box-shadow: 0 4px 0 #1b1208;
+}
+.round-btn:active { transform: translateY(3px); box-shadow: 0 1px 0 #1b1208; }
+.home-main { flex: 1; display: flex; align-items: center; justify-content: space-between; gap: 18px; min-height: 0; }
+.home-side { display: flex; flex-direction: column; gap: 12px; width: 200px; }
+.side-btn {
+    display: flex; flex-direction: column; align-items: flex-start; gap: 2px; padding: 12px 16px; cursor: pointer;
+    background: linear-gradient(#5b8def, #3a5fc8); color: #fff; border: 3px solid #14142b; border-radius: 14px;
+    font-family: 'Roboto Mono', monospace; font-weight: 700; font-size: 16px; text-shadow: 0 2px 0 #14142b;
+    box-shadow: 0 5px 0 #14142b, 0 8px 14px rgba(0, 0, 0, 0.35); text-align: left;
+}
+.side-btn small { font-size: 11px; opacity: 0.85; text-shadow: none; }
+.side-btn:nth-child(2) { background: linear-gradient(#b86be0, #8a3fc0); }
+.side-btn:nth-child(3) { background: linear-gradient(#4cc38a, #2a9563); }
+.side-btn:active { transform: translateY(4px); box-shadow: 0 1px 0 #14142b; }
+.home-play { display: flex; flex-direction: column; align-items: center; gap: 8px; width: 220px; }
+.play-btn {
+    font-family: 'Rye', serif; font-size: 46px; color: #3b1d00; cursor: pointer; padding: 16px 40px;
+    background: linear-gradient(#fff07a, #ffc21a 55%, #ff9f00); border: 4px solid #3b1d00; border-radius: 20px;
+    box-shadow: 0 8px 0 #3b1d00, 0 14px 22px rgba(0, 0, 0, 0.45); animation: play-pulse 1.6s ease-in-out infinite;
+}
+.play-btn:active { transform: translateY(6px); box-shadow: 0 2px 0 #3b1d00; animation: none; }
+@keyframes play-pulse { 0%, 100% { transform: scale(1); } 50% { transform: scale(1.05); } }
+.play-hint { margin: 0; font-size: 13px; color: #ddd; }
+.home-screen .run-log-box { margin-top: 4px; }
+
+/* ---------- Wanted poster ---------- */
+.wanted-poster {
+    width: 250px; box-sizing: border-box; padding: 12px 14px 10px; text-align: center; color: #3b2412; transform: rotate(-1.5deg);
+    background: radial-gradient(ellipse at center, #f7e6be 55%, #e2c68d 100%); border: 3px solid #6b4a2b; border-radius: 4px;
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.55), inset 0 0 18px rgba(107, 74, 43, 0.35);
+}
+.poster-wanted { font-family: 'Rye', serif; font-size: 40px; line-height: 1; letter-spacing: 2px; }
+.poster-sub { font-size: 10px; letter-spacing: 3px; margin: 2px 0 6px; }
+.poster-name { font-family: 'Rye', serif; font-size: 19px; margin-top: 6px; }
+.poster-title { font-size: 11px; font-style: italic; opacity: 0.8; }
+.poster-threats { display: flex; flex-wrap: wrap; gap: 4px; justify-content: center; margin: 6px 0; }
+.threat { background: #b71c1c; color: #fff; font-size: 10px; font-weight: 700; padding: 2px 6px; border-radius: 999px; }
+.threat.calm { background: #6b4a2b; }
+.threat.signature { background: #ffcc33; color: #3b1d00; }
+.poster-reward { font-family: 'Rye', serif; font-size: 22px; color: #9a1b1b; }
+.poster-footer { display: flex; justify-content: space-between; align-items: center; margin-top: 4px; font-size: 11px; font-weight: 700; }
+.star { color: rgba(59, 36, 18, 0.25); font-size: 18px; }
+.star.on { color: #ffb300; text-shadow: 0 1px 0 #6b3a00; }
+
+/* A drawn outlaw portrait tinted with each outlaw's colors. */
+.portrait {
+    position: relative; width: 110px; height: 96px; margin: 0 auto; overflow: hidden;
+    background: linear-gradient(#e9d3a0, #cfb177); border: 3px solid #6b4a2b; border-radius: 3px;
+}
+.p-body { position: absolute; left: 12%; right: 12%; bottom: -6px; height: 34%; background: var(--coat); border-radius: 18px 18px 0 0; border: 2px solid rgba(0, 0, 0, 0.35); }
+.p-head { position: absolute; left: 50%; bottom: 26%; width: 40px; height: 40px; margin-left: -20px; background: #e6b88a; border: 2px solid rgba(0, 0, 0, 0.35); border-radius: 6px; overflow: hidden; }
+.p-eyes { position: absolute; top: 13px; left: 9px; width: 5px; height: 5px; background: #1b1208; border-radius: 50%; box-shadow: 17px 0 0 #1b1208; }
+.p-bandana { position: absolute; left: 0; right: 0; bottom: 0; height: 45%; background: var(--bandana); }
+.p-hat-brim { position: absolute; left: 50%; bottom: 62%; width: 76px; height: 9px; margin-left: -38px; background: var(--poncho); border-radius: 4px; border: 2px solid rgba(0, 0, 0, 0.4); }
+.p-hat-top { position: absolute; left: 50%; bottom: 69%; width: 42px; height: 22px; margin-left: -21px; background: var(--poncho); border-radius: 8px 8px 2px 2px; border: 2px solid rgba(0, 0, 0, 0.4); }

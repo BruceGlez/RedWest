@@ -60,6 +60,9 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 - Growth: vertical videos recorded on a phone; Android via the same RevenueCat setup; Game Center and controller support.
 - Tech health: KTX2 and meshopt compression if downloads matter.
 
+## How we work (lanes)
+The repo is split into 11 lanes so several agents can work at once: art, mine, town (farm and places), scale, combat, audio, ui, story, money, qa, growth. Ownership is in `lanes.json`, the rules in `AGENTS.md`, each lane's brief in `docs/lanes/`. One lane per branch and PR; shared files change in small separate PRs.
+
 ## How to verify
 `npm test`, `npm run build`, then the browser smokes: `test:smoke`, `test:static`, `test:mobile`, `test:enemies`, `test:store`,
 `test:bosses`, `test:characters`, `test:event`, `test:story`, `test:town`, `test:demo` (known to fail on main: the ad fetches outlaw

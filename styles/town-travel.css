@@ -1,0 +1,4 @@
+/* The town train's short fade (src/townTravel.js). */
+.town-fade { position: absolute; inset: 0; z-index: 6; background: #0c0805; opacity: 0; pointer-events: none; transition: opacity 0.35s ease; }
+.town-fade.on { opacity: 1; }
+.town-label.train { border-color: #5fa06a; color: #cfeccf; }

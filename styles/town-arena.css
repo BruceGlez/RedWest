@@ -1,0 +1,16 @@
+/* ---------- The Arena in Frontier Town ---------- */
+.arena-town .arena-modes, .arena-town .arena-toggles { display: flex; gap: 6px; flex-wrap: wrap; }
+.arena-town .shop-tab { font-size: 11px; padding: 5px 9px; color: #f0d9a8; background: #3b2412; border-color: #6b4a2b; }
+.arena-town .shop-tab.active { background: #ffcc33; color: #3b1d00; border-color: #3b1d00; }
+.arena-list-town { display: flex; flex-direction: column; gap: 6px; margin-top: 4px; }
+.arena-row { display: flex; align-items: center; gap: 8px; padding: 5px 6px; border: 2px solid #6b4a2b; border-radius: 8px; background: rgba(255, 255, 255, 0.35); }
+.arena-row img, .arena-row .arena-pic { width: 46px; height: 46px; flex: 0 0 46px; border: 2px solid #6b4a2b; border-radius: 5px; object-fit: cover; background: #e7cf9c; }
+.arena-who { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.arena-who b { font-family: 'Rye', serif; font-size: 13px; font-weight: 400; }
+.arena-who small { font-size: 10px; color: #6d4c41; }
+.arena-row .shop-action { flex: 0 0 auto; width: auto; padding: 6px 12px; }
+.arena-row.locked { opacity: 0.6; }
+.arena-row.locked img { filter: grayscale(1) brightness(0.55); }
+.arena-card.locked { opacity: 0.6; }
+.arena-card.locked .portrait img { filter: grayscale(1) brightness(0.45); }
+.arena-fight:disabled { filter: grayscale(1); cursor: default; }
