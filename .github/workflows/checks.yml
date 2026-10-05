@@ -1,7 +1,15 @@
 name: checks
+# Pull requests run on the pull_request event; a push to a branch with an open PR would run everything a second time, so push
+# only runs on main.
 on:
   push:
+    branches: [main]
   pull_request:
+# A newer push to the same pull request cancels the older run (it is about to be replaced), so quick pushes do not pile up and
+# jam the hosted runners. Runs on main are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   build-and-test:
     runs-on: ubuntu-latest

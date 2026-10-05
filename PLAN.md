@@ -51,7 +51,7 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
   detail, wind and horizon pieces.
 - **Polish:** UI consistency (count-ups, reward reveals, safe areas), accessibility (text size, reduced motion, colour-blind aim
   line), hot-loop crossfade, barks for the stable and undertaker, weekly event rank titles.
-- **The Undertaker's Mine** (`MINE_PLAN.md`): built and reworked after the first playtest: the parlour as a place, a mine with no bottom, caves that grow a lot with every floor, a new monster on every floor, chests, a shaft that is always open and a lift back up (practice rules). Six deeper monsters (floors 15 to 20) borrow existing looks until the art lane makes models. Next: a saved deepest floor, checkpoints and ore (slice 2), then boss floors (slice 3).
+- **The Undertaker's Mine** (`MINE_PLAN.md`): built and reworked after the first playtest: the parlour as a place, a mine with no bottom, caves that grow a lot with every floor, a new monster on every floor, chests, a shaft that is always open and a lift back up (practice rules). Floor variety added (twin caverns, long galleries and rockfalls from floor 2 and 3). Six deeper monsters (floors 15 to 20) borrow existing looks until the art lane makes models. Next: a saved deepest floor, checkpoints and ore (slice 2), then boss floors (slice 3).
 - **Story** (`STORY_BIBLE.md`): story cards, the Case File, town barks and opening/ending panels are built. Open: chapter-two hook, story props in town, and the Drifter legend (decided, not built).
 
 ### 4. Later
