@@ -49,6 +49,7 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
   H4 Copper Bit, Tres Rios, Whisper Wash; H5 Silver Belle price board and Hollow Hill projects.
 - **Performance and look:** quality switch and bloom for the desert and arena (town has it); cut fight draw calls further; ground
   detail, wind and horizon pieces.
+- **3D enemies:** the eight enemy models (bandit, gunslinger, rifleman, dynamiter, knifer, duelist, brute, ghost) are in the fight, loaded on demand and hidden off screen; box figures stay as the fallback (`ENEMY_MODELS`, `src/enemyTypes.js`).
 - **Polish:** UI consistency (count-ups, reward reveals, safe areas), accessibility (text size, reduced motion, colour-blind aim
   line), hot-loop crossfade, barks for the stable and undertaker, weekly event rank titles.
 - **The Undertaker's Mine** (`MINE_PLAN.md`): built and reworked after the first playtest: the parlour as a place, a mine with no bottom, caves that grow a lot with every floor, a new monster on every floor, chests, a shaft that is always open and a lift back up (practice rules). Floor variety added (twin caverns, long galleries and rockfalls from floor 2 and 3). Six deeper monsters (floors 15 to 20) borrow existing looks until the art lane makes models. Next: a saved deepest floor, checkpoints and ore (slice 2), then boss floors (slice 3).

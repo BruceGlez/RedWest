@@ -9,12 +9,14 @@ import { gameState, enemies, playerStats } from './state.js';
 import { checkCollision } from './physics.js';
 import { activeFloor, isOpen, spawnPoint, steerTarget, AGGRO_DISTANCE } from './mineMap.js';
 import { mine } from './mine.js';
-import { MINE_MONSTERS, mineHpBonus } from './mineMonsters.js';
+import { MINE_MONSTERS, mineHpBonus, mineRoster } from './mineMonsters.js';
+import { ENEMY_MODELS, rosterFor } from './enemyTypes.js';
+import { DEMO } from './demo.js';
 import { playSound } from './audio.js';
 import { animateCharacter } from './animation.js';
 import { spawnBullet } from './bulletSystem.js';
 import { applyOutlawToEnemy, getOutlaw } from './outlaws.js';
-import { loadedCharacterModel, createCharacterInstance } from './characterModels.js';
+import { loadCharacterModel, loadedCharacterModel, createCharacterInstance } from './characterModels.js';
 
 /**
  * Handles enemy shooting logic (creation of bullets and sound)
@@ -182,6 +184,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
         stateTimer: 0,
         cooldown: 1 + Math.random(),
         phase: Math.random() * Math.PI * 2,
+        look,
         faded: false,
         untargetable: false
     });
@@ -189,7 +192,9 @@ export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
         attachOutlawModel(enemy, getOutlaw(gameState.outlawIndex));
         setupBoss(enemy, bossStyle);
     }
+    prefetchEnemyModels();
     if(type === 'wolf') attachWolfModel(enemy);
+    else attachEnemyModel(enemy);
     if(look === 'ghost' || look === 'wraith') enemy.userData.stateTimer = 1.5 + Math.random();
     if(look === 'rider') enemy.userData.stateTimer = 2.5 + Math.random() * 1.5;
 
@@ -330,6 +335,60 @@ function attachWolfModel(enemy) {
     for(const part of enemy.children) part.visible = false;
     enemy.add(instance.object);
     enemy.userData.model = instance;
+}
+
+// Imported 3D enemies (ENEMY_MODELS in enemyTypes.js): shown instead of the box figure once loaded, else the box figure stays. Files load
+// when a stage or a mine floor can send that type (about 1 MB each, so not all at startup), and an enemy that spawned before its file
+// arrived gets the model when it does. The playable ad loads nothing from the network, so it keeps the box figures.
+const modelRequests = new Map(); // file -> the time it may be asked for again (never, once asked for; after a failure, in RETRY_SECONDS)
+const RETRY_SECONDS = 30;
+function prefetchEnemyModels() {
+    if(DEMO) return;
+    const roster = mine.enabled ? mineRoster(mine.floor) : rosterFor(gameState.outlawIndex);
+    const now = Date.now() / 1000;
+    for(const id of roster) {
+        const file = ENEMY_MODELS[MINE_MONSTERS[id]?.look ?? id]?.file;
+        if(!file || now < (modelRequests.get(file) ?? 0)) continue;
+        modelRequests.set(file, Infinity);
+        loadCharacterModel(file).then(attachMissingEnemyModels).catch(() => modelRequests.set(file, Date.now() / 1000 + RETRY_SECONDS));
+    }
+}
+function attachEnemyModel(enemy) {
+    const u = enemy.userData;
+    const config = ENEMY_MODELS[u.look];
+    const gltf = config && !u.model ? loadedCharacterModel(config.file) : null;
+    if(!gltf) return;
+    const instance = createCharacterInstance(gltf, config.height);
+    for(const part of enemy.children) part.visible = false;
+    enemy.add(instance.object);
+    u.model = instance;
+    if(u.muzzle && instance.muzzle) u.muzzle = instance.muzzle; // shots leave from the revolver in the model's hand
+    if(u.behavior === 'phantom') prepareFade(enemy);
+    instance.object.visible = modelOnScreen(enemy); // updateEnemies keeps this right from the next frame
+}
+// A skinned model is never frustum-culled (its stored bounds do not follow the animation), so left alone every model in the fight is drawn
+// even when it is off screen, and 15 of them cost twice the draw calls of the box figures (which are culled). The camera is given by main.js
+// and a model off screen is hidden and not animated.
+let cullCamera = null;
+const cullFrustum = new THREE.Frustum();
+const cullMatrix = new THREE.Matrix4();
+const cullSphere = new THREE.Sphere();
+export function setEnemyCullCamera(camera) { cullCamera = camera; }
+function cullModels() {
+    if(!cullCamera) return;
+    cullCamera.updateMatrixWorld();
+    cullFrustum.setFromProjectionMatrix(cullMatrix.multiplyMatrices(cullCamera.projectionMatrix, cullCamera.matrixWorldInverse));
+}
+function modelOnScreen(e) {
+    if(!cullCamera) return true;
+    cullSphere.center.set(e.position.x, 3, e.position.z);
+    cullSphere.radius = 5; // the tallest model, a little room for the camera moving since
+    return cullFrustum.intersectsSphere(cullSphere);
+}
+
+function attachMissingEnemyModels() {
+    cullModels();
+    for(const enemy of enemies) if(enemy.userData.type !== 'boss' && !enemy.userData.model) attachEnemyModel(enemy);
 }
 
 // The part that shakes as an attack tell: the imported model, or the box figure.
@@ -657,6 +716,7 @@ function updateBoss(e, u, ctx) {
 export function updateEnemies(dt, scene, playerGroup, callbacks) {
     const timeInSeconds = Date.now() / 1000;
     const playerPos = playerGroup.position;
+    cullModels();
 
     for(let i = enemies.length - 1; i >= 0; i--) {
         const e = enemies[i];
@@ -888,6 +948,10 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         if(u.state === 'rear') e.rotateX(-0.35); // the horse rears up before charging
         animateCharacter(e, timeInSeconds, isMoving);
         if(u.model) {
+            const shown = u.type === 'boss' || modelOnScreen(e);
+            u.model.object.visible = shown;
+        }
+        if(u.model?.object.visible) {
             // Outlaws draw before they fire (u.isAiming is set just before a shot), aim, then holster.
             u.model.combat(dt, { moving: isMoving, aiming: u.isAiming || timeInSeconds - (u.shotAt ?? -9) < 0.2, quickDraw: true });
             u.model.mixer.update(dt);

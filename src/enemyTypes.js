@@ -65,6 +65,20 @@ export const ENEMY_TYPES = {
     }
 };
 
+// 3D models (public/models, art lane) for the regular enemies that have one: the file and the height in game units (the player is 6
+// tall and the box figures about 5.4). A type without a row, or whose file has not loaded yet, is the box figure. A mine monster that
+// borrows a look (MINE_MONSTERS[id].look) uses the row of that look.
+export const ENEMY_MODELS = {
+    bandit: { file: 'models/bandit.glb', height: 5.4 },
+    gunslinger: { file: 'models/gunslinger.glb', height: 5.4 },
+    rifleman: { file: 'models/rifleman.glb', height: 5.4 },
+    dynamiter: { file: 'models/dynamiter.glb', height: 5.4 },
+    knifer: { file: 'models/knifer.glb', height: 5.4 },
+    duelist: { file: 'models/duelist.glb', height: 5.4 },
+    brute: { file: 'models/brute.glb', height: 6.4 },
+    ghost: { file: 'models/ghost.glb', height: 5.4 }
+};
+
 export const ENEMY_ORDER = Object.keys(ENEMY_TYPES);
 
 // Types that can appear against the outlaw at `stage`. The newest one is featured (appears in

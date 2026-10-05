@@ -24,7 +24,7 @@ import { configureAnalytics, track } from './analytics.js';
 import { generatedName } from './names.js';
 import { loadoutColors, getShopItem, CHARACTERS } from './cosmetics.js';
 import { loadCharacterModel, loadedCharacterModel, createCharacterInstance } from './characterModels.js';
-import { WOLF_MODEL, WOLF_MODEL_HEIGHT, attachMissingOutlawModels } from './enemySystem.js';
+import { WOLF_MODEL, WOLF_MODEL_HEIGHT, attachMissingOutlawModels, setEnemyCullCamera } from './enemySystem.js';
 import { applyPlayerLoadout } from './assets.js';
 import { applyPerk } from './perks.js';
 import { DEMO, openStore, assetUrl } from './demo.js';
@@ -52,6 +52,7 @@ renderer.toneMappingExposure = 1.05;
 document.body.appendChild(renderer.domElement);
 // Dev builds only: lets tests and tools/perf.mjs read draw calls (renderer.info).
 if(import.meta.env?.DEV) Object.assign(window, { __redWestRenderer: renderer, __redWestCamera: camera });
+setEnemyCullCamera(camera); // a 3D enemy off screen is hidden (src/enemySystem.js)
 
 setupScene(scene, camera, renderer);
 generateMap(scene);
