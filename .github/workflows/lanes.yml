@@ -1,6 +1,11 @@
 name: lanes
 on:
   pull_request:
+# A newer push to the same pull request cancels the older run (it is about to be replaced), so quick pushes do not pile up and
+# jam the hosted runners. Runs on main are never cancelled.
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
 jobs:
   shared-files:
     runs-on: ubuntu-latest
