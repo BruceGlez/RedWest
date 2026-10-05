@@ -1,0 +1,10 @@
+/* Boss Arena (?arena) */
+.arena-body { flex-direction: column; align-items: center; flex-wrap: nowrap; justify-content: flex-start; }
+.arena-note { margin: 0; font-size: 13px; color: #ffcc80; text-align: center; }
+.arena-options { justify-content: center; }
+.arena-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 10px; width: 100%; }
+.arena-card .book-info { display: flex; flex-direction: column; gap: 4px; }
+.arena-fight { align-self: flex-start; font-family: 'Rye', serif; font-size: 16px; padding: 6px 18px; border-radius: 10px; cursor: pointer;
+    background: linear-gradient(#ffd54f, #ff9800); color: #3b1d00; border: 3px solid #3b1d00; box-shadow: 0 3px 0 #3b1d00; }
+.arena-link { color: #ffcc33; font-weight: 700; margin-left: 8px; text-decoration: underline; }
+a.round-btn { display: flex; align-items: center; justify-content: center; text-decoration: none; box-sizing: border-box; }

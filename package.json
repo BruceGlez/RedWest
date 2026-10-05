@@ -23,7 +23,8 @@
     "test:town": "node tests/town-smoke.mjs",
     "test:mine": "node tests/mine-smoke.mjs",
     "build:demo": "vite build --mode demo && node tools/inline-demo.mjs",
-    "test:demo": "node tests/demo-smoke.mjs"
+    "test:demo": "node tests/demo-smoke.mjs",
+    "lanes": "node tools/lanes.mjs"
   },
   "dependencies": {
     "@capacitor-community/apple-sign-in": "^7.1.0",
