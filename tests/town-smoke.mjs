@@ -81,6 +81,13 @@ try {
     }
 
     // Places you walk up to (TOWN_PLAN.md, step A): the board and the jail's cash box open cards, the train starts the hunt.
+    // A prompt is worded in the walk's per-frame update (src/townWalk.js), so after the marshal is put somewhere the prompt is still the one
+    // for where he was until a frame has been drawn. On a slow runner (6 frames a second) that is long enough for the test to see the old
+    // door's prompt ("EMPTY PLOT" belongs to every empty plot), press E and plant in the wrong plot. So: wait for two frames after standing.
+    const drawn = async (page, frames = 2) => {
+        const from = await page.evaluate(() => window.__redWestRenderer?.info.render.frame ?? 0);
+        await page.waitForFunction(({ from, frames }) => (window.__redWestRenderer?.info.render.frame ?? 0) >= from + frames, { from, frames });
+    };
     const goTo = (page, id) => page.evaluate(id => {
         const door = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
         window.__redWestTown.walk.place(door.x, door.z);
@@ -464,10 +471,13 @@ try {
         };
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
         const dollars = async () => Number((await page.locator('#town-dollars').textContent()).replace(/,/g, ''));
-        const stand = id => page.evaluate(id => {
-            const d = window.__redWestTown.farm3d.walkMap().doors.find(d => d.id === id);
-            window.__redWestTown.farmWalk.place(d.x, d.z);
-        }, id);
+        const stand = async id => {
+            await page.evaluate(id => {
+                const d = window.__redWestTown.farm3d.walkMap().doors.find(d => d.id === id);
+                window.__redWestTown.farmWalk.place(d.x, d.z);
+            }, id);
+            await drawn(page);
+        };
         const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
         // The prompt right after an action (planting) shows a moment after the card closes. On a slow runner that has twice not come within
         // the usual wait, so: wait a fair time, and if it has not come, put the marshal back at the door (the prompt follows the nearest door)
@@ -656,10 +666,13 @@ try {
         };
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
         const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
-        const stand = (id) => page.evaluate(id => {
-            const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
-            window.__redWestTown.placeWalk.place(d.x, d.z);
-        }, id);
+        const stand = async id => {
+            await page.evaluate(id => {
+                const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
+                window.__redWestTown.placeWalk.place(d.x, d.z);
+            }, id);
+            await drawn(page);
+        };
         await goTo(page, 'enter-canal');
         await prompt("MORGAN'S CHANNEL");
         await page.keyboard.press('e');
@@ -710,10 +723,13 @@ try {
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 0, 0, 0, 0, 0, 0, 0, 0, 0] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
         const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
-        const stand = id => page.evaluate(id => {
-            const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
-            window.__redWestTown.placeWalk.place(d.x, d.z);
-        }, id);
+        const stand = async id => {
+            await page.evaluate(id => {
+                const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
+                window.__redWestTown.placeWalk.place(d.x, d.z);
+            }, id);
+            await drawn(page);
+        };
         await goTo(page, 'enter-copper');
         await prompt('COPPER BIT');
         await page.keyboard.press('e');
