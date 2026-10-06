@@ -8,6 +8,7 @@ import { farmAction } from '../src/farm.js';
 import { ordersAction } from '../src/farmOrders.js';
 import { saloonAction } from '../src/saloon.js';
 import { applyMineRun } from '../src/mineProgress.js';
+import { buyLight, LIGHT_ITEMS, SHOP_MARKUP } from '../src/mineLight.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 import { createApple, AppleError } from './apple.js';
 
@@ -25,7 +26,8 @@ const LIMITS = {
     account: { max: 200, windowMs: 60 * 60 * 1000 },
     report: { max: 30, windowMs: 24 * 60 * 60 * 1000 },
     restore: { max: 5, windowMs: 10 * 60 * 1000 },
-    name: { max: 20, windowMs: 60 * 60 * 1000 }
+    name: { max: 20, windowMs: 60 * 60 * 1000 },
+    shop: { max: 120, windowMs: 60 * 60 * 1000 } // buying light: a few a session is normal, a script is not
 };
 const REFUND_EVENTS = new Set(['CANCELLATION']); // RevenueCat reports a refunded one-off purchase this way
 const MAX_ACTIVE_DAYS = 400;
@@ -429,6 +431,22 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 // Copper Bit's shifts (src/saloon.js): the server clock decides the day, so how many shifts pay and what a night's crowd holds.
                 if(url.pathname === '/api/town/saloon' && req.method === 'POST') {
                     const result = saloonAction(user.profile, body, now());
+                    await save();
+                    return send(res, 200, { result, profile: user.profile });
+                }
+                // Light for the Hollow Claim (src/mineLight.js): Bounty Dollars only. The client names the item and the shop; the price, the limits and
+                // the balance are the server's. A refused buy changes nothing (buyLight checks everything before it spends).
+                if(url.pathname === '/api/mine/buy' && req.method === 'POST') {
+                    if(!allow('shop', id)) return tooMany(res);
+                    // Own names only: an id like "constructor" must not reach the price table.
+                    if(typeof body.id !== 'string' || !Object.hasOwn(LIGHT_ITEMS, body.id)) throw new EconomyError('unknown_item', 'That is not for sale.');
+                    const shop = body.shop ?? 'grimsby';
+                    if(typeof shop !== 'string' || !Object.hasOwn(SHOP_MARKUP, shop)) throw new EconomyError('no_shop', 'There is no such shop.');
+                    let result;
+                    try { result = buyLight(user.profile, body.id, shop); } catch(error) {
+                        if(error.code) throw new EconomyError(error.code, error.message); // the shop's refusals are plain errors with a code
+                        throw error;
+                    }
                     await save();
                     return send(res, 200, { result, profile: user.profile });
                 }

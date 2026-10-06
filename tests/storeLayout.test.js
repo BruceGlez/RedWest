@@ -85,10 +85,10 @@ test('the counter card names the shopkeeper and sells light at the store\'s pric
 
 test('a BUY at the counter goes to the wallet as the store\'s sale', async () => {
     const calls = [];
-    const wallet = { buyLight: async body => { calls.push(['wallet', body]); return { result: { id: body.item, price: priceOf(body.item, 'store') }, profile: { marker: 'new' } }; } };
+    const wallet = { buyLight: async body => { calls.push(['wallet', body]); return { result: { id: body.id, price: priceOf(body.id, 'store') }, profile: { marker: 'new' } }; } };
     const place = createStorePlace(host(createProfile(T0), wallet, calls));
     assert.equal(place.click({ dataset: { buyLight: 'torches', shop: 'store' } }), true);
     await new Promise(resolve => setImmediate(resolve));
-    assert.deepEqual(calls.slice(0, 2), [['wallet', { item: 'torches', shop: 'store' }], ['profile', { marker: 'new' }]]);
+    assert.deepEqual(calls.slice(0, 2), [['wallet', { id: 'torches', shop: 'store' }], ['profile', { marker: 'new' }]]);
     assert.deepEqual(calls.at(-1), ['toast', `Bought torches x5 for $${priceOf('torches', 'store')}.`, false]);
 });

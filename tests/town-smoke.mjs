@@ -769,7 +769,8 @@ try {
     }
     // The general store (src/places/store.js): a place of its own on the town's west street, open to anyone. Its counter sells light at the store's prices.
     {
-        const { page, errors, context } = await open();
+        const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ balances: { dollars: 500, nuggets: 40 } }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
         const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
         const stand = id => page.evaluate(id => {
             const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
@@ -792,6 +793,16 @@ try {
         assert.equal(await page.locator('[data-buy-light]').count(), 4);
         assert.match(card, /LANTERN[^$]*\$66/, 'the lantern at the store is $60 and 10% over, $66');
         assert.ok(!/nugget/i.test(card), 'light is sold for dollars only');
+        // Buy the lantern: $66 at the store, in dollars, the nuggets untouched; it can only be bought once.
+        const dollars = async () => Number((await page.locator('#town-dollars').textContent()).replace(/,/g, ''));
+        const before = await dollars();
+        await page.locator('[data-buy-light="lantern"]').click();
+        await page.waitForFunction(() => /Bought lantern for \$66/.test(document.getElementById('town-toast').textContent));
+        assert.equal(await dollars(), before - 66);
+        const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestProfile.v1')));
+        assert.equal(saved.mine.light.lantern, true);
+        assert.equal(saved.balances.nuggets, 40, 'nuggets are not spent on light');
+        assert.equal(await page.locator('[data-buy-light="lantern"]').isDisabled(), true, 'one lantern is enough');
         await page.locator('#town-sheet-close').click();
         await stand('leave');
         await prompt('BACK TO THE STREET');

@@ -99,11 +99,11 @@ test('Mr. Grimsby\'s card carries the shop, with his name, his line and the BUY 
 
 test('BUY runs the wallet, hands the new profile back, says what was bought, and leaves the card open', async () => {
     const calls = [];
-    const wallet = { buyLight: async body => { calls.push(['wallet', body]); return { result: { id: body.item, price: 60 }, profile: { marker: 'new' } }; } };
+    const wallet = { buyLight: async body => { calls.push(['wallet', body]); return { result: { id: body.id, price: 60 }, profile: { marker: 'new' } }; } };
     const place = createUndertakerPlace(host(profile(), wallet, calls));
     assert.equal(click(place, { buyLight: 'lantern', shop: 'grimsby' }), true);
     await settle();
-    assert.deepEqual(calls, [['wallet', { item: 'lantern', shop: 'grimsby' }], ['profile', { marker: 'new' }], ['track', 'light_buy'], ['toast', 'Bought lantern for $60.', false]]);
+    assert.deepEqual(calls, [['wallet', { id: 'lantern', shop: 'grimsby' }], ['profile', { marker: 'new' }], ['track', 'light_buy'], ['toast', 'Bought lantern for $60.', false]]);
 });
 
 test('a refused sale is told as an error toast; an unknown item or another button is not sold or taken', async () => {
@@ -125,4 +125,35 @@ test('before the wallet can sell light the shop says so instead of failing', asy
     click(createUndertakerPlace(host(profile(), {}, calls)), { buyLight: 'lantern', shop: 'grimsby' });
     await settle();
     assert.deepEqual(calls, [['toast', 'The shop is not open yet.', true]]);
+});
+
+test('with the real offline wallet: a BUY at either shop spends dollars at that shop\'s price and gives the light, and a broke one is refused', async () => {
+    const store = new Map([['redWestProfile.v1', JSON.stringify({ balances: { dollars: 200, nuggets: 50 } })]]);
+    globalThis.localStorage = { getItem: key => store.get(key) ?? null, setItem: (key, value) => store.set(key, String(value)), removeItem: key => store.delete(key) };
+    try {
+        const { createLocalWallet } = await import('../src/wallet.js');
+        const wallet = createLocalWallet();
+        let current = (await wallet.load());
+        const calls = [];
+        const place = createUndertakerPlace({ ...host(current, wallet, calls), profile: () => current, onProfile: next => { current = next; calls.push(['profile']); } });
+        place.click({ dataset: { buyLight: 'lantern', shop: 'grimsby' } });
+        await settle();
+        assert.equal(current.mine.light.lantern, true);
+        assert.equal(current.balances.dollars, 200 - priceOf('lantern', 'grimsby'));
+        assert.equal(current.balances.nuggets, 50, 'nuggets untouched');
+        const { createStorePlace } = await import('../src/places/store.js');
+        const storePlace = createStorePlace({ ...host(current, wallet, calls), profile: () => current, onProfile: next => { current = next; } });
+        storePlace.click({ dataset: { buyLight: 'torches', shop: 'store' } });
+        await settle();
+        assert.equal(current.mine.light.torches, 5);
+        assert.equal(current.balances.dollars, 200 - priceOf('lantern', 'grimsby') - priceOf('torches', 'store'), 'the store charged its own price');
+        const poor = current.balances.dollars;
+        for(let i = 0; i < 40; i++) { storePlace.click({ dataset: { buyLight: 'matches', shop: 'store' } }); await settle(); }
+        assert.ok(current.balances.dollars >= 0 && current.balances.dollars < poor, 'it never goes below nothing');
+        assert.equal(current.balances.nuggets, 50);
+        const toasts = calls.filter(c => c[0] === 'toast');
+        assert.ok(toasts.some(t => t[2] === true), 'a refused sale (full, or not enough dollars) was told as an error');
+    } finally {
+        delete globalThis.localStorage;
+    }
 });
