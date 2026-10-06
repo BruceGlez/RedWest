@@ -359,6 +359,38 @@ kill one creature, kill a number of creatures, or a mix, plus a main quest that 
   Bounty Dollars. Since light costs money and the mine pays none, a small Bounty Dollar reward from a grave quest may be the fair answer.
 - Needs first: the dark mine (Slice 5), then a data contract (quest state in the profile and the server) before the screens.
 
+**Design note and the generator (town lane, 2026-10-06).** `src/graveQuests.js` is the pure generator (`tests/graveQuests.test.js`); nothing else is built yet.
+- **Six graves, six souls** (`SOULS`): each has a name, a trade, a mood (*revenge* or *unfinished*) and one line. A grave's quest is made when it is opened from
+  `graveQuest({ seed, day, grave, deepest })`: the same inputs always give the same quest. `seed` is 0 for everyone the same day, or an account's own number if the
+  owner wants different graves for different players.
+- **Templates (Fate's small ones):** FIND (bring up ore), HUNT (kill one named creature), CLEAR (kill a number of one kind), MIX (a clear and a find). One grave
+  each day is the **main** grave: a named creature, bigger and tougher, on floor 10 or three below the deepest the player has reached, with 2 to 4 of another
+  kind following it. The target kinds are only what lives on the asked floor (`mineRoster`), and an ordinary quest is never deeper than two floors below the
+  player's deepest, so it is always something he can do. A new player is sent no deeper than floor 2.
+- **What the mine lane has to count** (a tally since the quest was taken): `{ kills: { monsterId: n }, ore: n }`. `questProgress(quest, tally)` reads it and says
+  which goals are done. The state in the profile and the server (`profile.quests`: the quest ids taken, their tallies, the ones finished) is the data contract for
+  the next PR, once the reward is decided.
+- **The graves appear only after Deacon Graves has a star** (`gravesOpen`, the same unlock as the cellar's hidden door), and they stand in his own section, Hollow Hill
+  (owner, 2026-10-06). Same quests for every player on the same day (`seed` 0), made when a grave is opened.
+- **What a quest pays (owner's answers, 2026-10-06): it depends on the quest and pays more the deeper it goes.** `questReward(quest)` gives `{ dollars, ore, title }`:
+  earned Bounty Dollars, ore, and for the main quest a cosmetic rank title; never Gold Nuggets, stars or anything that changes a fight. `dollars = (6 + 4 x floor)`
+  times the template's share (find 0.8, clear 1, hunt 1.2, mix 1.4, main 1.8), rounded, at most **$90** a quest; `ore = floor / 2` (the main quest: 1.5 x floor), at least 1;
+  the main quest's title by its floor: 10 DELVER, 15 DEEP DELVER, 25 LAMPLESS, 40 THE LONG DARK. A quest is never timed.
+
+  | Floor asked | find | clear | hunt | mix | main |
+  |---|---|---|---|---|---|
+  | 2 | $11 | $14 | $17 | $20 | (the main quest is never above floor 10) |
+  | 6 | $24 | $30 | $36 | $42 | |
+  | 10 | $37 | $46 | $55 | $64 | $83 and DELVER |
+  | 20 | $69 | $86 | $90 | $90 | $90 and DEEP DELVER |
+  | 40 | $90 | $90 | $90 | $90 | $90 and THE LONG DARK |
+
+  The most the six graves of a day can pay together is six times the cap, $540, always less than the $600 a single Wanted Road run can bank
+  (`MAX_DOLLARS_PER_RUN`); the table is pinned by `tests/graveQuests.test.js`. Since light costs money and the mine pays none, this is where the
+  mine's money comes back, only through the graves and only for the deeper trips; ore and titles are banked and shown the same way as before.
+- **Not built yet:** the state in the profile and the server (`profile.quests`: the quests taken, their tallies, the ones finished and paid), the cards on the hill, and
+  the mine lane's counting. The data contract goes next.
+
 ## Open questions
 
 - How much ore a fall costs: 2a starts with all of the run's carried ore (`FALL_KEEPS`). To tune from playtests.

@@ -303,6 +303,7 @@ Deacon Graves. North edge, between Tres Rios and the Foundry.
 - **The other places are a bonus.** Pete's meals for the volunteers and the Wash's finds for the bell can speed a piece along, but
   the hill needs none of them: each piece shows what could help, and the others go on.
 - Nothing is timed for pay. The vigil waits for you each evening, and a missed night costs nothing but the night.
+- **The graves (slice 6, `MINE_PLAN.md`).** The graves stand on the hill and appear once Deacon Graves has a star, the same unlock as the hidden door in the cellar. Each gives a small job for a fallen soul: bring up ore, kill a named creature or a number of one kind, or both; one grave a day is the main one (a bigger, tougher creature deep down). The jobs are done in the mine, so the hill never changes a fight. A job pays earned Bounty Dollars, ore and for the main one a cosmetic rank title, and pays more the deeper it goes (the table is in `MINE_PLAN.md`). The generator is built (`src/graveQuests.js`).
 
 **The vigil's rules (built 2026-10-06, slice 1: the data contract).** `src/vigil.js`, saved as `profile.town.chapel` (`{ day, base, light, counted }`), tested in
 `tests/vigil.test.js`. The hill opens with Deacon Graves's first star and reads nothing else.
