@@ -116,35 +116,35 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
         });
     }
 
-    function loadUser(id) {
-        const user = store.getUser(id);
+    async function loadUser(id) {
+        const user = await store.getUser(id);
         if(!user) return null;
         user.profile = normalizeProfile(user.profile, now());
         return user;
     }
 
-    function authenticate(req) {
+    async function authenticate(req) {
         const token = /^Bearer (.+)$/.exec(req.headers.authorization || '')?.[1];
         if(!token) return null;
-        const id = store.findUserByTokenHash(sha256(token));
-        return id ? { id, user: loadUser(id) } : null;
+        const id = await store.findUserByTokenHash(sha256(token));
+        return id ? { id, user: await loadUser(id) } : null;
     }
 
-    function creditPurchase(userId, productId, transactionId, extra = {}) {
+    async function creditPurchase(userId, productId, transactionId, extra = {}) {
         const product = getProduct(productId);
-        const user = loadUser(userId);
+        const user = await loadUser(userId);
         if(!product || !user) return { ok: false, status: 404, message: 'unknown user or product' };
         const credited = grantProduct(user.profile, product, transactionId, now(), extra);
-        store.putUser(userId, user);
-        store.save();
+        await store.putUser(userId, user);
+        await store.save();
         return { ok: true, credited };
     }
 
-    function newAccount(extra = {}) {
+    async function newAccount(extra = {}) {
         const userId = `rw_${randomBytes(9).toString('hex')}`;
         const token = randomBytes(32).toString('hex');
-        store.putUser(userId, { tokenHash: sha256(token), profile: createProfile(now()), lastRunAt: 0, createdAt: now().toISOString(), ...extra });
-        store.save();
+        await store.putUser(userId, { tokenHash: sha256(token), profile: createProfile(now()), lastRunAt: 0, createdAt: now().toISOString(), ...extra });
+        await store.save();
         return { userId, token };
     }
 
@@ -154,12 +154,12 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
     // - no account on this device: make one, linked from the start.
     async function appleSignIn(body, caller) {
         const { sub, clientId } = await apple.verifyIdentityToken(body.identityToken, body.nonce);
-        const existing = store.listUsers().find(entry => entry.user.apple?.sub === sub);
+        const existing = await store.findUserByAppleSub(sub);
         if(existing) {
             const token = randomBytes(32).toString('hex');
             existing.user.tokenHashes = [...(existing.user.tokenHashes || []), sha256(token)].slice(-MAX_DEVICE_TOKENS);
-            store.putUser(existing.id, existing.user);
-            store.save();
+            await store.putUser(existing.id, existing.user);
+            await store.save();
             return { userId: existing.id, token, linked: false, switched: !!caller && caller.id !== existing.id };
         }
         const link = { sub, clientId, linkedAt: now().toISOString() };
@@ -167,11 +167,11 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
         if(refreshToken) link.refreshToken = refreshToken;
         if(caller?.user) {
             caller.user.apple = link;
-            store.putUser(caller.id, caller.user);
-            store.save();
+            await store.putUser(caller.id, caller.user);
+            await store.save();
             return { userId: caller.id, token: null, linked: true, switched: false };
         }
-        return { ...newAccount({ apple: link }), linked: true, switched: false };
+        return { ...await newAccount({ apple: link }), linked: true, switched: false };
     }
 
     return async function handle(req, res) {
@@ -189,7 +189,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
 
             if(url.pathname === '/api/account' && req.method === 'POST') {
                 if(!allow('account', callerIp(req))) return tooMany(res);
-                return send(res, 201, newAccount());
+                return send(res, 201, await newAccount());
             }
 
             // ---- Sign in with Apple (optional, see server/apple.js) ----
@@ -200,7 +200,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 if(url.pathname === '/api/apple/signin' && req.method === 'POST') {
                     const body = JSON.parse((await readBody(req)) || '{}');
                     try {
-                        return send(res, 200, await appleSignIn(body, authenticate(req)));
+                        return send(res, 200, await appleSignIn(body, await authenticate(req)));
                     } catch(error) {
                         if(error instanceof AppleError) return send(res, error.code === 'apple_down' ? 503 : 400, { code: error.code, message: error.message });
                         throw error;
@@ -215,15 +215,15 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 }
                 const event = JSON.parse(await readBody(req)).event || {};
                 if(REFUND_EVENTS.has(event.type) && getProduct(event.product_id)) {
-                    const user = loadUser(event.app_user_id);
+                    const user = await loadUser(event.app_user_id);
                     if(!user) return send(res, 404, { message: 'unknown user' });
                     const reversed = revokePurchase(user.profile, `rc:${event.transaction_id || event.id}`, now());
-                    store.putUser(event.app_user_id, user);
-                    store.save();
+                    await store.putUser(event.app_user_id, user);
+                    await store.save();
                     return send(res, 200, { reversed });
                 }
                 if(!PURCHASE_EVENTS.has(event.type)) return send(res, 200, { ignored: event.type || 'unknown' });
-                const result = creditPurchase(event.app_user_id, event.product_id, `rc:${event.transaction_id || event.id}`);
+                const result = await creditPurchase(event.app_user_id, event.product_id, `rc:${event.transaction_id || event.id}`);
                 return send(res, result.ok ? 200 : result.status, result);
             }
 
@@ -237,20 +237,20 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     // Full refunds only; a partial refund is a goodwill gesture and changes nothing in the game.
                     const charge = event.data?.object || {};
                     if(!charge.payment_intent || charge.amount_refunded < charge.amount) return send(res, 200, { ignored: 'partial refund' });
-                    const owner = store.listUsers().find(entry => entry.user.profile?.purchases?.some(p => p.paymentIntent === charge.payment_intent));
+                    const owner = await store.findUserByPaymentIntent(charge.payment_intent);
                     if(!owner) return send(res, 200, { ignored: 'unknown payment' });
-                    const user = loadUser(owner.id);
+                    const user = await loadUser(owner.id);
                     const record = user.profile.purchases.find(p => p.paymentIntent === charge.payment_intent);
                     const reversed = revokePurchase(user.profile, record.tx, now());
-                    store.putUser(owner.id, user);
-                    store.save();
+                    await store.putUser(owner.id, user);
+                    await store.save();
                     return send(res, 200, { reversed });
                 }
                 if(event.type !== 'checkout.session.completed') return send(res, 200, { ignored: event.type });
                 const session = event.data?.object || {};
                 if(session.payment_status !== 'paid') return send(res, 200, { ignored: 'unpaid' });
                 const productId = stripeLinks[session.payment_link];
-                const result = creditPurchase(session.client_reference_id, productId, `stripe:${session.id}`,
+                const result = await creditPurchase(session.client_reference_id, productId, `stripe:${session.id}`,
                     session.payment_intent ? { paymentIntent: session.payment_intent } : {});
                 return send(res, result.ok ? 200 : result.status, result);
             }
@@ -261,23 +261,22 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     return send(res, 401, { message: 'bad admin token' });
                 }
                 if(url.pathname === '/admin/reports' && req.method === 'GET') {
-                    const reported = store.listUsers()
-                        .filter(entry => entry.user.reportedBy?.length)
+                    const reported = (await store.listReportedUsers())
                         .map(entry => ({ userId: entry.id, name: entry.user.profile?.name || '', reports: entry.user.reportedBy.length, hidden: !!entry.user.nameHidden }))
                         .sort((a, b) => b.reports - a.reports);
                     return send(res, 200, { reported });
                 }
                 if(url.pathname === '/admin/name' && req.method === 'POST') {
                     const body = JSON.parse((await readBody(req)) || '{}');
-                    const user = store.getUser(body.userId);
+                    const user = await store.getUser(body.userId);
                     if(!user) return send(res, 404, { message: 'unknown user' });
                     // keep: the name is fine, clear the reports. reset: remove the name; the player picks another.
                     if(body.action === 'reset') user.profile.name = '';
                     else if(body.action !== 'keep') return send(res, 400, { message: 'action must be keep or reset' });
                     user.reportedBy = [];
                     user.nameHidden = false;
-                    store.putUser(body.userId, user);
-                    store.save();
+                    await store.putUser(body.userId, user);
+                    await store.save();
                     return send(res, 200, { ok: true });
                 }
                 return send(res, 404, { message: 'not found' });
@@ -285,23 +284,22 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
 
             // ---- Game API (authenticated) ----
             if(url.pathname.startsWith('/api/')) {
-                const auth = authenticate(req);
+                const auth = await authenticate(req);
                 if(!auth?.user) return send(res, 401, { message: 'Sign in again.' });
                 const { id, user } = auth;
-                const save = () => { store.putUser(id, user); store.save(); };
+                const save = async () => { await store.putUser(id, user); await store.save(); };
 
                 if(url.pathname === '/api/leaderboard' && req.method === 'GET') {
                     // Account boards: every named player's best, ranked server-side from reported runs.
                     // Names hidden after reports stay off the boards until reviewed or changed.
-                    const accounts = store.listUsers()
-                        .filter(entry => !entry.user.nameHidden)
+                    const accounts = (await store.listBoardUsers())
                         .map(entry => ({ id: entry.id, profile: normalizeProfile(entry.user.profile, now()) }));
                     const board = rankBoard(accounts, url.searchParams.get('board') || 'weekly', id, 50, now());
                     return send(res, 200, board);
                 }
                 if(url.pathname === '/api/profile' && req.method === 'GET') {
                     refreshJobs(user.profile, now());
-                    save();
+                    await save();
                     return send(res, 200, { userId: id, profile: user.profile, nameHidden: !!user.nameHidden, apple: !!user.apple });
                 }
                 const body = JSON.parse((await readBody(req)) || '{}');
@@ -310,7 +308,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     if(seconds < MIN_SECONDS_BETWEEN_RUNS) return send(res, 429, { code: 'too_fast', message: 'Runs are reported too quickly.' });
                     user.lastRunAt = now().getTime();
                     const result = applyRun(user.profile, body, now());
-                    save();
+                    await save();
                     return send(res, 200, { ...result, profile: user.profile });
                 }
                 // A finished Hollow Claim run (src/mineProgress.js). Touches profile.mine only: no stars, no dollars, no Wanted Road records.
@@ -320,7 +318,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     if(seconds < MIN_SECONDS_BETWEEN_RUNS) return send(res, 429, { code: 'too_fast', message: 'Runs are reported too quickly.' });
                     user.lastMineRunAt = now().getTime();
                     const result = applyMineRun(user.profile.mine, body);
-                    save();
+                    await save();
                     return send(res, 200, { result, profile: user.profile });
                 }
                 if(url.pathname === '/api/name' && req.method === 'POST') {
@@ -330,13 +328,13 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     // Players under 13 never choose a name; the game gives them a generated one.
                     if(user.ageBand === 'under13' && !isGeneratedName(wanted.name)) throw new EconomyError('bad_name', 'Names are chosen for you.');
                     // Names are unique so a leaderboard row always means one player.
-                    if(store.listUsers().some(entry => entry.id !== id && entry.user.profile?.name === wanted.name)) {
+                    if(await store.findUserByName(wanted.name, id)) {
                         return send(res, 409, { code: 'name_taken', message: 'That name is taken. Try another.' });
                     }
                     setName(user.profile, wanted.name);
                     user.reportedBy = [];
                     user.nameHidden = false;
-                    save();
+                    await save();
                     return send(res, 200, { profile: user.profile });
                 }
                 // "Restore purchases" (App Store rule for non-consumables): ask RevenueCat, never the game,
@@ -357,7 +355,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                             restored.push(product.id);
                         }
                     }
-                    save();
+                    await save();
                     return send(res, 200, { restored, profile: user.profile });
                 }
                 if(url.pathname === '/api/privacy' && req.method === 'POST') {
@@ -365,7 +363,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     user.ageBand = body.ageBand;
                     user.statsConsent = body.ageBand !== 'under13' && body.statsConsent === true;
                     if(!user.statsConsent) delete user.analytics; // opting out also removes what was collected
-                    save();
+                    await save();
                     return send(res, 200, { ageBand: user.ageBand, statsConsent: user.statsConsent });
                 }
                 if(url.pathname === '/api/events' && req.method === 'POST') {
@@ -377,7 +375,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     for(const name of names) {
                         if(ALLOWED_EVENTS.has(name)) stats.counts[name] = (stats.counts[name] || 0) + 1;
                     }
-                    save();
+                    await save();
                     return send(res, 200, { ok: true });
                 }
                 if(url.pathname === '/api/report' && req.method === 'POST') {
@@ -385,12 +383,12 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     // Only players with a few runs behind them count, so fresh throwaway accounts cannot gang up.
                     if((user.profile.stats?.runs || 0) < REPORTER_MIN_RUNS) return send(res, 200, { ok: true });
                     const name = String(body.name || '');
-                    const target = store.listUsers().find(entry => entry.id !== id && name && entry.user.profile?.name === name);
+                    const target = name ? await store.findUserByName(name, id) : null;
                     if(target && !target.user.reportedBy?.includes(id)) {
                         target.user.reportedBy = [...(target.user.reportedBy || []), id];
                         if(target.user.reportedBy.length >= REPORTS_TO_HIDE) target.user.nameHidden = true;
-                        store.putUser(target.id, target.user);
-                        store.save();
+                        await store.putUser(target.id, target.user);
+                        await store.save();
                     }
                     // The same answer either way, so reports cannot be used to probe accounts.
                     return send(res, 200, { ok: true });
@@ -399,53 +397,49 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     // Keep only purchase transaction ids (tax, refunds, fraud), with no link to the player.
                     const deletedAt = now().toISOString();
                     const appleRevoked = user.apple ? await apple.revoke(user.apple.refreshToken, user.apple.clientId) : false;
-                    store.retainPurchases((user.profile.processed || []).map(transactionId => ({ transactionId, deletedAt })));
-                    for(const entry of store.listUsers()) {
-                        if(!entry.user.reportedBy?.includes(id)) continue;
-                        entry.user.reportedBy = entry.user.reportedBy.filter(reporter => reporter !== id);
-                        store.putUser(entry.id, entry.user);
-                    }
-                    store.deleteUser(id);
-                    store.save();
+                    await store.retainPurchases((user.profile.processed || []).map(transactionId => ({ transactionId, deletedAt })));
+                    await store.removeReporter(id);
+                    await store.deleteUser(id);
+                    await store.save();
                     return send(res, 200, { deleted: true, appleRevoked });
                 }
                 // Frontier Town: the server clock decides what the Jail has earned.
                 if(url.pathname === '/api/town/collect' && req.method === 'POST') {
                     const collected = collectJail(user.profile, now());
-                    save();
+                    await save();
                     return send(res, 200, { collected, profile: user.profile });
                 }
                 if(url.pathname === '/api/town/upgrade' && req.method === 'POST') {
                     upgradeBuilding(user.profile, body.building, now());
-                    save();
+                    await save();
                     return send(res, 200, { profile: user.profile });
                 }
                 // Calloway Farm (src/farm.js): the server clock decides what has grown.
                 if(url.pathname === '/api/town/farm' && req.method === 'POST') {
                     const result = farmAction(user.profile, body, now());
-                    save();
+                    await save();
                     return send(res, 200, { result, profile: user.profile });
                 }
                 // Vane's Crossing orders (src/farmOrders.js): the server clock decides which day's orders are on the board.
                 if(url.pathname === '/api/town/orders' && req.method === 'POST') {
                     const result = ordersAction(user.profile, body, now());
-                    save();
+                    await save();
                     return send(res, 200, { result, profile: user.profile });
                 }
                 // Copper Bit's shifts (src/saloon.js): the server clock decides the day, so how many shifts pay and what a night's crowd holds.
                 if(url.pathname === '/api/town/saloon' && req.method === 'POST') {
                     const result = saloonAction(user.profile, body, now());
-                    save();
+                    await save();
                     return send(res, 200, { result, profile: user.profile });
                 }
                 if(url.pathname === '/api/buy' && req.method === 'POST') {
                     buyItem(user.profile, body.itemId);
-                    save();
+                    await save();
                     return send(res, 200, { profile: user.profile });
                 }
                 if(url.pathname === '/api/equip' && req.method === 'POST') {
                     equipItem(user.profile, body.itemId);
-                    save();
+                    await save();
                     return send(res, 200, { profile: user.profile });
                 }
             }
