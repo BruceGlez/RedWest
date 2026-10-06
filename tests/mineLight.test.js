@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DIM_RING, LANTERN_RADIUS, TORCH_RADIUS, MIN_TORCH_GAP, CARRY_LIMIT, MATCH_LIMIT, OIL_CAPACITY, MAX_HOLES, LIGHT_ITEMS, SHOP_MARKUP, priceOf,
     createLightKit, normalizeLightKit, buyLight, spendKit, createLightRun, lanternLit, burnLantern, placeTorch, putOutTorch, relightTorch, burnTorches,
-    lightSource, isLit, usedKit, torchesFor, nearestLitTorch, nearestOutTorch, TORCHES_BURN_OUT_FROM, TORCH_BURN_SECONDS } from '../src/mineLight.js';
+    lightSource, isLit, usedKit, torchesFor, isLightItem, nearestLitTorch, nearestOutTorch, TORCHES_BURN_OUT_FROM, TORCH_BURN_SECONDS } from '../src/mineLight.js';
 import { createProfile, normalizeProfile, CURRENCIES } from '../src/profile.js';
 import { applyMineRun, createMineProgress, normalizeMineProgress } from '../src/mineProgress.js';
 import { floorLayout, roadLength } from '../src/mineMap.js';
@@ -192,4 +192,25 @@ test('a light eater finds the nearest lit torch of this floor within its reach; 
     assert.equal(nearestOutTorch(run, 3, 28 + MIN_TORCH_GAP + 5, 0), null, 'too far from any stub');
     assert.equal(nearestOutTorch(run, 3, 0, 0), null, 'a lit torch is not a stub');
     assert.ok(relightTorch(run, b) && nearestOutTorch(run, 3, 28, 0) === null);
+});
+
+test('an id or a shop that is only a name on every object is not for sale, and a refused buy changes nothing', () => {
+    const names = ['constructor', 'toString', '__proto__', 'hasOwnProperty', 'valueOf', 'prototype', '', 'LANTERN', 'lantern ', null, undefined, 42, {}, ['lantern']];
+    for(const name of names) {
+        assert.equal(isLightItem(name), false, `${String(name)} is not an item`);
+        const p = rich(500);
+        const before = JSON.stringify(p);
+        assert.throws(() => buyLight(p, name), error => error.code === 'unknown_item', `${String(name)} as an item`);
+        assert.equal(JSON.stringify(p), before, 'nothing changed');
+        if(name === undefined) continue; // (no shop named is Mr. Grimsby's, the default)
+        const q = rich(500);
+        const kept = JSON.stringify(q);
+        assert.throws(() => buyLight(q, 'lantern', name), error => error.code === 'unknown_shop', `${String(name)} as a shop`);
+        assert.equal(JSON.stringify(q), kept, 'nothing changed');
+    }
+    for(const id of Object.keys(LIGHT_ITEMS)) assert.ok(isLightItem(id));
+    // The price of a real item in an unknown shop is the list price, never NaN.
+    for(const shop of ['constructor', '__proto__', 'toString']) assert.equal(priceOf('lantern', shop), LIGHT_ITEMS.lantern.dollars);
+    const p = rich(500);
+    assert.ok(Number.isFinite(buyLight(p, 'lantern', 'store').price) && Number.isFinite(p.balances.dollars), 'a real buy still works');
 });
