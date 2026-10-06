@@ -146,7 +146,8 @@
     "tools/loadtest/**",
     "tests/server.test.js",
     "tests/boards.test.js",
-    "tests/storeContract.test.js"
+    "tests/storeContract.test.js",
+    "tests/migrateJson.test.js"
    ],
    "checks": [
     "npm test",
