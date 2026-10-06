@@ -166,6 +166,23 @@ try {
             assert.match(await page.locator('#status-msg').textContent(), new RegExp(`TORCHES ${kit.torches - 1}`));
             assert.ok(await page.locator('#mine-torch-btn').isVisible(), 'a TORCH button for a touch screen');
             await put(0, 0);
+            // A light eater goes for the torch and gnaws it out without touching the marshal; T beside the stub relights it with a match.
+            const hearts = await page.evaluate(() => S.playerStats.hp);
+            await page.evaluate(async () => {
+                const { spawnEnemy } = await import('/src/enemySystem.js');
+                const p = window.__redWest.playerGroup.position;
+                spawnEnemy(window.__redWest.scene, p, 'lighteater', { x: p.x + 14, z: p.z });
+                S.enemies.at(-1).userData.mineNode = 0;
+            });
+            await page.waitForFunction(() => M.mine.light.placed.some(t => !t.lit), null, { timeout: 20000 }).catch(async error => { throw new Error(`${error.message}: ${JSON.stringify(await page.evaluate(() => ({ placed: M.mine.light.placed, eaters: S.enemies.filter(e => e.userData.type === 'lighteater').map(e => ({ at: [e.position.x, e.position.z], sense: e.userData.sense?.state, eating: e.userData.eating, hp: S.playerStats.hp })), floor: M.mine.floor })))}`); });
+            assert.equal(await page.evaluate(() => S.playerStats.hp), hearts, 'a light eater never hurts him');
+            const matches = await page.evaluate(() => M.mine.light.matches);
+            await page.evaluate(() => { for(const e of S.enemies.splice(0)) e.parent.remove(e); }); // (the eater would only go for it again)
+            await put(0, 0);
+            await page.keyboard.press('KeyT');
+            await page.waitForFunction(() => M.mine.light.placed.every(t => t.lit));
+            assert.equal(await page.evaluate(() => M.mine.light.matches), matches - 1, 'a relight costs one match');
+            await page.waitForTimeout(300);
             // The four monsters that live only down here spawn, wear their own look, and run their behaviours without a fault.
             const monsters = await page.evaluate(async () => {
                 const { spawnEnemy } = await import('/src/enemySystem.js');

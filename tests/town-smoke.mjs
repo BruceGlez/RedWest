@@ -772,6 +772,51 @@ try {
         assert.deepEqual(errors, []);
         await context.close();
     }
+    // The general store (src/places/store.js): a place of its own on the town's west street, open to anyone. Its counter sells light at the store's prices.
+    {
+        const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ balances: { dollars: 500, nuggets: 40 } }));
+        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
+        const stand = id => page.evaluate(id => {
+            const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
+            window.__redWestTown.placeWalk.place(d.x, d.z);
+        }, id);
+        await goTo(page, 'store');
+        await prompt('THE GENERAL STORE');
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === 'store');
+        assert.equal(await walking(page), false, 'the town waits');
+        await page.waitForTimeout(600);
+        const calls = await page.evaluate(() => window.__redWestRenderer?.info.render.calls ?? 0);
+        assert.ok(calls < 130, `the store stays cheap to draw (${calls} draw calls)`);
+        await stand('counter');
+        await prompt('ADA PRUITT');
+        await page.keyboard.press('e');
+        await page.locator('#town-sheet').waitFor({ state: 'visible' });
+        const card = await page.locator('#town-grid').textContent();
+        assert.match(card, /ADA PRUITT/);
+        assert.equal(await page.locator('[data-buy-light]').count(), 4);
+        assert.match(card, /LANTERN[^$]*\$66/, 'the lantern at the store is $60 and 10% over, $66');
+        assert.ok(!/nugget/i.test(card), 'light is sold for dollars only');
+        // Buy the lantern: $66 at the store, in dollars, the nuggets untouched; it can only be bought once.
+        const dollars = async () => Number((await page.locator('#town-dollars').textContent()).replace(/,/g, ''));
+        const before = await dollars();
+        await page.locator('[data-buy-light="lantern"]').click();
+        await page.waitForFunction(() => /Bought lantern for \$66/.test(document.getElementById('town-toast').textContent));
+        assert.equal(await dollars(), before - 66);
+        const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestProfile.v1')));
+        assert.equal(saved.mine.light.lantern, true);
+        assert.equal(saved.balances.nuggets, 40, 'nuggets are not spent on light');
+        assert.equal(await page.locator('[data-buy-light="lantern"]').isDisabled(), true, 'one lantern is enough');
+        await page.locator('#town-sheet-close').click();
+        await stand('leave');
+        await prompt('BACK TO THE STREET');
+        await page.keyboard.press('e');
+        await page.waitForFunction(() => window.__redWestTown.place === null);
+        assert.equal(await walking(page), true);
+        assert.deepEqual(errors, []);
+        await context.close();
+    }
     // Each off on its own from the URL.
     {
         const { page, errors, context } = await open('?walk=off');

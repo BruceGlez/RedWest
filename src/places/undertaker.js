@@ -3,6 +3,7 @@
 import { createUndertakerScene } from '../placeUndertaker.js';
 import { createTownWalk } from '../townWalk.js';
 import { parlourLabel, grimsbyLine, PARLOUR_START } from '../undertakerLayout.js';
+import { lightShopHtml, lightBuyer } from '../lightShop.js';
 
 const PARLOUR_SKY = { top: '#0c0807', middle: '#150e0b', horizon: '#241912' };
 
@@ -16,8 +17,9 @@ export function createUndertakerPlace(host) {
         const beaten = progress ? progress.stars.filter(mask => (mask & 1) !== 0).length : 0;
         return `<div class="town-card" data-building="grimsby"><div class="town-sign"><span>MR. GRIMSBY</span></div>`
             + `<p class="town-blurb">&ldquo;${grimsbyLine(beaten)}&rdquo;</p>`
-            + `<p class="town-stat">The cellar stairs are behind the coffins: the Hollow Claim, a mine with no bottom: every floor is bigger than the last, and stranger. The way down is always open and the lift always brings you back. Your deepest floor and the ore you ride up with are kept.</p></div>`;
+            + `<p class="town-stat">The cellar stairs are behind the coffins: the Hollow Claim, a mine with no bottom: every floor is bigger than the last, and stranger. The way down is always open and the lift always brings you back. Your deepest floor and the ore you ride up with are kept.</p>${host.profile() ? lightShopHtml(host.profile(), 'grimsby') : ''}</div>`;
     }
+    const buy = lightBuyer(host); // the BUY buttons on Mr. Grimsby's card (src/lightShop.js)
     // Walking up to something in the parlour (src/townWalk.js, the parlour's own instance).
     function use(id) {
         if(id === 'leave') return host.leave();
@@ -41,6 +43,6 @@ export function createUndertakerPlace(host) {
         arrive() { walk.place(PARLOUR_START[0], PARLOUR_START[1]); }, // every visit starts inside the door, not on the exit prompt
         resize: (w, h) => scene3d?.resize(w, h),
         card,
-        click: () => false
+        click: buy // the BUY buttons of the light shop on Mr. Grimsby's card: true when the click was the shop's
     };
 }

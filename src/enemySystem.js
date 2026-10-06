@@ -9,7 +9,8 @@ import { gameState, enemies, playerStats } from './state.js';
 import { checkCollision, stepAround } from './physics.js';
 import { activeFloor, isOpen, spawnPoint, steerTarget, AGGRO_DISTANCE } from './mineMap.js';
 import { mine } from './mine.js';
-import { MINE_MONSTERS, mineHpBonus, mineRoster, senseRadius, leashRadius } from './mineMonsters.js';
+import { MINE_MONSTERS, mineHpBonus, mineRoster, senseRadius, leashRadius, eaterSpeed, eaterReach, eatSeconds } from './mineMonsters.js';
+import { nearestLitTorch, putOutTorch } from './mineLight.js';
 import { createSense, senseStep } from './combatMath.js';
 import { ENEMY_MODELS, rosterFor } from './enemyTypes.js';
 import { DEMO } from './demo.js';
@@ -180,6 +181,7 @@ export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
         armAngle: 2.8,
         behavior: type === 'boss' ? 'boss' : (def?.behavior ?? 'chase'),
         heavy: !!def?.heavy,
+        harmless: !!def?.harmless, // a light eater never touches the marshal
         hitRadius: def?.hitRadius,
         state: 'move',
         stateTimer: 0,
@@ -774,6 +776,26 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
             }
             break;
         }
+        case 'eater': {
+            // It goes for the nearest lit torch of the marshal's and gnaws it out (it never hurts him); with nothing to eat it hovers near him.
+            speed = eaterSpeed(mine.floor);
+            const torch = mine.light ? nearestLitTorch(mine.light, mine.floor, e.position.x, e.position.z, eaterReach(mine.floor)) : null;
+            if(torch) {
+                const to = new THREE.Vector3(torch.x - e.position.x, 0, torch.z - e.position.z);
+                const away = to.length();
+                faceDir = to.clone().normalize();
+                if(away > 1.8) { moveDir = faceDir.clone(); u.eating = 0; }
+                else {
+                    moveDir = null;
+                    u.eating = (u.eating || 0) + dt;
+                    if(u.eating >= eatSeconds(mine.floor)) { putOutTorch(torch); u.eating = 0; playSound('hit'); }
+                }
+            } else {
+                u.eating = 0;
+                if(dist < 14) moveDir = null;
+            }
+            break;
+        }
         case 'zigzag': {
             moveDir.applyAxisAngle(UP, Math.sin((timeInSeconds * 5) + u.phase) * 0.95);
             faceDir = moveDir;
@@ -940,7 +962,7 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         }
 
         // --- MOVEMENT ---
-        if(moveDir && dist > 2.0) {
+        if(moveDir && (dist > 2.0 || u.behavior === 'eater')) { // (a light eater walks to its torch even when the marshal stands beside it)
             const moveX = moveDir.x * speed * dt;
             const moveZ = moveDir.z * speed * dt;
             const colRad = (u.type === 'boss' || u.heavy) ? 1.2 : 0.5;
@@ -989,7 +1011,7 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         // Enemies stop moving at 2.0 units, so every reach must be larger than that.
         const big = u.heavy || u.type === 'boss';
         const reach = u.type === 'boss' ? 3.4 : u.heavy ? 3.2 : u.type === 'rattler' ? 2.2 : 2.5;
-        if(!u.faded && e.position.distanceTo(playerPos) < reach && damagePlayer(callbacks)) {
+        if(!u.faded && !u.harmless && e.position.distanceTo(playerPos) < reach && damagePlayer(callbacks)) {
             const knock = dir.clone().multiplyScalar(big ? -2.5 : -5);
             // In the mine a knock-back never carries anyone into the rock.
             if(!activeFloor() || isOpen(activeFloor(), e.position.x + knock.x, e.position.z + knock.z, 1)) e.position.add(knock);

@@ -13,7 +13,7 @@ import { disposeBaked } from '../meshMerge.js';
 import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
 import { showMineFloor, openMineChest, updateMineScene, setMineTorches, setMineLantern } from '../mineScene.js';
 import { setMineLightSource } from '../placeDark.js';
-import { burnLantern, burnTorches, placeTorch, lanternLit, lightSource, DIM_RING } from '../mineLight.js';
+import { burnLantern, burnTorches, placeTorch, relightTorch, nearestOutTorch, lanternLit, lightSource, DIM_RING } from '../mineLight.js';
 import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE, SHAFT_REACH, LIFT_REACH } from '../mineMap.js';
 import { MINE_MONSTERS, newOn, isMineMonster, planNode, WAKE_DISTANCE, LEAVE_DISTANCE } from '../mineMonsters.js';
 
@@ -98,6 +98,7 @@ function updatePopulation(ctx, dt) {
 // through setMineTorches, which cuts their holes in the dark itself, so they are not passed again as holes here.
 const lightRadius = () => mine.light ? lightSource(mine.light, mine.floor).radius : DIM_RING;
 let lanternShown = null;
+let torchesLit = ''; // which torches of this floor are lit, as a string, to notice when one goes out
 function syncLantern() {
     const lit = !!mine.light && lanternLit(mine.light);
     if(lit === lanternShown) return;
@@ -106,6 +107,7 @@ function syncLantern() {
 }
 function syncTorches() {
     lanternShown = null;
+    torchesLit = mine.light ? mine.light.placed.filter(t => t.floor === mine.floor).map(t => t.lit ? 1 : 0).join('') : '';
     setMineTorches(mine.light ? mine.light.placed.filter(t => t.floor === mine.floor).map(({ x, z, lit }) => ({ x, z, lit })) : []);
     syncLantern();
 }
@@ -115,8 +117,14 @@ let modeCtx = null;
 function putTorchDown() {
     if(!mine.enabled || !mine.light || !modeCtx || gameState.isGameOver || gameState.isConfirming || gameState.isPaused || !gameState.isGameStarted) return;
     const at = modeCtx.playerSystem.playerGroup.position;
-    const torch = placeTorch(mine.light, at.x, at.z, mine.floor);
     const spot = new THREE.Vector3(at.x, 2.5, at.z);
+    const stub = nearestOutTorch(mine.light, mine.floor, at.x, at.z); // beside a torch that went out, T relights it (one match)
+    if(stub) {
+        if(relightTorch(mine.light, stub)) { syncTorches(); playSound('powerup'); floatText(`TORCH RELIT, ${mine.light.matches} MATCHES LEFT`, spot, 'hot'); }
+        else floatText('NO MATCHES LEFT', spot, 'hot');
+        return;
+    }
+    const torch = placeTorch(mine.light, at.x, at.z, mine.floor);
     if(!torch) {
         floatText(mine.light.torches <= 0 ? 'NO TORCHES LEFT' : 'TOO CLOSE TO ANOTHER TORCH', spot, 'hot');
         return;
@@ -196,8 +204,10 @@ function updateFlow(ctx, dt) {
     if(chest >= 0) openChest(ctx, chest, cave);
     if(mine.light) { // the lantern burns oil and, deep down, torches burn out (src/mineLight.js)
         burnLantern(mine.light, dt);
-        burnTorches(mine.light, mine.floor, dt);
+        for(const t of burnTorches(mine.light, mine.floor, dt)) floatText('THE AIR IS THIN: A TORCH WENT OUT', new THREE.Vector3(t.x, 3, t.z), 'hot');
         syncLantern();
+        const lit = mine.light.placed.filter(t => t.floor === mine.floor).map(t => t.lit ? 1 : 0).join('');
+        if(lit !== torchesLit) { torchesLit = lit; syncTorches(); } // a light eater put one out
     }
     updatePopulation(ctx, dt);
 }

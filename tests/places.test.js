@@ -20,17 +20,18 @@ test('registerPlace only takes a factory', () => {
     assert.throws(() => registerPlace({ id: 'x' }), /factory/);
 });
 
-test('the farm, the parlour and the cellar are registered, and each says its own way in', async () => {
+test('the farm, the parlour, the cellar and the store are registered, and each says its own way in', async () => {
     const { createPlaces: create } = await import('../src/places/index.js');
     const host = { screen: null, profile: () => null, progress: () => null, companion: () => ({}), isCardOpen: () => false };
     const places = create(host);
-    assert.deepEqual(places.map(p => p.id).sort(), ['canal', 'cellar', 'chapel', 'copper', 'crossing', 'ranch', 'undertaker']);
+    assert.deepEqual(places.map(p => p.id).sort(), ['canal', 'cellar', 'chapel', 'copper', 'crossing', 'ranch', 'store', 'undertaker']);
     assert.equal(places.find(p => p.entrance('enter-ranch')).id, 'ranch');
     assert.equal(places.find(p => p.entrance('enter-crossing')).id, 'crossing');
     assert.equal(places.find(p => p.entrance('enter-canal')).id, 'canal');
     assert.equal(places.find(p => p.entrance('enter-copper')).id, 'copper');
     assert.equal(places.find(p => p.entrance('enter-chapel')).id, 'chapel');
     assert.equal(places.find(p => p.entrance('undertaker')).id, 'undertaker');
+    assert.equal(places.find(p => p.entrance('store')).id, 'store');
     assert.equal(places.find(p => p.entrance('train')), undefined);
     for(const p of places) {
         assert.equal(p.canEnter(), false, `${p.id} cannot be entered before the profile has loaded`);
