@@ -104,6 +104,8 @@
     "src/places/undertaker.js",
     "src/places/vane.js",
     "src/saloon.js",
+    "src/graveQuests.js",
+    "tests/graveQuests.test.js",
     "src/saloonLayout.js",
     "src/places/saloon.js",
     "tests/saloonLayout.test.js",

@@ -312,6 +312,23 @@ kill one creature, kill a number of creatures, or a mix, plus a main quest that 
   Bounty Dollars. Since light costs money and the mine pays none, a small Bounty Dollar reward from a grave quest may be the fair answer.
 - Needs first: the dark mine (Slice 5), then a data contract (quest state in the profile and the server) before the screens.
 
+**Design note and the generator (town lane, 2026-10-06).** `src/graveQuests.js` is the pure generator (`tests/graveQuests.test.js`); nothing else is built yet.
+- **Six graves, six souls** (`SOULS`): each has a name, a trade, a mood (*revenge* or *unfinished*) and one line. A grave's quest is made when it is opened from
+  `graveQuest({ seed, day, grave, deepest })`: the same inputs always give the same quest. `seed` is 0 for everyone the same day, or an account's own number if the
+  owner wants different graves for different players.
+- **Templates (Fate's small ones):** FIND (bring up ore), HUNT (kill one named creature), CLEAR (kill a number of one kind), MIX (a clear and a find). One grave
+  each day is the **main** grave: a named creature, bigger and tougher, on floor 10 or three below the deepest the player has reached, with 2 to 4 of another
+  kind following it. The target kinds are only what lives on the asked floor (`mineRoster`), and an ordinary quest is never deeper than two floors below the
+  player's deepest, so it is always something he can do. A new player is sent no deeper than floor 2.
+- **What the mine lane has to count** (a tally since the quest was taken): `{ kills: { monsterId: n }, ore: n }`. `questProgress(quest, tally)` reads it and says
+  which goals are done. The state in the profile and the server (`profile.quests`: the quest ids taken, their tallies, the ones finished) is the data contract for
+  the next PR, once the reward is decided.
+- **No reward is named on purpose, and a test fails if one appears.** No timer, no stars, no Gold Nuggets.
+- **Open for the owner: what a quest pays.** Options: (1) a small amount of Bounty Dollars (fair, since light costs money and the mine pays none; it must stay
+  well under the jail's rate, and quests are once a day per grave), (2) ore, (3) cosmetic titles or markings for the marshal, (4) only the words of the soul (the
+  Calloway farm's epilogue style), or a mix of (3) and (1). Bounty Dollars from the graves would be the one place the mine's rule "no money from the mine" bends,
+  so it is the owner's call.
+
 ## Open questions
 
 - How much ore a fall costs: 2a starts with all of the run's carried ore (`FALL_KEEPS`). To tune from playtests.

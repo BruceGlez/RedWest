@@ -301,6 +301,7 @@ Deacon Graves. North edge, between Tres Rios and the Foundry.
 - **The other places are a bonus.** Pete's meals for the volunteers and the Wash's finds for the bell can speed a piece along, but
   the hill needs none of them: each piece shows what could help, and the others go on.
 - Nothing is timed for pay. The vigil waits for you each evening, and a missed night costs nothing but the night.
+- **The graves (slice 6, `MINE_PLAN.md`).** The graves on the hill give quests: the generator is built (`src/graveQuests.js`: six souls, small Fate-style templates, one main grave a day). They ask for things done in the mine, so they send the player down rather than into combat here; the hill itself still never changes a fight. What a quest pays is the owner's open question. How the graves sit with the vigil (beside it, as the hill's second thing to do) is for the owner to confirm.
 
 ## Order of work
 
