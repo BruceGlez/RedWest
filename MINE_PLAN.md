@@ -392,6 +392,9 @@ Money must not buy combat power: if oxygen can be bought it is Bounty Dollars on
 
 **Held, not answered by the owner (listed for the coordinator):** (1) rescaling the floor lengths if "main road" meant the longer measure in the table above (one constant, `hopGap` in `src/mineMap.js`); (2) a small "lift or shaft in sight" HUD rule (the art lane's glow and beams and the HUD arrows already work).
 
+**The light shops are open (#73), so `LIGHT_NEEDS_SHOP` is now `true` (2026-10-06).** A run starts with what the player owns (`profile.mine.light`) and nothing else; with no lantern he has the dim ring
+and the lift and the shaft to walk back by (never a softlock). The free kit (`FREE_KIT`) is kept only as a test aid behind the setting. The mine smoke starts as a player who has bought a kit.
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want

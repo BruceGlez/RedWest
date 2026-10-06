@@ -16,7 +16,8 @@ try {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     await context.addInitScript(answeredPrivacy);
     // The hidden door in the cellar opens once Deacon Graves has a star (MINE_PLAN.md, slice 5): start with him beaten, once (a reload keeps the saved run).
-    await context.addInitScript(() => { if(!localStorage.getItem('redWestProfile.v1')) localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [0, 0, 7, 0, 0, 0, 0, 0, 0, 0] } })); });
+    // (he has bought a kit at the light shop: a run starts with what he owns)
+    await context.addInitScript(() => { if(!localStorage.getItem('redWestProfile.v1')) localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [0, 0, 7, 0, 0, 0, 0, 0, 0, 0] }, mine: { light: { lantern: true, oil: 900, torches: 10, matches: 5 } } })); });
     const page = await context.newPage();
     page.setDefaultTimeout(60000);
     const errors = [];
@@ -338,6 +339,7 @@ try {
     assert.equal(saved.mine.deepest, 5);
     assert.equal(saved.mine.checkpoint, 5);
     assert.ok(saved.mine.ore > 0 && saved.mine.runs === 1);
+    assert.ok(saved.mine.light.lantern && saved.mine.light.torches < 10 && saved.mine.light.matches < 5 && saved.mine.light.oil < 900, `what the run used came off his kit: ${JSON.stringify(saved.mine.light)}`);
     assert.deepEqual([saved.balances.dollars, saved.stats.stageStars.reduce((a, b) => a + b, 0)], [0, 7], 'the mine paid no dollars and gave no stars (only the Deacon\'s, which it started with)');
 
     // Back to town: the Wanted Road rules are back (no mine, no cave, the ordinary arena limit).

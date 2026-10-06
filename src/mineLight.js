@@ -47,9 +47,9 @@ export const priceOf = (id, shop = 'grimsby', kit = null) => {
     return Math.ceil(LIGHT_ITEMS[id].dollars * markup);
 };
 
-// Until the light shops (Mr. Grimsby's and the general store) are open, nobody could buy a lantern and the mine would be black for everyone, so
-// a run starts with a full kit of its own. When the shops open, set this to true: the run then starts with what he owns (profile.mine.light).
-export const LIGHT_NEEDS_SHOP = false;
+// The light shops (Mr. Grimsby's and the general store) are open, so a run starts with what the player owns (profile.mine.light) and nothing else: with no
+// lantern he has the dim ring and the lift and the shaft to walk back by. Set this to false only to give every run a free full kit (FREE_KIT) while testing.
+export const LIGHT_NEEDS_SHOP = true;
 export const FREE_KIT = { lantern: true, oil: OIL_CAPACITY, torches: CARRY_LIMIT, matches: MATCH_LIMIT };
 
 // ---------- what a player owns (profile.mine.light) ----------
