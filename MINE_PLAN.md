@@ -344,6 +344,14 @@ stonekin 22, wraith 55). The Wanted Road, bosses and anything spawned without a 
 fills within `WAKE_DISTANCE` 45 of its edge and empties past `LEAVE_DISTANCE` 100) stay as the cap on how many monsters exist; the radius decides when each one acts.
 Every number is a guess to tune by playing. A lit marshal being sensed from farther is not built (it needs the light rules wired in).
 
+**Built 2026-10-06 (slice 5, part (a) wired into the mine mode).** `src/modes/mine.js`: a run starts with a light kit (`mine.light`, from `profile.mine.light` once the shops
+are open); the lantern burns oil each frame; **T** (or the TORCH button, made by the mode, for a touch screen) puts a torch down where the marshal stands (refused with a
+word when none are left or one is too close); the HUD shows `TORCHES n` and `OIL nm` (or `LANTERN OUT`); `setMineLightSource` gives the dark layer the lantern's radius
+(the dim ring when out of oil), `setMineTorches` shows the placed torches of the floor (they cut their own holes in the dark, so none are passed again as holes) and
+`setMineLantern` lights or puts out the marshal's lantern. The run's summary carries `used` so the oil, torches and matches spent come off what he owns.
+**Until the light shops are open, `LIGHT_NEEDS_SHOP` in `src/mineLight.js` is `false` and every run starts with a free full kit** (a lantern, full oil, 10 torches and 20 matches),
+otherwise nobody could buy a lantern and the mine would be black for everyone. When the shops are in, set it to `true`: a run then starts with what he owns.
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want

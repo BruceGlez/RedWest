@@ -11,7 +11,9 @@ import { clearParticles } from '../particleSystem.js';
 import { clearDecals } from '../decals.js';
 import { disposeBaked } from '../meshMerge.js';
 import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
-import { showMineFloor, openMineChest, updateMineScene } from '../mineScene.js';
+import { showMineFloor, openMineChest, updateMineScene, setMineTorches, setMineLantern } from '../mineScene.js';
+import { setMineLightSource } from '../placeDark.js';
+import { burnLantern, burnTorches, placeTorch, lanternLit, lightSource, DIM_RING } from '../mineLight.js';
 import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE, SHAFT_REACH, LIFT_REACH } from '../mineMap.js';
 import { MINE_MONSTERS, newOn, isMineMonster, planNode, WAKE_DISTANCE, LEAVE_DISTANCE } from '../mineMonsters.js';
 
@@ -47,6 +49,7 @@ function beginFloor(ctx, floor) {
     gameState.isIntermission = false;
     gameState.intermissionTimer = 0;
     gameState.waveBossSpawned = false;
+    syncTorches(); // (the torches he put down on an earlier floor are not on this one)
     mineNodes = activeFloor().nodes.map(() => false); // no chamber has been filled yet
     minePending = [];
     mineCheckIn = 0;
@@ -88,6 +91,59 @@ function updatePopulation(ctx, dt) {
             }
         }
     });
+}
+
+// ---------- light (src/mineLight.js) ----------
+// The dark layer asks for the radius of the marshal's own light each frame (src/placeDark.js, setMineLightSource); placed torches go to the scene
+// through setMineTorches, which cuts their holes in the dark itself, so they are not passed again as holes here.
+const lightRadius = () => mine.light ? lightSource(mine.light, mine.floor).radius : DIM_RING;
+let lanternShown = null;
+function syncLantern() {
+    const lit = !!mine.light && lanternLit(mine.light);
+    if(lit === lanternShown) return;
+    lanternShown = lit;
+    setMineLantern(lit);
+}
+function syncTorches() {
+    lanternShown = null;
+    setMineTorches(mine.light ? mine.light.placed.filter(t => t.floor === mine.floor).map(({ x, z, lit }) => ({ x, z, lit })) : []);
+    syncLantern();
+}
+
+// Put a torch down where the marshal stands (the T key, or the TORCH button on a touch screen).
+let modeCtx = null;
+function putTorchDown() {
+    if(!mine.enabled || !mine.light || !modeCtx || gameState.isGameOver || gameState.isConfirming || gameState.isPaused || !gameState.isGameStarted) return;
+    const at = modeCtx.playerSystem.playerGroup.position;
+    const torch = placeTorch(mine.light, at.x, at.z, mine.floor);
+    const spot = new THREE.Vector3(at.x, 2.5, at.z);
+    if(!torch) {
+        floatText(mine.light.torches <= 0 ? 'NO TORCHES LEFT' : 'TOO CLOSE TO ANOTHER TORCH', spot, 'hot');
+        return;
+    }
+    syncTorches();
+    playSound('powerup');
+    floatText(`TORCH PLACED, ${mine.light.torches} LEFT`, spot, 'hot');
+    modeCtx.ui.updateHUD();
+}
+const onKey = event => { if(event.code === 'KeyT' && !event.repeat && event.target?.tagName !== 'INPUT') putTorchDown(); };
+let torchButton = null;
+function showControls() {
+    window.addEventListener('keydown', onKey);
+    if(torchButton) return;
+    torchButton = document.createElement('button');
+    torchButton.id = 'mine-torch-btn';
+    torchButton.type = 'button';
+    torchButton.textContent = 'TORCH';
+    Object.assign(torchButton.style, { position: 'fixed', left: '12px', top: '46%', zIndex: 20, padding: '10px 18px',
+        font: 'inherit', fontWeight: 'bold', letterSpacing: '1px', color: '#ffd9a0', background: 'rgba(40,22,10,0.8)', border: '2px solid #c8863a', borderRadius: '10px' });
+    torchButton.addEventListener('click', event => { event.stopPropagation(); putTorchDown(); });
+    document.body.appendChild(torchButton);
+}
+function hideControls() {
+    window.removeEventListener('keydown', onKey);
+    torchButton?.remove();
+    torchButton = null;
 }
 
 // A chest: it opens when the marshal walks up to it, for score and either a heart or a spell of triple shot.
@@ -138,6 +194,11 @@ function updateFlow(ctx, dt) {
     if(mine.liftArmed && liftReached(at.x, at.z) && mine.blocked !== 'up') { askMine(ctx, 'up'); return; }
     const chest = chestWithin(cave, at.x, at.z, mine.opened);
     if(chest >= 0) openChest(ctx, chest, cave);
+    if(mine.light) { // the lantern burns oil and, deep down, torches burn out (src/mineLight.js)
+        burnLantern(mine.light, dt);
+        burnTorches(mine.light, mine.floor, dt);
+        syncLantern();
+    }
     updatePopulation(ctx, dt);
 }
 
@@ -151,13 +212,18 @@ export const mineMode = {
         waveLabel: 'DEPTH:',
         wave: () => mine.floor,
         timer: () => shaftHint(mine.shaftDx, mine.shaftDz),
-        status: () => statusText(mine.liftDx, mine.liftDz, mine.ore)
+        status: () => statusText(mine.liftDx, mine.liftDz, mine.ore, mine.light)
     },
     previewOutlaw: () => floorStage(1),
     runOutlaw: () => floorStage(1),
     atmosphereId: () => MINE_ATMOSPHERE_ID,
     previewScene: ctx => showMineFloor(ctx.scene, mine.floor), // the cave is there from the first frame
-    begin: ctx => beginFloor(ctx, mine.startFloor), // floor 1, or the checkpoint picked at the stairs
+    begin: ctx => {
+        modeCtx = ctx;
+        setMineLightSource(() => ({ radius: lightRadius(), holes: [] }));
+        showControls();
+        beginFloor(ctx, mine.startFloor); // floor 1, or the checkpoint picked at the stairs
+    },
     update: updateFlow,
     updateScene: (ctx, t) => updateMineScene(t),
     resultText: result => resultText(result, mine.floor, mine.ore),
@@ -167,5 +233,5 @@ export const mineMode = {
         if(!economy?.reportMineRun) return;
         economy.reportMineRun(runSummary(result, seconds)).then(reply => say(savedText(reply.result))).catch(() => say(SAVE_FAILED_NOTE));
     },
-    reset: () => { endMineRun(); }
+    reset: () => { hideControls(); setMineLightSource(null); modeCtx = null; endMineRun(); }
 };
