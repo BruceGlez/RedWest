@@ -436,6 +436,36 @@ test('Vane\'s Crossing is shut until Silas Vane is beaten, then the orders follo
     }
 });
 
+test('/healthz answers without a token, says whether the store is reachable, and shows nothing else', async () => {
+    const down = { ...createMemoryStore(), ping: () => { throw new Error('disk gone: /secret/path'); } };
+    const fine = createMemoryStore();
+    for(const [store, status, body] of [[fine, 200, { ok: true, store: true }], [down, 503, { ok: false, store: false }]]) {
+        const server = createServer(createApp({ store, env: ENV }));
+        await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+        try {
+            const response = await fetch(`http://127.0.0.1:${server.address().port}/healthz`);
+            assert.equal(response.status, status);
+            assert.deepEqual(await response.json(), body, 'no error text, paths or secrets in the answer');
+            const head = await fetch(`http://127.0.0.1:${server.address().port}/healthz`, { method: 'HEAD' });
+            assert.equal(head.status, status);
+        } finally {
+            await new Promise(resolve => server.close(resolve));
+        }
+    }
+});
+
+test('the file store pings while its folder is writable and fails when it is gone', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { createFileStore } = await import('../server/store.js');
+    const dir = mkdtempSync(join(tmpdir(), 'rw-store-'));
+    const store = createFileStore(join(dir, 'data', 'redwest.json'));
+    assert.equal(store.ping(), true);
+    rmSync(dir, { recursive: true });
+    assert.throws(() => store.ping());
+});
+
 test('a mine run is applied to profile.mine only, with the floor and ore cut down to what could be true', async () => {
     const s = await startServer();
     try {
