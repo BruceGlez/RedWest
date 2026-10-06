@@ -149,7 +149,8 @@
     "tests/server.test.js",
     "tests/boards.test.js",
     "tests/storeContract.test.js",
-    "tests/migrateJson.test.js"
+    "tests/migrateJson.test.js",
+    "tests/loadtest.test.js"
    ],
    "checks": [
     "npm test",

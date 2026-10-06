@@ -486,6 +486,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
             if(error instanceof EconomyError) return send(res, 400, { code: error.code, message: error.message });
             if(error instanceof SyntaxError) return send(res, 400, { message: 'bad JSON' });
             if(error instanceof StoreConflictError) return send(res, 409, { code: error.code, message: error.message });
+            console.error(`server error on ${req.method} ${req.url?.split('?')[0]}:`, error?.message ?? error); // the reason stays in the log, never in the answer
             return send(res, 500, { message: 'server error' });
         } finally {
             release?.();

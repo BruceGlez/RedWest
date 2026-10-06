@@ -112,3 +112,24 @@ Purchases and webhooks must be idempotent on the transaction id inside the same 
 - `server/migrate.js` + `server/migrate-cli.js` (`node server/migrate-cli.js [--file] [--dry-run] [--overwrite]`, needs `DATABASE_URL`). Read-only on the JSON file (it stays the rollback). A player already in Postgres is left alone unless `--overwrite`, so running it again after the game went live on Postgres cannot erase newer progress (the design said "only if the file copy is newer", but players carry no timestamp that could tell, so "never" is the safe rule). Entries that are not players (no profile, no token) are skipped and counted. Each copied player is read back and compared with the file (key order ignored, jsonb reorders it); one failing player is reported and the others still go, and a second run finishes the job. Retained purchases are copied once each. Measured: 5,000 players in about 6.5 seconds against a local Postgres 16.
 - The cut-over steps and the rollback are in `docs/DEPLOY.md`. Tests in `tests/migrateJson.test.js` (memory store always, Postgres with `TEST_DATABASE_URL`).
 - What is left on the Postgres plan: a leaderboard query (it still reads every visible player), unique names, a Postgres service in CI, then Redis only with a second instance. The next scale jobs I would propose: `tools/loadtest/` to measure the real ceiling, then those.
+
+## Built: the load test (`tools/loadtest/`) and what it measured
+`node tools/loadtest/run.mjs [--steps 100,300,1000,3000] [--seconds 20] [--think 8] [--seed 5000] [--pad-kb 4] [--p95 300] [--errors 0.005] [--without leaderboard] [--store json|postgres] [--database-url URL]`. It seeds a throwaway store with test players (ids `lt_...`), starts its own server as a child process, ramps virtual players through the steps (each acts about every `--think` seconds: profile reads that also save, jail collects, the leaderboard, mine runs, refused buys), and prints per step requests a second, p50/p95/p99/max latency, unexpected answers, the server's CPU and memory, the slowest operation, and a verdict against the budget (p95 under 300 ms, errors under 0.5%). It never touches real data: JSON runs in a temp file, and Postgres is refused if the database holds any player not starting with `lt_`. `tests/loadtest.test.js` checks its parts and runs it end to end.
+
+**Measured here** (a 4-core cloud box, the load generator and Postgres 16 on the same machine, so the numbers lean cautious; players padded to about 6 KB each, like a played profile; one action per player about every 8 s). "Players" means online at once, "accounts" means registered:
+
+| Store | Accounts | Mix | Players inside the budget |
+|---|---|---|---|
+| JSON file | 500 | all | 200 (p95 26 ms) |
+| JSON file | 1,000 | all | 200 (p95 44 ms) |
+| JSON file | 2,000 | all | about 100 (p95 210 to 380 ms); 200 is far over (p95 several seconds) |
+| JSON file | 5,000 | all | none: p95 0.3 s at 25 players, timeouts at 100 |
+| Postgres | 5,000 | all | 100 (p95 259 ms); 300 is over (p95 3 s) |
+| Postgres | 20,000 | all | none: p95 6 s at 100 players |
+| Postgres | 20,000 | **without the leaderboard** | **3,000** (p95 71 ms, about 380 requests a second); 5,000 is over (p95 1.4 s) |
+
+What it says:
+1. **My earlier answer was too optimistic.** I said the JSON store was comfortable to about 2,000 accounts and had a practical ceiling near 5,000, from timing one save of an empty profile. With realistic profiles (and because a profile read also saves) the whole file is rewritten on most requests, and the ceiling is nearer **1,000 to 2,000 accounts**, with only a few hundred players online. Past about 2,000 it is unusable. If the playtest could pass about 1,000 accounts, use Postgres.
+2. **Postgres fixes the writes**: with the leaderboard out of the mix it carries thousands of players at a few percent of a core, and the box was not the limit (the load generator was).
+3. **The leaderboard is now the bottleneck.** `listBoardUsers()` loads every visible player into memory on each call; with 10% of requests doing it, memory climbed to 3.4 GB at 20,000 accounts and everything timed out. That is the next job (a query that returns only the top rows), and until it lands the leaderboard should not be called often on a big database.
+4. A first rig mistake worth recording: the first Postgres run showed 500s at 2,000 players because the test database itself had been killed, not the server. Unexpected server errors are now logged (`server error on <method> <path>: <message>`), so such a cause shows in the log.
