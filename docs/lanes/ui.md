@@ -34,3 +34,6 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 ## Before you open a PR
 - `npm test`
 - `npm run test:mobile`
+
+## Backlog: the oxygen bar (the dark mine, `MINE_PLAN.md`)
+- A HUD bar for the marshal's oxygen on floors 15 and deeper, built from `src/mineAir.js` (`air.level` 0 to 100, `airLow`, `airEmpty`, `airEffects(air)` = `{ speed, light, warning, empty }`). The full spec is in `MINE_PLAN.md`, "The oxygen bar: spec for the ui lane". Only on thin floors; warns below a quarter; no effect on combat numbers.

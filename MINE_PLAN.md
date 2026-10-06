@@ -273,6 +273,7 @@ What we already do and what it means:
 2. **Torches and lantern: built** (`src/placeTorch.js`). `setMineTorches([{ x, z, lit }])` in `src/mineScene.js` shows them (lit ones burn, flicker and clear the dark; unlit ones are charred stubs with smoke, which is what a light eater leaves); `setMineLantern(false)` puts the marshal's lantern out. The **mine** lane calls these from its torch rules. Up to 48 torches, five draw calls in all.
 3. **Light eater model: built** (`createLightEaterMesh` in `src/assets.js`): a small dark bug with pale mandibles, four running legs and a dim amber abdomen (`userData.ember`, an unlit child the rules may dim or brighten). Waiting on the **mine** lane (its rules and floors) and **combat** (its behaviour): they add the monster with `look: 'lighteater'` and the mesh in `MINE_MESHES` (`src/enemySystem.js`).
 4. **Hidden door: built** as a part (`src/placeHiddenDoor.js`, `createHiddenDoor()`): `group.position`/`rotation.y` from the cellar layout, `update(t, distanceFromMarshal)` each frame (a faint seam of light, dust at the foot and a draught when near, nothing from far away), `setOpen(true)` swings it on a lit passage. Waiting on the **town** lane: the cellar layout and placeholder scene (`src/placeCellar.js`) that place it on a wall spot, say how wide the wall spot is (the door is 3.2 x 4.6 units; ask the art lane to change that), and call `setOpen` once Deacon Graves has a star.
+5. **Bigger light: follows the mine lane's numbers.** `placeDark.js` and `placeTorch.js` now import `LANTERN_RADIUS`, `TORCH_RADIUS` and `MAX_HOLES` from `src/mineLight.js`, so the dark layer, the lantern and placed torches share one number; the torch limit is 12. Checked at 28 / 22: a wide soft-edged pool, black beyond it, 22 draw calls.
 
 ### Decided by the owner (2026-10-06, answers to the "still open" list)
 
@@ -394,6 +395,18 @@ Money must not buy combat power: if oxygen can be bought it is Bounty Dollars on
 
 **The light shops are open (#73), so `LIGHT_NEEDS_SHOP` is now `true` (2026-10-06).** A run starts with what the player owns (`profile.mine.light`) and nothing else; with no lantern he has the dim ring
 and the lift and the shaft to walk back by (never a softlock). The free kit (`FREE_KIT`) is kept only as a test aid behind the setting. The mine smoke starts as a player who has bought a kit.
+**Bigger light (owner, 2026-10-06: "the light is too small").** `LANTERN_RADIUS` 15 to **28** and `TORCH_RADIUS` 12 to **22** (about 1.9x and 1.8x), both named constants in `src/mineLight.js`; the dim ring
+stays 6 (your own feet, with no light). Beyond them it is still truly black. A chamber is 22 to 30 wide, so the lantern lights about a chamber's width; a torch every 40 units overlaps its
+neighbour a little (2 x 22 = 44), so a torch road is a lit path with dark cave to either side. `MIN_TORCH_GAP` (14) is unchanged. **For the art lane (`src/placeTorch.js`, `src/placeDark.js`):** the
+lantern's radius reaches the dark layer through the hook as before, but a placed torch's hole is drawn with the art lane's own `TORCH_LIGHT_RADIUS` through `setMineTorches`, so it stays small until
+that is set from `TORCH_RADIUS` in `src/mineLight.js` (and the `limit` of `torchHoles`, 8, raised towards the 12 the light rules allow; `MAX_HOLES` 16 already fits the lift, the shaft and 12 torches).
+
+**The oxygen bar: spec for the ui lane (the owner confirmed my defaults, 2026-10-06).** Confirmed: drain = time on a thin floor (0.5 a second on floor 15, +0.05 a second each floor deeper, cap 2.0); refill = at the lift and beside
+a lit torch of his, plus the arrival fill; **not** checkpoints and **not** a shop flask; at empty = a slower marshal and a dimmer lantern, never a lost heart. `OXYGEN_ENABLED` in `src/mineAir.js` is set to
+`true` when the bar is wired. The bar is a HUD element built from `src/mineAir.js`: `air.level` (0 to `AIR_CAPACITY` 100), `airLow(air)`, `airEmpty(air)` and `airEffects(air)` = `{ speed, light, warning, empty }`
+(`speed` and `light` are factors from 1 down to `SLOW_AT_EMPTY` 0.85 and `LIGHT_AT_EMPTY` 0.6). It shows only on floors 15 and deeper (`THIN_AIR_FROM_FLOOR`), warns below `LOW_AIR` (25), and
+fills fast within `LIFT_AIR_RADIUS` (14) of the lift. The mine mode will call `tickAir(air, dt, { floor, nearLift, nearLitTorch })` each frame, `arriveAir` on each new floor, scale the marshal's speed by
+`airEffects(air).speed` and the lantern radius by `.light`; that wiring is the mine lane's and follows once the bar exists.
 
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
