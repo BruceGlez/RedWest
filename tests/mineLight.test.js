@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DIM_RING, LANTERN_RADIUS, TORCH_RADIUS, MIN_TORCH_GAP, CARRY_LIMIT, MATCH_LIMIT, OIL_CAPACITY, MAX_HOLES, LIGHT_ITEMS, SHOP_MARKUP, priceOf,
     createLightKit, normalizeLightKit, buyLight, spendKit, createLightRun, lanternLit, burnLantern, placeTorch, putOutTorch, relightTorch, burnTorches,
-    lightSource, isLit, usedKit, torchesFor, isLightItem, nearestLitTorch, nearestOutTorch, TORCHES_BURN_OUT_FROM, TORCH_BURN_SECONDS } from '../src/mineLight.js';
+    lightSource, isLit, usedKit, torchesFor, isLightItem, nearestLitTorch, nearestOutTorch, THIN_AIR_FROM_FLOOR, OIL_MIN_PRICE, TORCH_FAIL_MIN_SECONDS, TORCH_FAIL_SPREAD_SECONDS, torchFailChance, torchFailAfter } from '../src/mineLight.js';
 import { createProfile, normalizeProfile, CURRENCIES } from '../src/profile.js';
 import { applyMineRun, createMineProgress, normalizeMineProgress } from '../src/mineProgress.js';
 import { floorLayout, roadLength } from '../src/mineMap.js';
@@ -40,8 +40,9 @@ test('buying: the lantern once, oil to fill it, torches and matches up to what h
     assert.throws(() => buyLight(p, 'oil'), error => error.code === 'full');
     p.mine.light.oil = 100;
     const before = p.balances.dollars;
+    const topUp = priceOf('oil', 'grimsby', p.mine.light); // (by what the lantern is missing)
     buyLight(p, 'oil');
-    assert.deepEqual([p.mine.light.oil, p.balances.dollars], [OIL_CAPACITY, before - LIGHT_ITEMS.oil.dollars]);
+    assert.deepEqual([p.mine.light.oil, p.balances.dollars], [OIL_CAPACITY, before - topUp]);
     buyLight(p, 'torches'); buyLight(p, 'torches');
     assert.equal(p.mine.light.torches, CARRY_LIMIT, 'two stacks fill the carry limit');
     const kept = p.balances.dollars;
@@ -116,13 +117,70 @@ test('a torch that goes out stops lighting, and a match lights it again', () => 
     assert.ok(!relightTorch(run, torch) && !torch.lit, 'no matches: it stays out, and nothing breaks');
 });
 
-test('torches are permanent down to floor 14 by default; from the floor of the setting they burn out after a time', () => {
-    assert.equal(TORCHES_BURN_OUT_FROM, Infinity, 'default: permanent everywhere (OPEN: what happens from floor 15 is the owner\'s call)');
-    const run = createLightRun({ lantern: false, oil: 0, torches: 2, matches: 0 });
-    const torch = placeTorch(run, 0, 0, 20);
-    burnTorches(run, 20, 1e6);
-    assert.ok(torch.lit, 'with the default setting a torch never burns out');
-    assert.ok(TORCH_BURN_SECONDS > 0);
+test('torches are permanent down to floor 14; from floor 15 a few go out by themselves, more with depth but never all, the same way every time', () => {
+    for(let floor = 1; floor <= 14; floor++) assert.equal(torchFailChance(floor), 0, `floor ${floor}: no failures`);
+    assert.ok(Math.abs(torchFailChance(15) - 0.10) < 1e-9, 'about 10% on the first thin floor');
+    assert.ok(torchFailChance(25) > torchFailChance(15) && torchFailChance(25) < torchFailChance(40) + 1e-9);
+    assert.equal(torchFailChance(100), 0.5, 'never more than half');
+    assert.equal(THIN_AIR_FROM_FLOOR, 15);
+    // Safe floors: a torch never burns out.
+    const safe = createLightRun({ lantern: false, oil: 0, torches: 4, matches: 0 });
+    const kept = placeTorch(safe, 0, 0, 14);
+    assert.deepEqual(burnTorches(safe, 14, 1e6), []);
+    assert.ok(kept.lit && kept.failAfter === Infinity);
+    // The first torch of a thin floor never fails; of many, only some do, and never all.
+    for(const floor of [15, 20, 30, 60]) {
+        const run = createLightRun({ lantern: false, oil: 0, torches: 0, matches: 0 });
+        run.torches = 99; // (a run carries ten; this one has plenty, to see many torches)
+        const torches = [];
+        for(let i = 0; i < 60; i++) torches.push(placeTorch(run, i * 100, 0, floor));
+        assert.equal(torches[0].failAfter, Infinity, `floor ${floor}: the first torch never fails`);
+        const failing = torches.filter(t => Number.isFinite(t.failAfter));
+        assert.ok(failing.length < torches.length, `floor ${floor}: never all of them`);
+        assert.ok(failing.length <= torches.length * 0.75, `floor ${floor}: a few, not most (${failing.length} of ${torches.length})`);
+        for(const t of failing) assert.ok(t.failAfter >= TORCH_FAIL_MIN_SECONDS && t.failAfter <= TORCH_FAIL_MIN_SECONDS + TORCH_FAIL_SPREAD_SECONDS);
+        // The air puts them out once they have burned their time, and says which.
+        const gone = burnTorches(run, floor, 1e6);
+        assert.equal(gone.length, failing.length);
+        assert.ok(gone.every(t => !t.lit) && torches.filter(t => !Number.isFinite(t.failAfter)).every(t => t.lit), 'only the chosen ones');
+        assert.deepEqual(burnTorches(run, floor, 1e6), [], 'a torch is put out once');
+    }
+    // Deeper means more of them (counted over many torches), and the same floor goes the same way every time.
+    const count = floor => { let n = 0; for(let i = 1; i <= 400; i++) if(Number.isFinite(torchFailAfter(floor, i))) n++; return n; };
+    assert.ok(count(30) > count(16) && count(16) > 0, `more failures deeper (${count(16)} then ${count(30)})`);
+    assert.equal(torchFailAfter(22, 7), torchFailAfter(22, 7));
+    assert.deepEqual([torchFailAfter(15, 0), torchFailAfter(14, 5)], [Infinity, Infinity]);
+    // Time passes only on the floor being played, and a dead torch is relit with a match like any other (and may fail again, at a time of its own).
+    const run = createLightRun({ lantern: false, oil: 0, torches: 0, matches: 5 });
+    run.torches = 999;
+    const doomed = (() => { for(let i = 0; i < 200; i++) { const t = placeTorch(run, i * 100, 0, 22); if(Number.isFinite(t.failAfter)) return t; } })();
+    assert.deepEqual(burnTorches(run, 21, 1e6), [], 'not on another floor');
+    assert.ok(doomed.lit);
+    assert.ok(burnTorches(run, 22, 1e6).includes(doomed) && !doomed.lit);
+    assert.ok(relightTorch(run, doomed) && doomed.lit && doomed.burned === 0 && doomed.relights === 1);
+});
+
+test('oil is sold by what the lantern is missing, with a small minimum, and a full flask costs the list price', () => {
+    const full = LIGHT_ITEMS.oil.dollars;
+    assert.equal(priceOf('oil'), full, 'no kit named: the full flask');
+    assert.equal(priceOf('oil', 'grimsby', { oil: 0 }), full);
+    assert.equal(priceOf('oil', 'grimsby', { oil: OIL_CAPACITY / 2 }), Math.ceil(full / 2));
+    assert.equal(priceOf('oil', 'grimsby', { oil: OIL_CAPACITY - 60 }), OIL_MIN_PRICE, 'a minute missing costs the minimum, not a flask');
+    assert.ok(priceOf('oil', 'store', { oil: 0 }) >= priceOf('oil', 'grimsby', { oil: 0 }));
+    const p = rich(500);
+    buyLight(p, 'lantern');
+    p.mine.light.oil = OIL_CAPACITY - 60;
+    const before = p.balances.dollars;
+    assert.equal(buyLight(p, 'oil').price, OIL_MIN_PRICE);
+    assert.deepEqual([p.balances.dollars, p.mine.light.oil], [before - OIL_MIN_PRICE, OIL_CAPACITY], 'the top-up fills the lantern');
+    assert.throws(() => buyLight(p, 'oil'), error => error.code === 'full');
+    // Never cheaper by buying twice: two half-top-ups cost at least one whole one.
+    const q = rich(500);
+    buyLight(q, 'lantern');
+    q.mine.light.oil = 0;
+    q.mine.light.oil = OIL_CAPACITY / 2; // (a half tank)
+    const half = priceOf('oil', 'grimsby', q.mine.light);
+    assert.ok(half * 2 >= full - 1, 'the price is in proportion to the oil, not a bargain');
 });
 
 test('the dark layer is told the radius and at most MAX_HOLES torches, the nearest first', () => {

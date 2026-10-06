@@ -19,8 +19,8 @@ export const MIN_TORCH_GAP = 14;      // a torch cannot be put closer than this 
 export const CARRY_LIMIT = 10;        // torches he can carry (and own): about the most the first ten floors need
 export const MATCH_LIMIT = 20;        // matches (a relight costs one)
 export const OIL_CAPACITY = 900;      // seconds of lantern burn in a full lantern (OPEN: oil per refill)
-export const TORCHES_BURN_OUT_FROM = Infinity; // floor from which a placed torch burns out (OPEN: down to floor 14 they are permanent; from 15 undecided)
-export const TORCH_BURN_SECONDS = 600; // how long a torch burns on a floor from TORCHES_BURN_OUT_FROM on
+export const THIN_AIR_FROM_FLOOR = 15; // from here the air is thin: a few placed torches go out by themselves, and the marshal has an oxygen bar (src/mineAir.js)
+export const OIL_MIN_PRICE = 2;       // the least a top-up of oil costs, in dollars
 export const MAX_HOLES = 12;          // how many torches the dark layer can show at once (src/placeDark.js)
 
 // What the shops sell (Mr. Grimsby's and the general store, the town lane's cards): ids, what they give and their price in Bounty Dollars.
@@ -36,7 +36,16 @@ export const SHOP_MARKUP = { grimsby: 1.0, store: 1.1 }; // the general store ch
 // Ids and shop names come from the network: only the ones listed count ("constructor" and "__proto__" are not items or shops).
 const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export const isLightItem = id => has(LIGHT_ITEMS, id);
-export const priceOf = (id, shop = 'grimsby') => Math.ceil(LIGHT_ITEMS[id].dollars * (has(SHOP_MARKUP, shop) ? SHOP_MARKUP[shop] : 1));
+// What a thing costs in a shop. Oil is sold by what the lantern is missing, so nobody pays the price of a full flask to add a minute: pass the kit (what he
+// owns) for the top-up price; without it the price is the full flask's.
+export const priceOf = (id, shop = 'grimsby', kit = null) => {
+    const markup = has(SHOP_MARKUP, shop) ? SHOP_MARKUP[shop] : 1;
+    if(id === 'oil' && kit && typeof kit === 'object') {
+        const missing = Math.max(0, Math.min(OIL_CAPACITY, OIL_CAPACITY - whole(kit.oil)));
+        return Math.max(OIL_MIN_PRICE, Math.ceil(LIGHT_ITEMS.oil.dollars * markup * missing / OIL_CAPACITY));
+    }
+    return Math.ceil(LIGHT_ITEMS[id].dollars * markup);
+};
 
 // Until the light shops (Mr. Grimsby's and the general store) are open, nobody could buy a lantern and the mine would be black for everyone, so
 // a run starts with a full kit of its own. When the shops open, set this to true: the run then starts with what he owns (profile.mine.light).
@@ -74,7 +83,7 @@ export function buyLight(profile, id, shop = 'grimsby') {
     if(id === 'oil' && kit.oil >= OIL_CAPACITY) throw lightError('full', 'The lantern is full.');
     if(id === 'torches' && kit.torches >= CARRY_LIMIT) throw lightError('full', `You cannot carry more than ${CARRY_LIMIT} torches.`);
     if(id === 'matches' && kit.matches >= MATCH_LIMIT) throw lightError('full', `You cannot carry more than ${MATCH_LIMIT} matches.`);
-    const price = priceOf(id, shop);
+    const price = priceOf(id, shop, kit); // (oil: by what the lantern is missing)
     if(profile.balances.dollars < price) throw lightError('funds', 'Not enough bounty dollars.');
     profile.balances.dollars -= price;
     if(id === 'lantern') { kit.lantern = true; kit.oil = OIL_CAPACITY; } // it comes full
@@ -118,17 +127,37 @@ export function burnLantern(run, seconds) {
     run.oil = Math.max(0, run.oil - Math.max(0, Number(seconds) || 0));
 }
 
+// ---------- thin air: from THIN_AIR_FROM_FLOOR a few placed torches go out by themselves ----------
+// "Torches go out for lack of oxygen, randomly, not all of them, just a few; the deeper you go the more it becomes an issue" (owner, 2026-10-06). Each torch gets,
+// when it is put down, a time after which it goes out, or never. Which ones, and when, comes from the floor and the torch's number on it, so the same floor
+// goes the same way every time and a test can fix it. The first torch of a floor never fails and no more than half of them are chosen, so the way back is
+// never all dark. A dead torch is the same smoking stub a light eater leaves, and a match relights it.
+export const TORCH_FAIL_BASE = 0.10;       // the share of torches that fail on the first thin floor
+export const TORCH_FAIL_PER_FLOOR = 0.025; // and how much more each floor deeper
+export const TORCH_FAIL_CAP = 0.5;         // never more than half
+export const TORCH_FAIL_MIN_SECONDS = 60, TORCH_FAIL_SPREAD_SECONDS = 300; // a failing torch lasts between 1 and 6 minutes
+export const torchFailChance = floor => floor < THIN_AIR_FROM_FLOOR ? 0 : Math.min(TORCH_FAIL_CAP, TORCH_FAIL_BASE + TORCH_FAIL_PER_FLOOR * (Math.floor(floor) - THIN_AIR_FROM_FLOOR));
+const hash01 = text => { let h = 2166136261; for(const c of text) h = Math.imul(h ^ c.charCodeAt(0), 16777619); h ^= h >>> 15; h = Math.imul(h, 2246822519); h ^= h >>> 13; return (h >>> 0) / 4294967296; };
+// How long torch number `index` of `floor` burns before the air puts it out (its `relights`th light), in seconds, or Infinity for one that never fails.
+export function torchFailAfter(floor, index, relights = 0) {
+    const chance = torchFailChance(floor);
+    if(chance <= 0 || (index === 0 && relights === 0)) return Infinity;
+    const roll = hash01(`torch-${Math.floor(floor)}-${index}-${relights}`);
+    return roll < chance ? TORCH_FAIL_MIN_SECONDS + (roll / chance) * TORCH_FAIL_SPREAD_SECONDS : Infinity;
+}
+
 // Put a torch down where the marshal stands, on `floor`. Returns the torch, or null (none left, or one is already close).
 export function placeTorch(run, x, z, floor) {
     if(run.torches <= 0) return null;
     if(run.placed.some(t => t.floor === floor && Math.hypot(t.x - x, t.z - z) < MIN_TORCH_GAP)) return null;
     run.torches--;
-    const torch = { x, z, floor, lit: true, burned: 0 };
+    const index = run.placed.filter(t => t.floor === floor).length;
+    const torch = { x, z, floor, lit: true, burned: 0, index, relights: 0, failAfter: torchFailAfter(floor, index, 0) };
     run.placed.push(torch);
     return torch;
 }
 
-// A torch is put out (by a light eater, src/mineMonsters.js) or burns out (from TORCHES_BURN_OUT_FROM on).
+// A torch is put out (by a light eater, src/mineMonsters.js, or by the thin air below).
 export function putOutTorch(torch) { torch.lit = false; }
 
 // Relight a torch with a match. Returns true when it is lit again; false when there are no matches or it was not out.
@@ -137,17 +166,22 @@ export function relightTorch(run, torch) {
     run.matches--;
     torch.lit = true;
     torch.burned = 0;
+    torch.relights = (torch.relights || 0) + 1;
+    torch.failAfter = torchFailAfter(torch.floor, torch.index || 0, torch.relights); // (a torch that was lit again may fail again, at a time of its own)
     return true;
 }
 
-// Torches burn out from TORCHES_BURN_OUT_FROM on, after TORCH_BURN_SECONDS lit (call with the seconds that passed, on the floor being played).
+// Lit torches of this floor burn, and in thin air the ones chosen go out when their time comes (call with the seconds that passed, on the floor being
+// played). Returns the torches the air just put out, so the mode can say so.
 export function burnTorches(run, floor, seconds) {
-    if(floor < TORCHES_BURN_OUT_FROM) return;
+    const out = [];
+    if(floor < THIN_AIR_FROM_FLOOR) return out;
     for(const t of run.placed) {
-        if(t.floor !== floor || !t.lit) continue;
+        if(t.floor !== floor || !t.lit || !Number.isFinite(t.failAfter)) continue;
         t.burned += seconds;
-        if(t.burned >= TORCH_BURN_SECONDS) t.lit = false;
+        if(t.burned >= t.failAfter) { t.lit = false; out.push(t); }
     }
+    return out;
 }
 
 // What the dark layer needs: the radius of the marshal's own light, and the lit torches of this floor, nearest first (at most MAX_HOLES):
