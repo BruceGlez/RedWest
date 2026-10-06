@@ -534,6 +534,35 @@ export function createCrawlerMesh() {
     return group;
 }
 
+// Light eater (MINE_PLAN.md, slice 5): a small bug, about a third the size of a crawler, that puts torches out. A flat dark shell, big pale
+// mandibles at the front (it chews the flame), a short pair of feelers, and an abdomen with a dim glow of its own: it carries the light it
+// has eaten, so it can be seen a little way off in the dark and a stub it leaves behind is easy to follow. Four legs run (the quadruped
+// bones, like the crawler), two stand. The glow is a separate unlit child (the bake loses emissive); the rules, floors and behaviour belong
+// to the mine and combat lanes (use `look: 'lighteater'` and add it to MINE_MESHES in src/enemySystem.js).
+export function createLightEaterMesh() {
+    const group = new THREE.Group();
+    const shell = colorMat(0x2c2833), plate = colorMat(0x45404f), jaw = colorMat(0xd8d0bc);
+    group.add(box(0.9, 0.38, 1.1, shell, 0, 0.42, 0), box(0.62, 0.28, 0.5, plate, 0, 0.4, 0.78), box(0.78, 0.12, 0.8, plate, 0, 0.64, -0.05)); // body, head, back plate
+    for(const x of [-1, 1]) {
+        group.add(box(0.12, 0.12, 0.42, jaw, x * 0.2, 0.34, 1.12)); // mandibles that meet in front
+        group.add(box(0.05, 0.05, 0.55, plate, x * 0.16, 0.6, 1.0)); // feelers
+        group.add(box(0.1, 0.34, 0.1, shell, x * 0.5, 0.2, 0.05)); // the middle pair of legs, which do not move
+    }
+    for(const [name, x, z] of [['fl', -0.5, 0.35], ['fr', 0.5, 0.35], ['bl', -0.5, -0.4], ['br', 0.5, -0.4]]) {
+        const leg = box(0.1, 0.36, 0.1, shell, x, 0.2, z);
+        leg.name = name;
+        group.add(leg);
+    }
+    group.userData = { type: 'lighteater', quadruped: true };
+    bakeEnemy(group, QUADRUPED_BONES);
+    const ember = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.34, 0.55), new THREE.MeshBasicMaterial({ color: 0xffb347 }));
+    ember.position.set(0, 0.5, -0.75);
+    ember.name = 'ember'; // the abdomen: the monster's rules may dim or brighten it (it glows more with a torch eaten)
+    group.add(ember);
+    group.userData.ember = ember;
+    return group;
+}
+
 // Stonekin: a heavy grey man-shaped slab with a hood of rock, bigger than a brute.
 export function createStonekinMesh() {
     const group = createHumanoid({ type: 'stonekin', coat: 0x6b645b, vest: 0x8c8478, hat: 0x4a453e, pants: 0x5a544b, skinMat: colorMat(0x8c8478), hatStyle: 'hood', weapon: null, bulk: 1.55 });
