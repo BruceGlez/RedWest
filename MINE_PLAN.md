@@ -265,6 +265,10 @@ What we already do and what it means:
 | Light eaters | **mine** (the monster's rules and floors) with **combat** (its behaviour) and **art** (its model: add a prompt to "Art prompts" above) | Only from a floor decided with the owner; they go to the nearest lit torch of yours and put it out; killing one is easy and is the answer; torches can be relit (cost decided below) | torches and the sense radius |
 | Visible lift and shaft | **mine** (HUD, beams) with **art** | The lift and the shaft stay visible in the dark (a glow and a beam, and the HUD arrow already there), with a "you can see the lift from here" rule so a dark floor is never a lost player | the dark |
 
+### Art status (art lane, code art only for now)
+
+3. **Light eater model: built** (`createLightEaterMesh` in `src/assets.js`): a small dark bug with pale mandibles, four running legs and a dim amber abdomen (`userData.ember`, an unlit child the rules may dim or brighten). Waiting on the **mine** lane (its rules and floors) and **combat** (its behaviour): they add the monster with `look: 'lighteater'` and the mesh in `MINE_MESHES` (`src/enemySystem.js`).
+
 ### Decided by the owner (2026-10-06, answers to the "still open" list)
 
 1. **The lantern runs out of oil and needs refilling.** Everything costs in-game currency (earned Bounty Dollars, never Gold Nuggets): the lantern, oil, torches and anything else the dark needs. Prices are small and are tuned against what a Wanted Road run earns, because the mine itself pays no money (slice 2's rule), so the player must be able to afford a descent from road income.
