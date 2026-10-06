@@ -54,6 +54,7 @@ Budget: about 90 draw calls in town, under about 50 in a fight. Run `node tools/
 - `tests/characters-smoke.mjs`
 
 ## Backlog: the dark mine (owner's brief, `MINE_PLAN.md`, "Slice 5")
+- **For now everything is made in code** (owner, 2026-10-06): boxes, cones, planes, emissive materials, point lights and shader tricks built in `src/mineScene.js` and small new modules, with no downloaded or generated models. Models can replace them later, one build at a time, like the other art passes.
 - The look of the dark: truly black outside a small dim radius, torch light and glow, a lantern in the marshal's hand, the lift and shaft glowing so they can be found in the dark (`src/mineScene.js`, the town lane's cellar placeholder scene once it exists). Keep a fight under about 50 draw calls (`node tools/perf.mjs`).
 - Models and prompts (prompts go in `MINE_PLAN.md`, "Art prompts"; `ASSETS.md` rows): lantern, wall torch, the light eater (a small bug that puts torches out), the hidden door in the cellar.
 
