@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { IMPACTS, impactForObstacle, deathPose, deathLength, weaponKick, muzzleFlash, TUMBLE_SECONDS, POP_SECONDS, MAX_CLIP_SECONDS } from '../src/combatMath.js';
+import { createSense, senseStep, WAKE_SECONDS, HOME_REACHED, IMPACTS, impactForObstacle, deathPose, deathLength, weaponKick, muzzleFlash, TUMBLE_SECONDS, POP_SECONDS, MAX_CLIP_SECONDS } from '../src/combatMath.js';
 import { WEAPONS } from '../src/weapons.js';
 import { stepAround, checkCollision, markObstacleGridDirty } from '../src/physics.js';
 import { obstacles } from '../src/state.js';
@@ -108,4 +108,40 @@ test('a mover boxed in on every side finds no way round, and does not throw', ()
         obstacles.push(...saved);
         markObstacleGridDirty();
     }
+});
+
+test('a monster of the mine sleeps until the marshal is within its sense radius, takes a moment to wake, then hunts', () => {
+    const sense = createSense(30, 70, { x: 0, z: 0 });
+    assert.equal(sense.state, 'asleep');
+    assert.equal(senseStep(sense, 80, 0, 0.1), 'asleep', 'far away: it does not stir');
+    assert.equal(senseStep(sense, 45, 0, 5), 'asleep', 'near, but outside its radius, however long he stands there');
+    assert.equal(senseStep(sense, 29, 0, 0.1), 'waking', 'inside the radius: it wakes');
+    assert.equal(senseStep(sense, 29, 0, WAKE_SECONDS / 2), 'waking', 'and takes a moment');
+    assert.equal(senseStep(sense, 29, 0, WAKE_SECONDS), 'hunting');
+    assert.equal(senseStep(sense, 60, 0, 1), 'hunting', 'it keeps after him past its radius, until its leash');
+});
+
+test('past its leash it gives up and walks back to its post, and goes to sleep there; if he returns first it hunts at once', () => {
+    const sense = createSense(30, 70, { x: 0, z: 0 });
+    senseStep(sense, 10, 0, 0.1); senseStep(sense, 10, 0, 1);
+    assert.equal(sense.state, 'hunting');
+    assert.equal(senseStep(sense, 71, 40, 0.1), 'returning', 'he got away');
+    assert.equal(senseStep(sense, 90, 30, 0.1), 'returning', 'still walking home');
+    assert.equal(senseStep(sense, 90, HOME_REACHED - 0.1, 0.1), 'asleep', 'home: it sleeps again');
+    senseStep(sense, 10, 0, 0.1); senseStep(sense, 10, 0, 1);
+    senseStep(sense, 80, 40, 0.1);
+    assert.equal(sense.state, 'returning');
+    assert.equal(senseStep(sense, 15, 40, 0.1), 'hunting', 'he came back inside the radius: no new wake-up');
+    // A leash is never closer than the radius plus a margin, so it cannot flicker at the edge.
+    assert.ok(createSense(30, 31, { x: 0, z: 0 }).leash >= 50);
+});
+
+test('a monster that is shot wakes at once, and one that is waking when he runs off goes back to sleep', () => {
+    const sense = createSense(25, 60, { x: 0, z: 0 });
+    assert.equal(senseStep(sense, 50, 0, 0.1, true), 'waking', 'shot from afar: awake');
+    assert.equal(sense.wake, 0, 'with no wait');
+    assert.equal(senseStep(sense, 50, 0, 0.1, true), 'hunting');
+    const sleeper = createSense(25, 60, { x: 0, z: 0 });
+    senseStep(sleeper, 20, 0, 0.1);
+    assert.equal(senseStep(sleeper, 70, 0, 0.1), 'asleep', 'he was gone before it woke');
 });

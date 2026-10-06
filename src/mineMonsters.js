@@ -8,22 +8,22 @@ import { isOpen } from './mineMap.js';
 // crawler rushes (chase), stonekin charge after a shake (charger), a wraith fades and reappears beside you (phantom).
 export const MINE_MONSTERS = {
     bat: {
-        name: 'CAVE BAT', cost: 0.8, weight: 1.6, cap: 6, hp: 1, speed: 13, behavior: 'zigzag', danger: 2,
+        name: 'CAVE BAT', sense: 50, cost: 0.8, weight: 1.6, cap: 6, hp: 1, speed: 13, behavior: 'zigzag', danger: 2,
         blurb: 'Hangs from the roof until you walk under it, then flits about like a thrown rag.',
         tip: 'It never goes straight. Shoot where it will be.'
     },
     crawler: {
-        name: 'CRAWLER', cost: 1.1, weight: 1.9, cap: 9, hp: 2, speed: 8.5, behavior: 'chase', danger: 2,
+        name: 'CRAWLER', sense: 30, cost: 1.1, weight: 1.9, cap: 9, hp: 2, speed: 8.5, behavior: 'chase', danger: 2,
         blurb: 'A pale thing that lives in the old workings. It comes in numbers and it does not tire.',
         tip: 'Two hits each. Back up and keep your distance.'
     },
     stonekin: {
-        name: 'STONEKIN', cost: 3.4, weight: 0.9, cap: 2, hp: 9, speed: 3.4, behavior: 'charger', danger: 3, heavy: true, hitRadius: 2.4,
+        name: 'STONEKIN', sense: 22, cost: 3.4, weight: 0.9, cap: 2, hp: 9, speed: 3.4, behavior: 'charger', danger: 3, heavy: true, hitRadius: 2.4,
         blurb: 'A man-shaped slab of the mountain. It shakes before it charges, and it cannot turn mid-charge.',
         tip: 'When it shakes, sidestep.'
     },
     wraith: {
-        name: 'LANTERN WRAITH', cost: 2.2, weight: 1.0, cap: 3, hp: 2, speed: 7, behavior: 'phantom', danger: 3,
+        name: 'LANTERN WRAITH', sense: 55, cost: 2.2, weight: 1.0, cap: 3, hp: 2, speed: 7, behavior: 'phantom', danger: 3,
         blurb: 'What is left of a miner who went looking for the way up. It carries a light and it fades from sight.',
         tip: 'Bullets pass through while it is faded. Fire when it flickers back.'
     },
@@ -67,6 +67,19 @@ export const MINE_LADDER = [
     ['slagadder'], ['slaglobber'], ['sentry'], ['hollowhide'], ['choir'], ['ghoul']
 ];
 export const BASE_ROSTER = ['bandit', 'wolf', 'gunslinger'];
+
+// ---------- how far each one senses the marshal ----------
+// A monster is asleep until the marshal comes within its sense radius (src/combatMath.js, senseStep) and gives up past its leash. The radius
+// is the monster's own, `sense` on its entry, or the usual one for how it fights: a sniper sees a long way, a slab of stone wakes late.
+// Units are the cave's (a chamber is 22 to 30 wide and a tunnel about 20). Every number is a guess to tune by playing.
+export const SENSE_BY_BEHAVIOR = { chase: 36, zigzag: 34, charger: 26, phantom: 44, sniper: 60, shooter: 48, lobber: 46, rider: 44, scattergun: 38, knives: 40, volley: 48 };
+export const MIN_SENSE = 18, MAX_SENSE = 70;
+export const senseRadius = id => {
+    const def = monsterDef(id);
+    return Math.max(MIN_SENSE, Math.min(MAX_SENSE, def?.sense ?? SENSE_BY_BEHAVIOR[def?.behavior] ?? 36));
+};
+// How far the marshal must get before it gives up and goes back: twice the radius, and never less than 40 beyond it.
+export const leashRadius = id => Math.max(senseRadius(id) * 2, senseRadius(id) + 40);
 
 export const monsterDef = id => ENEMY_TYPES[id] ?? MINE_MONSTERS[id] ?? null;
 export const isMineMonster = id => id in MINE_MONSTERS;
