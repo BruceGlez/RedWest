@@ -3,6 +3,7 @@ import assert from 'node:assert/strict';
 import { mine, beginMineRun, endMineRun, nextFloor, MINE_ATMOSPHERE_ID, floorStage, floorWave, floorTitle, floorBanner, descentScore, chestReward,
     resultText, confirmText, shaftArrow, shaftHint, liftHint, PRACTICE_NOTE, SAVE_FAILED_NOTE, oreInChest, runSummary, savedText, statusText } from '../src/mine.js';
 import { maxOreOnFloor, applyMineRun, createMineProgress, normalizeMineProgress } from '../src/mineProgress.js';
+import { LIGHT_NEEDS_SHOP, lightSource, DIM_RING, OIL_CAPACITY, CARRY_LIMIT, MATCH_LIMIT } from '../src/mineLight.js';
 import { OUTLAWS } from '../src/outlaws.js';
 import { atmosphereFor, soundFor, MINE_ATMOSPHERE, ATMOSPHERES } from '../src/atmosphere.js';
 import { SURFACES, BEDS } from '../src/soundscape.js';
@@ -136,9 +137,9 @@ test('the run reports where it began, how deep, the ore carried and how it ended
 });
 
 test('the run starts with a light kit and reports what it used; the HUD shows the torches and the oil', () => {
-    beginMineRun(1);
+    beginMineRun(1, { checkpoint: 0, light: { lantern: true, oil: 900, torches: 10, matches: 0 } });
     assert.ok(mine.light, 'a run has a light');
-    assert.equal(mine.light.lantern, true, 'with the free kit until the shops are open (LIGHT_NEEDS_SHOP)');
+    assert.deepEqual([mine.light.lantern, mine.light.oil, mine.light.torches], [true, 900, 10], 'it starts with what he owns');
     mine.light.oil -= 125.2;
     mine.light.torches -= 2;
     assert.deepEqual(runSummary('mine-win', 60).used, { oil: 126, torches: 2, matches: 0 });
@@ -150,4 +151,20 @@ test('the run starts with a light kit and reports what it used; the HUD shows th
     endMineRun();
     assert.equal(mine.light, null);
     assert.deepEqual(runSummary('died', 5).used, { oil: 0, torches: 0, matches: 0 }, 'no run, nothing used');
+});
+
+test('the light shops are open: a run starts with what he owns and nothing else, so with nothing he has the dim ring and can still walk back', () => {
+    assert.equal(LIGHT_NEEDS_SHOP, true);
+    beginMineRun(1);
+    assert.deepEqual([mine.light.lantern, mine.light.oil, mine.light.torches, mine.light.matches], [false, 0, 0, 0], 'no record: an empty kit');
+    assert.equal(lightSource(mine.light, 1).radius, DIM_RING, 'the dim ring, never nothing');
+    assert.deepEqual(runSummary('died', 10).used, { oil: 0, torches: 0, matches: 0 });
+    endMineRun();
+    beginMineRun(1, { checkpoint: 0, light: { lantern: true, oil: 9999, torches: 99, matches: 99 } });
+    assert.deepEqual([mine.light.oil, mine.light.torches, mine.light.matches], [OIL_CAPACITY, CARRY_LIMIT, MATCH_LIMIT], 'a kit is kept inside its limits');
+    endMineRun();
+    beginMineRun(1, { checkpoint: 0, light: { lantern: false, oil: 500, torches: 3, matches: 1 } });
+    assert.equal(mine.light.oil, 0, 'oil without a lantern is nothing');
+    assert.equal(mine.light.torches, 3);
+    endMineRun();
 });

@@ -393,6 +393,8 @@ Money must not buy combat power: if oxygen can be bought it is Bounty Dollars on
 
 **Held, not answered by the owner (listed for the coordinator):** (1) rescaling the floor lengths if "main road" meant the longer measure in the table above (one constant, `hopGap` in `src/mineMap.js`); (2) a small "lift or shaft in sight" HUD rule (the art lane's glow and beams and the HUD arrows already work).
 
+**The light shops are open (#73), so `LIGHT_NEEDS_SHOP` is now `true` (2026-10-06).** A run starts with what the player owns (`profile.mine.light`) and nothing else; with no lantern he has the dim ring
+and the lift and the shaft to walk back by (never a softlock). The free kit (`FREE_KIT`) is kept only as a test aid behind the setting. The mine smoke starts as a player who has bought a kit.
 **Bigger light (owner, 2026-10-06: "the light is too small").** `LANTERN_RADIUS` 15 to **28** and `TORCH_RADIUS` 12 to **22** (about 1.9x and 1.8x), both named constants in `src/mineLight.js`; the dim ring
 stays 6 (your own feet, with no light). Beyond them it is still truly black. A chamber is 22 to 30 wide, so the lantern lights about a chamber's width; a torch every 40 units overlaps its
 neighbour a little (2 x 22 = 44), so a torch road is a lit path with dark cave to either side. `MIN_TORCH_GAP` (14) is unchanged. **For the art lane (`src/placeTorch.js`, `src/placeDark.js`):** the
