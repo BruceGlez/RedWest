@@ -11,7 +11,7 @@ import { SPREAD } from './townSpace.js';
 // fence: the line across the way in while it is shut, from (x1, z1) to (x2, z2), and where to stand to read the sign.
 // place: the thing to use inside (a plaque), with where it stands and where you stand.
 // interior: a district that is a place of its own (PLACES.md). Its gate opens a whole new map you walk around (the farm's is
-//           src/farmLayout.js, the Crossing's src/vaneLayout.js, the Channel's src/channelLayout.js) and not ground in the town, so it has no walk area and no place here.
+//           src/farmLayout.js, the Crossing's src/vaneLayout.js, the Channel's src/channelLayout.js, Copper Bit's src/saloonLayout.js) and not ground in the town, so it has no walk area and no place here.
 
 // The town's ground, spread out (src/townSpace.js). The districts below are written as originally laid out, against the
 // original edge (x from -38 to 40, z from -21 to 19), and each is then moved out by exactly how far the edge moved at its gate,
@@ -97,11 +97,11 @@ const BASE_DISTRICTS = [
         }
     },
     {
-        id: 'copper', name: 'COPPER BIT', outlaw: 'dusty-pete',
+        id: 'copper', name: 'COPPER BIT', outlaw: 'dusty-pete', interior: 'saloon',
         area: { minX: -62, maxX: -22, minZ: 16, maxZ: 44 },
         fence: { from: [-38, 19], to: [-22, 19], read: [-30, 17.4] },
         ground: 0x8a6e4c,
-        place: { id: 'piano', verb: 'READ', object: { x: -46, z: 30, hx: 1.4, hz: 0.8 }, stand: [-46, 32.4] },
+        place: null, // the piano stands in the saloon you walk into (src/saloonLayout.js); from the town it is seen over the fence
         card: {
             title: 'COPPER BIT',
             text: "Copper Bit's saloon street is open again. Dusty Pete runs the bar, and the broken piano stays broken: he says the sour notes keep the tune honest. The first drink of the day is on the house."

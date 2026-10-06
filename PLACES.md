@@ -128,7 +128,7 @@ town as an overview, and then the places cannot be entered (they need walking).
 | El Espectro | **Tres Rios** | TEND | planned |
 | Lucky Lou | **The Silver Belle** | MARKET | planned |
 | Colonel Crane | **Fort Pell** | PATROL | planned |
-| Dusty Pete | **Copper Bit** | SERVE | the street is built in town (2026-10-01), the place is designed below, not built |
+| Dusty Pete | **Copper Bit** | SERVE | **place built 2026-10-05** (the bar's card and the piano; the shift game is next) |
 | Rattlesnake Rosa | **Whisper Wash** | TAME | the canyon is built in town (2026-10-01), the place is designed below, not built |
 | Deacon Graves | **Hollow Hill** | KEEP | the chapel is built in town (2026-10-01), the place is designed below, not built |
 
@@ -225,7 +225,7 @@ better day to sell. The notice post shows tomorrow's prices.
 dollars and scrap. The board shows what each patrol pays and when the deputies return. Patrols never involve combat on the
 screen, and the number of deputies grows with place upgrades.
 
-### 8. Copper Bit: SERVE (street built; the rules are built 2026-10-05, the place is not)
+### 8. Copper Bit: SERVE (the rules and the place are built 2026-10-05; the shift game is not)
 
 *Copper Bit's saloon street is open again. Dusty Pete runs the bar; the broken piano stays broken.* Opens with Dusty Pete.
 Southwest of the town (the gate is on the south edge, left of the channel).
@@ -258,8 +258,9 @@ A tip adds 0, a quarter or a half of the price (a fifth more with the farm). Thr
 (a clock moved back brings none back); later ones pay nothing and still earn the night's stars (half, three quarters, all of the
 crowd). A night opens with a star on the one before. The test holds a whole day's best (3 shifts) to $400, like a farm check-in.
 **Waiting on lanes:** `server/app.js` (scale) `POST /api/town/saloon` calling `saloonAction(user.profile, body, now())`, and
-`saloon(body)` on both wallets in the shared `src/wallet.js`, the same way as `orders`. **Not built yet:** the place
-(`src/places/saloon.js`, the shift screen, the scene), upgrades, regulars and the piano.
+`saloon(body)` on both wallets in the shared `src/wallet.js`, the same way as `orders`.
+
+**Slice 2 (built 2026-10-05): the place.** The gate in the town opens Copper Bit (`interior: 'saloon'`, shut with a LOCKED sign naming Dusty Pete until his first star). `src/saloonLayout.js` is the map (the saloon at the back, the broken piano out front, kegs, a rail, the way out), `src/places/saloon.js` the bar's card (tonight's night, the stars on each night, the menu with prices, the paid shifts left) and the piano's card, and `src/placeSaloon.js` a plain box-built **placeholder scene** (the art lane's from here on). The card says the shift is coming soon: there is no button yet, because a shift cannot be saved until the server route and the wallet method exist. Tests: `tests/saloonLayout.test.js` and the Copper Bit walk-through in `tests/town-smoke.mjs`. **Not built yet:** the shift screen itself, upgrades, regulars, and the piano tune.
 
 ### 9. Whisper Wash: TAME (canyon built, place designed 2026-10-05)
 

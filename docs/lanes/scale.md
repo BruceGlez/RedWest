@@ -30,3 +30,60 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 
 ## Built: Copper Bit's route
 - `POST /api/town/saloon`: `saloonAction(user.profile, body, now())` (src/saloon.js), same shape as `/api/town/orders`, answers `{ result, profile }`. The server clock decides the day, so paid shifts per day, a night's crowd and the menu are the server's, whatever the client sends. Tested in `tests/server.test.js`.
+
+## Design: the Postgres store seam (not built yet)
+
+**Goal:** players in Postgres instead of one JSON file, with no change to game rules and the JSON store still the default for dev and tests.
+
+### Where it hurts today
+`server/app.js` calls the store synchronously and keeps the whole user in memory:
+- Per request it does `getUser`, mutates `user.profile`, then `putUser` + `save()`. `save()` rewrites the whole file, so it grows with the player count, and two instances would overwrite each other.
+- Four lookups scan every user with `listUsers()`: Apple `sub`, a Stripe `paymentIntent` (refunds), the name-taken check, and name reports; the leaderboard and account deletion scan too. Fine at playtest size, not at millions.
+
+### The interface (async, small, named for what the app asks)
+`store.js` stays the seam; every method returns a promise (the JSON store just returns resolved values). Replace the scans with the questions the app really asks, so Postgres can use indexes:
+
+```
+getUser(id) -> user | null
+putUser(id, user, { expectedVersion }?) -> { version }     // see "Concurrency"
+deleteUser(id)
+findUserByTokenHash(hash) -> id | null                     // indexed
+findUserByAppleSub(sub) -> { id, user } | null             // indexed
+findUserByPaymentIntent(pi) -> { id, user } | null         // indexed (purchases.paymentIntent)
+nameTaken(name, exceptId) -> boolean                       // unique index on lower(name)
+leaderboard(board, limit) -> rows                          // query, not a full scan
+reportsForName(name) / clearReports(name)                  // replaces the report scan
+retainPurchases(records) / retainedPurchases()
+ping()                                                     // already there (/healthz)
+```
+`save()` goes away (a write is a write). `listUsers()` stays only on the JSON/memory store for tools and tests. The JSON store implements the new methods with the same scans as today, so behaviour and tests do not change. `app.js` changes mechanically (`await` in front of store calls, the four scans become the new lookups); that is one scale-lane PR, tests green throughout.
+
+### Postgres schema (first version, deliberately plain)
+- `users(id text primary key, token_hash text, token_hashes text[], apple_sub text, name text, profile jsonb, meta jsonb, version int not null default 0, created_at, updated_at)`. The profile stays one `jsonb` document: the game rules (`src/profile.js` and friends) own its shape and change often, so we do not mirror it in columns. Only what we look up gets a column and an index: `token_hash`, `apple_sub`, `lower(name)` (unique), and a GIN or expression index for `paymentIntent`.
+- Leaderboards: start with an indexed query over a few numeric columns copied from the profile on write (best score per board), later a materialised view or a cache if needed.
+- `retained_purchases(transaction_id primary key, deleted_at)`.
+- Driver: `pg` (one new dependency, the first the server has; the Dockerfile then needs `npm ci --omit=dev`). That change is part of the Postgres PR, not before.
+
+### Concurrency (the real work)
+Read, mutate, write is a race when two requests for one player overlap (a double tap, a retry, the same account on two phones). Today a single process hides it. Options, in order of preference:
+1. **Optimistic version:** `putUser` with `expectedVersion` does `UPDATE ... WHERE id=$1 AND version=$2`; on 0 rows the app re-reads and retries the whole action (they are pure functions of the profile and the clock, so a retry is safe). Cheap, no long locks.
+2. `SELECT ... FOR UPDATE` in a transaction per request. Simpler to reason about, holds a connection for the request.
+Purchases and webhooks must be idempotent on the transaction id inside the same transaction (shared with the money lane); that is a correctness requirement on its own, whatever the store.
+
+### Migration from the JSON file
+1. Ship the Postgres store behind `STORE=postgres` + `DATABASE_URL`; default stays the JSON file.
+2. `tools/migrate-json-to-postgres.mjs`: reads `redwest.json`, normalises each profile with `normalizeProfile`, inserts in batches, is safe to run twice (`ON CONFLICT DO UPDATE` only if the JSON copy is newer), and prints counts. Dry-run flag first.
+3. Cut-over: stop the app, back up the file, run the script, check counts and a few logins, start with `STORE=postgres`. Keep the file for a week as the rollback.
+4. Tests: the same store contract test runs against the memory store and, in CI with a Postgres service, the Postgres store.
+
+### When Redis is actually needed
+- **One app instance: not at all.** Rate limits (`createRateLimiter`) live in memory and are right for one process. A restart forgets them, which is acceptable.
+- **More than one instance:** each instance has its own counters, so the real limit becomes N times larger and per-user checks like "20 s between runs" use `user.lastRunAt` in the store, which is already shared and fine. Only the IP/account request limiters need a shared place: Redis `INCR` with expiry. Cache for the leaderboard becomes useful at the same point.
+- Sessions are tokens looked up in the store, not in-process state, so the servers are already stateless apart from the limiter.
+- So the order is: Postgres first (fixes the durability and write-amplification problems, and is what lets us run more than one instance at all), Redis only when a second instance is added.
+
+### Proposed PR sequence
+1. Async store interface + the new lookups on the JSON store, `app.js` awaited (no new dependency, behaviour unchanged).
+2. Postgres store + contract tests + `STORE`/`DATABASE_URL` + Dockerfile `npm ci --omit=dev`.
+3. Migration script and the cut-over steps in `docs/DEPLOY.md`.
+4. (Only with a second instance) Redis limiter.
