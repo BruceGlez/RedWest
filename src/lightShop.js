@@ -39,3 +39,22 @@ export function lightShopHtml(profile, shop = 'grimsby') {
         + `<button type="button" class="shop-action upgrade" data-buy-light="${r.id}" data-shop="${shop}"${r.can ? '' : ' disabled'}>${r.can ? 'BUY' : r.why}</button></div>`).join('');
     return `<p class="town-stat">LIGHT FOR THE HOLLOW CLAIM. Bounty Dollars only. ${kitLine(profile)}.</p>${rows}`;
 }
+
+// The BUY buttons of a light shop, for a place: `lightBuyer(host)` returns `buy(button)`, which is true when the click was a shop's button. A sale goes to
+// `wallet.buyLight({ item, shop })` (src/mineLight.js `buyLight` runs for real there, here or on the server) and the card is drawn again from the new profile.
+export function lightBuyer(host) {
+    return button => {
+        const item = button.dataset.buyLight;
+        if(!item) return false;
+        if(!LIGHT_ITEMS[item]) return true; // not something the shops sell
+        const body = { item, shop: button.dataset.shop === 'store' ? 'store' : 'grimsby' };
+        host.act(async () => {
+            if(typeof host.wallet?.buyLight !== 'function') throw new Error('The shop is not open yet.');
+            const response = await host.wallet.buyLight(body);
+            host.onProfile(response.profile);
+            host.track('light_buy');
+            host.toast(`Bought ${LIGHT_ITEMS[response.result.id].name.toLowerCase()} for $${response.result.price}.`);
+        }, text => host.toast(text, true));
+        return true;
+    };
+}
