@@ -303,6 +303,27 @@ Deacon Graves. North edge, between Tres Rios and the Foundry.
 - **The other places are a bonus.** Pete's meals for the volunteers and the Wash's finds for the bell can speed a piece along, but
   the hill needs none of them: each piece shows what could help, and the others go on.
 - Nothing is timed for pay. The vigil waits for you each evening, and a missed night costs nothing but the night.
+- **The graves (slice 6, `MINE_PLAN.md`).** The graves stand on the hill and appear once Deacon Graves has a star, the same unlock as the hidden door in the cellar. Each gives a small job for a fallen soul: bring up ore, kill a named creature or a number of one kind, or both; one grave a day is the main one (a bigger, tougher creature deep down). The jobs are done in the mine, so the hill never changes a fight. A job pays earned Bounty Dollars, ore and for the main one a cosmetic rank title, and pays more the deeper it goes (the table is in `MINE_PLAN.md`). The generator is built (`src/graveQuests.js`).
+
+**The vigil's rules (built 2026-10-06, slice 1: the data contract).** `src/vigil.js`, saved as `profile.town.chapel` (`{ day, base, light, counted }`), tested in
+`tests/vigil.test.js`. The hill opens with Deacon Graves's first star and reads nothing else.
+- **The hill and the night.** Eighteen posts on the hill (paths and graves), an oil stand and a gate (`POSTS`, `OIL_STAND`, `HILL_START`). Each night picks
+  6 to 8 posts for a lantern at the start, plus 2 for each piece of the chapel already standing (up to 16), the same for everybody on the same day (`vigilNight`).
+  Some lanterns are **gated** (out of reach until a lantern nearer the gate is lit: 1, plus 1 for each piece built) and some are **dry** (they need oil from the stand: 2,
+  plus 2 for each piece built; the can holds 3 fills and starts empty). The bell's limit is what a good route needs (the nearest-first route, `referenceRoute`) with 25% room,
+  so every night can be won; it is 40 to about 90 seconds.
+- **The route is the report.** The player walks the hill; what he sends is only the order he visited things in (`{ action: 'light', order: ['oil', 'p4', ...] }`).
+  `vigilRoute` replays it from the posts' positions and the marshal's walking speed (the straight-line distance, which an honest walk never beats), and cuts it at the first
+  step that is not allowed (an unknown post, one lit twice, one out of reach, a dry lantern with no oil, or past the bell). What came before counts, so the server never
+  trusts a claim of more than the night holds.
+- **The chapel** is built from light, one per lantern lit: the window at 30, the pews at 100, the bell tower at 200, the roof at 330 (`PIECES`; 400 is the most it keeps). A
+  piece is built for good. **Only the first vigil of a day counts** (light and pay); later ones the same day are free practice, and tonight's hill does not change under him
+  during the day (it is made from the light the chapel had when the day began). A missed night costs only the night; nothing is timed for pay.
+- **Pay** is earned Bounty Dollars: $2 a lantern and $10 for a full night (at most $42), a small part of one Wanted Road run's $600 and of a day of the jail. The vigil
+  touches only `profile.town.chapel` and the dollars (a test checks no star, the jail, another place or the mine changes), and never a fight.
+- **Waiting on lanes:** `POST /api/town/vigil` calling `vigilAction(user.profile, body, now())` in `server/app.js` (scale), and `vigil(body)` on both wallets in `src/wallet.js`
+  (shared), the same way as `saloon`. **Not built yet:** the place (the hill, the lanterns you walk up to, the oil stand, the bell, the chapel growing in the town), the
+  look, sounds, and the other places' bonus (Pete's meals and the Wash's finds speeding a piece).
 
 ### Extra places that are not an outlaw's
 

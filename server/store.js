@@ -13,16 +13,42 @@ import { dirname } from 'node:path';
 //   listReportedUsers() -> users with name reports; listBoardUsers() -> users whose name is not hidden (the leaderboards)
 //   removeReporter(id) -> take one account out of everyone's reports (it is being deleted)
 //   retainPurchases(records), retainedPurchases(), ping()
+//   lock(id) -> release: one request at a time per player (read, change, write must not interleave with another request for the same
+//     player). Always `release()` in a finally. A database store can also refuse a stale write: putUser throws StoreConflictError when
+//     the player was changed by someone else since getUser (another server instance); the app answers 409 and the client retries.
 // listUsers() is not part of the interface; it stays on this store for tools and tests.
+// A write that lost a race: the player changed since the object was read.
+export class StoreConflictError extends Error {
+    constructor() { super('The account changed while this request ran. Try again.'); this.code = 'store_conflict'; }
+}
+
+// One holder at a time per key; waiters go in order. In this process only: several server instances need the database's version check
+// (StoreConflictError) as well.
+export function createKeyedLock() {
+    const tails = new Map();
+    return key => {
+        const before = tails.get(key) ?? Promise.resolve();
+        let release;
+        const mine = new Promise(resolve => { release = resolve; });
+        const tail = before.then(() => mine);
+        tails.set(key, tail);
+        tail.then(() => { if(tails.get(key) === tail) tails.delete(key); });
+        return before.then(() => () => release());
+    };
+}
+
 export function createMemoryStore(initial = {}) {
     const data = { users: {}, ...initial };
     // Purchase transaction ids from deleted accounts, kept without any player data for tax and refunds.
     data.retainedPurchases ??= [];
+    const lock = createKeyedLock();
     const store = {
+        lock,
         getUser: id => data.users[id] ?? null,
         putUser: (id, user) => { data.users[id] = user; },
         deleteUser: id => { delete data.users[id]; },
-        retainPurchases: records => { data.retainedPurchases.push(...records); },
+        // One record per transaction (the Postgres store's primary key says the same).
+        retainPurchases: records => { for(const record of records) if(!data.retainedPurchases.some(r => r.transactionId === record.transactionId)) data.retainedPurchases.push(record); },
         retainedPurchases: () => data.retainedPurchases,
         findUserByTokenHash: hash => Object.entries(data.users).find(([, user]) => user.tokenHash === hash || user.tokenHashes?.includes(hash))?.[0] ?? null,
         listUsers: () => Object.entries(data.users).map(([id, user]) => ({ id, user })),

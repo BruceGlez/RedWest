@@ -11,6 +11,7 @@ import { applyMineRun } from '../src/mineProgress.js';
 import { buyLight, LIGHT_ITEMS, SHOP_MARKUP } from '../src/mineLight.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 import { createApple, AppleError } from './apple.js';
+import { StoreConflictError } from './store.js';
 
 // Red West economy server. The game talks to /api/*; the stores talk to /webhooks/*.
 // Paid Gold Nuggets are only ever credited from a verified store webhook, never by the client.
@@ -118,6 +119,13 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
         });
     }
 
+    // One request at a time per player: read, change and write of one account must not interleave with another request for it
+    // (two quick buys would both see the old balance). Several server instances are caught by the store's version check (409).
+    async function withLock(id, fn) {
+        const release = await store.lock(id);
+        try { return await fn(); } finally { release(); }
+    }
+
     async function loadUser(id) {
         const user = await store.getUser(id);
         if(!user) return null;
@@ -134,12 +142,15 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
 
     async function creditPurchase(userId, productId, transactionId, extra = {}) {
         const product = getProduct(productId);
-        const user = await loadUser(userId);
-        if(!product || !user) return { ok: false, status: 404, message: 'unknown user or product' };
-        const credited = grantProduct(user.profile, product, transactionId, now(), extra);
-        await store.putUser(userId, user);
-        await store.save();
-        return { ok: true, credited };
+        if(!product) return { ok: false, status: 404, message: 'unknown user or product' };
+        return withLock(userId, async () => {
+            const user = await loadUser(userId);
+            if(!user) return { ok: false, status: 404, message: 'unknown user or product' };
+            const credited = grantProduct(user.profile, product, transactionId, now(), extra);
+            await store.putUser(userId, user);
+            await store.save();
+            return { ok: true, credited };
+        });
     }
 
     async function newAccount(extra = {}) {
@@ -178,6 +189,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
 
     return async function handle(req, res) {
         res.requestOrigin = req.headers.origin;
+        let release = null; // the lock on the signed-in player's account, for the length of an /api/ request
         try {
             const url = new URL(req.url, 'http://localhost');
             if(req.method === 'OPTIONS') return send(res, 204, {});
@@ -217,12 +229,14 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 }
                 const event = JSON.parse(await readBody(req)).event || {};
                 if(REFUND_EVENTS.has(event.type) && getProduct(event.product_id)) {
-                    const user = await loadUser(event.app_user_id);
-                    if(!user) return send(res, 404, { message: 'unknown user' });
-                    const reversed = revokePurchase(user.profile, `rc:${event.transaction_id || event.id}`, now());
-                    await store.putUser(event.app_user_id, user);
-                    await store.save();
-                    return send(res, 200, { reversed });
+                    return await withLock(event.app_user_id, async () => {
+                        const user = await loadUser(event.app_user_id);
+                        if(!user) return send(res, 404, { message: 'unknown user' });
+                        const reversed = revokePurchase(user.profile, `rc:${event.transaction_id || event.id}`, now());
+                        await store.putUser(event.app_user_id, user);
+                        await store.save();
+                        return send(res, 200, { reversed });
+                    });
                 }
                 if(!PURCHASE_EVENTS.has(event.type)) return send(res, 200, { ignored: event.type || 'unknown' });
                 const result = await creditPurchase(event.app_user_id, event.product_id, `rc:${event.transaction_id || event.id}`);
@@ -241,12 +255,14 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     if(!charge.payment_intent || charge.amount_refunded < charge.amount) return send(res, 200, { ignored: 'partial refund' });
                     const owner = await store.findUserByPaymentIntent(charge.payment_intent);
                     if(!owner) return send(res, 200, { ignored: 'unknown payment' });
-                    const user = await loadUser(owner.id);
-                    const record = user.profile.purchases.find(p => p.paymentIntent === charge.payment_intent);
-                    const reversed = revokePurchase(user.profile, record.tx, now());
-                    await store.putUser(owner.id, user);
-                    await store.save();
-                    return send(res, 200, { reversed });
+                    return await withLock(owner.id, async () => {
+                        const user = await loadUser(owner.id);
+                        const record = user.profile.purchases.find(p => p.paymentIntent === charge.payment_intent);
+                        const reversed = revokePurchase(user.profile, record.tx, now());
+                        await store.putUser(owner.id, user);
+                        await store.save();
+                        return send(res, 200, { reversed });
+                    });
                 }
                 if(event.type !== 'checkout.session.completed') return send(res, 200, { ignored: event.type });
                 const session = event.data?.object || {};
@@ -286,8 +302,12 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
 
             // ---- Game API (authenticated) ----
             if(url.pathname.startsWith('/api/')) {
-                const auth = await authenticate(req);
-                if(!auth?.user) return send(res, 401, { message: 'Sign in again.' });
+                const signedIn = await authenticate(req);
+                if(!signedIn?.user) return send(res, 401, { message: 'Sign in again.' });
+                // Wait for any other request of this player, then read the account fresh: what was read before the wait may be stale.
+                release = await store.lock(signedIn.id);
+                const auth = { id: signedIn.id, user: await loadUser(signedIn.id) };
+                if(!auth.user) return send(res, 401, { message: 'Sign in again.' });
                 const { id, user } = auth;
                 const save = async () => { await store.putUser(id, user); await store.save(); };
 
@@ -465,7 +485,10 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
         } catch(error) {
             if(error instanceof EconomyError) return send(res, 400, { code: error.code, message: error.message });
             if(error instanceof SyntaxError) return send(res, 400, { message: 'bad JSON' });
+            if(error instanceof StoreConflictError) return send(res, 409, { code: error.code, message: error.message });
             return send(res, 500, { message: 'server error' });
+        } finally {
+            release?.();
         }
     };
 }

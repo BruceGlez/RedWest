@@ -1,0 +1,10 @@
+{
+  "name": "red-west-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Red West economy server. Its only dependency is pg, used by the Postgres store (STORE=postgres); the JSON file store needs none.",
+  "dependencies": {
+    "pg": "^8.13.0"
+  }
+}

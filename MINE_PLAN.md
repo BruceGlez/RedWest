@@ -269,6 +269,8 @@ What we already do and what it means:
 
 ### Art status (art lane, code art only for now)
 
+1. **The dark: built** (`src/placeDark.js`, `src/mineScene.js`). One screen-space layer, black outside a dim radius around the marshal; the lift (cold white beam) and the shaft (gold beam) glow above it and have a lit patch, so they are found from far away. The radius comes through one hook, `setMineLightSource(() => ({ radius, holes }))` in `src/placeDark.js`; the mine lane's light module should call it (lantern lit, torch near, out of oil = `MIN_RADIUS`, the faint ring). Until then a named constant (`LANTERN_RADIUS`) stands in. Waiting on: the **mine** lane's light rules.
+2. **Torches and lantern: built** (`src/placeTorch.js`). `setMineTorches([{ x, z, lit }])` in `src/mineScene.js` shows them (lit ones burn, flicker and clear the dark; unlit ones are charred stubs with smoke, which is what a light eater leaves); `setMineLantern(false)` puts the marshal's lantern out. The **mine** lane calls these from its torch rules. Up to 48 torches, five draw calls in all.
 3. **Light eater model: built** (`createLightEaterMesh` in `src/assets.js`): a small dark bug with pale mandibles, four running legs and a dim amber abdomen (`userData.ember`, an unlit child the rules may dim or brighten). Waiting on the **mine** lane (its rules and floors) and **combat** (its behaviour): they add the monster with `look: 'lighteater'` and the mesh in `MINE_MESHES` (`src/enemySystem.js`).
 4. **Hidden door: built** as a part (`src/placeHiddenDoor.js`, `createHiddenDoor()`): `group.position`/`rotation.y` from the cellar layout, `update(t, distanceFromMarshal)` each frame (a faint seam of light, dust at the foot and a draught when near, nothing from far away), `setOpen(true)` swings it on a lit passage. Waiting on the **town** lane: the cellar layout and placeholder scene (`src/placeCellar.js`) that place it on a wall spot, say how wide the wall spot is (the door is 3.2 x 4.6 units; ask the art lane to change that), and call `setOpen` once Deacon Graves has a star.
 
@@ -342,6 +344,14 @@ stonekin 22, wraith 55). The Wanted Road, bosses and anything spawned without a 
 fills within `WAKE_DISTANCE` 45 of its edge and empties past `LEAVE_DISTANCE` 100) stay as the cap on how many monsters exist; the radius decides when each one acts.
 Every number is a guess to tune by playing. A lit marshal being sensed from farther is not built (it needs the light rules wired in).
 
+**Built 2026-10-06 (slice 5, part (a) wired into the mine mode).** `src/modes/mine.js`: a run starts with a light kit (`mine.light`, from `profile.mine.light` once the shops
+are open); the lantern burns oil each frame; **T** (or the TORCH button, made by the mode, for a touch screen) puts a torch down where the marshal stands (refused with a
+word when none are left or one is too close); the HUD shows `TORCHES n` and `OIL nm` (or `LANTERN OUT`); `setMineLightSource` gives the dark layer the lantern's radius
+(the dim ring when out of oil), `setMineTorches` shows the placed torches of the floor (they cut their own holes in the dark, so none are passed again as holes) and
+`setMineLantern` lights or puts out the marshal's lantern. The run's summary carries `used` so the oil, torches and matches spent come off what he owns.
+**Until the light shops are open, `LIGHT_NEEDS_SHOP` in `src/mineLight.js` is `false` and every run starts with a free full kit** (a lantern, full oil, 10 torches and 20 matches),
+otherwise nobody could buy a lantern and the mine would be black for everyone. When the shops are in, set it to `true`: a run then starts with what he owns.
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want
@@ -357,6 +367,38 @@ kill one creature, kill a number of creatures, or a mix, plus a main quest that 
 - **Rules:** no stars, no Gold Nuggets and no timers. **Rewards are open (ask the owner):** score, ore, cosmetic titles, or a small amount of
   Bounty Dollars. Since light costs money and the mine pays none, a small Bounty Dollar reward from a grave quest may be the fair answer.
 - Needs first: the dark mine (Slice 5), then a data contract (quest state in the profile and the server) before the screens.
+
+**Design note and the generator (town lane, 2026-10-06).** `src/graveQuests.js` is the pure generator (`tests/graveQuests.test.js`); nothing else is built yet.
+- **Six graves, six souls** (`SOULS`): each has a name, a trade, a mood (*revenge* or *unfinished*) and one line. A grave's quest is made when it is opened from
+  `graveQuest({ seed, day, grave, deepest })`: the same inputs always give the same quest. `seed` is 0 for everyone the same day, or an account's own number if the
+  owner wants different graves for different players.
+- **Templates (Fate's small ones):** FIND (bring up ore), HUNT (kill one named creature), CLEAR (kill a number of one kind), MIX (a clear and a find). One grave
+  each day is the **main** grave: a named creature, bigger and tougher, on floor 10 or three below the deepest the player has reached, with 2 to 4 of another
+  kind following it. The target kinds are only what lives on the asked floor (`mineRoster`), and an ordinary quest is never deeper than two floors below the
+  player's deepest, so it is always something he can do. A new player is sent no deeper than floor 2.
+- **What the mine lane has to count** (a tally since the quest was taken): `{ kills: { monsterId: n }, ore: n }`. `questProgress(quest, tally)` reads it and says
+  which goals are done. The state in the profile and the server (`profile.quests`: the quest ids taken, their tallies, the ones finished) is the data contract for
+  the next PR, once the reward is decided.
+- **The graves appear only after Deacon Graves has a star** (`gravesOpen`, the same unlock as the cellar's hidden door), and they stand in his own section, Hollow Hill
+  (owner, 2026-10-06). Same quests for every player on the same day (`seed` 0), made when a grave is opened.
+- **What a quest pays (owner's answers, 2026-10-06): it depends on the quest and pays more the deeper it goes.** `questReward(quest)` gives `{ dollars, ore, title }`:
+  earned Bounty Dollars, ore, and for the main quest a cosmetic rank title; never Gold Nuggets, stars or anything that changes a fight. `dollars = (6 + 4 x floor)`
+  times the template's share (find 0.8, clear 1, hunt 1.2, mix 1.4, main 1.8), rounded, at most **$90** a quest; `ore = floor / 2` (the main quest: 1.5 x floor), at least 1;
+  the main quest's title by its floor: 10 DELVER, 15 DEEP DELVER, 25 LAMPLESS, 40 THE LONG DARK. A quest is never timed.
+
+  | Floor asked | find | clear | hunt | mix | main |
+  |---|---|---|---|---|---|
+  | 2 | $11 | $14 | $17 | $20 | (the main quest is never above floor 10) |
+  | 6 | $24 | $30 | $36 | $42 | |
+  | 10 | $37 | $46 | $55 | $64 | $83 and DELVER |
+  | 20 | $69 | $86 | $90 | $90 | $90 and DEEP DELVER |
+  | 40 | $90 | $90 | $90 | $90 | $90 and THE LONG DARK |
+
+  The most the six graves of a day can pay together is six times the cap, $540, always less than the $600 a single Wanted Road run can bank
+  (`MAX_DOLLARS_PER_RUN`); the table is pinned by `tests/graveQuests.test.js`. Since light costs money and the mine pays none, this is where the
+  mine's money comes back, only through the graves and only for the deeper trips; ore and titles are banked and shown the same way as before.
+- **Not built yet:** the state in the profile and the server (`profile.quests`: the quests taken, their tallies, the ones finished and paid), the cards on the hill, and
+  the mine lane's counting. The data contract goes next.
 
 ## Open questions
 

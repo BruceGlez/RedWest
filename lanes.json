@@ -40,6 +40,8 @@
     "ASSETS.md",
     "POLISH_PLAN.md",
     "tests/atmosphere.test.js",
+    "tests/placeDark.test.js",
+    "tests/placeTorch.test.js",
     "tests/lightEaterMesh.test.js",
     "tests/placeHiddenDoor.test.js",
     "tests/animationClips.test.js",
@@ -110,6 +112,8 @@
     "src/places/store.js",
     "tests/storeLayout.test.js",
     "tests/lightShop.test.js",
+    "src/graveQuests.js",
+    "tests/graveQuests.test.js",
     "src/cellarLayout.js",
     "src/places/cellar.js",
     "tests/cellarLayout.test.js",
@@ -126,7 +130,9 @@
     "src/vaneLayout.js",
     "tests/vaneLayout.test.js",
     "src/modes/arena.js",
-    "tests/places.test.js"
+    "tests/places.test.js",
+    "src/vigil.js",
+    "tests/vigil.test.js"
    ],
    "checks": [
     "npm test",
@@ -146,7 +152,9 @@
     "tools/retention.mjs",
     "tools/loadtest/**",
     "tests/server.test.js",
-    "tests/boards.test.js"
+    "tests/boards.test.js",
+    "tests/storeContract.test.js",
+    "tests/migrateJson.test.js"
    ],
    "checks": [
     "npm test",
