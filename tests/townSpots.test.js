@@ -5,8 +5,8 @@ import { TOWN_LAYOUT } from '../src/townScene.js';
 import { TOWN_AREA } from '../src/townDistricts.js';
 import { UNDERTAKER_AT } from '../src/townSpace.js';
 
-test('the five places exist, with a verb each', () => {
-    assert.deepEqual(SPOTS.map(s => s.id), ['train', 'platform', 'cashbox', 'board', 'undertaker']);
+test('the six places exist, with a verb each', () => {
+    assert.deepEqual(SPOTS.map(s => s.id), ['train', 'platform', 'cashbox', 'board', 'undertaker', 'store']);
     for(const spot of SPOTS) assert.ok(spot.verb && getSpot(spot.id) === spot);
     assert.equal(getSpot('nope'), null);
 });

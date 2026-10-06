@@ -325,6 +325,15 @@ Deacon Graves. North edge, between Tres Rios and the Foundry.
   (shared), the same way as `saloon`. **Not built yet:** the place (the hill, the lanterns you walk up to, the oil stand, the bell, the chapel growing in the town), the
   look, sounds, and the other places' bonus (Pete's meals and the Wash's finds speeding a piece).
 
+### Extra places that are not an outlaw's
+
+- **Mr. Grimsby's cellar** (built 2026-10-06, `MINE_PLAN.md` slice 5): the room under his parlour. The way down to the Hollow Claim is a hidden door in its wall that
+  only shows its prompt when you are beside it, and it opens once Deacon Graves has a star.
+- **The general store** (built 2026-10-06, waiting on the buy call to sell): a small shop on the town's west street, Ada Pruitt behind the counter, open to anyone. It
+  sells the same light as Mr. Grimsby's (lantern, oil, torches, matches) in earned Bounty Dollars only, at a tenth more (`SHOP_MARKUP`). `src/storeLayout.js` is the map,
+  `src/places/store.js` the counter's card, `src/placeStore.js` a plain box-built placeholder scene (and a plain placeholder building in `src/townScene.js`), and the door is
+  the `store` spot in `src/townSpots.js`. The shop card is shared with Mr. Grimsby's (`src/lightShop.js`).
+
 ## Order of work
 
 1. **H1** (built): the place shell and Calloway Farm. Three new districts so every outlaw has one.

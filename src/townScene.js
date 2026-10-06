@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { mergeByMaterial } from './meshMerge.js';
 import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces, getDistrict, districtOffsetById } from './townDistricts.js';
-import { TOWN_LAYOUT, SPREAD, STATION, UNDERTAKER_AT, spread, near, moved } from './townSpace.js';
+import { TOWN_LAYOUT, SPREAD, STATION, UNDERTAKER_AT, STORE_AT, spread, near, moved } from './townSpace.js';
 import { FOLK, createWalker, stepWalker } from './townFolk.js';
 import { skyAt } from './townTime.js';
 import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
@@ -866,6 +866,14 @@ export function createTownScene(options = {}) {
     const undertakerAt = UNDERTAKER_AT;
     undertaker.position.set(undertakerAt[0], 0, undertakerAt[1]);
     scenery.add(undertaker);
+    // The general store (cross-lane on purpose: a plain placeholder building; its door, src/townSpots.js, opens the store, src/places/store.js).
+    const store = new THREE.Group();
+    store.add(box(5, 4.5, 5, C.timber, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+    const storeSign = sign('GENERAL STORE', 4.4);
+    storeSign.position.set(0, 3.6, 2.6);
+    store.add(storeSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    store.position.set(STORE_AT[0], 0, STORE_AT[1]);
+    scenery.add(store);
 
     // A foundry chimney on the skyline.
     const foundry = new THREE.Group();
@@ -1069,7 +1077,7 @@ export function createTownScene(options = {}) {
     const at = (x, z, hx, hz) => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
     const shiftBox = (b, [dx, dz]) => ({ minX: b.minX + dx, maxX: b.maxX + dx, minZ: b.minZ + dz, maxZ: b.maxZ + dz });
     const walkBoxes = [
-        at(stableAt[0], stableAt[1], 4.2, 3.2), at(undertakerAt[0], undertakerAt[1], 2.8, 2.8), at(foundryAt[0], foundryAt[1], 6.2, 4.2), at(wagonAt[0], wagonAt[1], 2.4, 1.7),
+        at(stableAt[0], stableAt[1], 4.2, 3.2), at(undertakerAt[0], undertakerAt[1], 2.8, 2.8), at(STORE_AT[0], STORE_AT[1], 2.8, 2.8), at(foundryAt[0], foundryAt[1], 6.2, 4.2), at(wagonAt[0], wagonAt[1], 2.4, 1.7),
         ...BARRELS.map(([x, z]) => at(x, z, 0.7, 0.7)),
         ...CRATES.map(([x, z]) => at(x, z, 0.75, 0.75)),
         ...LAMPS.map(([x, z]) => at(x, z, 0.3, 0.3)),
