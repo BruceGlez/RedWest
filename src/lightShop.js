@@ -13,7 +13,7 @@ export function shopRows(profile, shop = 'grimsby') {
     const dollars = Math.max(0, Math.floor(Number(profile?.balances?.dollars)) || 0);
     return ORDER.map(id => {
         const item = LIGHT_ITEMS[id];
-        const price = priceOf(id, shop);
+        const price = priceOf(id, shop, kit); // (oil: by what the lantern is missing, as the sale charges it)
         let why = '';
         if(id === 'lantern' && kit.lantern) why = 'YOU HAVE ONE';
         else if(id === 'oil' && !kit.lantern) why = 'NEEDS A LANTERN';
