@@ -3,11 +3,22 @@ import { dirname } from 'node:path';
 
 // Minimal persistence: one JSON document of users. Fine for a playtest-scale launch; swap for a
 // real database (Postgres, Firestore, ...) before large numbers of players.
+//
+// The store interface (docs/lanes/scale.md, "Design: the Postgres store seam"). Callers MUST `await` every method: this JSON store
+// answers at once, a database store answers later. Lookups are named for the question the app asks, so a database can answer them
+// from an index; here they scan, as the app used to.
+//   getUser(id), putUser(id, user), deleteUser(id), save()
+//   findUserByTokenHash(hash) -> id | null
+//   findUserByAppleSub(sub), findUserByPaymentIntent(intent), findUserByName(name, exceptId) -> { id, user } | null
+//   listReportedUsers() -> users with name reports; listBoardUsers() -> users whose name is not hidden (the leaderboards)
+//   removeReporter(id) -> take one account out of everyone's reports (it is being deleted)
+//   retainPurchases(records), retainedPurchases(), ping()
+// listUsers() is not part of the interface; it stays on this store for tools and tests.
 export function createMemoryStore(initial = {}) {
     const data = { users: {}, ...initial };
     // Purchase transaction ids from deleted accounts, kept without any player data for tax and refunds.
     data.retainedPurchases ??= [];
-    return {
+    const store = {
         getUser: id => data.users[id] ?? null,
         putUser: (id, user) => { data.users[id] = user; },
         deleteUser: id => { delete data.users[id]; },
@@ -15,10 +26,22 @@ export function createMemoryStore(initial = {}) {
         retainedPurchases: () => data.retainedPurchases,
         findUserByTokenHash: hash => Object.entries(data.users).find(([, user]) => user.tokenHash === hash || user.tokenHashes?.includes(hash))?.[0] ?? null,
         listUsers: () => Object.entries(data.users).map(([id, user]) => ({ id, user })),
+        findUserByAppleSub: sub => store.listUsers().find(entry => entry.user.apple?.sub === sub) ?? null,
+        findUserByPaymentIntent: intent => store.listUsers().find(entry => entry.user.profile?.purchases?.some(p => p.paymentIntent === intent)) ?? null,
+        findUserByName: (name, exceptId) => store.listUsers().find(entry => entry.id !== exceptId && entry.user.profile?.name === name) ?? null,
+        listReportedUsers: () => store.listUsers().filter(entry => entry.user.reportedBy?.length),
+        listBoardUsers: () => store.listUsers().filter(entry => !entry.user.nameHidden),
+        removeReporter: id => {
+            for(const entry of store.listUsers()) {
+                if(!entry.user.reportedBy?.includes(id)) continue;
+                entry.user.reportedBy = entry.user.reportedBy.filter(reporter => reporter !== id);
+            }
+        },
         // Is the store usable right now? Cheap, no data read; /healthz asks it. Throws or returns false when not.
         ping: () => true,
         save: () => {}
     };
+    return store;
 }
 
 export function createFileStore(path) {

@@ -48,3 +48,4 @@ commercial use.
 - Music and effects from other sources need a licence that covers games and their ads (a "sync" licence
   for trailers and ads).
 | Light eater (small bug that puts torches out) | `src/assets.js` (`createLightEaterMesh`) | Made in code: boxes baked with the quadruped bones like the crawler, plus an unlit amber abdomen | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. Not wired to a monster yet: the mine and combat lanes add `look: 'lighteater'` and the mesh in `src/enemySystem.js`. A later art pass may replace it. |
+| Hidden door for the cellar (a wall spot that gives itself away near, and a swung-open version) | `src/placeHiddenDoor.js` | Made in code: stone boxes, a hinged slab, an additive seam line, drifting dust points, a warm spill behind the open door | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. A part the town lane's cellar scene hangs on a wall spot; no models or textures. A later art pass may replace it. |

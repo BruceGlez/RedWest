@@ -1,3 +1,4 @@
+@import url('./townSaloon.css');
 /* ---------- Places you step into: Calloway Farm (src/placeFarm.js, src/townPanel.js) ---------- */
 .town-leave { background: #6b2a1c; }
 .town-toast { position: absolute; left: 50%; top: calc(112px + env(safe-area-inset-top)); transform: translateX(-50%); z-index: 5; max-width: 86vw; padding: 8px 16px;
