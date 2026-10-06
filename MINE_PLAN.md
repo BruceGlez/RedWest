@@ -391,6 +391,19 @@ Money must not buy combat power: if oxygen can be bought it is Bounty Dollars on
 
 **Held, not answered by the owner (listed for the coordinator):** (1) rescaling the floor lengths if "main road" meant the longer measure in the table above (one constant, `hopGap` in `src/mineMap.js`); (2) a small "lift or shaft in sight" HUD rule (the art lane's glow and beams and the HUD arrows already work).
 
+**Bigger light (owner, 2026-10-06: "the light is too small").** `LANTERN_RADIUS` 15 to **28** and `TORCH_RADIUS` 12 to **22** (about 1.9x and 1.8x), both named constants in `src/mineLight.js`; the dim ring
+stays 6 (your own feet, with no light). Beyond them it is still truly black. A chamber is 22 to 30 wide, so the lantern lights about a chamber's width; a torch every 40 units overlaps its
+neighbour a little (2 x 22 = 44), so a torch road is a lit path with dark cave to either side. `MIN_TORCH_GAP` (14) is unchanged. **For the art lane (`src/placeTorch.js`, `src/placeDark.js`):** the
+lantern's radius reaches the dark layer through the hook as before, but a placed torch's hole is drawn with the art lane's own `TORCH_LIGHT_RADIUS` through `setMineTorches`, so it stays small until
+that is set from `TORCH_RADIUS` in `src/mineLight.js` (and the `limit` of `torchHoles`, 8, raised towards the 12 the light rules allow; `MAX_HOLES` 16 already fits the lift, the shaft and 12 torches).
+
+**The oxygen bar: spec for the ui lane (the owner confirmed my defaults, 2026-10-06).** Confirmed: drain = time on a thin floor (0.5 a second on floor 15, +0.05 a second each floor deeper, cap 2.0); refill = at the lift and beside
+a lit torch of his, plus the arrival fill; **not** checkpoints and **not** a shop flask; at empty = a slower marshal and a dimmer lantern, never a lost heart. `OXYGEN_ENABLED` in `src/mineAir.js` is set to
+`true` when the bar is wired. The bar is a HUD element built from `src/mineAir.js`: `air.level` (0 to `AIR_CAPACITY` 100), `airLow(air)`, `airEmpty(air)` and `airEffects(air)` = `{ speed, light, warning, empty }`
+(`speed` and `light` are factors from 1 down to `SLOW_AT_EMPTY` 0.85 and `LIGHT_AT_EMPTY` 0.6). It shows only on floors 15 and deeper (`THIN_AIR_FROM_FLOOR`), warns below `LOW_AIR` (25), and
+fills fast within `LIFT_AIR_RADIUS` (14) of the lift. The mine mode will call `tickAir(air, dt, { floor, nearLift, nearLitTorch })` each frame, `arriveAir` on each new floor, scale the marshal's speed by
+`airEffects(air).speed` and the lantern radius by `.light`; that wiring is the mine lane's and follows once the bar exists.
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want
