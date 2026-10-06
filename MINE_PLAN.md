@@ -304,6 +304,26 @@ mouths are only put where the marshal can walk. The wall ring also stands 1.2 un
 caves cannot slip between its circles. Rockfalls are a little smaller (3.6 to 5.4) so they still fit the smaller chambers. Smaller chambers hold fewer
 monsters (a chamber's danger grows with its area), so the early floors are quieter: tune `nodeBudget` if a playtest says so.
 
+**Built 2026-10-06 (slice 5, part (a): the light rules).** `src/mineLight.js` (pure, with `tests/mineLight.test.js`) and a `light` field in `profile.mine`:
+`{ lantern, oil, torches, matches }` (what he owns, kept inside its limits by `normalizeLightKit`). What it says:
+- **Numbers:** `DIM_RING` 6 (always: your own feet), `LANTERN_RADIUS` 15 (lit, while it has oil), `TORCH_RADIUS` 12, a torch every `TORCH_SPACING` 40 units of the
+  road (`torchesFor(roadLength)`: 7 on floor 1), `MIN_TORCH_GAP` 14, carry limit `CARRY_LIMIT` 10 torches and `MATCH_LIMIT` 20 matches, `OIL_CAPACITY` 900 seconds of burn.
+- **What is sold** (`LIGHT_ITEMS`, in Bounty Dollars only; `buyLight(profile, id, shop)` spends `balances.dollars` and nothing else, and refuses without changing
+  anything): the lantern (once, comes full), lamp oil (fills it), torches x5, matches x5 (a relight costs one match). Mr. Grimsby's and the general store
+  charge the same except `SHOP_MARKUP` (the store 10% more, rounded up). The test fails if any price is in nuggets or any real-money product sells light.
+- **Running out:** with no lantern or no oil the radius falls to the dim ring, never to nothing, so nobody is ever stuck (and the lift and shaft stay visible: part (c)).
+- **A run:** `createLightRun(kit)`, `burnLantern`, `placeTorch` (not within `MIN_TORCH_GAP` of another on the same floor), `putOutTorch` (a light eater, part (d)),
+  `relightTorch` (one match), `burnTorches` (only from `TORCHES_BURN_OUT_FROM`, default `Infinity`: permanent), `isLit`, and `lightSource(run, floor, at)` which returns
+  `{ radius, holes: [{ x, z, r, k }] }` (at most 12 torches, nearest first): exactly what `setMineLightSource` in the art lane's `src/placeDark.js` reads.
+- **Saving:** the run's summary carries `used: { oil, torches, matches }` and `applyMineRun` takes that from the kit (never below nothing, whatever happened to the
+  marshal). Placed torches stay on their floor and are not returned. The server cannot see the run, so a client could under-report what it used: that gives free light,
+  not money or power, and a server-issued run token (already proposed for the depth) would close it.
+- **Owner to confirm (OPEN):** the prices (lantern 60, oil 15, torches x5 20, matches x5 5; a first kit 85 and a refill 35 against what a short Wanted Road run earns),
+  the oil in a refill (a full lantern is 15 minutes of burn), and what torches do from floor 15 (`TORCHES_BURN_OUT_FROM`; options: stay permanent, burn out after
+  `TORCH_BURN_SECONDS` 10 minutes, or need a match to relight each floor).
+- **Still to do for the light:** the wallet and server calls to buy (`POST /api/mine/buy`, scale; `wallet.buyLight`, money), the shop cards (town), and the mine mode
+  using it (a button to place a torch, burning the lantern, calling `setMineLightSource`): after the dark layer (#56) and the shops exist.
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want
