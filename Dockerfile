@@ -1,5 +1,6 @@
 # Red West economy server (server/), for Coolify or any Docker host. See docs/DEPLOY.md.
-# The server has no npm dependencies: it needs only server/ and the pure rules in src/ that it imports.
+# The server needs only server/ and the pure rules in src/ that it imports. Its one npm dependency (pg, for STORE=postgres) is listed in
+# server/package.json, so the game's own dependencies are not installed here.
 # The web game itself is a static build (npm run build) and is hosted separately (GitHub Pages today).
 FROM node:22-alpine
 
@@ -9,6 +10,8 @@ ENV NODE_ENV=production \
 
 WORKDIR /app
 COPY package.json ./
+COPY server/package.json server/package-lock.json ./server/
+RUN cd server && npm ci --omit=dev
 COPY server ./server
 COPY src ./src
 
