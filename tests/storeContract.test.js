@@ -6,6 +6,8 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createApp } from '../server/app.js';
 import { createMemoryStore, createFileStore, createKeyedLock, StoreConflictError } from '../server/store.js';
+import { createProfile, weekKey, BOARDS } from '../src/profile.js';
+import { OUTLAWS } from '../src/outlaws.js';
 
 // One contract, run against every store: the JSON memory and file stores always, and Postgres when TEST_DATABASE_URL points at a
 // throwaway database (the tests empty its tables). `npm test` skips the Postgres runs without it. (docs/DEPLOY.md, "Testing the Postgres store".)
@@ -47,7 +49,6 @@ for(const [label, make] of stores) {
             assert.equal(await store.findUserByName('BOB', 'b'), null, 'a player does not take his own name');
             assert.equal(await store.findUserByName('NOBODY', 'a'), null);
             assert.deepEqual((await store.listReportedUsers()).map(e => e.id), ['a']);
-            assert.deepEqual((await store.listBoardUsers()).map(e => e.id).sort(), ['a', 'c'], 'a hidden name is off the boards');
 
             // A purchase is found by its Stripe payment intent.
             const c = await store.getUser('c');
@@ -75,6 +76,64 @@ for(const [label, make] of stores) {
             assert.equal(await store.getUser('b'), null);
             assert.equal(await store.findUserByTokenHash('h-b'), null);
             assert.equal(await store.ping(), true);
+        } finally {
+            await store.close?.();
+        }
+    });
+
+    test(`store contract (${label}): the leaderboards give the same answer as the JSON store's ranking`, async () => {
+        const store = await make();
+        const reference = createMemoryStore();
+        try {
+            const NOW = new Date(Date.UTC(2026, 8, 30, 12));
+            const LAST_WEEK = weekKey(new Date(Date.UTC(2026, 8, 20, 12)));
+            const players = [
+                // id, name, weekly (this week unless stale), event, stage bests, stage star masks, extra
+                ['a', 'ANNIE', 900, 300, { 0: 500 }, { 0: 7, 1: 1 }, {}],
+                ['b', 'BOB', 900, 0, { 0: 700, 1: 100 }, { 0: 1 }, {}],                 // ties ANNIE on weekly: the earlier player ranks first
+                ['c', 'CARL', 1200, 800, { 0: 700 }, { 0: 7, 1: 7, 2: 3 }, {}],
+                ['d', 'DORA', 5000, 5000, { 0: 9999 }, { 0: 7 }, { nameHidden: true }],   // hidden name: off every board
+                ['e', '', 4000, 4000, { 0: 8888 }, { 0: 7 }, {}],                         // no name: off every board
+                ['f', 'FRED', 0, 0, {}, {}, {}],                                          // nothing scored: off every board
+                ['g', 'GINA', 100, 50, { 0: 10, 2: 40 }, { 0: 1 }, { staleWeek: true }],  // last week's scores do not count this week
+                ['h', 'HANK', 50, 10, { 0: 5 }, { 0: 1 }, {}]
+            ];
+            for(const [id, name, weekly, event, best, stars, extra] of players) {
+                const profile = createProfile(NOW);
+                profile.name = name;
+                profile.stats.weekly = { week: extra.staleWeek ? LAST_WEEK : weekKey(NOW), score: weekly, character: 'char-marshal' };
+                profile.event = { week: extra.staleWeek ? LAST_WEEK : weekKey(NOW), best: event, tiers: 0, character: 'char-drifter' };
+                for(const [i, v] of Object.entries(best)) { profile.stats.stageBest[i] = v; profile.stats.stageChar[i] = 'char-marshal'; }
+                for(const [i, v] of Object.entries(stars)) profile.stats.stageStars[i] = v;
+                const user = { tokenHash: `h-${id}`, profile, ...(extra.nameHidden ? { nameHidden: true } : {}) };
+                await store.putUser(id, structuredClone(user));
+                await reference.putUser(id, structuredClone(user));
+            }
+            for(const board of Object.keys(BOARDS)) {
+                for(const meId of [null, 'a', 'b', 'c', 'd', 'e', 'f', 'g', 'h', 'nobody']) {
+                    for(const limit of [50, 2]) {
+                        assert.deepEqual(await store.leaderboard(board, meId, limit, NOW), await reference.leaderboard(board, meId, limit, NOW), `${board} as ${meId}, top ${limit}`);
+                    }
+                }
+            }
+            const weekly = await store.leaderboard('weekly', 'h', 2, NOW);
+            assert.deepEqual(weekly.entries.map(e => e.name), ['CARL', 'ANNIE'], 'tied players rank in the order they joined');
+            assert.equal(weekly.me.rank, 4, 'a player outside the top rows still sees their own rank');
+            assert.equal(weekly.total, 4, 'hidden, unnamed, unscored and last week\'s players are not counted');
+            await assert.rejects(() => store.leaderboard('nope', 'a', 50, NOW), { code: 'bad_board' });
+            await assert.rejects(() => store.leaderboard('constructor', 'a', 50, NOW), { code: 'bad_board' });
+            await assert.rejects(() => store.leaderboard('stage-99', 'a', 50, NOW), { code: 'bad_board' });
+
+            // A player's new score moves them up, and hiding a name takes them off, as the saves happen.
+            const hank = await store.getUser('h');
+            hank.profile.stats.weekly.score = 2000;
+            await store.putUser('h', hank);
+            assert.equal((await store.leaderboard('weekly', 'h', 50, NOW)).me.rank, 1);
+            hank.nameHidden = true;
+            await store.putUser('h', hank);
+            assert.equal((await store.leaderboard('weekly', 'h', 50, NOW)).me, null);
+            assert.equal((await store.leaderboard('weekly', 'h', 50, NOW)).total, 3);
+            assert.ok(OUTLAWS.length >= 3);
         } finally {
             await store.close?.();
         }
@@ -111,6 +170,28 @@ for(const [label, make] of stores) {
 }
 
 if(process.env.TEST_DATABASE_URL) {
+    test('postgres store: players saved before the board columns existed appear on the boards after the next start', async () => {
+        const { createPgStore } = await import('../server/pgStore.js');
+        const NOW = new Date();
+        const first = await createPgStore({ connectionString: process.env.TEST_DATABASE_URL, max: 3 });
+        await first.pool.query('truncate users, retained_purchases');
+        for(const [id, name, score] of [['x1', 'OLD ONE', 700], ['x2', 'OLD TWO', 900]]) {
+            const profile = createProfile(NOW);
+            profile.name = name;
+            profile.stats.weekly = { week: weekKey(NOW), score, character: '' };
+            await first.putUser(id, { tokenHash: `h-${id}`, profile });
+        }
+        // As if an earlier version of the store had written them: no board columns, no board version.
+        await first.pool.query(`update users set hidden = false, b_weekly = 0, b_weekly_week = null, b_stars = 0, b_stage = '{}', board_version = null`);
+        assert.equal((await first.leaderboard('weekly', null, 50, NOW)).total, 0, 'nothing on the board without the columns');
+        await first.close();
+        const second = await createPgStore({ connectionString: process.env.TEST_DATABASE_URL, max: 3 });
+        const board = await second.leaderboard('weekly', 'x1', 50, NOW);
+        assert.deepEqual(board.entries.map(e => [e.name, e.value]), [['OLD TWO', 900], ['OLD ONE', 700]]);
+        assert.equal(board.me.rank, 2);
+        await second.close();
+    });
+
     test('postgres store: a stale write is refused, a fresh one goes through, and the account survives a restart', async () => {
         const { createPgStore } = await import('../server/pgStore.js');
         const one = await createPgStore({ connectionString: process.env.TEST_DATABASE_URL, max: 3 });

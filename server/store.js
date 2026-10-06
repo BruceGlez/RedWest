@@ -1,3 +1,5 @@
+import { normalizeProfile, rankBoard, BOARDS } from '../src/profile.js';
+import { EconomyError } from '../src/economyError.js';
 import { readFileSync, writeFileSync, renameSync, mkdirSync, accessSync, constants } from 'node:fs';
 import { dirname } from 'node:path';
 
@@ -10,13 +12,18 @@ import { dirname } from 'node:path';
 //   getUser(id), putUser(id, user), deleteUser(id), save()
 //   findUserByTokenHash(hash) -> id | null
 //   findUserByAppleSub(sub), findUserByPaymentIntent(intent), findUserByName(name, exceptId) -> { id, user } | null
-//   listReportedUsers() -> users with name reports; listBoardUsers() -> users whose name is not hidden (the leaderboards)
+//   listReportedUsers() -> users with name reports; leaderboard(board, meId, limit, now) -> { board, entries, me, total }, the leaderboard response (names that are hidden stay off)
 //   removeReporter(id) -> take one account out of everyone's reports (it is being deleted)
 //   retainPurchases(records), retainedPurchases(), ping()
 //   lock(id) -> release: one request at a time per player (read, change, write must not interleave with another request for the same
 //     player). Always `release()` in a finally. A database store can also refuse a stale write: putUser throws StoreConflictError when
 //     the player was changed by someone else since getUser (another server instance); the app answers 409 and the client retries.
 // listUsers() is not part of the interface; it stays on this store for tools and tests.
+// Only the boards that exist, by their own names (rankBoard alone lets an inherited name such as "constructor" through as an empty board).
+export function assertBoard(board) {
+    if(typeof board !== 'string' || !Object.hasOwn(BOARDS, board)) throw new EconomyError('bad_board', 'Unknown leaderboard.');
+}
+
 // A write that lost a race: the player changed since the object was read.
 export class StoreConflictError extends Error {
     constructor() { super('The account changed while this request ran. Try again.'); this.code = 'store_conflict'; }
@@ -56,7 +63,13 @@ export function createMemoryStore(initial = {}) {
         findUserByPaymentIntent: intent => store.listUsers().find(entry => entry.user.profile?.purchases?.some(p => p.paymentIntent === intent)) ?? null,
         findUserByName: (name, exceptId) => store.listUsers().find(entry => entry.id !== exceptId && entry.user.profile?.name === name) ?? null,
         listReportedUsers: () => store.listUsers().filter(entry => entry.user.reportedBy?.length),
-        listBoardUsers: () => store.listUsers().filter(entry => !entry.user.nameHidden),
+        // Every visible player is read and ranked here, which is fine for the JSON file; the Postgres store answers from an index instead.
+        leaderboard: async (board, meId, limit, now) => {
+            assertBoard(board);
+            return rankBoard(
+                store.listUsers().filter(entry => !entry.user.nameHidden).map(entry => ({ id: entry.id, profile: normalizeProfile(entry.user.profile, now) })),
+                board, meId, limit, now);
+        },
         removeReporter: id => {
             for(const entry of store.listUsers()) {
                 if(!entry.user.reportedBy?.includes(id)) continue;

@@ -1,5 +1,5 @@
 import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypto';
-import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, grantProduct, restoreProduct, revokePurchase, refreshJobs, setName, rankBoard, EconomyError } from '../src/profile.js';
+import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, grantProduct, restoreProduct, revokePurchase, refreshJobs, setName, EconomyError } from '../src/profile.js';
 import { getProduct } from '../src/products.js';
 import { validateName, isGeneratedName } from '../src/names.js';
 import { AGE_BANDS } from '../src/privacy.js';
@@ -315,10 +315,7 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 if(url.pathname === '/api/leaderboard' && req.method === 'GET') {
                     // Account boards: every named player's best, ranked server-side from reported runs.
                     // Names hidden after reports stay off the boards until reviewed or changed.
-                    const accounts = (await store.listBoardUsers())
-                        .map(entry => ({ id: entry.id, profile: normalizeProfile(entry.user.profile, now()) }));
-                    const board = rankBoard(accounts, url.searchParams.get('board') || 'weekly', id, 50, now());
-                    return send(res, 200, board);
+                    return send(res, 200, await store.leaderboard(url.searchParams.get('board') || 'weekly', id, 50, now()));
                 }
                 if(url.pathname === '/api/profile' && req.method === 'GET') {
                     refreshJobs(user.profile, now());

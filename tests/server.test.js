@@ -570,7 +570,6 @@ test('the store lookups answer the questions the app asks (and are awaited, so a
     assert.equal((await store.findUserByName('BOB', 'a')).id, 'b');
     assert.equal(await store.findUserByName('BOB', 'b'), null, 'a player is not taking his own name');
     assert.deepEqual((await store.listReportedUsers()).map(e => e.id), ['a']);
-    assert.deepEqual((await store.listBoardUsers()).map(e => e.id), ['a'], 'a hidden name is off the boards');
     await store.removeReporter('b');
     assert.deepEqual(await store.listReportedUsers(), [], 'a deleted account no longer counts as a reporter');
     assert.equal(await store.ping(), true);
