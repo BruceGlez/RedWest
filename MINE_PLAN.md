@@ -296,6 +296,18 @@ Measured from `floorLayout(depth)` (`src/mineMap.js`; "main road" is the chain f
 
 So floor 1 is already about 400 and it is 1,900 by floor 5: marking the way back would take 60 or more torches, which is too many to carry, buy or place. **Targets for the mine agent** (the numbers are a start, to tune by playing): a main road of about 250 on floor 1, about 500 by floor 5, about 800 on floor 10, then growing slowly to about 1,500 by floor 30 and staying there; chambers `3 + floor` for the first 10 floors, then slowly; a torch roughly every 40 units, so about 6 torches on floor 1, 12 on floor 5, 20 on floor 10 and not more than about 38 deep down. Carry limit around 10 to 12, bought in stacks of a few, plus oil to match. Floors stay deterministic per depth (the generator is unchanged); only the sizes change, and `tests/mine*.test.js` pin the new targets.
 
+**Built 2026-10-06 (slice 5, part 0: the floors are smaller).** `chamberCount` is now `3 + floor` for the first ten floors and one more chamber every five
+floors after (up to `MAX_CHAMBERS` 17); chambers are 22 to 30 units wide (growing from the tenth floor) and spaced so the road (`roadLength`, the rails from
+the lift to the shaft, one number the torches have to mark) is about 270 on floor 1, 550 on floor 5, 840 on floor 10, 990 on floor 15, 1,180 on floor 20 and
+1,500 on floor 30 (`tests/mineMap.test.js` pins each target within 15% and says no floor jumps by more than 40%). A torch every 40 units is then 7 on floor 1,
+14 on floor 5, 21 on floor 10 and 38 at the deepest. **Note on the table above:** it measured a longer "main road" than the rails (404 on floor 1); the
+straight distance lift to shaft quoted in "The descent" (237 on floor 1) matches `roadLength`, so the targets are applied to `roadLength`. Two generator fixes
+came with it, because new floors meant new dice: props are kept off the way into every alcove and treasure room, and a repair pass (`openBlockedWays`)
+walks the cave after the props go in and takes away any column, crate or cart that shuts a way to the shaft, a chamber, a chest or an extra cavern; tunnel
+mouths are only put where the marshal can walk. The wall ring also stands 1.2 units inside the open ground (`WALL_INSET`), so a thin spit of rock between two
+caves cannot slip between its circles. Rockfalls are a little smaller (3.6 to 5.4) so they still fit the smaller chambers. Smaller chambers hold fewer
+monsters (a chamber's danger grows with its area), so the early floors are quieter: tune `nodeBudget` if a playtest says so.
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want
