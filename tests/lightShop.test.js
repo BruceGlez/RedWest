@@ -115,6 +115,7 @@ test('a refused sale is told as an error toast; an unknown item or another butto
     assert.deepEqual(calls.at(-1), ['toast', 'Not enough bounty dollars.', true]);
     calls.length = 0;
     assert.equal(click(place, { buyLight: 'diamonds', shop: 'grimsby' }), true, 'the shop swallows what it does not sell');
+    for(const name of ['constructor', '__proto__', 'toString', 'hasOwnProperty']) assert.equal(click(place, { buyLight: name, shop: 'grimsby' }), true, `${name} is not for sale`);
     assert.equal(click(place, {}), false);
     await settle();
     assert.deepEqual(calls, [], 'nothing was asked of the wallet');

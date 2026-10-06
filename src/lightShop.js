@@ -46,7 +46,7 @@ export function lightBuyer(host) {
     return button => {
         const item = button.dataset.buyLight;
         if(!item) return false;
-        if(!LIGHT_ITEMS[item]) return true; // not something the shops sell
+        if(!Object.hasOwn(LIGHT_ITEMS, item)) return true; // not something the shops sell (own names only: "constructor" is not an item)
         const body = { id: item, shop: button.dataset.shop === 'store' ? 'store' : 'grimsby' }; // the wallet's body (src/wallet.js, POST /api/mine/buy)
         host.act(async () => {
             if(typeof host.wallet?.buyLight !== 'function') throw new Error('The shop is not open yet.');
