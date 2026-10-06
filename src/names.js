@@ -43,9 +43,13 @@ export function validateName(raw) {
 const GENERATED_WORDS = ['RIDER', 'RANGER', 'DRIFTER', 'WRANGLER', 'DEPUTY', 'SCOUT', 'TRACKER', 'COWPOKE'];
 const GENERATED = new RegExp(`^(${GENERATED_WORDS.join('|')}) [0-9]{4}$`);
 
+// Digits are checked as letters (1515 reads as "ISIS", 1488 as "I488"), so a draw the filter would reject is drawn again.
 export function generatedName(random = Math.random) {
-    const word = GENERATED_WORDS[Math.floor(random() * GENERATED_WORDS.length)];
-    return `${word} ${String(Math.floor(random() * 10000)).padStart(4, '0')}`;
+    for(;;) {
+        const word = GENERATED_WORDS[Math.floor(random() * GENERATED_WORDS.length)];
+        const name = `${word} ${String(Math.floor(random() * 10000)).padStart(4, '0')}`;
+        if(validateName(name).ok) return name;
+    }
 }
 
 export function isGeneratedName(name) {
