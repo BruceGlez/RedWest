@@ -141,7 +141,8 @@
     "tools/retention.mjs",
     "tools/loadtest/**",
     "tests/server.test.js",
-    "tests/boards.test.js"
+    "tests/boards.test.js",
+    "tests/storeContract.test.js"
    ],
    "checks": [
     "npm test",
