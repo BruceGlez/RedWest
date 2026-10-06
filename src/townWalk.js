@@ -63,7 +63,11 @@ export function createTownWalk({ town3d, host, onOpen, blocked = () => false, de
         if(!active || event.target.tagName === 'INPUT') return;
         const move = MOVE_KEYS[event.code];
         if(move) held.add(move);
-        else if((event.code === 'KeyE' || event.code === 'Enter') && door && !blocked()) use();
+        else if((event.code === 'KeyE' || event.code === 'Enter') && !blocked()) {
+            // The door under the marshal's feet now, not the one the last frame drew: after a move (or a slow frame) the two can differ.
+            const here = nearestDoor(map, position.x, position.z);
+            if(here) { door = here; use(); }
+        }
     };
     const onKeyUp = event => { const move = MOVE_KEYS[event.code]; if(move) held.delete(move); };
     window.addEventListener('keydown', onKeyDown);

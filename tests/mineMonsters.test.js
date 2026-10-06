@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MINE_MONSTERS, MINE_LADDER, BASE_ROSTER, monsterDef, isMineMonster, monsterCost, newOn, mineRoster, mineWave, mineHpBonus, nodeBudget, planNode, WAKE_DISTANCE, LEAVE_DISTANCE } from '../src/mineMonsters.js';
+import { MINE_MONSTERS, MINE_LADDER, BASE_ROSTER, monsterDef, isMineMonster, monsterCost, newOn, mineRoster, mineWave, mineHpBonus, nodeBudget, planNode, WAKE_DISTANCE, LEAVE_DISTANCE, senseRadius, leashRadius, SENSE_BY_BEHAVIOR, MIN_SENSE, MAX_SENSE } from '../src/mineMonsters.js';
 import { floorLayout, isOpen } from '../src/mineMap.js';
 import { ENEMY_TYPES } from '../src/enemyTypes.js';
 
@@ -154,4 +154,19 @@ test('a chamber\'s monsters are of the floor\'s kinds, spend about its budget, a
 test('they come when the marshal is near, and go back to sleep only when he is far', () => {
     assert.ok(WAKE_DISTANCE > 20 && WAKE_DISTANCE < LEAVE_DISTANCE, 'a chamber fills well before he is in it and empties only once he is much farther');
     assert.ok(LEAVE_DISTANCE - WAKE_DISTANCE >= 40, 'room to stand at the edge without it flickering');
+});
+
+test('every monster of the mine has a sense radius and a leash: its own, or the usual one for how it fights', () => {
+    const everyone = [...new Set([...Object.keys(MINE_MONSTERS), ...mineRoster(MINE_LADDER.length)])];
+    for(const id of everyone) {
+        const radius = senseRadius(id), leash = leashRadius(id);
+        assert.ok(radius >= MIN_SENSE && radius <= MAX_SENSE, `${id}: a sense radius of ${radius}`);
+        assert.ok(leash >= radius + 40 && leash >= radius * 2, `${id}: it gives up well past where it woke`);
+    }
+    for(const [behavior, radius] of Object.entries(SENSE_BY_BEHAVIOR)) assert.ok(BEHAVIORS.includes(behavior) && radius >= MIN_SENSE && radius <= MAX_SENSE);
+    for(const id of everyone) if(!MINE_MONSTERS[id]?.sense) assert.ok(monsterDef(id).behavior in SENSE_BY_BEHAVIOR, `${id}: a usual radius for how it fights`);
+    assert.ok(senseRadius('sniper' in MINE_MONSTERS ? 'sniper' : 'rifleman') > senseRadius('bandit'), 'a rifleman sees farther than a bandit');
+    assert.ok(senseRadius('stonekin') < senseRadius('bandit'), 'a slab of stone wakes late');
+    assert.ok(senseRadius('bat') > senseRadius('crawler'), 'a bat hears a long way; a crawler is nearly blind');
+    assert.equal(senseRadius('nobody'), 36, 'an unknown one gets the usual middling radius');
 });

@@ -265,6 +265,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                     bulletHit = true;
                 }
                 e.userData.hp -= b.userData.damage;
+                e.userData.alerted = true; // a monster of the mine that was asleep wakes at once (src/combatMath.js, senseStep)
                 runStats.shotsHit++;
                 
                 if(e.userData.hp <= 0) { 
