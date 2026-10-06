@@ -328,6 +328,7 @@ monsters (a chamber's danger grows with its area), so the early floors are quiet
 - **Owner to confirm (OPEN):** the prices (lantern 60, oil 15, torches x5 20, matches x5 5; a first kit 85 and a refill 35 against what a short Wanted Road run earns),
   the oil in a refill (a full lantern is 15 minutes of burn), and what torches do from floor 15 (`TORCHES_BURN_OUT_FROM`; options: stay permanent, burn out after
   `TORCH_BURN_SECONDS` 10 minutes, or need a match to relight each floor).
+- **Built 2026-10-06 (town lane): Mr. Grimsby's shop card.** `src/lightShop.js` lays out what is for sale (`shopRows`: the four things, a dollar price each, and the reason one cannot be bought now, from exactly the refusals of `buyLight`, which a test checks for every state) and `src/places/undertaker.js` puts it on his card with a BUY button each; a sale goes to `wallet.buyLight({ item, shop })` and the card is drawn again from the new profile. The card never names another currency (`tests/lightShop.test.js`). **The general store's card is not built:** where it stands is the owner's to say (a new building in the town, or a counter inside a place); it reuses `lightShopHtml(profile, 'store')` at the 10% markup.
 - **Still to do for the light:** the wallet and server calls to buy (`POST /api/mine/buy`, scale; `wallet.buyLight`, money), the shop cards (town), and the mine mode
   using it (a button to place a torch, burning the lantern, calling `setMineLightSource`): after the dark layer (#56) and the shops exist.
 
