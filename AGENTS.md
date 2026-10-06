@@ -36,7 +36,7 @@ of checks to run. Agents in different lanes should almost never touch the same f
    never change combat; original art, names and story only; every asset gets a row in `ASSETS.md`.
 7. **Green before you push:** `npm test` (includes the ownership check), `npm run build`, and your lane's checks. A red `main` is everyone's
    first priority.
-8. **Docs:** update `PLAN.md` (status) and your own plan doc in the same PR as the change. Do not create new top-level plan files.
+8. **Docs:** update your own plan doc (your lane's `docs/lanes/<id>.md`, and the plan doc of your slice such as `MINE_PLAN.md` or `PLACES.md`) in the same PR as the change, adding new lines at the END of a list or section. Do **not** edit `PLAN.md` in a feature PR: every PR changed the same status line and each conflict cost a full CI cycle; the coordinator updates `PLAN.md`. The same goes for `lanes.json` and `ASSETS.md`: append at the end of the list. Do not create new top-level plan files.
 
 ## Adding a run mode or a place (no edits to the big files)
 
