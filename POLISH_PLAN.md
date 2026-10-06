@@ -178,7 +178,7 @@ bursts stay cheap: dust puffs, footsteps, smoke.
 - **A quiet start-here hint:** a pulsing "NEW HERE? READ THE STORY" button under PLAY for a player who has not played and has not
   read the opening; it opens the opening and goes away. It never covers anything or interrupts.
 - **Still open:** a listening check of the new recordings and the music switch on a real phone; a crossfade for the hot loop; the
-  stable and the undertaker still have no barks (scenery, not tappable); snake and horse rigging needs Blender on the owner's machine.
+  stable and the undertaker still have no barks (scenery, not tappable); the horse rigging needs Blender on the owner's machine. The snake is done (`public/models/rattler.glb`) and waits for the one-line load in `enemySystem.js`.
 
 ### 3. Post-processing with a quality switch (M)
 
@@ -208,7 +208,7 @@ accessibility options (text size, reduced motion, colour-blind aim line).
 ### 6. Art coherence (S to L)
 
 A one-page style guide (palette, outline width, proportions), then re-generate or retouch the characters and props
-that do not match. The snake and the horse with rider still need rigging (`tools/blender/README.md`).
+that do not match. The horse with rider still needs rigging (`tools/blender/README.md`); the snake is done.
 
 **Parked on purpose (2026-09-30): the Township-style art for Frontier Town.** The owner chose to leave art for now
 and judge the walkable town first. The plan, in order, when it comes back:
