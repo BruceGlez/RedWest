@@ -12,8 +12,11 @@
 // ---------- numbers (named so they can be tuned; the ones marked OPEN are the owner's to confirm, MINE_PLAN.md "Decided by the owner") ----------
 
 export const DIM_RING = 6;            // radius of what you always see: your own feet (the art lane's MIN_RADIUS)
-export const LANTERN_RADIUS = 15;     // radius the lit lantern throws around the marshal
-export const TORCH_RADIUS = 12;       // radius a placed, burning torch lights
+// The owner found the light too small (2026-10-06): both are nearly twice what they were (the lantern 15, a torch 12). Everything beyond is still black.
+// A chamber is 22 to 30 units wide, so the lantern now lights about a chamber's width around the marshal, and a torch every TORCH_SPACING (40) units overlaps
+// its neighbour a little (2 x TORCH_RADIUS is a little more than the spacing), so a torch road is one lit path with a dark cave to either side.
+export const LANTERN_RADIUS = 28;     // radius the lit lantern throws around the marshal
+export const TORCH_RADIUS = 22;       // radius a placed, burning torch lights
 export const TORCH_SPACING = 40;      // about one torch every this many units of the road (src/mineMap.js roadLength)
 export const MIN_TORCH_GAP = 14;      // a torch cannot be put closer than this to another (nothing gained by a pile)
 export const CARRY_LIMIT = 10;        // torches he can carry (and own): about the most the first ten floors need
