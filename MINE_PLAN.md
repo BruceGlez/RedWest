@@ -264,6 +264,11 @@ What we already do and what it means:
 | Light eaters | **mine** (the monster's rules and floors) with **combat** (its behaviour) and **art** (its model: add a prompt to "Art prompts" above) | Only from a floor decided with the owner; they go to the nearest lit torch of yours and put it out; killing one is easy and is the answer; torches can be relit (cost decided below) | torches and the sense radius |
 | Visible lift and shaft | **mine** (HUD, beams) with **art** | The lift and the shaft stay visible in the dark (a glow and a beam, and the HUD arrow already there), with a "you can see the lift from here" rule so a dark floor is never a lost player | the dark |
 
+### Art status (art lane, code art only for now)
+
+1. **The dark: built** (`src/placeDark.js`, `src/mineScene.js`). One screen-space layer, black outside a dim radius around the marshal; the lift (cold white beam) and the shaft (gold beam) glow above it and have a lit patch, so they are found from far away. The radius comes through one hook, `setMineLightSource(() => ({ radius, holes }))` in `src/placeDark.js`; the mine lane's light module should call it (lantern lit, torch near, out of oil = `MIN_RADIUS`, the faint ring). Until then a named constant (`LANTERN_RADIUS`) stands in. Waiting on: the **mine** lane's light rules.
+2. Torches and lantern, 3. light eater, 4. hidden door: next, each its own PR.
+
 ### Still open (ask the owner before building on these)
 
 1. **Lantern oil:** does the lantern run out and need refilling (a reason to buy more), or does it last and only torches are used up?
