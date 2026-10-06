@@ -268,6 +268,7 @@ What we already do and what it means:
 ### Art status (art lane, code art only for now)
 
 3. **Light eater model: built** (`createLightEaterMesh` in `src/assets.js`): a small dark bug with pale mandibles, four running legs and a dim amber abdomen (`userData.ember`, an unlit child the rules may dim or brighten). Waiting on the **mine** lane (its rules and floors) and **combat** (its behaviour): they add the monster with `look: 'lighteater'` and the mesh in `MINE_MESHES` (`src/enemySystem.js`).
+4. **Hidden door: built** as a part (`src/placeHiddenDoor.js`, `createHiddenDoor()`): `group.position`/`rotation.y` from the cellar layout, `update(t, distanceFromMarshal)` each frame (a faint seam of light, dust at the foot and a draught when near, nothing from far away), `setOpen(true)` swings it on a lit passage. Waiting on the **town** lane: the cellar layout and placeholder scene (`src/placeCellar.js`) that place it on a wall spot, say how wide the wall spot is (the door is 3.2 x 4.6 units; ask the art lane to change that), and call `setOpen` once Deacon Graves has a star.
 
 ### Decided by the owner (2026-10-06, answers to the "still open" list)
 
