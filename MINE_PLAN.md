@@ -30,7 +30,7 @@ walking back to it brings you up with whatever you got. Deeper is stranger, hard
 | **1d** | After the second playtest: the shaft and the lift ask first, and the monsters belong to their chambers (no endless stream; a chamber refills only after you have gone far away) | small | **built 2026-10-05** ("The descent", below) |
 | **1e** | Floor variety: twin caverns, long galleries and rockfalls you walk round, deterministic per depth | small | **built 2026-10-05** ("The maps", below) |
 | **1f** | Six more monsters for floors 15 to 20, built only from behaviours and looks the game already has (`look` field, see "Deeper monsters") | small | **built 2026-10-05**; own models wait for the art lane |
-| **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | **2a built 2026-10-06** (the data contract, below); **2b planned** (the endpoint, then the mine-side consumer) |
+| **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | **2a built 2026-10-06** (the data contract, below); **2b built 2026-10-06** (the mine side: stairs, ore, saving; "Slice 2b" below); the server endpoint is still to do |
 | **3** | Boss floors (every 5th), more of Mr. Grimsby's talk and rumours, a pet that follows you down | medium | planned |
 | **4** | The art pass for the maps and the monsters: modelled rock, timber, carts, a real lift and shaft, painted textures (`POLISH_PLAN.md`, section 6) | large | parked, like the other art passes. The maps are made of boxes so this can replace them one builder at a time. |
 
@@ -185,6 +185,24 @@ or shop item grants or sells it, and a normal Wanted Road run does not touch it.
 `profile.mine`, answer with the result and the profile; no purchase or webhook code is involved), and the **shared** `profile.js` hook in this PR. The
 browser wallet needs the same call (`src/wallet.js`, shared). Then the mine lane's consumer: pick the start floor at the stairs, count ore in
 `src/modes/mine.js`, send the summary when the run ends, and show the result.
+
+## Slice 2b: the mine side
+
+What a player sees: at the cellar stairs, once a checkpoint has been reached (deepest floor 5 or more), a card offers **FLOOR 1** and every checkpoint
+reached; before that the stairs go straight down as before (`src/places/undertaker.js`). Each chest now also holds **ore**, its share of the floor's
+limit (`oreInChest`, so opening every chest never gives more than `maxOreOnFloor`); the HUD shows `ORE n` beside the lift. When the run ends,
+`runSummary` (`src/mine.js`) is sent to the wallet (`reportMineRun`), which applies `applyMineRun` to `profile.mine`, and the result screen replaces
+its line with what was saved (`savedText`): the new deepest floor, a new checkpoint, and the ore banked or lost. The result still says the mine gives
+no stars and no money, and nothing here touches the Wanted Road records.
+
+Where it lives: rules and words in `src/mine.js`, the flow in `src/modes/mine.js` (`begin` from the picked floor, chest ore, the `settle` hook),
+the stairs card in `src/places/undertaker.js` (town lane's file, a small edit on purpose), and small hooks in the shared `gameLoop.js` (the mode's
+`settle` is called when a practice run ends), `townPanel.js`/`main.js` (the floor travels from the card to `beginMineRun`) and the money lane's
+`wallet.js` (`reportMineRun`: local applies it at once; remote calls `POST /api/mine/run`).
+
+**Still to do: the server.** `POST /api/mine/run` in `server/app.js` (scale lane) does not exist yet, so a signed-in account on the server gets "could
+not be saved this time" on the result screen, and a local (offline) wallet saves fine. The endpoint is `applyMineRun` on the user's `profile.mine`,
+authenticated like `/api/run`, returning `{ result, profile }`.
 
 ## Open questions
 

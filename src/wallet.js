@@ -1,6 +1,7 @@
 import { CONFIG } from './config.js';
 import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, refreshJobs, setName, importProgress } from './profile.js';
 import { collectJail, upgradeBuilding } from './town.js';
+import { applyMineRun } from './mineProgress.js';
 import { farmAction } from './farm.js';
 import { ordersAction } from './farmOrders.js';
 import { validateName } from './names.js';
@@ -93,7 +94,8 @@ export function createLocalWallet() {
             const result = applyRun(profile, summary);
             persist();
             return { ...result, profile: snapshot() };
-        }
+        },
+        async reportMineRun(summary) { const result = applyMineRun(profile.mine, summary); persist(); return { result, profile: snapshot() }; }
     };
 }
 
@@ -172,7 +174,8 @@ export function createRemoteWallet(apiBase) {
         async farm(body) { return call('/api/town/farm', body); },
         async orders(body) { return call('/api/town/orders', body); },
         async leaderboard(board) { return call(`/api/leaderboard?board=${encodeURIComponent(board)}`); },
-        async reportRun(summary) { return call('/api/run', summary); }
+        async reportRun(summary) { return call('/api/run', summary); },
+        async reportMineRun(summary) { return call('/api/mine/run', summary); }
     };
 }
 

@@ -10,7 +10,7 @@
 //   isCardOpen(), openBuilding(id), closeCard()   the card (sheet) the walk opens at a door
 //   leave()           walk back out to the town
 //   markVisited(id)   remember the player has been in a district
-//   onDescend()       start a mine run (the parlour's cellar)
+//   onDescend(floor)  start a mine run on a floor (the parlour's cellar: floor 1, or a checkpoint)
 //
 // A place is an object with:
 //   id, sky, title()          its name for the header and its sky colours (src/townLook.js)

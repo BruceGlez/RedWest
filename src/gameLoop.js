@@ -127,7 +127,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         }
         const mode = activeMode();
         if(mode.practice) {
-            // Practice: show the result, record nothing. (The mine saves nothing yet: MINE_PLAN.md, slice 2.)
+            // Practice: show the result, record nothing on the Wanted Road. A mode may report its own run (the mine saves its deepest floor).
             gameState.runWon = result !== 'died';
             gameState.isGameOver = true;
             gameState.isChoosingBounty = false;
@@ -135,6 +135,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             ui.hideBountyChoice();
             ui.showGameOver(result, null);
             ui.showPracticeResult(mode.practice.note);
+            mode.settle?.({ economy, result, seconds: gameState.runTime }, ui.showPracticeResult);
             return;
         }
         if(result === 'died') gameState.score = forfeitBounty(gameState.bounty, gameState.score);
