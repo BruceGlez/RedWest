@@ -27,6 +27,12 @@ export const MINE_MONSTERS = {
         blurb: 'What is left of a miner who went looking for the way up. It carries a light and it fades from sight.',
         tip: 'Bullets pass through while it is faded. Fire when it flickers back.'
     },
+    // Not on the ladder: lives in the chambers from floor 8 on, and only for your torches (see "the light eater" below).
+    lighteater: {
+        name: 'LIGHT EATER', cost: 0.4, weight: 0, cap: 0, hp: 1, speed: 7, behavior: 'eater', danger: 1, look: 'crawler', special: true, harmless: true, sense: 30,
+        blurb: 'A pale bug that lives on light. It goes for the nearest torch you put down and gnaws it out. It never touches you.',
+        tip: 'Shoot it before it reaches a torch. A torch it put out can be relit with a match (T beside it).'
+    },
     // Deeper still (floors 15 to 20). These have no model of their own yet: `look` borrows an existing one (src/enemySystem.js) and the
     // behaviour is the one named. The art prompts for their own models are in MINE_PLAN.md.
     slagadder: {
@@ -72,7 +78,7 @@ export const BASE_ROSTER = ['bandit', 'wolf', 'gunslinger'];
 // A monster is asleep until the marshal comes within its sense radius (src/combatMath.js, senseStep) and gives up past its leash. The radius
 // is the monster's own, `sense` on its entry, or the usual one for how it fights: a sniper sees a long way, a slab of stone wakes late.
 // Units are the cave's (a chamber is 22 to 30 wide and a tunnel about 20). Every number is a guess to tune by playing.
-export const SENSE_BY_BEHAVIOR = { chase: 36, zigzag: 34, charger: 26, phantom: 44, sniper: 60, shooter: 48, lobber: 46, rider: 44, scattergun: 38, knives: 40, volley: 48 };
+export const SENSE_BY_BEHAVIOR = { eater: 30, chase: 36, zigzag: 34, charger: 26, phantom: 44, sniper: 60, shooter: 48, lobber: 46, rider: 44, scattergun: 38, knives: 40, volley: 48 };
 export const MIN_SENSE = 18, MAX_SENSE = 70;
 export const senseRadius = id => {
     const def = monsterDef(id);
@@ -120,6 +126,17 @@ export function mineHpBonus(floor) {
     return Math.max(0, Math.floor((Math.floor(floor) - 5) / 4));
 }
 
+// ---------- the light eater ----------
+// From EATER_FROM_FLOOR a chamber may hold one (never the landing, never more than one). It walks to the nearest lit torch of the marshal's within its reach
+// and gnaws it out, then goes for the next. It never harms him and dies to one shot. It gets more annoying with depth (more chambers hold one, it is faster,
+// sees torches from farther, gnaws quicker) but every number is capped, so a floor is never impossible: the cheapest answer is to shoot it.
+export const EATER_FROM_FLOOR = 8;
+const deeper = floor => Math.max(0, Math.floor(floor) - EATER_FROM_FLOOR);
+export const eaterChance = floor => floor < EATER_FROM_FLOOR ? 0 : Math.min(0.7, 0.25 + 0.06 * deeper(floor)); // of a chamber to hold one
+export const eaterSpeed = floor => Math.min(11, 6.5 + 0.35 * deeper(floor));                                     // units a second
+export const eaterReach = floor => Math.min(60, 24 + 2.5 * deeper(floor));                                       // how far from it a torch draws it
+export const eatSeconds = floor => Math.max(1.0, 3.0 - 0.15 * deeper(floor));                                    // how long it gnaws a torch
+
 // ---------- who lives where ----------
 // Each chamber, alcove and treasure room has its own monsters. They are there when the marshal comes near (WAKE_DISTANCE from its edge),
 // and they do not come back while he stays: kill them and the chamber is quiet. When he has gone far away (LEAVE_DISTANCE) the survivors
@@ -162,6 +179,12 @@ export function planNode(layout, index, floor, rand = Math.random) {
         placed.push({ type, x, z });
         count[type] = (count[type] || 0) + 1;
         remaining -= monsterCost(type);
+    }
+    // A light eater, from the eighth floor: at most one to a chamber, never in the one the marshal lands in (the dice are drawn last, so the other
+    // monsters of a chamber are the same as they were).
+    if(floor >= EATER_FROM_FLOOR && index > 0 && layout.nodes[index].kind === 'chamber' && rand() < eaterChance(floor)) {
+        const [sx, sz] = sites[Math.floor(rand() * sites.length)];
+        placed.push({ type: 'lighteater', x: sx, z: sz });
     }
     return placed;
 }

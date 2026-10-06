@@ -166,6 +166,28 @@ export function isLit(run, floor, at, x, z) {
     return holes.some(h => Math.hypot(x - h.x, z - h.z) <= h.r);
 }
 
+// The nearest lit torch of this floor within `reach` of (x, z), or null (a light eater goes for it).
+export function nearestLitTorch(run, floor, x, z, reach = Infinity) {
+    let best = null, bestD = reach;
+    for(const t of run.placed) {
+        if(t.floor !== floor || !t.lit) continue;
+        const d = Math.hypot(t.x - x, t.z - z);
+        if(d <= bestD) { best = t; bestD = d; }
+    }
+    return best;
+}
+
+// The torch of this floor within `within` of (x, z) that is out (a stub), nearest first, or null: T near it relights it.
+export function nearestOutTorch(run, floor, x, z, within = MIN_TORCH_GAP) {
+    let best = null, bestD = within;
+    for(const t of run.placed) {
+        if(t.floor !== floor || t.lit) continue;
+        const d = Math.hypot(t.x - x, t.z - z);
+        if(d <= bestD) { best = t; bestD = d; }
+    }
+    return best;
+}
+
 // What the run used, for the summary the server applies to the kit: { oil, torches, matches }.
 export function usedKit(run) {
     return { oil: Math.ceil(run.oilStart - run.oil), torches: run.torchesStart - run.torches, matches: run.matchesStart - run.matches };

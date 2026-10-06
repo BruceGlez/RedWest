@@ -1,11 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { MINE_MONSTERS, MINE_LADDER, BASE_ROSTER, monsterDef, isMineMonster, monsterCost, newOn, mineRoster, mineWave, mineHpBonus, nodeBudget, planNode, WAKE_DISTANCE, LEAVE_DISTANCE, senseRadius, leashRadius, SENSE_BY_BEHAVIOR, MIN_SENSE, MAX_SENSE } from '../src/mineMonsters.js';
+import { MINE_MONSTERS, MINE_LADDER, BASE_ROSTER, monsterDef, isMineMonster, monsterCost, newOn, mineRoster, mineWave, mineHpBonus, nodeBudget, planNode, EATER_FROM_FLOOR, eaterChance, eaterSpeed, eaterReach, eatSeconds, WAKE_DISTANCE, LEAVE_DISTANCE, senseRadius, leashRadius, SENSE_BY_BEHAVIOR, MIN_SENSE, MAX_SENSE } from '../src/mineMonsters.js';
 import { floorLayout, isOpen } from '../src/mineMap.js';
 import { ENEMY_TYPES } from '../src/enemyTypes.js';
 
 // The behaviours src/enemySystem.js knows how to run.
-const BEHAVIORS = ['chase', 'shooter', 'zigzag', 'sniper', 'lobber', 'charger', 'rider', 'scattergun', 'knives', 'volley', 'phantom'];
+const BEHAVIORS = ['chase', 'shooter', 'zigzag', 'sniper', 'lobber', 'charger', 'rider', 'scattergun', 'knives', 'volley', 'phantom', 'eater'];
 
 test('every floor below the first brings exactly one new monster, and the ladder never repeats one', () => {
     assert.deepEqual(newOn(1), [], 'the first floor is the Wanted Road\'s three first enemies');
@@ -24,11 +24,12 @@ test('every floor below the first brings exactly one new monster, and the ladder
 
 test('the monsters of the mine are all on the ladder, and the ladder mixes them with the Wanted Road\'s', () => {
     const onLadder = MINE_LADDER.flat();
-    for(const id of Object.keys(MINE_MONSTERS)) assert.ok(onLadder.includes(id), `${id} is on the ladder`);
+    for(const id of Object.keys(MINE_MONSTERS).filter(id => !MINE_MONSTERS[id].special)) assert.ok(onLadder.includes(id), `${id} is on the ladder`);
+    for(const id of Object.keys(MINE_MONSTERS).filter(id => MINE_MONSTERS[id].special)) assert.ok(!onLadder.includes(id), `${id} is special: not on the ladder`);
     for(const id of onLadder) assert.ok(ENEMY_TYPES[id] || MINE_MONSTERS[id], `${id} exists`);
     assert.ok(onLadder.some(id => ENEMY_TYPES[id]) && onLadder.some(isMineMonster), 'both kinds');
     assert.ok(isMineMonster('bat') && !isMineMonster('bandit'));
-    assert.equal(Object.keys(MINE_MONSTERS).length, 10);
+    assert.equal(Object.keys(MINE_MONSTERS).filter(id => !MINE_MONSTERS[id].special).length, 10);
     for(const id of Object.keys(MINE_MONSTERS)) assert.ok(!(id in ENEMY_TYPES), `${id} stays out of the Bounty Book's list`);
     // Strange things come early: one of the mine's own by the second floor, and another within three floors of each.
     assert.ok(isMineMonster(newOn(2)[0]));
@@ -73,7 +74,7 @@ test('the deep monsters are priced like the ones whose behaviour they borrow, an
 test('every monster has what the director and the spawner need', () => {
     for(const [id, def] of Object.entries(MINE_MONSTERS)) {
         assert.ok(def.name && def.blurb && def.tip, `${id}: words for the banner`);
-        assert.ok(def.cost > 0 && def.weight > 0 && def.cap >= 1 && def.hp >= 1 && def.speed > 0, `${id}: numbers`);
+        assert.ok(def.cost > 0 && (def.special || def.weight > 0 && def.cap >= 1) && def.hp >= 1 && def.speed > 0, `${id}: numbers`);
         assert.ok(BEHAVIORS.includes(def.behavior), `${id}: a behaviour the game runs (${def.behavior})`);
         assert.equal(monsterCost(id), def.cost);
     }
@@ -130,17 +131,17 @@ test('a chamber\'s monsters are of the floor\'s kinds, spend about its budget, a
         const wave = mineWave(floor);
         for(let i = 0; i < layout.nodes.length; i++) {
             const plan = planNode(layout, i, floor, seeded(1000 + i));
-            const spent = plan.reduce((sum, m) => sum + monsterCost(m.type), 0);
+            const spent = plan.filter(m => m.type !== 'lighteater').reduce((sum, m) => sum + monsterCost(m.type), 0); // (a light eater is not part of the budget)
             assert.ok(spent <= nodeBudget(layout, i, floor) + 1e-9, `floor ${floor} node ${i}: within its budget`);
             assert.ok(plan.length <= 60);
             const counts = {};
             for(const m of plan) {
-                assert.ok(roster.has(m.type), `${m.type} is one of floor ${floor}'s kinds`);
+                assert.ok(roster.has(m.type) || m.type === 'lighteater' && floor >= EATER_FROM_FLOOR, `${m.type} is one of floor ${floor}'s kinds`);
                 counts[m.type] = (counts[m.type] || 0) + 1;
                 assert.ok(isOpen(layout, m.x, m.z, 2), `floor ${floor} node ${i}: in open ground`);
                 assert.ok(Math.hypot(m.x, m.z) >= 15, `floor ${floor} node ${i}: never on the lift's doorstep (placed 20 off, scattered by up to 4)`);
             }
-            for(const [id, n] of Object.entries(counts)) assert.ok(n <= wave.caps[id], `floor ${floor} node ${i}: no more ${id} than the cap`);
+            for(const [id, n] of Object.entries(counts)) assert.ok(id === 'lighteater' ? n <= 1 : n <= wave.caps[id], `floor ${floor} node ${i}: no more ${id} than the cap`);
         }
         const main = planNode(layout, 1, floor, seeded(5));
         assert.ok(main.length >= 5, `floor ${floor}: a chamber is a real fight (${main.length})`);
@@ -169,4 +170,33 @@ test('every monster of the mine has a sense radius and a leash: its own, or the 
     assert.ok(senseRadius('stonekin') < senseRadius('bandit'), 'a slab of stone wakes late');
     assert.ok(senseRadius('bat') > senseRadius('crawler'), 'a bat hears a long way; a crawler is nearly blind');
     assert.equal(senseRadius('nobody'), 36, 'an unknown one gets the usual middling radius');
+});
+
+test('the light eater: from the eighth floor, one to a chamber at most, never at the landing, more annoying with depth but capped', () => {
+    assert.equal(EATER_FROM_FLOOR, 8);
+    assert.equal(eaterChance(7), 0);
+    assert.ok(eaterChance(8) > 0 && eaterChance(30) <= 0.7 && eaterChance(30) > eaterChance(8), 'more chambers hold one, up to a cap');
+    assert.ok(eaterSpeed(30) > eaterSpeed(8) && eaterSpeed(100) <= 11, 'faster, up to a cap');
+    assert.ok(eaterReach(30) > eaterReach(8) && eaterReach(100) <= 60, 'it sees torches from farther, up to a cap');
+    assert.ok(eatSeconds(30) < eatSeconds(8) && eatSeconds(100) >= 1.0, 'it gnaws quicker, but never instantly');
+    const def = MINE_MONSTERS.lighteater;
+    assert.ok(def.harmless && def.hp === 1 && def.behavior === 'eater' && def.special, 'harmless, one shot, its own behaviour, not on the ladder');
+    // The landing chamber never has one, and none appears before floor 8.
+    let found = 0, chambers = 0;
+    for(const floor of [3, 7, 8, 9, 12, 20, 30]) {
+        const layout = floorLayout(floor);
+        for(let i = 0; i < layout.nodes.length; i++) {
+            const plan = planNode(layout, i, floor, seeded(77 + i));
+            const eaters = plan.filter(m => m.type === 'lighteater');
+            assert.ok(eaters.length <= 1, `floor ${floor} node ${i}: at most one`);
+            if(floor < 8 || i === 0 || layout.nodes[i].kind !== 'chamber') assert.equal(eaters.length, 0, `floor ${floor} node ${i}: none here`);
+            if(floor >= 8 && i > 0 && layout.nodes[i].kind === 'chamber') { chambers++; found += eaters.length; }
+        }
+    }
+    assert.ok(found > 0 && found < chambers, `some chambers hold one and some do not (${found} of ${chambers})`);
+    // The other monsters of a chamber are the same with or without the eater: its dice are drawn last.
+    const layout = floorLayout(10);
+    const withEater = planNode(layout, 1, 10, seeded(5)).filter(m => m.type !== 'lighteater');
+    const before = planNode(layout, 1, 7, seeded(5));
+    assert.ok(withEater.length > 0 && before.length > 0);
 });

@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DIM_RING, LANTERN_RADIUS, TORCH_RADIUS, MIN_TORCH_GAP, CARRY_LIMIT, MATCH_LIMIT, OIL_CAPACITY, MAX_HOLES, LIGHT_ITEMS, SHOP_MARKUP, priceOf,
     createLightKit, normalizeLightKit, buyLight, spendKit, createLightRun, lanternLit, burnLantern, placeTorch, putOutTorch, relightTorch, burnTorches,
-    lightSource, isLit, usedKit, torchesFor, TORCHES_BURN_OUT_FROM, TORCH_BURN_SECONDS } from '../src/mineLight.js';
+    lightSource, isLit, usedKit, torchesFor, nearestLitTorch, nearestOutTorch, TORCHES_BURN_OUT_FROM, TORCH_BURN_SECONDS } from '../src/mineLight.js';
 import { createProfile, normalizeProfile, CURRENCIES } from '../src/profile.js';
 import { applyMineRun, createMineProgress, normalizeMineProgress } from '../src/mineProgress.js';
 import { floorLayout, roadLength } from '../src/mineMap.js';
@@ -177,4 +177,19 @@ test('a first descent is within reach: the starter kit costs about what a short 
     assert.ok(kit <= 120, `the first kit costs ${kit} dollars`);
     const refill = priceOf('oil') + priceOf('torches');
     assert.ok(refill <= 60, `a refill of oil and torches costs ${refill} dollars`);
+});
+
+test('a light eater finds the nearest lit torch of this floor within its reach; a stub is found by T, the nearest out torch', () => {
+    const run = createLightRun({ lantern: false, oil: 0, torches: 5, matches: 2 });
+    const a = placeTorch(run, 0, 0, 3), b = placeTorch(run, 30, 0, 3), c = placeTorch(run, 100, 0, 4);
+    assert.equal(nearestLitTorch(run, 3, 25, 0), b, 'the nearest');
+    assert.equal(nearestLitTorch(run, 3, 25, 0, 4), null, 'out of its reach');
+    assert.equal(nearestLitTorch(run, 3, 99, 0), b, 'not the torch on another floor');
+    assert.equal(nearestLitTorch(run, 4, 99, 0), c);
+    putOutTorch(b);
+    assert.equal(nearestLitTorch(run, 3, 25, 0), a, 'a torch that is out is not food');
+    assert.equal(nearestOutTorch(run, 3, 28, 0), b, 'beside the stub');
+    assert.equal(nearestOutTorch(run, 3, 28 + MIN_TORCH_GAP + 5, 0), null, 'too far from any stub');
+    assert.equal(nearestOutTorch(run, 3, 0, 0), null, 'a lit torch is not a stub');
+    assert.ok(relightTorch(run, b) && nearestOutTorch(run, 3, 28, 0) === null);
 });
