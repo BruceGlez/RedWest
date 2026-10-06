@@ -46,3 +46,4 @@ commercial use.
 - AI voices: stock or properly licensed voices only; no voice clones of real people.
 - Music and effects from other sources need a licence that covers games and their ads (a "sync" licence
   for trailers and ads).
+| Light eater (small bug that puts torches out) | `src/assets.js` (`createLightEaterMesh`) | Made in code: boxes baked with the quadruped bones like the crawler, plus an unlit amber abdomen | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. Not wired to a monster yet: the mine and combat lanes add `look: 'lighteater'` and the mesh in `src/enemySystem.js`. A later art pass may replace it. |
