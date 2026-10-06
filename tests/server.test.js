@@ -485,3 +485,74 @@ test('Copper Bit is shut until Dusty Pete is beaten, then shifts pay by the serv
         await s.close();
     }
 });
+
+test('/healthz answers without a token, says whether the store is reachable, and shows nothing else', async () => {
+    const down = { ...createMemoryStore(), ping: () => { throw new Error('disk gone: /secret/path'); } };
+    const fine = createMemoryStore();
+    for(const [store, status, body] of [[fine, 200, { ok: true, store: true }], [down, 503, { ok: false, store: false }]]) {
+        const server = createServer(createApp({ store, env: ENV }));
+        await new Promise(resolve => server.listen(0, '127.0.0.1', resolve));
+        try {
+            const response = await fetch(`http://127.0.0.1:${server.address().port}/healthz`);
+            assert.equal(response.status, status);
+            assert.deepEqual(await response.json(), body, 'no error text, paths or secrets in the answer');
+            const head = await fetch(`http://127.0.0.1:${server.address().port}/healthz`, { method: 'HEAD' });
+            assert.equal(head.status, status);
+        } finally {
+            await new Promise(resolve => server.close(resolve));
+        }
+    }
+});
+
+test('the file store pings while its folder is writable and fails when it is gone', async () => {
+    const { mkdtempSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { join } = await import('node:path');
+    const { createFileStore } = await import('../server/store.js');
+    const dir = mkdtempSync(join(tmpdir(), 'rw-store-'));
+    const store = createFileStore(join(dir, 'data', 'redwest.json'));
+    assert.equal(store.ping(), true);
+    rmSync(dir, { recursive: true });
+    assert.throws(() => store.ping());
+});
+
+test('a mine run is applied to profile.mine only, with the floor and ore cut down to what could be true', async () => {
+    const s = await startServer();
+    try {
+        const a = await s.call('/api/account').then(r => r.data);
+        const mineRun = body => s.call('/api/mine/run', { token: a.token, body });
+        assert.equal((await s.call('/api/mine/run', { body: {} })).status, 401, 'no token, no mine run');
+        const before = (await s.call('/api/profile', { token: a.token })).data.profile;
+
+        const first = await mineRun({ startFloor: 1, depth: 6, ore: 40, outcome: 'up', seconds: 60 });
+        assert.equal(first.status, 200);
+        assert.equal(first.data.result.depth, 6);
+        assert.equal(first.data.result.kept, 40);
+        assert.equal(first.data.result.newCheckpoint, 5);
+        assert.deepEqual({ deepest: first.data.profile.mine.deepest, checkpoint: first.data.profile.mine.checkpoint, ore: first.data.profile.mine.ore, runs: first.data.profile.mine.runs }, { deepest: 6, checkpoint: 5, ore: 40, runs: 1 });
+        const { mine: _a, ...rest } = first.data.profile;
+        const { mine: _b, ...restBefore } = before;
+        assert.deepEqual(rest, restBefore, 'nothing outside profile.mine changed: no stars, dollars or records');
+
+        assert.equal((await mineRun({ startFloor: 1, depth: 2, ore: 0, outcome: 'up', seconds: 60 })).status, 429, 'mine runs reported seconds apart are rejected');
+        s.advance(30);
+        const forged = await mineRun({ startFloor: 50, depth: 400, ore: 99999, outcome: 'up', seconds: 1 });
+        assert.equal(forged.status, 200);
+        assert.equal(forged.data.result.startFloor, 1, 'a start floor that is not one of his checkpoints is floor 1');
+        assert.equal(forged.data.result.depth, 1, 'no walk reaches a deep floor in one second');
+        assert.equal(forged.data.result.kept, 9, 'ore is cut to what floor 1 can hold');
+        s.advance(30);
+        const fell = await mineRun({ startFloor: 5, depth: 7, ore: 20, outcome: 'fell', seconds: 90 });
+        assert.equal(fell.data.result.startFloor, 5, 'his checkpoint is a good start');
+        assert.equal(fell.data.result.kept, 0);
+        assert.equal(fell.data.profile.mine.ore, 49);
+        assert.equal(fell.data.profile.balances.dollars, before.balances.dollars);
+        s.advance(30);
+        assert.equal((await mineRun('nope')).status, 200, 'junk is cut to nothing, not an error');
+        assert.equal((await s.call('/api/mine/run', { token: a.token, raw: '{bad' })).status, 400);
+        const wr = (await s.call('/api/run', { token: a.token, body: { score: 800, bounty: 'banked', kills: {} } }));
+        assert.equal(wr.status, 200, 'a mine run does not use up the Wanted Road\'s own report limit');
+    } finally {
+        await s.close();
+    }
+});

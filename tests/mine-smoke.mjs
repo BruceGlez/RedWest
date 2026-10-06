@@ -265,12 +265,24 @@ try {
     await page.waitForFunction(() => S.gameState.isConfirming, null, { timeout: 8000 }).catch(async error => {
         throw new Error(`the lift did not ask again: ${JSON.stringify(await page.evaluate(() => ({ blocked: M.mine.blocked, armed: M.mine.liftArmed, confirm: M.mine.confirm, over: S.gameState.isGameOver, at: [window.__redWest.playerGroup.position.x, window.__redWest.playerGroup.position.z], floor: M.mine.floor })))}`);
     });
+    // (The test teleports, and the server cuts a depth no walk could reach in the time: say the descent took five minutes.)
+    await page.evaluate(() => { S.gameState.runTime = 300; });
     await page.locator('#mine-confirm-yes').click();
     await page.waitForFunction(() => S.gameState.isGameOver, null, { timeout: 30000 });
     assert.equal(await page.evaluate(() => S.gameState.runWon), true);
     assert.match(await page.locator('#result-title').textContent(), /LIFT UP/);
     assert.match(await page.locator('#result-detail').textContent(), /depth 5/);
-    assert.match(await page.locator('#result-earnings').textContent(), /practice only/);
+    // The run is saved: no stars and no money, but the deepest floor, the checkpoint and the ore he rode up with.
+    await page.waitForFunction(() => /New deepest floor: 5\./.test(document.getElementById('result-earnings').textContent), null, { timeout: 15000 }).catch(async error => { throw new Error(`${error.message}: ${await page.locator('#result-earnings').textContent()}`); });
+    const earnings = await page.locator('#result-earnings').textContent();
+    assert.match(earnings, /no stars and no money/);
+    assert.match(earnings, /Checkpoint: floor 5\./);
+    assert.match(earnings, /\d+ ore banked\./, 'the ore from the chest he opened came up with him');
+    const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestProfile.v1')));
+    assert.equal(saved.mine.deepest, 5);
+    assert.equal(saved.mine.checkpoint, 5);
+    assert.ok(saved.mine.ore > 0 && saved.mine.runs === 1);
+    assert.deepEqual([saved.balances.dollars, saved.stats.stageStars.reduce((a, b) => a + b, 0)], [0, 0], 'the mine paid no dollars and gave no stars');
 
     // Back to town: the Wanted Road rules are back (no mine, no cave, the ordinary arena limit).
     await page.locator('#restart-msg').waitFor({ state: 'visible' });
@@ -278,6 +290,27 @@ try {
     await page.waitForFunction(() => !M.mine.enabled);
     assert.equal(await page.evaluate(() => MM.activeFloor()), null, 'the cave is gone');
     assert.equal(await page.evaluate(() => S.gameState.MAP_SIZE), 140, 'the arena limit is back');
+
+    // The stairs now offer the floors he may begin on: the top, and the checkpoint he reached.
+    await page.locator('#town-btn').click();
+    await page.locator('#town-screen').waitFor({ state: 'visible' });
+    await page.waitForFunction(() => window.__redWestTown && window.__redWestTown.hasProfile);
+    await page.evaluate(() => { const door = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === 'undertaker'); window.__redWestTown.walk.place(door.x, door.z); });
+    await page.locator('.walk-prompt').filter({ hasText: 'MR. GRIMSBY, UNDERTAKER' }).waitFor({ state: 'visible' });
+    await page.keyboard.press('e');
+    await page.waitForFunction(() => window.__redWestTown.place === 'undertaker');
+    await page.evaluate(() => { const door = window.__redWestTown.parlour3d.walkMap().doors.find(d => d.id === 'cellar'); window.__redWestTown.parlourWalk.place(door.x, door.z); });
+    await page.locator('.walk-prompt').filter({ hasText: 'HOLLOW CLAIM' }).waitFor({ state: 'visible' });
+    await page.keyboard.press('e');
+    await page.locator('#town-sheet').waitFor({ state: 'visible' });
+    assert.deepEqual(await page.locator('#town-grid [data-descend]').evaluateAll(buttons => buttons.map(b => b.dataset.descend)), ['1', '5']);
+    assert.match(await page.locator('#town-grid').textContent(), /deepest floor is 5/);
+    await shot('stairs-card');
+    await page.locator('#town-grid [data-descend="5"]').click();
+    await page.waitForFunction(() => S.gameState.isGameStarted && M.mine.enabled, null, { timeout: 60000 });
+    assert.deepEqual(await page.evaluate(() => [M.mine.floor, M.mine.startFloor, M.mine.ore]), [5, 5, 0], 'a run from the checkpoint begins on floor 5');
+    assert.match(await page.locator('#wave-label').textContent(), /DEPTH/);
+    assert.equal((await page.locator('#wave').textContent()).trim(), '5');
     assert.deepEqual(errors, []);
     await context.close();
     console.log('mine smoke: ok');

@@ -140,9 +140,10 @@ const town = createTownPanel({
         await ensureOutlawModel(index);
         keys.startRequested = true;
     },
-    // The cellar stairs in Mr. Grimsby's parlour: the Hollow Claim, from floor 1. It needs no outlaw model; the mine sends no outlaw.
-    onDescend: () => {
-        beginMineRun();
+    // The cellar stairs in Mr. Grimsby's parlour: the Hollow Claim, from floor 1 or a checkpoint (src/mineProgress.js). It needs no outlaw model;
+    // the mine sends no outlaw.
+    onDescend: floor => {
+        beginMineRun(floor, profile?.mine);
         ui.hidePanels();
         keys.startRequested = true;
     },
@@ -359,6 +360,10 @@ const economy = {
     reportRun: summary => wallet.reportRun(summary).then(result => {
         applyProfile(result.profile);
         return result;
+    }),
+    reportMineRun: summary => wallet.reportMineRun(summary).then(reply => {
+        applyProfile(reply.profile);
+        return reply;
     })
 };
 

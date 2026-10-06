@@ -1,0 +1,17 @@
+.git
+node_modules
+dist
+dist-demo
+data
+art
+ios
+public
+fonts
+tests
+tools
+docs
+*.md
+*.blend
+*.blend1
+.env
+.env.*

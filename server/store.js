@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync, renameSync, mkdirSync } from 'node:fs';
+import { readFileSync, writeFileSync, renameSync, mkdirSync, accessSync, constants } from 'node:fs';
 import { dirname } from 'node:path';
 
 // Minimal persistence: one JSON document of users. Fine for a playtest-scale launch; swap for a
@@ -15,6 +15,8 @@ export function createMemoryStore(initial = {}) {
         retainedPurchases: () => data.retainedPurchases,
         findUserByTokenHash: hash => Object.entries(data.users).find(([, user]) => user.tokenHash === hash || user.tokenHashes?.includes(hash))?.[0] ?? null,
         listUsers: () => Object.entries(data.users).map(([id, user]) => ({ id, user })),
+        // Is the store usable right now? Cheap, no data read; /healthz asks it. Throws or returns false when not.
+        ping: () => true,
         save: () => {}
     };
 }
@@ -32,6 +34,7 @@ export function createFileStore(path) {
         writeFileSync(temp, JSON.stringify(data));
         renameSync(temp, path); // atomic replace so a crash never leaves half a file
     };
+    store.ping = () => { accessSync(dirname(path), constants.W_OK); return true; }; // the data folder is there and writable
     // createMemoryStore copied the users object reference, so mutations land in `data`.
     return store;
 }

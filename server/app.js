@@ -7,6 +7,7 @@ import { collectJail, upgradeBuilding } from '../src/town.js';
 import { farmAction } from '../src/farm.js';
 import { ordersAction } from '../src/farmOrders.js';
 import { saloonAction } from '../src/saloon.js';
+import { applyMineRun } from '../src/mineProgress.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 import { createApple, AppleError } from './apple.js';
 
@@ -179,6 +180,12 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
             const url = new URL(req.url, 'http://localhost');
             if(req.method === 'OPTIONS') return send(res, 204, {});
             if(url.pathname === '/health') return send(res, 200, { ok: true });
+            // For the host's health check (Docker, Coolify): the process is up and the store answers. No auth, no secrets, no player data.
+            if(url.pathname === '/healthz' && (req.method === 'GET' || req.method === 'HEAD')) {
+                let storeOk = false;
+                try { storeOk = (await store.ping?.()) !== false; } catch { /* reported as not ok below */ }
+                return send(res, storeOk ? 200 : 503, { ok: storeOk, store: storeOk });
+            }
 
             if(url.pathname === '/api/account' && req.method === 'POST') {
                 if(!allow('account', callerIp(req))) return tooMany(res);
@@ -305,6 +312,16 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     const result = applyRun(user.profile, body, now());
                     save();
                     return send(res, 200, { ...result, profile: user.profile });
+                }
+                // A finished Hollow Claim run (src/mineProgress.js). Touches profile.mine only: no stars, no dollars, no Wanted Road records.
+                // The client is not trusted: applyMineRun cuts the floor and the ore down to what the player's checkpoints and the floors allow.
+                if(url.pathname === '/api/mine/run' && req.method === 'POST') {
+                    const seconds = (now().getTime() - (user.lastMineRunAt || 0)) / 1000;
+                    if(seconds < MIN_SECONDS_BETWEEN_RUNS) return send(res, 429, { code: 'too_fast', message: 'Runs are reported too quickly.' });
+                    user.lastMineRunAt = now().getTime();
+                    const result = applyMineRun(user.profile.mine, body);
+                    save();
+                    return send(res, 200, { result, profile: user.profile });
                 }
                 if(url.pathname === '/api/name' && req.method === 'POST') {
                     if(!allow('name', id)) return tooMany(res);

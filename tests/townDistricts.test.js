@@ -65,10 +65,10 @@ test("each place is inside its own district, clear of the buildings and of the p
 test('walk areas and places grow with the open districts', () => {
     assert.deepEqual(walkAreas([]), [TOWN_AREA]);
     assert.equal(walkAreas(['fort', 'foundry']).length, 3);
-    assert.equal(walkAreas(['ranch', 'canal', 'crossing', 'foundry']).length, 2, 'the farm, the Channel and the Crossing are places of their own, so they add no ground to the town');
+    assert.equal(walkAreas(['ranch', 'canal', 'crossing', 'copper', 'foundry']).length, 2, 'the farm, the Channel, Copper Bit and the Crossing are places of their own, so they add no ground to the town');
     assert.deepEqual(districtPlaces([]), []);
     assert.deepEqual(districtPlaces(['ranch']), [], 'and no place in the town');
-    assert.deepEqual(districtPlaces(['canal', 'crossing']), [], 'nor do the Channel and the Crossing');
+    assert.deepEqual(districtPlaces(['canal', 'crossing', 'copper']), [], 'nor do the Channel, Copper Bit and the Crossing');
     assert.deepEqual(districtPlaces(['foundry']).map(p => p.id), ['furnace']);
     assert.equal(districtPlaces(['foundry'])[0].district, 'foundry');
 });
@@ -79,10 +79,12 @@ test('every outlaw has a district: ten of them, one for each', () => {
     assert.deepEqual(DISTRICTS.map(d => d.id).sort(), ['belle', 'canal', 'chapel', 'copper', 'crossing', 'fort', 'foundry', 'ranch', 'tresrios', 'wash']);
 });
 
-test('the farm, the Crossing and the Channel are the places so far you step into; the others are ground in the town', () => {
-    assert.deepEqual(DISTRICTS.filter(d => d.interior).map(d => d.id).sort(), ['canal', 'crossing', 'ranch']);
+test('the farm, the Crossing, the Channel and Copper Bit are the places so far you step into; the others are ground in the town', () => {
+    assert.deepEqual(DISTRICTS.filter(d => d.interior).map(d => d.id).sort(), ['canal', 'copper', 'crossing', 'ranch']);
     assert.equal(getDistrict('crossing').place, null);
     assert.equal(getDistrict('canal').place, null);
+    assert.equal(getDistrict('copper').place, null);
+    assert.equal(doorLabel('enter-copper'), 'COPPER BIT');
     assert.equal(doorLabel('enter-canal'), "MORGAN'S CHANNEL");
     assert.equal(doorLabel('enter-crossing'), "VANE'S CROSSING");
     assert.equal(getDistrict('ranch').place, null);
