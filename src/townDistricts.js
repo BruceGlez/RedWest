@@ -11,7 +11,7 @@ import { SPREAD } from './townSpace.js';
 // fence: the line across the way in while it is shut, from (x1, z1) to (x2, z2), and where to stand to read the sign.
 // place: the thing to use inside (a plaque), with where it stands and where you stand.
 // interior: a district that is a place of its own (PLACES.md). Its gate opens a whole new map you walk around (the farm's is
-//           src/farmLayout.js, the Crossing's src/vaneLayout.js, the Channel's src/channelLayout.js, Copper Bit's src/saloonLayout.js) and not ground in the town, so it has no walk area and no place here.
+//           src/farmLayout.js, the Crossing's src/vaneLayout.js, the Channel's src/channelLayout.js, Copper Bit's src/saloonLayout.js, Hollow Hill's src/hillLayout.js) and not ground in the town, so it has no walk area and no place here.
 
 // The town's ground, spread out (src/townSpace.js). The districts below are written as originally laid out, against the
 // original edge (x from -38 to 40, z from -21 to 19), and each is then moved out by exactly how far the edge moved at its gate,
@@ -119,11 +119,11 @@ const BASE_DISTRICTS = [
         }
     },
     {
-        id: 'chapel', name: 'HOLLOW HILL', outlaw: 'deacon-graves',
+        id: 'chapel', name: 'HOLLOW HILL', outlaw: 'deacon-graves', interior: 'hill',
         area: { minX: -3, maxX: 10, minZ: -46, maxZ: -18 },
         fence: { from: [-3, -21], to: [10, -21], read: [3.5, -19.4] },
         ground: 0x4f5a40,
-        place: { id: 'bell', verb: 'READ', object: { x: 3.5, z: -34, hx: 1.0, hz: 1.0 }, stand: [3.5, -31.4] },
+        place: null, // the bell hangs at the chapel on the hill you walk into (src/hillLayout.js); from the town it is seen over the fence
         card: {
             title: 'HOLLOW HILL',
             text: 'The Deacon rebuilt the chapel from the burnt beams, one pew at a time. The bell rings once at dusk for everyone the road took. He keeps a lamp lit in the window and asks nothing for it.'

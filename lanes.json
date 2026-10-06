@@ -127,7 +127,10 @@
     "src/modes/arena.js",
     "tests/places.test.js",
     "src/vigil.js",
-    "tests/vigil.test.js"
+    "tests/vigil.test.js",
+    "src/hillLayout.js",
+    "src/places/hill.js",
+    "tests/hillLayout.test.js"
    ],
    "checks": [
     "npm test",

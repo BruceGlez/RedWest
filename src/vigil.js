@@ -148,7 +148,7 @@ export function vigilRoute(night, order) {
     const byId = new Map(night.lanterns.map(l => [l.id, l]));
     const lit = [];
     const done = new Set();
-    let here = HILL_START, time = 0, oil = OIL_AT_START, stoppedBy = null;
+    let here = HILL_START, time = 0, oil = OIL_AT_START, stoppedBy = null, steps = 0;
     for(const id of Array.isArray(order) ? order.slice(0, POSTS.length * 3) : []) {
         if(id !== 'oil' && (typeof id !== 'string' || !byId.has(id))) { stoppedBy = 'unknown'; break; }
         const lantern = byId.get(id);
@@ -161,8 +161,31 @@ export function vigilRoute(night, order) {
         here = at(id);
         if(id === 'oil') oil = OIL_CAPACITY;
         else { if(lantern.dry) oil--; done.add(id); lit.push(id); }
+        steps++;
     }
-    return { lit, seconds: Math.round(time * 10) / 10, stoppedBy };
+    return { lit, seconds: Math.round(time * 10) / 10, stoppedBy, steps, oil };
+}
+
+// What the walk can say when a step is refused, and what is left of the bell: the screen plays the vigil one step at a time with these, and the server
+// replays the whole route with `vigilRoute`, so the two always agree.
+export const STEP_WORDS = {
+    unknown: 'There is no lantern there.',
+    twice: 'That one is already lit.',
+    out_of_reach: 'Out of reach. Light the lantern nearer the gate first.',
+    no_oil: 'The can is empty. Fill it at the oil stand.',
+    bell: 'The bell would fade before you got there.'
+};
+// Can this step follow the steps so far? { ok, why, seconds, left }: `left` is the seconds of the bell's walking that remain after it.
+export function canStep(night, order, id) {
+    const before = vigilRoute(night, order);
+    const after = vigilRoute(night, [...order, id]);
+    const ok = after.stoppedBy === null && (after.lit.length > before.lit.length || (id === 'oil' && after.seconds > before.seconds));
+    return { ok, why: ok ? '' : STEP_WORDS[after.stoppedBy] ?? STEP_WORDS.unknown, seconds: ok ? after.seconds : before.seconds, left: Math.max(0, night.limit - (ok ? after.seconds : before.seconds)) };
+}
+// The state after some steps (for the prompts): { lit: [ids], oil: how many lanterns the can still lights, seconds, left }.
+export function runState(night, order) {
+    const route = vigilRoute(night, order);
+    return { lit: route.lit, oil: route.oil, seconds: route.seconds, left: Math.max(0, night.limit - route.seconds) };
 }
 
 // Tonight's hill for a player: the same for everybody with the same part of the chapel built.
