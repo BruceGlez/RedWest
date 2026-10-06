@@ -333,6 +333,16 @@ monsters (a chamber's danger grows with its area), so the early floors are quiet
 - **Still to do for the light:** the wallet and server calls to buy (`POST /api/mine/buy`, scale; `wallet.buyLight`, money), the shop cards (town), and the mine mode
   using it (a button to place a torch, burning the lantern, calling `setMineLightSource`): after the dark layer (#56) and the shops exist.
 
+**Built 2026-10-06 (slice 5, part (b): monsters sense you by distance).** Cross-lane on purpose, owner approved: `src/enemySystem.js` and `src/bulletSystem.js`
+are the combat lane's. In the mine a monster that came out of a chamber (`spawnEnemy` with a post) waits there until the marshal is inside its **sense radius**,
+takes `WAKE_SECONDS` (0.7 s, standing and facing him: the tell) to wake, then hunts as before. If he gets away past its **leash** (twice the radius, never less than
+40 beyond it) it gives up and walks back to its post, and sleeps again; if he returns before it is home it hunts at once. A shot that hits wakes it with no wait. The rule
+is pure (`createSense`, `senseStep` in `src/combatMath.js`, tested); the radii are the mine lane's (`senseRadius`, `leashRadius` in `src/mineMonsters.js`): a number per
+way of fighting (`SENSE_BY_BEHAVIOR`: chase 36, zigzag 34, charger 26, phantom 44, sniper 60, shooter 48, ...) and an override on an entry (bat 50, crawler 30,
+stonekin 22, wraith 55). The Wanted Road, bosses and anything spawned without a post hunt from the start, so nothing there changes. The chamber rules (a chamber
+fills within `WAKE_DISTANCE` 45 of its edge and empties past `LEAVE_DISTANCE` 100) stay as the cap on how many monsters exist; the radius decides when each one acts.
+Every number is a guess to tune by playing. A lit marshal being sensed from farther is not built (it needs the light rules wired in).
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want
