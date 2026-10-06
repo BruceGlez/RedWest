@@ -264,6 +264,10 @@ What we already do and what it means:
 | Light eaters | **mine** (the monster's rules and floors) with **combat** (its behaviour) and **art** (its model: add a prompt to "Art prompts" above) | Only from a floor decided with the owner; they go to the nearest lit torch of yours and put it out; killing one is easy and is the answer; torches can be relit (cost decided below) | torches and the sense radius |
 | Visible lift and shaft | **mine** (HUD, beams) with **art** | The lift and the shaft stay visible in the dark (a glow and a beam, and the HUD arrow already there), with a "you can see the lift from here" rule so a dark floor is never a lost player | the dark |
 
+### Art status (art lane, code art only for now)
+
+4. **Hidden door: built** as a part (`src/placeHiddenDoor.js`, `createHiddenDoor()`): `group.position`/`rotation.y` from the cellar layout, `update(t, distanceFromMarshal)` each frame (a faint seam of light, dust at the foot and a draught when near, nothing from far away), `setOpen(true)` swings it on a lit passage. Waiting on the **town** lane: the cellar layout and placeholder scene (`src/placeCellar.js`) that place it on a wall spot, say how wide the wall spot is (the door is 3.2 x 4.6 units; ask the art lane to change that), and call `setOpen` once Deacon Graves has a star.
+
 ### Still open (ask the owner before building on these)
 
 1. **Lantern oil:** does the lantern run out and need refilling (a reason to buy more), or does it last and only torches are used up?

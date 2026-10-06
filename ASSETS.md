@@ -46,3 +46,4 @@ commercial use.
 - AI voices: stock or properly licensed voices only; no voice clones of real people.
 - Music and effects from other sources need a licence that covers games and their ads (a "sync" licence
   for trailers and ads).
+| Hidden door for the cellar (a wall spot that gives itself away near, and a swung-open version) | `src/placeHiddenDoor.js` | Made in code: stone boxes, a hinged slab, an additive seam line, drifting dust points, a warm spill behind the open door | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. A part the town lane's cellar scene hangs on a wall spot; no models or textures. A later art pass may replace it. |
