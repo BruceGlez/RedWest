@@ -575,3 +575,64 @@ test('the store lookups answer the questions the app asks (and are awaited, so a
     assert.deepEqual(await store.listReportedUsers(), [], 'a deleted account no longer counts as a reporter');
     assert.equal(await store.ping(), true);
 });
+
+test('light is bought with Bounty Dollars only, the server sets every price, and a refused buy changes nothing', async () => {
+    const { PRODUCTS } = await import('../src/products.js');
+    const { LIGHT_ITEMS, priceOf, OIL_CAPACITY, CARRY_LIMIT } = await import('../src/mineLight.js');
+    const s = await startAdminServer();
+    try {
+        const a = await s.account();
+        const buy = body => s.call('/api/mine/buy', { token: a.token, body });
+        const profile = async () => (await s.call('/api/profile', { token: a.token })).data.profile;
+        assert.equal((await s.call('/api/mine/buy', { body: { id: 'lantern' } })).status, 401, 'no token, no shop');
+
+        // Nuggets never spend: a rich-in-nuggets, penniless player cannot buy light.
+        s.store.getUser(a.userId).profile.balances.nuggets = 99999;
+        const poor = await profile();
+        const refused = await buy({ id: 'lantern' });
+        assert.equal(refused.status, 400);
+        assert.equal(refused.data.code, 'funds');
+        assert.deepEqual(await profile(), poor, 'a refused buy changes nothing');
+        assert.equal(poor.balances.nuggets, 99999);
+
+        // No product sells light, and no light item is a nugget price: the shop reads Bounty Dollars only.
+        assert.ok(Object.values(LIGHT_ITEMS).every(item => typeof item.dollars === 'number' && item.nuggets === undefined));
+        assert.ok(!Object.values(PRODUCTS ?? {}).some(p => JSON.stringify(p).match(/lantern|torch|oil|matches/i)), 'no real-money product sells light');
+
+        // Earn dollars on the Wanted Road, then buy.
+        await s.call('/api/run', { token: a.token, body: { score: 800, seconds: 120, outlawIndex: 0, bounty: 'banked', kills: {} } });
+        const rich = await profile();
+        assert.ok(rich.balances.dollars >= priceOf('lantern') + priceOf('oil', 'store'));
+        const lantern = await buy({ id: 'lantern', shop: 'grimsby' });
+        assert.equal(lantern.status, 200);
+        assert.deepEqual(lantern.data.result, { id: 'lantern', price: priceOf('lantern') });
+        assert.equal(lantern.data.profile.balances.dollars, rich.balances.dollars - priceOf('lantern'));
+        assert.equal(lantern.data.profile.balances.nuggets, 99999, 'nuggets are never touched');
+        assert.equal(lantern.data.profile.mine.light.lantern, true);
+        assert.equal(lantern.data.profile.mine.light.oil, OIL_CAPACITY);
+        assert.deepEqual({ ...lantern.data.profile, balances: 0, mine: 0 }, { ...rich, balances: 0, mine: 0 }, 'nothing outside balances and profile.mine changed');
+
+        // The general store charges its markup; the price comes from the server, never the body.
+        const torches = await buy({ id: 'torches', shop: 'store', price: 1, dollars: 0 });
+        assert.equal(torches.data.result.price, priceOf('torches', 'store'));
+        assert.equal(torches.data.profile.mine.light.torches, LIGHT_ITEMS.torches.gives);
+
+        // Refusals by the rules, each leaving the profile as it was.
+        const before = await profile();
+        for(const [body, code] of [
+            [{ id: 'lantern' }, 'owned'], [{ id: 'oil' }, 'full'], [{ id: 'nope' }, 'unknown_item'], [{ id: 'constructor' }, 'unknown_item'],
+            [{ id: '__proto__' }, 'unknown_item'], [{ id: 'toString' }, 'unknown_item'], [{ id: ['lantern'] }, 'unknown_item'], [{}, 'unknown_item'],
+            [{ id: 'torches', shop: 'black-market' }, 'no_shop'], [{ id: 'torches', shop: '__proto__' }, 'no_shop']
+        ]) {
+            const answer = await buy(body);
+            assert.equal(answer.status, 400, JSON.stringify(body));
+            assert.equal(answer.data.code, code, JSON.stringify(body));
+        }
+        assert.deepEqual(await profile(), before, 'refused buys changed nothing');
+        assert.ok(Number.isFinite(before.balances.dollars));
+        for(let i = 0; i < CARRY_LIMIT; i++) { const r = await buy({ id: 'torches' }); if(r.status !== 200) { assert.equal(r.data.code, i === 0 ? 'full' : 'full'); break; } }
+        assert.equal((await profile()).mine.light.torches, CARRY_LIMIT, 'torches stop at the carry limit');
+    } finally {
+        await s.close();
+    }
+});
