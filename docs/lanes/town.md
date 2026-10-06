@@ -40,7 +40,8 @@ Places change income and goods, never combat. A tended place never earns more th
 
 ## Backlog: the cellar and the hidden door (owner's brief, `MINE_PLAN.md`, "Slice 5")
 - The cellar becomes a place you walk into (pair per `AGENTS.md`: layout, rules, card, registry line, and a box placeholder scene marked "cross-lane on purpose: placeholder scene"). It holds a hidden door you have to find; the door opens only once **Deacon Graves** has a star (decided). Until then the stairs lead only to the cellar.
-- The shop for the lantern and torches (Bounty Dollars only; a test that light is never priced in nuggets), once the mine lane's light data exists.
+- The shops for the lantern, oil and torches: **two** of them, Mr. Grimsby's and the general store (decided 2026-10-06), Bounty Dollars only (a test that light is never priced in nuggets), once the mine lane's light data exists.
+- **Slice 6, quests from the graves** (`MINE_PLAN.md`): the graves in Deacon Graves's place give generated jobs from fallen souls who want revenge or want their quests finished. Layout, cards and rules are the town lane's; the generator is a pure module with tests (`src/graveQuests.js`); the mine lane counts kills and finds. Rewards are an open question for the owner.
 - `src/places/undertaker.js` today sends the stairs straight into the mine; existing saves (deepest floor, checkpoints, ore) must keep working.
 
 Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `node tools/lanes.mjs diff` before opening a PR.
