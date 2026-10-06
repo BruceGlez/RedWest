@@ -33,7 +33,10 @@ export const LIGHT_ITEMS = {
     matches: { name: 'MATCHES x5', blurb: 'Relights a torch that went out.', dollars: 5, gives: 5 }
 };
 export const SHOP_MARKUP = { grimsby: 1.0, store: 1.1 }; // the general store charges a little more (rounded up)
-export const priceOf = (id, shop = 'grimsby') => Math.ceil(LIGHT_ITEMS[id].dollars * (SHOP_MARKUP[shop] ?? 1));
+// Ids and shop names come from the network: only the ones listed count ("constructor" and "__proto__" are not items or shops).
+const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
+export const isLightItem = id => has(LIGHT_ITEMS, id);
+export const priceOf = (id, shop = 'grimsby') => Math.ceil(LIGHT_ITEMS[id].dollars * (has(SHOP_MARKUP, shop) ? SHOP_MARKUP[shop] : 1));
 
 // ---------- what a player owns (profile.mine.light) ----------
 
@@ -57,8 +60,9 @@ export function normalizeLightKit(raw) {
 // Buying light. `profile` is the whole profile (it spends profile.balances.dollars and fills profile.mine.light). Throws EconomyError-shaped
 // errors (code and message) for the shop card to show; the profile is unchanged when it throws.
 export function buyLight(profile, id, shop = 'grimsby') {
+    if(!isLightItem(id)) throw lightError('unknown_item', 'That is not for sale.');
     const item = LIGHT_ITEMS[id];
-    if(!item) throw lightError('unknown_item', 'That is not for sale.');
+    if(typeof shop !== 'string' || !has(SHOP_MARKUP, shop)) throw lightError('unknown_shop', 'That shop does not sell light.');
     const kit = profile.mine.light;
     if(id === 'lantern' && kit.lantern) throw lightError('owned', 'You already have a lantern.');
     if(id === 'oil' && !kit.lantern) throw lightError('no_lantern', 'You need a lantern to put oil in.');

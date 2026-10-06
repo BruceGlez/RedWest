@@ -3,6 +3,7 @@ import { EconomyError } from './economyError.js';
 import { createFarm, normalizeFarm } from './farm.js';
 import { createOrders, normalizeOrders } from './farmOrders.js';
 import { createSaloon, normalizeSaloon } from './saloon.js';
+import { createChapel, normalizeChapel } from './vigil.js';
 
 // Frontier Town (GROWTH_PLAN.md, Phase 1.1): buildings between runs.
 // - The Jail holds every outlaw you have beaten; they pay a bounty each hour, collected when you
@@ -52,7 +53,7 @@ export function getBuilding(id) {
 }
 
 export function createTown(now = new Date()) {
-    return { levels: Object.fromEntries(BUILDINGS.map(b => [b.id, 1])), jailCollectedAt: now.toISOString(), farm: createFarm(now), orders: createOrders(now), saloon: createSaloon(now) };
+    return { levels: Object.fromEntries(BUILDINGS.map(b => [b.id, 1])), jailCollectedAt: now.toISOString(), farm: createFarm(now), orders: createOrders(now), saloon: createSaloon(now), chapel: createChapel(now) };
 }
 
 export function normalizeTown(raw, now = new Date()) {
@@ -67,6 +68,7 @@ export function normalizeTown(raw, now = new Date()) {
     town.farm = normalizeFarm(raw.farm, now); // Calloway Farm (src/farm.js)
     town.orders = normalizeOrders(raw.orders, now); // Vane's Crossing (src/farmOrders.js)
     town.saloon = normalizeSaloon(raw.saloon, now); // Copper Bit (src/saloon.js)
+    town.chapel = normalizeChapel(raw.chapel, now); // Hollow Hill's vigil (src/vigil.js)
     return town;
 }
 

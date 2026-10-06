@@ -3,6 +3,8 @@ import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { obstacles, gameState } from './state.js';
 import { markObstacleGridDirty } from './physics.js';
 import { toonVertexColorMaterial } from './assets.js';
+import { createMineDark, glowMaterial, GLOW_RENDER_ORDER } from './placeDark.js';
+import { createTorchLayer, createLantern, torchHoles } from './placeTorch.js';
 import { floorLayout, bounds, distance, gridPoints, wallCircles, propCircles, setActiveFloor } from './mineMap.js';
 
 // Draws one floor of the Hollow Claim (src/mineMap.js has the shape of the cave and every rule). It is all built from simple shapes
@@ -207,6 +209,21 @@ function liftParts(glow) {
     return parts;
 }
 
+// A tall pale beam and a ring of light on the lift's deck, so the way up can be found from far away in the dark (the shaft's is gold, the
+// lift's is a cold white: daylight from above). Drawn after the dark layer (src/placeDark.js).
+function buildLiftBeacon() {
+    const group = new THREE.Group();
+    const beam = new THREE.Mesh(new THREE.CylinderGeometry(2.2, 2.8, 40, 14, 1, true),
+        new THREE.MeshBasicMaterial({ color: 0xcfe6ff, transparent: true, opacity: 0.18, blending: THREE.AdditiveBlending, depthWrite: false, side: THREE.DoubleSide, fog: false }));
+    beam.position.y = 20;
+    const ring = new THREE.Mesh(new THREE.RingGeometry(4.9, 6.4, 24).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0xbcd8ff, transparent: true, opacity: 0.3, blending: THREE.AdditiveBlending, depthWrite: false }));
+    ring.position.y = 0.14;
+    for(const m of [beam, ring]) m.renderOrder = GLOW_RENDER_ORDER;
+    group.add(beam, ring);
+    return { group, beam, ring };
+}
+
 // The shaft down: a pit with a stone curb, a ring of light on the floor and a tall beam of light that shows over the rock from far away.
 // It is always open: the way down is never locked, it is only a walk away.
 function buildShaft(layout, glow) {
@@ -238,6 +255,7 @@ function buildShaft(layout, glow) {
         new THREE.MeshBasicMaterial({ color: 0xffc260, transparent: true, opacity: 0.35, blending: THREE.AdditiveBlending, depthWrite: false }));
     ring.position.y = 0.12;
 
+    for(const m of [beam, ring]) m.renderOrder = GLOW_RENDER_ORDER;
     group.add(pit, curb, beam, ring);
     return { x: sx, z: sz, group, beam, ring };
 }
@@ -287,7 +305,8 @@ export function showMineFloor(scene, floor) {
     const rand = seededRandom(hashOf(layout.id));
     const group = new THREE.Group();
     group.name = 'mine-floor';
-    const glow = [];
+    const glow = []; // lanterns that hang in the cave: dark like everything else until the marshal's light reaches them
+    const beacon = []; // the lift's and the shaft's lanterns: they stay lit, drawn above the dark
 
     const solid = (geometry, { cast = false, receive = true } = {}) => {
         const mesh = new THREE.Mesh(geometry, toonVertexColorMaterial());
@@ -303,11 +322,13 @@ export function showMineFloor(scene, floor) {
     group.add(mass);
     solid(buildFloor(layout, rand));
     solid(buildRock(layout, rand), { cast: true });
-    const props = [...pillarParts(layout, rand), ...archParts(layout, glow), ...clusterParts(layout, rand, glow), ...cartParts(layout, rand), ...railParts(layout), ...liftParts(glow)];
+    const props = [...pillarParts(layout, rand), ...archParts(layout, glow), ...clusterParts(layout, rand, glow), ...cartParts(layout, rand), ...railParts(layout), ...liftParts(beacon)];
     solid(mergeGeometries(props, false), { cast: true });
 
-    const shaft = buildShaft(layout, glow);
+    const shaft = buildShaft(layout, beacon);
     group.add(shaft.group);
+    const lift = buildLiftBeacon();
+    group.add(lift.group);
     const chests = layout.chests.map(([x, z], i) => {
         const chest = buildChest(x, z, (i * 2.1) % 6.28);
         group.add(chest.group);
@@ -315,6 +336,19 @@ export function showMineFloor(scene, floor) {
     });
     // The lantern glow is one unlit mesh, so it stays bright whatever the light does.
     group.add(new THREE.Mesh(mergeGeometries(glow, false), new THREE.MeshBasicMaterial({ vertexColors: true })));
+    const beacons = new THREE.Mesh(mergeGeometries(beacon, false), glowMaterial({ vertexColors: true }));
+    beacons.renderOrder = GLOW_RENDER_ORDER;
+    group.add(beacons);
+    // The dark: black outside the marshal's light, with the lift and the shaft always a little lit (never a lost player).
+    const dark = createMineDark(scene, [[0, 0, 11, 0.85], [shaft.x, shaft.z, 11, 0.85]]);
+    group.add(dark.mesh);
+    const torches = createTorchLayer();
+    group.add(torches.group);
+    const marshal = scene.children.find(o => o.userData?.muzzle) ?? null;
+    const lantern = createLantern();
+    lantern.group.position.set(-0.6, 1.2, 0.7); // in his hand
+    lantern.group.scale.setScalar(1.6);
+    marshal?.add(lantern.group);
 
     scene.add(group);
     const markers = solidMarkers(layout);
@@ -323,13 +357,15 @@ export function showMineFloor(scene, floor) {
     setActiveFloor(layout);
     const b = bounds(layout, 0);
     gameState.MAP_SIZE = Math.ceil(Math.max(-b.minX, b.maxX, -b.minZ, b.maxZ)) + 40; // the marshal can walk the whole cave
-    current = { floor, layout, group, shaft, chests, markers };
+    current = { floor, layout, group, shaft, lift, chests, markers, dark, torches, torchList: [], lantern, marshal };
     return current;
 }
 
 export function clearMineFloor(scene) {
     if(!current) { setActiveFloor(null); return; }
     scene.remove(current.group);
+    current.lantern.group.parent?.remove(current.lantern.group);
+    current.lantern.group.traverse(o => { if(o.isMesh) { o.geometry.dispose(); o.material.map?.dispose(); o.material.dispose(); } });
     current.group.traverse(o => {
         if(!o.isMesh) return;
         o.geometry.dispose();
@@ -345,6 +381,15 @@ export function clearMineFloor(scene) {
 
 export const mineFloorOnShow = () => current;
 
+// The torches on show: [{ x, z, lit }]. The mine lane's rules decide where they stand and which are lit; lit ones burn and clear the dark, the
+// others are charred stubs that smoke (what a light eater leaves). The marshal's lantern: `setMineLantern(false)` puts it out.
+export function setMineTorches(list) {
+    if(!current) return;
+    current.torchList = list;
+    current.torches.set(list);
+}
+export const setMineLantern = lit => current?.lantern.setLit(lit);
+
 // Opens chest `index` (the lid lifts, the glow goes out).
 export function openMineChest(index) {
     const chest = current?.chests[index];
@@ -359,6 +404,11 @@ export function openMineChest(index) {
 export function updateMineScene(timeInSeconds) {
     const shaft = current?.shaft;
     if(!shaft) return;
+    if(current.marshal) current.dark.extraHoles = torchHoles(current.torchList, current.marshal.position);
+    current.dark.update(timeInSeconds);
+    current.torches.update(timeInSeconds);
+    current.lantern.update(timeInSeconds);
+    current.lift.beam.material.opacity = 0.13 + (0.5 + 0.5 * Math.sin(timeInSeconds * 1.9 + 1)) * 0.08;
     const pulse = 0.5 + 0.5 * Math.sin(timeInSeconds * 2.4);
     shaft.beam.material.opacity = 0.16 + pulse * 0.1;
     shaft.ring.material.opacity = 0.28 + pulse * 0.22;

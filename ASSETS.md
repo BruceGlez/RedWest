@@ -28,6 +28,7 @@ show what licence applied if anyone asks.
 | Three.js | npm `three` | | MIT licence | | |
 | Other code-built art (props, box characters, the Drifter) | `src/` | Written in code | Owned | | |
 | Story panels (opening and ending pictures) | `public/story/`, originals in `art/story/` | OpenAI Images API (`tools/story-picture.mjs`, prompts in `tools/story-prompts.mjs`) | The OpenAI account's terms allow commercial use of generated images; original prompts, no other games' characters or real people | 2026-09-30 | No text in the pictures; the words are on the panels in the game. Regenerate one with `node tools/story-picture.mjs <name>`. |
+| The dark of the mine (full-screen shader layer), lift beam and ring | `src/placeDark.js`, `src/mineScene.js` | Made in code: one screen-space shader layer plus a cylinder and a ring of additive light, no models, textures or downloads | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. A later art pass may replace it. |
 
 ## Animals
 
@@ -46,5 +47,6 @@ commercial use.
 - AI voices: stock or properly licensed voices only; no voice clones of real people.
 - Music and effects from other sources need a licence that covers games and their ads (a "sync" licence
   for trailers and ads).
+| Torch (lit, and put-out stub with smoke) and the marshal's lantern | `src/placeTorch.js`, `src/mineScene.js` | Made in code: boxes, cones, cylinders, additive glow sprites drawn from a canvas gradient; five instanced meshes for all torches, no real point lights | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. A later art pass may replace it. |
 | Light eater (small bug that puts torches out) | `src/assets.js` (`createLightEaterMesh`) | Made in code: boxes baked with the quadruped bones like the crawler, plus an unlit amber abdomen | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. Not wired to a monster yet: the mine and combat lanes add `look: 'lighteater'` and the mesh in `src/enemySystem.js`. A later art pass may replace it. |
 | Hidden door for the cellar (a wall spot that gives itself away near, and a swung-open version) | `src/placeHiddenDoor.js` | Made in code: stone boxes, a hinged slab, an additive seam line, drifting dust points, a warm spill behind the open door | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. A part the town lane's cellar scene hangs on a wall spot; no models or textures. A later art pass may replace it. |
