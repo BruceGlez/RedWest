@@ -455,7 +455,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         wallet, onProfile, track, toast, act,
         isCardOpen: () => !!openId,
         openBuilding,
-        closeCard: () => { openId = null; },
+        closeCard: () => { openId = null; render(); },
         leave: leavePlace,
         markVisited: id => { news = markVisited(news, id); saveNews(news); },
         onDescend: floor => onDescend(floor)

@@ -1,0 +1,18 @@
+/* ---------- Copper Bit: a shift behind Dusty Pete's bar (src/saloonShiftView.js) ---------- */
+.saloon-shift { position: absolute; inset: 0; z-index: 6; display: flex; flex-direction: column; gap: 10px; padding: calc(12px + env(safe-area-inset-top)) 12px calc(12px + env(safe-area-inset-bottom));
+    background: rgba(24, 16, 10, 0.96); color: #f0d9a8; overflow-y: auto; }
+.saloon-head { display: flex; align-items: center; gap: 12px; font-size: 16px; }
+.saloon-head .saloon-time { margin-left: auto; font-size: 20px; font-weight: bold; }
+.saloon-head .saloon-combo { color: #8ab84a; }
+.saloon-quit { flex: 0 0 auto; padding: 4px 12px; }
+.saloon-seats { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.saloon-seat { display: flex; flex-direction: column; gap: 6px; min-height: 120px; padding: 10px; background: #3b2a20; border: 2px solid #c8a050; border-radius: 10px; }
+.saloon-seat.empty { opacity: 0.45; border-style: dashed; justify-content: center; align-items: center; }
+.saloon-seat.late .farm-bar i { background: #d9534f; }
+.saloon-seat.ready { border-color: #8ab84a; }
+.saloon-seat .shop-action { width: 100%; }
+.saloon-note, .saloon-empty { font-size: 13px; opacity: 0.8; text-align: center; }
+.saloon-stations { display: flex; gap: 8px; }
+.saloon-station { flex: 1; padding: 6px; text-align: center; background: #2a1d15; border: 1px solid #c8a050; border-radius: 8px; font-size: 13px; }
+.saloon-station.busy { background: #6b4a2b; color: #fff; }
+.saloon-result { margin-top: auto; }
