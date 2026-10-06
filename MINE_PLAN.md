@@ -32,6 +32,7 @@ walking back to it brings you up with whatever you got. Deeper is stranger, hard
 | **1f** | Six more monsters for floors 15 to 20, built only from behaviours and looks the game already has (`look` field, see "Deeper monsters") | small | **built 2026-10-05**; own models wait for the art lane |
 | **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | **2a built 2026-10-06** (the data contract, below); **2b built 2026-10-06** (the mine side: stairs, ore, saving; "Slice 2b" below); the server endpoint is still to do |
 | **5** | The dark mine (owner's brief, 2026-10-06): a cellar and a hidden door that Deacon Graves's defeat unlocks, a mine with no light of its own, a lantern and torches you buy and place, monsters that sense you by distance, light eaters from the deep floors, and a lift and shaft you can see | large; five parts, below | **planned**, assigned by lane ("Slice 5") |
+| **6** | Quests from the graves: Deacon Graves's graveyard in town gives generated jobs, the fallen souls asking for revenge or for their unfinished quests to be finished (find an item, kill a creature, kill a number, or a mix), many of them in the mine | medium | planned, owner said yes 2026-10-06 ("Slice 6") |
 | **3** | Boss floors (every 5th), more of Mr. Grimsby's talk and rumours, a pet that follows you down | medium | planned |
 | **4** | The art pass for the maps and the monsters: modelled rock, timber, carts, a real lift and shaft, painted textures (`POLISH_PLAN.md`, section 6) | large | parked, like the other art passes. The maps are made of boxes so this can replace them one builder at a time. |
 
@@ -268,15 +269,48 @@ What we already do and what it means:
 
 3. **Light eater model: built** (`createLightEaterMesh` in `src/assets.js`): a small dark bug with pale mandibles, four running legs and a dim amber abdomen (`userData.ember`, an unlit child the rules may dim or brighten). Waiting on the **mine** lane (its rules and floors) and **combat** (its behaviour): they add the monster with `look: 'lighteater'` and the mesh in `MINE_MESHES` (`src/enemySystem.js`).
 
-### Still open (ask the owner before building on these)
+### Decided by the owner (2026-10-06, answers to the "still open" list)
 
-1. **Lantern oil:** does the lantern run out and need refilling (a reason to buy more), or does it last and only torches are used up?
-2. **Torch count and price,** how many you can carry, and whether a lit torch burns out or is permanent once placed.
-3. **Where light is sold:** Mr. Grimsby, the general store, or both.
-4. **Which floor the light eaters begin on** (the plan below assumes about floor 8, where monsters already get tougher).
-5. **Relighting:** a torch a light eater put out can be relit for free by walking up to it, or costs a match.
-6. **Does the hidden door open the existing mine, or a second, darker mine?** Assumed: it is the existing mine, so existing saves (deepest floor, checkpoints, ore) carry over, and the stairs-only route to the cellar replaces today's direct stairs.
-7. **Quest generator** (slice 6): approve or drop.
+1. **The lantern runs out of oil and needs refilling.** Everything costs in-game currency (earned Bounty Dollars, never Gold Nuggets): the lantern, oil, torches and anything else the dark needs. Prices are small and are tuned against what a Wanted Road run earns, because the mine itself pays no money (slice 2's rule), so the player must be able to afford a descent from road income.
+2. **The floors grow slowly at first.** Today a floor grows fast (see "Level size and torches" below). Make the first 10 floors small and let size grow gently after that.
+3. **Torches are permanent down to floor 14.** From **floor 15 and deeper it is undecided**: leave it as a single named setting in code (for example `torchesBurnOutFrom`), default permanent, and the mine agent proposes options to the owner before changing it.
+4. **Light is sold in both places:** Mr. Grimsby and the general store (two shops, same rules; prices may differ a little, nothing else).
+5. **Light eaters start about floor 8, and get more annoying the deeper you go:** more of them, faster, and they put out torches from further away and more often. Annoying, not unfair: they never hurt you (they put torches out), they are easy to kill, and the number and speed have a cap so a floor is never impossible. A put-out torch can always be relit.
+6. **Relighting costs** a little (a match, in Bounty Dollars, or a splash of oil), never free and never a timer.
+7. **It is the existing mine.** Saved deepest floor, checkpoints and ore carry over; the hidden door replaces today's direct stairs.
+8. **Yes to the quest generator** (slice 6, below).
+
+### Level size and torches (checked 2026-10-06)
+
+Measured from `floorLayout(depth)` (`src/mineMap.js`; "main road" is the chain from the lift to the shaft):
+
+| Floor | Chambers | Main road | Torches at one per 30 | at one per 45 |
+|---|---|---|---|---|
+| 1 | 4 | 404 | 14 | 9 |
+| 2 | 6 | 780 | 27 | 18 |
+| 3 | 8 | 1,033 | 35 | 23 |
+| 5 | 12 | 1,876 | 63 | 42 |
+| 8 | 15 | 2,354 | 79 | 53 |
+| 10 | 15 | 2,383 | 80 | 53 |
+| 20 | 15 | 2,596 | 87 | 58 |
+
+So floor 1 is already about 400 and it is 1,900 by floor 5: marking the way back would take 60 or more torches, which is too many to carry, buy or place. **Targets for the mine agent** (the numbers are a start, to tune by playing): a main road of about 250 on floor 1, about 500 by floor 5, about 800 on floor 10, then growing slowly to about 1,500 by floor 30 and staying there; chambers `3 + floor` for the first 10 floors, then slowly; a torch roughly every 40 units, so about 6 torches on floor 1, 12 on floor 5, 20 on floor 10 and not more than about 38 deep down. Carry limit around 10 to 12, bought in stacks of a few, plus oil to match. Floors stay deterministic per depth (the generator is unchanged); only the sizes change, and `tests/mine*.test.js` pin the new targets.
+
+## Slice 6: quests from the graves (owner's brief, 2026-10-06)
+
+The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want
+revenge or want their quests finished.** The investigation (see Slice 5) found that Fate's quests are small random templates: find an item,
+kill one creature, kill a number of creatures, or a mix, plus a main quest that enlarges an ordinary monster and puts it on a deep floor.
+
+- **A generator, not a list:** `src/graveQuests.js` (pure, deterministic from a seed and the day, with tests): a template (find, hunt, clear,
+  or a mix) plus a target (an ore count, a monster kind, a floor, a number) plus a soul's story line. Quests are made when you open a grave,
+  not all at once; two players on the same day may see the same graves.
+- **Where it happens:** the graves live in Deacon Graves's place (town lane: layout, card, rules); the targets are in the mine (mine lane:
+  counts what you kill and find, already saved in `profile.mine`). Combat lane: only if a quest needs a stronger "revenge target" monster.
+- **The main grave** is the Fate main quest in our terms: one named monster, bigger and tougher, on a deep floor, with a posse.
+- **Rules:** no stars, no Gold Nuggets and no timers. **Rewards are open (ask the owner):** score, ore, cosmetic titles, or a small amount of
+  Bounty Dollars. Since light costs money and the mine pays none, a small Bounty Dollar reward from a grave quest may be the fair answer.
+- Needs first: the dark mine (Slice 5), then a data contract (quest state in the profile and the server) before the screens.
 
 ## Open questions
 
