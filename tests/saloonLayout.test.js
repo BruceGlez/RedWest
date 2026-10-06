@@ -73,6 +73,8 @@ test('the bar card shows the night, the menu and the paid shifts; the farm adds 
     assert.match(alone, /night 1 of 10/);
     assert.match(alone, /3 of 3 paid shifts left/);
     assert.match(alone, /BEANS <b>\$3<\/b>/);
+    assert.match(alone, /data-shift="1"[^>]*>START NIGHT 1/);
+    assert.ok(!/data-shift="2"/.test(alone), 'night 2 is shut until night 1 has a star');
     assert.ok(!/EGG PLATE/.test(alone));
     const p = withStars(['dusty-pete', 'calloway-gang']);
     p.town.saloon.nights = [3, 3, 0, 0, 0, 0, 0, 0, 0, 0];
@@ -80,6 +82,8 @@ test('the bar card shows the night, the menu and the paid shifts; the farm adds 
     assert.match(farmed, /night 3 of 10/);
     assert.match(farmed, /EGG PLATE <b>\$5<\/b>/);
     assert.match(farmed, /NIGHT 1 <b>\*\*\*<\/b>/);
+    assert.match(farmed, /data-shift="3"[^>]*>START NIGHT 3/);
+    assert.match(farmed, /data-shift="1"[^>]*>REPLAY NIGHT 1/);
     for(let i = 0; i < PAID_SHIFTS_PER_DAY; i++) settleShift(p, { night: 1, served: [] }, new Date());
     assert.match(createSaloonPlace(host(p)).card('bar'), /paid shifts are done/);
 });
@@ -90,4 +94,10 @@ test('a shut saloon shows no menu, and the piano card still reads', () => {
     assert.ok(!shut.card('bar').includes('On the menu'));
     assert.match(shut.card('piano'), /sour notes/);
     assert.equal(shut.card('nowhere'), '');
+});
+
+test('only the START NIGHT buttons are the saloon\'s, and a shut saloon starts nothing', () => {
+    const place = createSaloonPlace({ ...host(createProfile(T0)), closeCard: () => { throw new Error('a shut saloon must not start a shift'); } });
+    assert.equal(place.click({ dataset: { shift: '1' }, hasAttribute: () => false }), true);
+    assert.equal(place.click({ dataset: { plant: 'wheat' }, hasAttribute: () => false }), false);
 });

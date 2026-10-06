@@ -87,7 +87,8 @@ export function nearestDoor(map, x, z, reach = DOOR_REACH) {
     let bestDistance = reach;
     for(const door of map.doors) {
         const distance = Math.hypot(door.x - x, door.z - z);
-        if(distance <= bestDistance) {
+        // A door may ask for a closer reach than the rest (`reach`): a hidden one only shows its prompt when the marshal is right beside it.
+        if(distance <= bestDistance && distance <= (door.reach ?? Infinity)) {
             best = door;
             bestDistance = distance;
         }

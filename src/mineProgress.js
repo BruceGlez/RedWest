@@ -8,6 +8,8 @@
 //   or a faster descent. (What ore is spent on, later, is cosmetic only and is not part of this slice.)
 // - A checkpoint only lets you start lower; it never gives power or items.
 
+import { createLightKit, normalizeLightKit, spendKit } from './mineLight.js';
+
 export const CHECKPOINT_EVERY = 5;     // a checkpoint on floors 5, 10, 15, ...
 export const MAX_FLOOR = 500;          // far past anything walkable; a bound for tampered input
 export const MIN_SECONDS_PER_FLOOR = 6; // the shortest honest walk from lift to shaft (a floor is at least ~240 units)
@@ -17,7 +19,7 @@ export const FALL_KEEPS = 0;           // the share of the ore carried in a run 
 const whole = value => Math.max(0, Math.floor(Number(value)) || 0);
 
 export function createMineProgress() {
-    return { version: 1, deepest: 0, checkpoint: 0, ore: 0, runs: 0 };
+    return { version: 1, deepest: 0, checkpoint: 0, ore: 0, runs: 0, light: createLightKit() }; // light: the lantern, oil, torches and matches he owns (src/mineLight.js)
 }
 
 // The checkpoint a floor gives: the highest multiple of CHECKPOINT_EVERY that is not deeper than it (0 before the first).
@@ -33,6 +35,7 @@ export function normalizeMineProgress(raw) {
     mine.checkpoint = checkpointFor(mine.deepest);
     mine.ore = Math.min(whole(raw.ore), MAX_ORE);
     mine.runs = whole(raw.runs);
+    mine.light = normalizeLightKit(raw.light);
     return mine;
 }
 
@@ -59,7 +62,7 @@ export function oreKept(carried, outcome) {
     return outcome === 'up' ? ore : Math.floor(ore * FALL_KEEPS);
 }
 
-// A finished mine run: summary = { startFloor, depth, ore, outcome: 'up' | 'fell', seconds }.
+// A finished mine run: summary = { startFloor, depth, ore, outcome: 'up' | 'fell', seconds, used: { oil, torches, matches } } (what the light used, src/mineLight.js).
 // Changes `mine` only (the caller's profile.mine) and returns what the result screen shows. Nothing is rejected: a summary that cannot be
 // true is cut down to what could be (a start floor that is not a checkpoint of his is floor 1; a depth no walk could reach, or more ore than
 // the floors can hold, is cut), because the client is not trusted.
@@ -72,6 +75,7 @@ export function applyMineRun(mine, summary) {
     const depth = Math.min(Math.max(startFloor, whole(summary?.depth)), reachable, MAX_FLOOR);
     const carried = Math.min(whole(summary?.ore), maxOreForRun(startFloor, depth));
     const kept = oreKept(carried, outcome);
+    spendKit(mine.light, summary?.used); // the oil burned and the torches and matches used: they are gone, whatever happened to the marshal
     const before = { deepest: mine.deepest, checkpoint: mine.checkpoint };
     mine.runs++;
     mine.deepest = Math.max(mine.deepest, depth);

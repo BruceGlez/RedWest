@@ -6,7 +6,7 @@ import { PRODUCTS } from '../src/products.js';
 import { SHOP_ITEMS } from '../src/cosmetics.js';
 
 test('a new profile has an empty mine record, and old saves without one get it', () => {
-    assert.deepEqual(createProfile().mine, { version: 1, deepest: 0, checkpoint: 0, ore: 0, runs: 0 });
+    assert.deepEqual(createProfile().mine, { version: 1, deepest: 0, checkpoint: 0, ore: 0, runs: 0, light: { lantern: false, oil: 0, torches: 0, matches: 0 } });
     const old = createProfile();
     delete old.mine;
     assert.deepEqual(normalizeProfile(old).mine, createMineProgress());
@@ -14,12 +14,12 @@ test('a new profile has an empty mine record, and old saves without one get it',
 });
 
 test('normalizing keeps real numbers, cuts tampered ones, and derives the checkpoint from the deepest floor', () => {
-    assert.deepEqual(normalizeMineProgress({ deepest: 13.9, checkpoint: 500, ore: '40', runs: 3 }), { version: 1, deepest: 13, checkpoint: 10, ore: 40, runs: 3 });
+    assert.deepEqual(normalizeMineProgress({ deepest: 13.9, checkpoint: 500, ore: '40', runs: 3 }), { version: 1, deepest: 13, checkpoint: 10, ore: 40, runs: 3, light: createMineProgress().light });
     assert.equal(normalizeMineProgress({ deepest: 1e9 }).deepest, MAX_FLOOR);
     assert.equal(normalizeMineProgress({ ore: 1e12 }).ore, MAX_ORE);
     assert.deepEqual(normalizeMineProgress({ deepest: -4, ore: -1, runs: 'x' }), createMineProgress());
     assert.deepEqual(normalizeMineProgress('nope'), createMineProgress());
-    assert.deepEqual(normalizeProfile({ mine: { deepest: 7, ore: 12 } }).mine, { version: 1, deepest: 7, checkpoint: 5, ore: 12, runs: 0 });
+    assert.deepEqual(normalizeProfile({ mine: { deepest: 7, ore: 12 } }).mine, { version: 1, deepest: 7, checkpoint: 5, ore: 12, runs: 0, light: createMineProgress().light });
     const once = normalizeMineProgress({ deepest: 22, ore: 5, runs: 9 });
     assert.deepEqual(normalizeMineProgress(once), once, 'normalizing twice changes nothing');
 });

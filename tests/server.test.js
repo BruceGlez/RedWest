@@ -556,3 +556,22 @@ test('a mine run is applied to profile.mine only, with the floor and ore cut dow
         await s.close();
     }
 });
+
+test('the store lookups answer the questions the app asks (and are awaited, so a database can answer later)', async () => {
+    const store = createMemoryStore();
+    await store.putUser('a', { tokenHash: 'ha', apple: { sub: 'sub-a' }, profile: { name: 'ANNIE', purchases: [{ tx: 't1', paymentIntent: 'pi_1' }] }, reportedBy: ['b'] });
+    await store.putUser('b', { tokenHash: 'hb', tokenHashes: ['hb2'], profile: { name: 'BOB' }, nameHidden: true });
+    assert.equal(await store.findUserByTokenHash('hb2'), 'b');
+    assert.equal(await store.findUserByTokenHash('nope'), null);
+    assert.equal((await store.findUserByAppleSub('sub-a')).id, 'a');
+    assert.equal(await store.findUserByAppleSub('x'), null);
+    assert.equal((await store.findUserByPaymentIntent('pi_1')).id, 'a');
+    assert.equal(await store.findUserByPaymentIntent('pi_2'), null);
+    assert.equal((await store.findUserByName('BOB', 'a')).id, 'b');
+    assert.equal(await store.findUserByName('BOB', 'b'), null, 'a player is not taking his own name');
+    assert.deepEqual((await store.listReportedUsers()).map(e => e.id), ['a']);
+    assert.deepEqual((await store.listBoardUsers()).map(e => e.id), ['a'], 'a hidden name is off the boards');
+    await store.removeReporter('b');
+    assert.deepEqual(await store.listReportedUsers(), [], 'a deleted account no longer counts as a reporter');
+    assert.equal(await store.ping(), true);
+});

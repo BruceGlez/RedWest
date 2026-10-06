@@ -20,11 +20,11 @@ test('registerPlace only takes a factory', () => {
     assert.throws(() => registerPlace({ id: 'x' }), /factory/);
 });
 
-test('the farm and the parlour are registered, and each says its own way in', async () => {
+test('the farm, the parlour and the cellar are registered, and each says its own way in', async () => {
     const { createPlaces: create } = await import('../src/places/index.js');
     const host = { screen: null, profile: () => null, progress: () => null, companion: () => ({}), isCardOpen: () => false };
     const places = create(host);
-    assert.deepEqual(places.map(p => p.id).sort(), ['canal', 'copper', 'crossing', 'ranch', 'undertaker']);
+    assert.deepEqual(places.map(p => p.id).sort(), ['canal', 'cellar', 'copper', 'crossing', 'ranch', 'undertaker']);
     assert.equal(places.find(p => p.entrance('enter-ranch')).id, 'ranch');
     assert.equal(places.find(p => p.entrance('enter-crossing')).id, 'crossing');
     assert.equal(places.find(p => p.entrance('enter-canal')).id, 'canal');
