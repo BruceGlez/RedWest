@@ -94,3 +94,16 @@ Skip this if there are no accounts worth keeping (a fresh playtest): just set `S
 
 Running the script again later is safe: a player already in Postgres is left alone, so it cannot undo newer progress. `--overwrite` replaces
 players from the file on purpose (only for a rollback-and-retry, never after the game has been live on Postgres).
+
+## Measuring your server
+
+The load test starts its own throwaway server and fake players, so it is safe to run on the VPS (it never touches your data; with Postgres it refuses a database that holds real players, so give it an empty one):
+
+```
+git clone <the repository> && cd RedWest        # Node 22
+node tools/loadtest/run.mjs --steps 100,300,1000,3000 --seed 5000                       # JSON file store
+npm ci --prefix server
+node tools/loadtest/run.mjs --store postgres --database-url postgres://... --seed 20000   # an empty database
+```
+
+It prints one row per step and the highest step that stayed inside the budget (p95 under 300 ms, errors under 0.5%). Run it while nothing else is busy. See `docs/lanes/scale.md` for what it measured on a test machine and how to read the columns.

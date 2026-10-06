@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { DIM_RING, LANTERN_RADIUS, TORCH_RADIUS, MIN_TORCH_GAP, CARRY_LIMIT, MATCH_LIMIT, OIL_CAPACITY, MAX_HOLES, LIGHT_ITEMS, SHOP_MARKUP, priceOf,
+import { DIM_RING, LANTERN_RADIUS, TORCH_RADIUS, MIN_TORCH_GAP, CARRY_LIMIT, MATCH_LIMIT, OIL_CAPACITY, MAX_HOLES, TORCH_SPACING, LIGHT_ITEMS, SHOP_MARKUP, priceOf,
     createLightKit, normalizeLightKit, buyLight, spendKit, createLightRun, lanternLit, burnLantern, placeTorch, putOutTorch, relightTorch, burnTorches,
     lightSource, isLit, usedKit, torchesFor, isLightItem, nearestLitTorch, nearestOutTorch, THIN_AIR_FROM_FLOOR, OIL_MIN_PRICE, TORCH_FAIL_MIN_SECONDS, TORCH_FAIL_SPREAD_SECONDS, torchFailChance, torchFailAfter } from '../src/mineLight.js';
 import { createProfile, normalizeProfile, CURRENCIES } from '../src/profile.js';
@@ -86,7 +86,15 @@ test('the lantern burns oil, and with none (or no lantern) he still sees his own
     assert.equal(lightSource(run, 1, { x: 0, z: 0 }).radius, DIM_RING, 'out of oil: back to the dim ring, never to nothing');
     burnLantern(none, 50);
     assert.equal(none.oil, 0);
-    assert.ok(DIM_RING > 0 && DIM_RING < LANTERN_RADIUS && LANTERN_RADIUS > TORCH_RADIUS * 0.5);
+    assert.ok(DIM_RING > 0 && DIM_RING < TORCH_RADIUS && TORCH_RADIUS < LANTERN_RADIUS, 'the feet, a torch, the lantern: each lights more than the last');
+});
+
+test('the light is clearly bigger than it was (owner, 2026-10-06), still small against the dark, and the torch road overlaps nicely', () => {
+    assert.ok(LANTERN_RADIUS >= 15 * 1.5 && LANTERN_RADIUS <= 15 * 2.2, `a lantern of ${LANTERN_RADIUS}: about 1.5x to 2x what it was (15)`);
+    assert.ok(TORCH_RADIUS >= 12 * 1.5 && TORCH_RADIUS <= 12 * 2.2, `a torch of ${TORCH_RADIUS}: about 1.5x to 2x what it was (12)`);
+    assert.ok(2 * TORCH_RADIUS > TORCH_SPACING && 2 * TORCH_RADIUS <= TORCH_SPACING * 1.25, 'torches a torch-spacing apart touch, and only a little more: a lit path, not a lit cave');
+    assert.ok(LANTERN_RADIUS < 40, 'the dark is still the dark: the lantern never lights more than a chamber and a bit');
+    assert.ok(MIN_TORCH_GAP < TORCH_RADIUS, 'two torches closer than that would only waste one');
 });
 
 test('torches: placed one at a time where he stands, not on top of each other, and each lights its own place', () => {

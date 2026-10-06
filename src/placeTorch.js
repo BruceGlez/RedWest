@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLOW_RENDER_ORDER } from './placeDark.js';
+import { TORCH_RADIUS, MAX_HOLES } from './mineLight.js';
 
 // Torches and the lantern for the dark mine (MINE_PLAN.md, slice 5), made in code: boxes, cones, planes, additive glow. No real point lights
 // (they are expensive); the glow is fake and the light that clears the dark comes from `torchHoles` (src/placeDark.js, `holes`).
@@ -14,7 +15,7 @@ import { GLOW_RENDER_ORDER } from './placeDark.js';
 // The whole layer is five instanced meshes however many torches there are (up to MAX_TORCHES).
 
 export const MAX_TORCHES = 48;
-export const TORCH_LIGHT_RADIUS = 9; // how far a lit torch clears the dark (the mine lane's rules may pass their own)
+export const TORCH_LIGHT_RADIUS = TORCH_RADIUS; // how far a lit torch clears the dark: the mine lane's number (src/mineLight.js)
 const FLAME = 0xffa23a, FLAME_HOT = 0xffe39a, TIMBER = 0x5a3e27, IRON = 0x34343a, CHAR = 0x17110d;
 
 function glowTexture(inner, outer) {
@@ -118,7 +119,7 @@ export function createTorchLayer() {
 }
 
 // The marshal's own lit torches nearest to him (at most `limit`), as holes in the dark layer: [{ x, z, r, k }].
-export function torchHoles(list, marshal, limit = 8, radius = TORCH_LIGHT_RADIUS) {
+export function torchHoles(list, marshal, limit = MAX_HOLES, radius = TORCH_LIGHT_RADIUS) {
     return list
         .filter(t => t.lit)
         .map(t => ({ t, d: Math.hypot(t.x - marshal.x, t.z - marshal.z) }))
