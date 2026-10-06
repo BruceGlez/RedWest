@@ -364,6 +364,33 @@ Nothing else is hurt by it, and the cheapest answer is to shoot it.
 its belly as if it has swallowed a lamp, small blunt jaws. Cream and pale grey with a faint warm yellow glow in the belly. Cartoon proportions, chunky shapes, friendly rather
 than scary, readable from the high camera in the dark." Add a row to `ASSETS.md` when it exists.
 
+### Decisions and options from the owner's answers (2026-10-06, second round)
+
+**Oil (the owner said "choose something reasonable"; built).** A full lantern stays 15 minutes of burn (`OIL_CAPACITY` 900 s). A flask fills it. **A top-up costs in proportion to
+the oil missing**, with a small minimum (`priceOf('oil', shop, kit)`; `OIL_MIN_PRICE` 2 dollars), so nobody pays 15 dollars to add a minute; with no kit named the price is the full
+flask's, which is what the shop card shows until it passes the kit. Prices stay my first guess in one table (`LIGHT_ITEMS`: lantern 60, oil 15 for a full flask, torches x5 20, matches x5 5; the general
+store 10% more); the owner has not confirmed them. **`LIGHT_NEEDS_SHOP` is flipped to `true` in its own small PR right after the shops (#73) merge**, not before.
+
+**Thin air from floor 15 (built, named and tested).** "Torches go out for lack of oxygen, randomly, not all of them, just a few; the deeper you go the more it becomes an issue."
+`THIN_AIR_FROM_FLOOR` is 15. A torch put down on a thin floor gets, from the floor and its number on the floor, a time after which the air puts it out, or never
+(`torchFailAfter`): about 10% of torches on floor 15, rising 2.5 points a floor to a cap of 50% (`torchFailChance`), each lasting between 1 and 6 minutes. The first torch of a floor never fails, so
+the way back is never all dark. The same floor goes the same way every time (a hash of floor and torch number), so tests fix it. A dead torch is the same smoking stub as a light eater's:
+**T beside it relights it with a match**, and a relit torch may fail again at a time of its own. The mode says `THE AIR IS THIN: A TORCH WENT OUT` where it happened. This replaces the
+earlier open `TORCHES_BURN_OUT_FROM` idea.
+
+**The oxygen bar from floor 15: OPTIONS for the owner (nothing is wired; `OXYGEN_ENABLED` is `false` in `src/mineAir.js`).** The owner gave no details beyond "the marshal has an oxygen bar as well".
+`src/mineAir.js` is pure rules with tests, so any choice below is a change of numbers, not of design. My default is marked **(default)**.
+- *What drains it.* **(default)** Time on a thin floor, gently on floor 15 (`0.5` units a second, a full bar of 100 lasting 200 s) and worse deeper (`+0.05` a floor, capped at `2.0`, 50 s). *Or* only while running, dashing or shooting
+  (rewards standing still; punishes the fight). *Or* only when far (more than about 40 units) from the lift and from any lit torch of his (rewards laying a torch road).
+- *What refills it.* **(default)** At the lift (within 14 units, 12 a second) and beside a lit torch of his (within 10 units, 3 a second: a place to catch his breath, not a cure); arriving on a new thin floor gives 25 at once so a floor is never started on empty.
+  *Or* also a landing on every fifth floor (the checkpoints). *Or* an oxygen flask bought in the shop: Bounty Dollars only, filling part of the bar, never touching combat and never sold for nuggets.
+- *What happens at empty.* **(default, non-lethal)** The marshal is a little slower (x0.85) and his lantern a little dimmer (x0.6, never below the dim ring), growing worse from a quarter bar down; the bar warns. *Or* a blurred, darkened screen only. *Or* (not recommended) hearts drain slowly: it changes combat
+  stakes, which the game rules keep for fights.
+- *Where the bar shows.* A HUD element: the **ui lane's** (the coordinator should hand it a spec: `airEffects(air)` gives `{ speed, light, warning, empty }`, `air.level` is 0 to 100).
+Money must not buy combat power: if oxygen can be bought it is Bounty Dollars only and the item changes the bar, not damage, fire rate or enemies (`tests/mineAir.test.js` checks no effect touches hearts or damage).
+
+**Held, not answered by the owner (listed for the coordinator):** (1) rescaling the floor lengths if "main road" meant the longer measure in the table above (one constant, `hopGap` in `src/mineMap.js`); (2) a small "lift or shaft in sight" HUD rule (the art lane's glow and beams and the HUD arrows already work).
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want

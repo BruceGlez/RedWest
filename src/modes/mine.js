@@ -204,7 +204,7 @@ function updateFlow(ctx, dt) {
     if(chest >= 0) openChest(ctx, chest, cave);
     if(mine.light) { // the lantern burns oil and, deep down, torches burn out (src/mineLight.js)
         burnLantern(mine.light, dt);
-        burnTorches(mine.light, mine.floor, dt);
+        for(const t of burnTorches(mine.light, mine.floor, dt)) floatText('THE AIR IS THIN: A TORCH WENT OUT', new THREE.Vector3(t.x, 3, t.z), 'hot');
         syncLantern();
         const lit = mine.light.placed.filter(t => t.floor === mine.floor).map(t => t.lit ? 1 : 0).join('');
         if(lit !== torchesLit) { torchesLit = lit; syncTorches(); } // a light eater put one out
