@@ -180,6 +180,12 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
             const url = new URL(req.url, 'http://localhost');
             if(req.method === 'OPTIONS') return send(res, 204, {});
             if(url.pathname === '/health') return send(res, 200, { ok: true });
+            // For the host's health check (Docker, Coolify): the process is up and the store answers. No auth, no secrets, no player data.
+            if(url.pathname === '/healthz' && (req.method === 'GET' || req.method === 'HEAD')) {
+                let storeOk = false;
+                try { storeOk = (await store.ping?.()) !== false; } catch { /* reported as not ok below */ }
+                return send(res, storeOk ? 200 : 503, { ok: storeOk, store: storeOk });
+            }
 
             if(url.pathname === '/api/account' && req.method === 'POST') {
                 if(!allow('account', callerIp(req))) return tooMany(res);

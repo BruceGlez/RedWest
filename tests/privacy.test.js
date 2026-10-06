@@ -34,6 +34,14 @@ test('the name blocklist catches abuse without blocking innocent names', () => {
         assert.equal(validateName(bad).ok, false, bad);
 });
 
+test('a generated name the filter would reject (digits read as letters: 1515 is ISIS) is drawn again', () => {
+    assert.equal(validateName('DRIFTER 1515').ok, false, 'the filter rejects it');
+    const draws = [0.3, 0.1515, 0.3, 0.5]; // DRIFTER 1515 (rejected), then DRIFTER 5000
+    let i = 0;
+    assert.equal(generatedName(() => draws[i++]), 'DRIFTER 5000');
+    assert.equal(i, 4);
+});
+
 test('generated names are valid names and recognisable', () => {
     for(let i = 0; i < 200; i++) {
         const name = generatedName();

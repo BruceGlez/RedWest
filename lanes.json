@@ -127,6 +127,9 @@
    "owns": [
     "server/**",
     "render.yaml",
+    "Dockerfile",
+    ".dockerignore",
+    "docs/DEPLOY.md",
     "tools/retention.mjs",
     "tools/loadtest/**",
     "tests/server.test.js",
