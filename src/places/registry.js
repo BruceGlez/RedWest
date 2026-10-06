@@ -9,6 +9,7 @@
 //   wallet, onProfile(profile), track(event), toast(text, isError), act(work, onError)   doing something for real and saying so
 //   isCardOpen(), openBuilding(id), closeCard()   the card (sheet) the walk opens at a door
 //   leave()           walk back out to the town
+//   goTo(id)          walk from this place straight into another place by its id (the parlour's stairs to the cellar and back)
 //   markVisited(id)   remember the player has been in a district
 //   onDescend(floor)  start a mine run on a floor (the parlour's cellar: floor 1, or a checkpoint)
 //

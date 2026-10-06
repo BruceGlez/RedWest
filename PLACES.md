@@ -128,7 +128,7 @@ town as an overview, and then the places cannot be entered (they need walking).
 | El Espectro | **Tres Rios** | TEND | planned |
 | Lucky Lou | **The Silver Belle** | MARKET | planned |
 | Colonel Crane | **Fort Pell** | PATROL | planned |
-| Dusty Pete | **Copper Bit** | SERVE | **place built 2026-10-05** (the bar's card and the piano; the shift game is next) |
+| Dusty Pete | **Copper Bit** | SERVE | **built 2026-10-06** (the place and a playable shift; upgrades, regulars and the piano tune are next) |
 | Rattlesnake Rosa | **Whisper Wash** | TAME | the canyon is built in town (2026-10-01), the place is designed below, not built |
 | Deacon Graves | **Hollow Hill** | KEEP | the chapel is built in town (2026-10-01), the place is designed below, not built |
 
@@ -225,7 +225,7 @@ better day to sell. The notice post shows tomorrow's prices.
 dollars and scrap. The board shows what each patrol pays and when the deputies return. Patrols never involve combat on the
 screen, and the number of deputies grows with place upgrades.
 
-### 8. Copper Bit: SERVE (the rules and the place are built 2026-10-05; the shift game is not)
+### 8. Copper Bit: SERVE (built 2026-10-06: the rules, the place and a first playable shift)
 
 *Copper Bit's saloon street is open again. Dusty Pete runs the bar; the broken piano stays broken.* Opens with Dusty Pete.
 Southwest of the town (the gate is on the south edge, left of the channel).
@@ -260,7 +260,9 @@ crowd). A night opens with a star on the one before. The test holds a whole day'
 **Waiting on lanes:** `server/app.js` (scale) `POST /api/town/saloon` calling `saloonAction(user.profile, body, now())`, and
 `saloon(body)` on both wallets in the shared `src/wallet.js`, the same way as `orders`.
 
-**Slice 2 (built 2026-10-05): the place.** The gate in the town opens Copper Bit (`interior: 'saloon'`, shut with a LOCKED sign naming Dusty Pete until his first star). `src/saloonLayout.js` is the map (the saloon at the back, the broken piano out front, kegs, a rail, the way out), `src/places/saloon.js` the bar's card (tonight's night, the stars on each night, the menu with prices, the paid shifts left) and the piano's card, and `src/placeSaloon.js` a plain box-built **placeholder scene** (the art lane's from here on). The card says the shift is coming soon: there is no button yet, because a shift cannot be saved until the server route and the wallet method exist. Tests: `tests/saloonLayout.test.js` and the Copper Bit walk-through in `tests/town-smoke.mjs`. **Not built yet:** the shift screen itself, upgrades, regulars, and the piano tune.
+**Slice 2 (built 2026-10-05): the place.** The gate in the town opens Copper Bit (`interior: 'saloon'`, shut with a LOCKED sign naming Dusty Pete until his first star). `src/saloonLayout.js` is the map (the saloon at the back, the broken piano out front, kegs, a rail, the way out), `src/places/saloon.js` the bar's card (tonight's night, the stars on each night, the menu with prices, the paid shifts left) and the piano's card, and `src/placeSaloon.js` a plain box-built **placeholder scene** (the art lane's from here on). Tests: `tests/saloonLayout.test.js` and the Copper Bit walk-through in `tests/town-smoke.mjs`.
+
+**Slice 3 (built 2026-10-06): a playable shift.** The bar's card has a START NIGHT button for the newest night and REPLAY NIGHT for each earlier one. `src/saloonShift.js` is the game with no rendering (`tests/saloonShift.test.js` plays whole shifts): two minutes, up to four seats, customers who each want a dish and have a patience bar, and three stations (the stove, the barrel, the oven) that cook one thing at a time, so what you cook first is the game. COOK a seat's dish, then SERVE it; serve with half the patience left for a **tip**, and with nobody having walked out yet for the **big tip**. A customer who runs out of patience walks out (a miss, and the combo starts again). The same night, farm and seed give the same crowd, and a night's crowd, menu and patience come from the rules in `src/saloon.js`. `src/saloonShiftView.js` is the screen. When the shift ends it goes to `wallet.saloon({ action: 'shift', night, served })` (the server route and the wallet method are built by the scale lane), which settles it: three paid shifts a day, then free practice for stars. A shift in which nobody was served is not sent, so it never uses up a paid shift. A failed save keeps the shift and offers TRY AGAIN. **Not built yet:** upgrades, regulars with favourite dishes, the piano tune, patience that differs by customer, and real art.
 
 ### 9. Whisper Wash: TAME (canyon built, place designed 2026-10-05)
 
