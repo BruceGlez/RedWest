@@ -127,6 +127,19 @@ try {
         assert.ok(await page.evaluate(() => S.enemies.every(e => e.userData.mineNode !== undefined)), `depth ${depth}: every monster belongs to a chamber`);
 
         if(depth === 1) {
+            // Monsters sense the marshal by distance: those out of their radius stand at their post, asleep; one he walks up to wakes and hunts.
+            const sensed = await page.evaluate(() => {
+                const p = window.__redWest.playerGroup.position;
+                return S.enemies.filter(e => e.userData.sense).map(e => { const u = e.userData; return { state: u.sense.state, d: Math.hypot(e.position.x - p.x, e.position.z - p.z), r: u.sense.radius, moved: Math.hypot(e.position.x - u.sense.home.x, e.position.z - u.sense.home.z) }; });
+            });
+            assert.ok(sensed.length > 0, 'the chamber monsters have a sense radius');
+            for(const m of sensed.filter(m => m.d > m.r + 10)) assert.ok(m.state === 'asleep' && m.moved < 1, `a monster ${Math.round(m.d)} away (radius ${m.r}) sleeps at its post: ${JSON.stringify(m)}`);
+            const sleeper = await page.evaluate(() => { const e = S.enemies.find(e => e.userData.sense?.state === 'asleep'); return e ? { x: e.userData.sense.home.x, z: e.userData.sense.home.z } : null; });
+            if(sleeper) {
+                await put(sleeper.x, sleeper.z);
+                await page.waitForFunction(() => S.enemies.some(e => e.userData.sense?.state === 'hunting'), null, { timeout: 8000 });
+                await put(0, 0);
+            }
             // The four monsters that live only down here spawn, wear their own look, and run their behaviours without a fault.
             const monsters = await page.evaluate(async () => {
                 const { spawnEnemy } = await import('/src/enemySystem.js');

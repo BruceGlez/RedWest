@@ -9,7 +9,8 @@ import { gameState, enemies, playerStats } from './state.js';
 import { checkCollision, stepAround } from './physics.js';
 import { activeFloor, isOpen, spawnPoint, steerTarget, AGGRO_DISTANCE } from './mineMap.js';
 import { mine } from './mine.js';
-import { MINE_MONSTERS, mineHpBonus, mineRoster } from './mineMonsters.js';
+import { MINE_MONSTERS, mineHpBonus, mineRoster, senseRadius, leashRadius } from './mineMonsters.js';
+import { createSense, senseStep } from './combatMath.js';
 import { ENEMY_MODELS, rosterFor } from './enemyTypes.js';
 import { DEMO } from './demo.js';
 import { playSound } from './audio.js';
@@ -192,6 +193,8 @@ export function spawnEnemy(scene, playerPos, requestedType = null, at = null) {
         attachOutlawModel(enemy, getOutlaw(gameState.outlawIndex));
         setupBoss(enemy, bossStyle);
     }
+    // In the mine a monster waits at its post until the marshal comes within its sense radius (src/combatMath.js, senseStep).
+    if(mine.enabled && at) enemy.userData.sense = createSense(senseRadius(type), leashRadius(type), { x: ex, z: ez });
     prefetchEnemyModels();
     if(type === 'wolf') attachWolfModel(enemy);
     else attachEnemyModel(enemy);
@@ -738,7 +741,22 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         u.stateTimer -= dt;
         u.cooldown -= dt;
 
-        switch(u.behavior) {
+        // The mine's monsters sense the marshal by distance: asleep or waking they stand where they are (the wake-up is the tell), and one that
+        // lost him walks back to its post. Everything else (the Wanted Road, bosses) hunts from the start, as before.
+        let held = false;
+        if(u.sense) {
+            const home = u.sense.home;
+            const state = senseStep(u.sense, dist, Math.hypot(home.x - e.position.x, home.z - e.position.z), dt, !!u.alerted);
+            u.alerted = false;
+            if(state !== 'hunting') {
+                held = true;
+                moveDir = state === 'returning' ? new THREE.Vector3(home.x - e.position.x, 0, home.z - e.position.z).normalize() : null;
+                if(state === 'returning') faceDir = moveDir.clone();
+            }
+        }
+
+        switch(held ? 'held' : u.behavior) {
+        case 'held': break;
         case 'boss': {
             const result = updateBoss(e, u, { dt, dist, dir, playerPos, scene, callbacks, timeInSeconds });
             moveDir = result.moveDir;
