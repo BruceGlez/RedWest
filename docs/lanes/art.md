@@ -53,6 +53,10 @@ Budget: about 90 draw calls in town, under about 50 in a fight. Run `node tools/
 - `src/particleSystem.js`
 - `tests/characters-smoke.mjs`
 
+## Backlog: the dark mine (owner's brief, `MINE_PLAN.md`, "Slice 5")
+- The look of the dark: truly black outside a small dim radius, torch light and glow, a lantern in the marshal's hand, the lift and shaft glowing so they can be found in the dark (`src/mineScene.js`, the town lane's cellar placeholder scene once it exists). Keep a fight under about 50 draw calls (`node tools/perf.mjs`).
+- Models and prompts (prompts go in `MINE_PLAN.md`, "Art prompts"; `ASSETS.md` rows): lantern, wall torch, the light eater (a small bug that puts torches out), the hidden door in the cellar.
+
 Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `node tools/lanes.mjs diff` before opening a PR.
 
 ## Before you open a PR

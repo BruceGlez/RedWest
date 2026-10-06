@@ -22,6 +22,12 @@ The mine never gives stars and never sells speed-ups. Rules live in `mine.js` wi
 - `tests/mine*`
 - `tests/undertakerLayout.test.js`
 
+## Backlog: the dark mine (owner's brief, `MINE_PLAN.md`, "Slice 5")
+- Light rules first, as a pure module with tests: the lantern, the torches you carry and place, the dim ring (always visible: your feet, the lift and the shaft), what a placed torch lights.
+- The light eater (rules, floors from about 8 on, goes for your lit torches), after torches and the combat lane's sense radius exist.
+- The lift and shaft stay visible in the dark (glow, beam, the HUD arrow that is already there); a player with no light can always walk back to the lift.
+- Ask the owner about the "Still open" list in `MINE_PLAN.md` before building on lantern oil, torch count, price, burn time or relighting.
+
 Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `node tools/lanes.mjs diff` before opening a PR.
 
 ## Before you open a PR

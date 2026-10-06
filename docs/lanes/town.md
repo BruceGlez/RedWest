@@ -38,6 +38,11 @@ Places change income and goods, never combat. A tended place never earns more th
 - `tests/arena.test.js`
 - `tests/steps.test.js`
 
+## Backlog: the cellar and the hidden door (owner's brief, `MINE_PLAN.md`, "Slice 5")
+- The cellar becomes a place you walk into (pair per `AGENTS.md`: layout, rules, card, registry line, and a box placeholder scene marked "cross-lane on purpose: placeholder scene"). It holds a hidden door you have to find; the door opens only once **Deacon Graves** has a star (decided). Until then the stairs lead only to the cellar.
+- The shop for the lantern and torches (Bounty Dollars only; a test that light is never priced in nuggets), once the mine lane's light data exists.
+- `src/places/undertaker.js` today sends the stairs straight into the mine; existing saves (deepest floor, checkpoints, ore) must keep working.
+
 Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `node tools/lanes.mjs diff` before opening a PR.
 
 ## Before you open a PR

@@ -31,6 +31,7 @@ walking back to it brings you up with whatever you got. Deeper is stranger, hard
 | **1e** | Floor variety: twin caverns, long galleries and rockfalls you walk round, deterministic per depth | small | **built 2026-10-05** ("The maps", below) |
 | **1f** | Six more monsters for floors 15 to 20, built only from behaviours and looks the game already has (`look` field, see "Deeper monsters") | small | **built 2026-10-05**; own models wait for the art lane |
 | **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | **2a built 2026-10-06** (the data contract, below); **2b built 2026-10-06** (the mine side: stairs, ore, saving; "Slice 2b" below); the server endpoint is still to do |
+| **5** | The dark mine (owner's brief, 2026-10-06): a cellar and a hidden door that Deacon Graves's defeat unlocks, a mine with no light of its own, a lantern and torches you buy and place, monsters that sense you by distance, light eaters from the deep floors, and a lift and shaft you can see | large; five parts, below | **planned**, assigned by lane ("Slice 5") |
 | **3** | Boss floors (every 5th), more of Mr. Grimsby's talk and rumours, a pet that follows you down | medium | planned |
 | **4** | The art pass for the maps and the monsters: modelled rock, timber, carts, a real lift and shaft, painted textures (`POLISH_PLAN.md`, section 6) | large | parked, like the other art passes. The maps are made of boxes so this can replace them one builder at a time. |
 
@@ -203,6 +204,75 @@ the stairs card in `src/places/undertaker.js` (town lane's file, a small edit on
 **Still to do: the server.** `POST /api/mine/run` in `server/app.js` (scale lane) does not exist yet, so a signed-in account on the server gets "could
 not be saved this time" on the result screen, and a local (offline) wallet saves fine. The endpoint is `applyMineRun` on the user's `profile.mine`,
 authenticated like `/api/run`, returning `{ result, profile }`.
+
+## Slice 5: the dark mine (owner's brief, 2026-10-06)
+
+Written down as the owner gave it, then split by lane. Decisions he made when asked are marked **decided**; anything else is an assumption and is
+listed under "Still open" so an agent asks before building on it.
+
+### The brief
+
+1. **A cellar before the mine, and a hidden door.** Today the cellar stairs go straight down. Instead the cellar is a small place of its own
+   (like the parlour): you walk into it and have to *find* a hidden door, and the door only opens after **Deacon Graves** (Wanted Road stage 3)
+   is beaten (**decided**). Until then the stairs lead only to the cellar.
+2. **The mine is completely dark.** You bring a **lantern** or **torches** (**decided**: they are not free, everything is bought somewhere).
+   **Decided look:** a dim radius around the marshal, and everything outside it truly black until torches are on the wall.
+3. **Torches are placed along the corridors** to mark where you have been, and they light the place they are in.
+4. **Monsters sense you by distance, Fate style.** They do not all come at once: each has a sense radius, stays asleep or idle outside it, and
+   comes for you once you are inside it.
+5. **Light eaters** (new monster): small bugs that put out the torches you placed. They only appear on the deeper floors.
+6. **The lift and the shaft are always visible**, so you can always see where to ride up or go down (in the dark too).
+
+### The rules this has to keep
+
+- **Light is bought with earned Bounty Dollars only** (never Gold Nuggets, never real money, no timers, no loot box): the same rule as guns
+  (`MONETIZATION.md`, "No pay-to-win", and the unit test that fails if a gun is priced in nuggets gets the same test for light). Prices
+  are small. Whether the shop is Mr. Grimsby's or the general store is open (below). Light does not change combat numbers; it changes what you can see.
+- **Nobody gets stuck.** Without light you can still see your own feet and the lift and shaft glow (a small ring, **decided**), so a player
+  who arrives with nothing can walk back to the lift. The mine is never a softlock.
+- **Stars and money still come only from the Wanted Road** (slice 2's rule): the mine gives score, ore and cosmetics.
+- Original art only; every new asset gets a row in `ASSETS.md` (lantern, torch, light eater).
+
+### What Fate does (the investigation)
+
+Sources: [Wikipedia, *Fate (video game)*](https://en.wikipedia.org/wiki/Fate_(video_game)), [the GameFAQs review](https://gamefaqs.gamespot.com/pc/927041-fate/reviews/125003) and [the Codex Gamicus entry](https://gamicus.fandom.com/wiki/FATE). *Fate* is the 2005 WildTangent game.
+
+- **Levels come from a generator, one at a time, not all at once.** The dungeon has no fixed number of levels (the cap is a 32-bit integer, in
+  practice endless). Each level's layout is randomised, and so are its treasure and the number and kind of monsters. Layout style varies from
+  level to level: a twisty maze, a wide open hall, rooms joined by halls, or a mine-like cave. So it is made when you get to it.
+- **Quests also come from a generator.** The main quest picks an ordinary monster, enlarges it and strengthens it, gives it a posse of boss-tier
+  allies, puts it on a random floor between about 40 and 50, and sends you to kill it. Side quests from the townspeople are small random
+  jobs: find an item, kill one creature, kill a number of creatures, or a mix.
+- I did **not** find a source for Fate's monster sense radius or whether a level is saved once made; the agents should treat "sense radius" as
+  our own design (below), and keep to the idea, not the numbers.
+
+What we already do and what it means:
+- Our mine already works the same way: **a generator per floor, made from the depth** (`src/mineMap.js`, `src/mine.js`), deterministic, so
+  the same depth is the same cave, and floors are made when you arrive, never all at once. That matches Fate and needs no change.
+- Fate's **quest generator** is the thing we do not have. A good small first step for the mine is a generated "job" at the cellar door
+  (find N ore, reach floor N, put out no torch...), built from the same kind of templates: an item, a creature, a number, or a mix. Not in the
+  five parts above; proposed as slice 6 and left for the owner to approve.
+
+### Lane by lane
+
+| Part | Lane that builds it | What | Needs first |
+|---|---|---|---|
+| Cellar place and hidden door | **town** (`src/places/undertaker.js`, cellar layout and scene as a placeholder pair, per `AGENTS.md`) | A cellar you walk into, with a hidden door you must find (a searchable spot), locked until Deacon Graves has a star; the card and prompt words; walk map tests (door reachable once found) | owner's boss choice (done) |
+| The dark, the lantern, the torches | **mine** (`src/mine.js`, `src/modes/mine.js`) for the rules (carry, place, light radius, the dim ring, shop items, saved count), **art** for how it looks (`src/mineScene.js`: lighting, glow, fog, the black) | Light rules first (a pure module with tests); the look follows on the same data | the data contract goes first (`AGENTS.md`, rule 5) |
+| Buying light | **town** (shop card) with **money** only if the wallet changes | A small shop for lantern and torches, priced in Bounty Dollars; a test that light is never priced in nuggets | the light rules |
+| Monsters sense you by distance | **combat** (`src/enemySystem.js`, `src/mineMonsters.js` is the mine's) | A sense radius per monster (some wider, some narrower), idle or asleep outside it, a short wake-up, and a "lost you" distance (a leash) so they go back; the existing chamber sleep (45 and 100 units) becomes this per monster | none |
+| Light eaters | **mine** (the monster's rules and floors) with **combat** (its behaviour) and **art** (its model: add a prompt to "Art prompts" above) | Only from a floor decided with the owner; they go to the nearest lit torch of yours and put it out; killing one is easy and is the answer; torches can be relit (cost decided below) | torches and the sense radius |
+| Visible lift and shaft | **mine** (HUD, beams) with **art** | The lift and the shaft stay visible in the dark (a glow and a beam, and the HUD arrow already there), with a "you can see the lift from here" rule so a dark floor is never a lost player | the dark |
+
+### Still open (ask the owner before building on these)
+
+1. **Lantern oil:** does the lantern run out and need refilling (a reason to buy more), or does it last and only torches are used up?
+2. **Torch count and price,** how many you can carry, and whether a lit torch burns out or is permanent once placed.
+3. **Where light is sold:** Mr. Grimsby, the general store, or both.
+4. **Which floor the light eaters begin on** (the plan below assumes about floor 8, where monsters already get tougher).
+5. **Relighting:** a torch a light eater put out can be relit for free by walking up to it, or costs a match.
+6. **Does the hidden door open the existing mine, or a second, darker mine?** Assumed: it is the existing mine, so existing saves (deepest floor, checkpoints, ore) carry over, and the stairs-only route to the cellar replaces today's direct stairs.
+7. **Quest generator** (slice 6): approve or drop.
 
 ## Open questions
 
