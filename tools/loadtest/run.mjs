@@ -52,12 +52,22 @@ if(storeKind !== 'json' && storeKind !== 'postgres') { console.error('--store mu
 if(storeKind === 'postgres' && !databaseUrl) { console.error('--store postgres needs --database-url (a database that holds no real players).'); process.exit(2); }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const { createProfile } = await import(join(root, 'src', 'profile.js'));
+const { createProfile, weekKey } = await import(join(root, 'src', 'profile.js'));
 const dir = mkdtempSync(join(tmpdir(), 'rw-loadtest-'));
 let child = null, pgStore = null;
 
 const freePort = () => new Promise(resolve => { const s = createServer(); s.listen(0, '127.0.0.1', () => { const { port } = s.address(); s.close(() => resolve(port)); }); });
-const makeUser = i => ({ tokenHash: sha256(tokenOf(i)), profile: createProfile(new Date()), lastRunAt: 0, createdAt: new Date().toISOString(), pad: padKb > 0 ? 'x'.repeat(padKb * 1024) : undefined });
+// A seeded player has a name and a score on the weekly board and the first stage, like a player who has played, so the leaderboard has real work to do.
+function makeUser(i) {
+    const now = new Date();
+    const profile = createProfile(now);
+    profile.name = `RIDER ${i}`;
+    const score = 100 + ((i * 7919) % 9000);
+    profile.stats.weekly = { week: weekKey(now), score, character: 'char-marshal' };
+    profile.stats.stageBest[0] = score;
+    profile.stats.stageStars[0] = 1 + (i % 7);
+    return { tokenHash: sha256(tokenOf(i)), profile, lastRunAt: 0, createdAt: now.toISOString(), pad: padKb > 0 ? 'x'.repeat(padKb * 1024) : undefined };
+}
 
 async function cleanup() {
     child?.kill('SIGTERM');
