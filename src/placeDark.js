@@ -12,7 +12,7 @@ export const MIN_RADIUS = 6; // the faint ring: you can always see your own feet
 export const LANTERN_RADIUS = 15; // stand-in for "lantern lit" until the mine lane's light module says so
 export const DARK_RENDER_ORDER = 5; // the dark layer; the lift and shaft glow are drawn above it
 export const GLOW_RENDER_ORDER = 20;
-const MAX_HOLES = 12;
+const MAX_HOLES = 16; // the lift and the shaft, then up to 12 of the mine lane's torches (src/mineLight.js MAX_HOLES)
 
 let lightSource = () => ({ radius: LANTERN_RADIUS, holes: [] });
 // Hook for the mine lane: `fn()` returns { radius, holes? }, where radius is the marshal's own light (world units) and holes are extra
