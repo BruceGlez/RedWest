@@ -29,6 +29,7 @@ show what licence applied if anyone asks.
 | Other code-built art (props, box characters, the Drifter) | `src/` | Written in code | Owned | | |
 | Story panels (opening and ending pictures) | `public/story/`, originals in `art/story/` | OpenAI Images API (`tools/story-picture.mjs`, prompts in `tools/story-prompts.mjs`) | The OpenAI account's terms allow commercial use of generated images; original prompts, no other games' characters or real people | 2026-09-30 | No text in the pictures; the words are on the panels in the game. Regenerate one with `node tools/story-picture.mjs <name>`. |
 | The dark of the mine (full-screen shader layer), lift beam and ring | `src/placeDark.js`, `src/mineScene.js` | Made in code: one screen-space shader layer plus a cylinder and a ring of additive light, no models, textures or downloads | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. A later art pass may replace it. |
+| Rattler (3D enemy) | `public/models/rattler.glb` | Built from code in Blender (`tools/blender/rattler_rig.py`), modelled on `art/characters/rattler.jpg` | Owned (original, no outside model or service) | 2026-10-05 | Single skinned mesh, ~3,300 triangles, 236 KB. Rig `root` + `seg01`..`seg12`. Clips: idle, run, dead. Not wired into `enemySystem.js` yet (box rattler still used). |
 
 ## Animals
 
