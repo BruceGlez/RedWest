@@ -351,6 +351,19 @@ word when none are left or one is too close); the HUD shows `TORCHES n` and `OIL
 **Until the light shops are open, `LIGHT_NEEDS_SHOP` in `src/mineLight.js` is `false` and every run starts with a free full kit** (a lantern, full oil, 10 torches and 20 matches),
 otherwise nobody could buy a lantern and the mine would be black for everyone. When the shops are in, set it to `true`: a run then starts with what he owns.
 
+**Built 2026-10-06 (slice 5, part (d): the light eater).** `lighteater` in `MINE_MONSTERS` (`special`: not on the ladder, so the one-new-monster-a-floor rule is untouched): a pale bug
+that lives on light, hp 1 (one shot), `harmless` (it never touches the marshal), wearing the crawler's look until the art lane makes its own (prompt below). From floor 8 a
+chamber may hold one (`eaterChance`: 31% on floor 8 rising to the cap of 70%; at most one to a chamber, never the landing; its dice are drawn after the chamber's other
+monsters, so those do not change). New behaviour `eater` in `src/enemySystem.js` (combat lane's file, cross-lane on purpose, owner approved): it sleeps by the usual sense
+rules (radius 30), then walks to the nearest lit torch of the marshal's within `eaterReach` of itself and gnaws it for `eatSeconds`, which puts it out (`putOutTorch`); with nothing to
+eat it hovers near the marshal. It gets more annoying with depth and every number is capped, so a floor is never impossible: speed 6.5 rising to 11, reach 24 rising to 60,
+gnaw time 3.0 s falling to 1.0 s. A put-out torch shows as a smoking stub (the art lane) and **T beside it relights it with a match** (one match, bought in the shop; never free).
+Nothing else is hurt by it, and the cheapest answer is to shoot it.
+
+*Art prompt, the light eater (`lighteater`):* "Low-poly stylised cave bug about 1 unit long, a pale grub-like body with six short legs and two wide round eyes, a soft glow inside
+its belly as if it has swallowed a lamp, small blunt jaws. Cream and pale grey with a faint warm yellow glow in the belly. Cartoon proportions, chunky shapes, friendly rather
+than scary, readable from the high camera in the dark." Add a row to `ASSETS.md` when it exists.
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want
