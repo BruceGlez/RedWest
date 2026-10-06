@@ -267,6 +267,11 @@ What we already do and what it means:
 | Light eaters | **mine** (the monster's rules and floors) with **combat** (its behaviour) and **art** (its model: add a prompt to "Art prompts" above) | Only from a floor decided with the owner; they go to the nearest lit torch of yours and put it out; killing one is easy and is the answer; torches can be relit (cost decided below) | torches and the sense radius |
 | Visible lift and shaft | **mine** (HUD, beams) with **art** | The lift and the shaft stay visible in the dark (a glow and a beam, and the HUD arrow already there), with a "you can see the lift from here" rule so a dark floor is never a lost player | the dark |
 
+### Art status (art lane, code art only for now)
+
+3. **Light eater model: built** (`createLightEaterMesh` in `src/assets.js`): a small dark bug with pale mandibles, four running legs and a dim amber abdomen (`userData.ember`, an unlit child the rules may dim or brighten). Waiting on the **mine** lane (its rules and floors) and **combat** (its behaviour): they add the monster with `look: 'lighteater'` and the mesh in `MINE_MESHES` (`src/enemySystem.js`).
+4. **Hidden door: built** as a part (`src/placeHiddenDoor.js`, `createHiddenDoor()`): `group.position`/`rotation.y` from the cellar layout, `update(t, distanceFromMarshal)` each frame (a faint seam of light, dust at the foot and a draught when near, nothing from far away), `setOpen(true)` swings it on a lit passage. Waiting on the **town** lane: the cellar layout and placeholder scene (`src/placeCellar.js`) that place it on a wall spot, say how wide the wall spot is (the door is 3.2 x 4.6 units; ask the art lane to change that), and call `setOpen` once Deacon Graves has a star.
+
 ### Decided by the owner (2026-10-06, answers to the "still open" list)
 
 1. **The lantern runs out of oil and needs refilling.** Everything costs in-game currency (earned Bounty Dollars, never Gold Nuggets): the lantern, oil, torches and anything else the dark needs. Prices are small and are tuned against what a Wanted Road run earns, because the mine itself pays no money (slice 2's rule), so the player must be able to afford a descent from road income.
@@ -293,6 +298,38 @@ Measured from `floorLayout(depth)` (`src/mineMap.js`; "main road" is the chain f
 | 20 | 15 | 2,596 | 87 | 58 |
 
 So floor 1 is already about 400 and it is 1,900 by floor 5: marking the way back would take 60 or more torches, which is too many to carry, buy or place. **Targets for the mine agent** (the numbers are a start, to tune by playing): a main road of about 250 on floor 1, about 500 by floor 5, about 800 on floor 10, then growing slowly to about 1,500 by floor 30 and staying there; chambers `3 + floor` for the first 10 floors, then slowly; a torch roughly every 40 units, so about 6 torches on floor 1, 12 on floor 5, 20 on floor 10 and not more than about 38 deep down. Carry limit around 10 to 12, bought in stacks of a few, plus oil to match. Floors stay deterministic per depth (the generator is unchanged); only the sizes change, and `tests/mine*.test.js` pin the new targets.
+
+**Built 2026-10-06 (slice 5, part 0: the floors are smaller).** `chamberCount` is now `3 + floor` for the first ten floors and one more chamber every five
+floors after (up to `MAX_CHAMBERS` 17); chambers are 22 to 30 units wide (growing from the tenth floor) and spaced so the road (`roadLength`, the rails from
+the lift to the shaft, one number the torches have to mark) is about 270 on floor 1, 550 on floor 5, 840 on floor 10, 990 on floor 15, 1,180 on floor 20 and
+1,500 on floor 30 (`tests/mineMap.test.js` pins each target within 15% and says no floor jumps by more than 40%). A torch every 40 units is then 7 on floor 1,
+14 on floor 5, 21 on floor 10 and 38 at the deepest. **Note on the table above:** it measured a longer "main road" than the rails (404 on floor 1); the
+straight distance lift to shaft quoted in "The descent" (237 on floor 1) matches `roadLength`, so the targets are applied to `roadLength`. Two generator fixes
+came with it, because new floors meant new dice: props are kept off the way into every alcove and treasure room, and a repair pass (`openBlockedWays`)
+walks the cave after the props go in and takes away any column, crate or cart that shuts a way to the shaft, a chamber, a chest or an extra cavern; tunnel
+mouths are only put where the marshal can walk. The wall ring also stands 1.2 units inside the open ground (`WALL_INSET`), so a thin spit of rock between two
+caves cannot slip between its circles. Rockfalls are a little smaller (3.6 to 5.4) so they still fit the smaller chambers. Smaller chambers hold fewer
+monsters (a chamber's danger grows with its area), so the early floors are quieter: tune `nodeBudget` if a playtest says so.
+
+**Built 2026-10-06 (slice 5, part (a): the light rules).** `src/mineLight.js` (pure, with `tests/mineLight.test.js`) and a `light` field in `profile.mine`:
+`{ lantern, oil, torches, matches }` (what he owns, kept inside its limits by `normalizeLightKit`). What it says:
+- **Numbers:** `DIM_RING` 6 (always: your own feet), `LANTERN_RADIUS` 15 (lit, while it has oil), `TORCH_RADIUS` 12, a torch every `TORCH_SPACING` 40 units of the
+  road (`torchesFor(roadLength)`: 7 on floor 1), `MIN_TORCH_GAP` 14, carry limit `CARRY_LIMIT` 10 torches and `MATCH_LIMIT` 20 matches, `OIL_CAPACITY` 900 seconds of burn.
+- **What is sold** (`LIGHT_ITEMS`, in Bounty Dollars only; `buyLight(profile, id, shop)` spends `balances.dollars` and nothing else, and refuses without changing
+  anything): the lantern (once, comes full), lamp oil (fills it), torches x5, matches x5 (a relight costs one match). Mr. Grimsby's and the general store
+  charge the same except `SHOP_MARKUP` (the store 10% more, rounded up). The test fails if any price is in nuggets or any real-money product sells light.
+- **Running out:** with no lantern or no oil the radius falls to the dim ring, never to nothing, so nobody is ever stuck (and the lift and shaft stay visible: part (c)).
+- **A run:** `createLightRun(kit)`, `burnLantern`, `placeTorch` (not within `MIN_TORCH_GAP` of another on the same floor), `putOutTorch` (a light eater, part (d)),
+  `relightTorch` (one match), `burnTorches` (only from `TORCHES_BURN_OUT_FROM`, default `Infinity`: permanent), `isLit`, and `lightSource(run, floor, at)` which returns
+  `{ radius, holes: [{ x, z, r, k }] }` (at most 12 torches, nearest first): exactly what `setMineLightSource` in the art lane's `src/placeDark.js` reads.
+- **Saving:** the run's summary carries `used: { oil, torches, matches }` and `applyMineRun` takes that from the kit (never below nothing, whatever happened to the
+  marshal). Placed torches stay on their floor and are not returned. The server cannot see the run, so a client could under-report what it used: that gives free light,
+  not money or power, and a server-issued run token (already proposed for the depth) would close it.
+- **Owner to confirm (OPEN):** the prices (lantern 60, oil 15, torches x5 20, matches x5 5; a first kit 85 and a refill 35 against what a short Wanted Road run earns),
+  the oil in a refill (a full lantern is 15 minutes of burn), and what torches do from floor 15 (`TORCHES_BURN_OUT_FROM`; options: stay permanent, burn out after
+  `TORCH_BURN_SECONDS` 10 minutes, or need a match to relight each floor).
+- **Still to do for the light:** the wallet and server calls to buy (`POST /api/mine/buy`, scale; `wallet.buyLight`, money), the shop cards (town), and the mine mode
+  using it (a button to place a torch, burning the lantern, calling `setMineLightSource`): after the dark layer (#56) and the shops exist.
 
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 

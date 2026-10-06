@@ -108,13 +108,13 @@ try {
         const cave = MM.activeFloor();
         const b = MM.bounds(cave, 0);
         return { depth: M.mine.floor, cave: cave.id, at: [p.x, p.z], open: MM.isOpen(cave, p.x, p.z, 8), obstacles: S.obstacles.length, mapSize: S.gameState.MAP_SIZE,
-            area: (b.maxX - b.minX) * (b.maxZ - b.minZ), reach: Math.max(-b.minX, b.maxX, -b.minZ, b.maxZ), shaft: Math.hypot(...cave.shaft), score: S.gameState.score };
+            area: (b.maxX - b.minX) * (b.maxZ - b.minZ), road: MM.roadLength(cave), reach: Math.max(-b.minX, b.maxX, -b.minZ, b.maxZ), shaft: Math.hypot(...cave.shaft), score: S.gameState.score };
     });
     // (The marshal is kept alive: monsters now wait in every chamber, and this test is about the cave, not the fight.)
     const put = (x, z) => page.evaluate(([x, z]) => { S.playerStats.hp = S.playerStats.maxHp; S.playerStats.invulnerabilityTimer = 60; window.__redWest.playerGroup.position.set(x, 0, z); }, [x, z]);
     const toShaft = () => page.evaluate(() => { const c = MM.activeFloor(); S.playerStats.hp = S.playerStats.maxHp; S.playerStats.invulnerabilityTimer = 60; window.__redWest.playerGroup.position.set(c.shaft[0], 0, c.shaft[1]); });
 
-    let lastArea = 0;
+    let lastRoad = 0;
     for(let depth = 1; depth <= 4; depth++) {
         await page.waitForFunction(d => M.mine.floor === d, depth, { timeout: 60000 });
         const state = await here();
@@ -124,8 +124,8 @@ try {
         assert.ok(state.obstacles > 300, `depth ${depth}: the walls are solid (${state.obstacles} obstacles)`);
         assert.equal(state.mapSize, Math.ceil(state.reach) + 40, `depth ${depth}: the marshal may walk the whole cave`);
         assert.ok(state.shaft >= 180, `depth ${depth}: the shaft is a real walk away (${Math.round(state.shaft)} units)`);
-        assert.ok(state.area > lastArea * 1.3, `depth ${depth}: the map is a lot larger than the one above`);
-        lastArea = state.area;
+        assert.ok(state.road > lastRoad * 1.1, `depth ${depth}: the road to the shaft is longer than the one above (${Math.round(state.road)}; the first floors are small: MINE_PLAN.md, level size)`);
+        lastRoad = state.road;
         if(depth > 1) assert.match(await page.locator('#wave-banner').textContent(), new RegExp(`DEPTH ${depth}`));
         if(depth === 2) assert.match(await page.locator('#wave-banner').textContent(), /NEW: CAVE BAT/, 'the new monster is announced');
         await page.waitForTimeout(2200);

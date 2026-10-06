@@ -11,6 +11,7 @@
 export const CELL = 2.5;           // the grid the wall circles stand on
 export const WALL_DEPTH = 4.5;     // how deep into the rock the wall circles go (the marshal and bullets stop at the first ring)
 export const WALL_RADIUS = 2.5;
+const WALL_INSET = 1.2;       // wall circles also stand just inside the open ground, so a thin spit of rock between two caves cannot slip between the circles
 export const SHAFT_REACH = 3.4;    // how close to the shaft counts as stepping into it
 export const LIFT_REACH = 4.4;     // the lift: it brings the marshal back up, once he has walked away from it
 export const LIFT_ARM_DISTANCE = 20; // ... which only works after he has been this far from it
@@ -18,7 +19,7 @@ export const CHEST_REACH = 3.2;    // how close opens a chest
 export const MIN_SPAWN_DISTANCE = 34; // pursuers come out of the dark at least this far from the marshal ...
 export const MAX_SPAWN_DISTANCE = 66; // ... and no farther, so the cave is alive around him, not all over it
 export const AGGRO_DISTANCE = 64;  // anything farther than this from the marshal is asleep
-export const MAX_CHAMBERS = 15;
+export const MAX_CHAMBERS = 17;
 
 const shapeBox = s => s.kind === 'circle' ? [s.x - s.r, s.x + s.r, s.z - s.r, s.z + s.r]
     : [Math.min(s.x1, s.x2) - s.r, Math.max(s.x1, s.x2) + s.r, Math.min(s.z1, s.z2) - s.r, Math.max(s.z1, s.z2) + s.r];
@@ -102,18 +103,32 @@ function segmentDistance(x, z, ax, az, bx, bz) {
     return Math.hypot(x - (ax + vx * t), z - (az + vz * t));
 }
 
-// How many chambers a depth has: the maps grow a lot with every floor.
+// How many chambers a depth has. The mine is dark and the way back is marked with torches you carry (MINE_PLAN.md, "Level size and torches"),
+// so the first ten floors are small (3 + the floor), and after that a floor grows by a chamber every five.
 export function chamberCount(floor) {
-    return Math.min(MAX_CHAMBERS, 2 + 2 * Math.max(1, Math.floor(floor)));
+    const depth = Math.max(1, Math.floor(floor));
+    return Math.min(MAX_CHAMBERS, depth <= 10 ? 3 + depth : 13 + Math.floor((depth - 10) / 5));
 }
 
+// How far it is to walk from the lift to the shaft along the road of chambers (the rails): the length the torches have to mark.
+export function roadLength(layout) {
+    let length = 0;
+    for(let i = 1; i < layout.rails.length; i++) length += Math.hypot(layout.rails[i][0] - layout.rails[i - 1][0], layout.rails[i][1] - layout.rails[i - 1][1]);
+    return length;
+}
+
+// A chamber's size and the gap between two chambers: the knobs for how long the road is. Few chambers on the first floors are spaced
+// wide, the chambers of the first ten floors are of one size, and from the tenth floor the chambers grow and the caves lengthen slowly.
+const BASE_RADIUS = 22;
+const growth = depth => Math.max(0, Math.min(depth, 30) - 10) * 0.7;
+const hopGap = depth => Math.max(12, 26 - 1.4 * Math.min(depth, 10));
 function generate(floor) {
     const depth = Math.max(1, Math.floor(floor));
     const rand = seededRandom(hashOf(`hollow-claim-${depth}`));
     const nodes = [{ x: 0, z: 0, r: 30, kind: 'chamber', parent: -1 }];
     const tunnels = []; // { a, b, r, angle, rim0, rim1 }: a tunnel between two nodes (rim0 and rim1: where it leaves the first and enters the second)
     const target = chamberCount(depth);
-    const grow = Math.min(depth, 10) * 1.2;
+    const grow = growth(depth);
     let heading = (rand() - 0.5) * 0.8;
 
     // The main road: chambers one after another, each turning a little from the last, never close to an earlier one.
@@ -122,8 +137,8 @@ function generate(floor) {
         let placed = false;
         for(let attempt = 0; attempt < 60 && !placed; attempt++) {
             const h = heading + (rand() - 0.5) * (attempt < 24 ? 1.3 : 2.8);
-            const r = 24 + rand() * 8 + grow;
-            const dist = prev.r + r + 12 + rand() * 10 + attempt * 0.7;
+            const r = BASE_RADIUS + rand() * 8 + grow;
+            const dist = prev.r + r + hopGap(depth) + rand() * 10 + attempt * 0.7;
             const x = prev.x + Math.cos(h) * dist, z = prev.z + Math.sin(h) * dist;
             let ok = true;
             for(let j = 0; j < i - 1 && ok; j++) {
@@ -220,6 +235,8 @@ function generate(floor) {
         if(Math.hypot(x, z) < r + 10 || Math.hypot(x - shaft[0], z - shaft[1]) < r + 9) return false;
         for(const p of props) if(Math.hypot(x - p.x, z - p.z) < r + p.r + gap) return false;
         if(railGap !== null) for(let i = 0; i < rails.length - 1; i++) if(segmentDistance(x, z, rails[i][0], rails[i][1], rails[i + 1][0], rails[i + 1][1]) < r + railGap) return false;
+        // The way into an alcove or a treasure room has no rails, but it must stay walkable too: nothing is put in its way.
+        for(let i = main; i < nodes.length; i++) if(segmentDistance(x, z, nodes[nodes[i].parent].x, nodes[nodes[i].parent].z, nodes[i].x, nodes[i].z) < r + 5.5) return false;
         return true;
     };
     const place = (list, node, frac0, frac1, r, count, tries = 14) => {
@@ -282,11 +299,11 @@ function generate(floor) {
     // rules; art may dress it as it likes). Kept well off the rails and the walls, so there is always a wide way past on both sides.
     const fallChance = Math.min(0.5, 0.12 + 0.04 * depth);
     for(let i = 1; i < main; i++) {
-        if(nodes[i].r < 24 || variety() > fallChance) continue;
+        if(nodes[i].r < 22 || variety() > fallChance) continue;
         for(let attempt = 0; attempt < 14; attempt++) {
-            const r = 4.6 + variety() * 2, a = variety() * Math.PI * 2, f = 0.2 + variety() * 0.4;
+            const r = 3.6 + variety() * 1.8, a = variety() * Math.PI * 2, f = 0.2 + variety() * 0.4;
             const x = nodes[i].x + Math.cos(a) * nodes[i].r * f, z = nodes[i].z + Math.sin(a) * nodes[i].r * f;
-            if(!clear(x, z, r) || !isOpen(layout, x, z, r + 7)) continue;
+            if(!clear(x, z, r, 4.5) || !isOpen(layout, x, z, r + 5.5)) continue;
             props.push({ x, z, r });
             layout.pillars.push([x, z, r]);
             layout.rockfalls.push([x, z, r]);
@@ -294,6 +311,9 @@ function generate(floor) {
         }
     }
     layout.clusters = layout.clusters.map(([x, z]) => [x, z]); // (a cluster has no radius of its own to the rules)
+
+    // Props are put where the dice say, and now and then a few of them close a narrow way. Everything the marshal has to reach must be reachable.
+    const reached = openBlockedWays(layout);
 
     // ----- the road: how a pursuer finds the marshal through a winding cave, as the next chamber to head for -----
     const count = nodes.length;
@@ -330,9 +350,103 @@ function generate(floor) {
     for(const [x, z] of gridPoints(layout, 10, 0)) {
         if(!isOpen(layout, x, z, 7) || !free(x, z, 4.5)) continue;
         if(Math.hypot(x, z) < 16 || Math.hypot(x - shaft[0], z - shaft[1]) < 12) continue;
+        if(!reached(x, z)) continue; // a pocket shut in by props is no place for anyone to come from
         layout.spawns.push([x, z, nearestNode(layout, x, z)]);
     }
     return layout;
+}
+
+// ---------- keeping every way open ----------
+
+const FLOOD_STEP = 3, FLOOD_RADIUS = 1.5; // the grid and the radius the marshal is checked with (src/playerSystem.js)
+function solidsHash(layout) {
+    const hash = new Map();
+    for(const c of [...wallCircles(layout), ...propCirclesOf(layout)]) {
+        const key = `${Math.floor(c.x / 12)},${Math.floor(c.z / 12)}`;
+        (hash.get(key) ?? hash.set(key, []).get(key)).push(c);
+    }
+    return (x, z, radius) => {
+        for(let gx = Math.floor((x - 8) / 12); gx <= Math.floor((x + 8) / 12); gx++) for(let gz = Math.floor((z - 8) / 12); gz <= Math.floor((z + 8) / 12); gz++) {
+            for(const c of hash.get(`${gx},${gz}`) ?? []) if(Math.hypot(x - c.x, z - c.z) < c.r + radius) return true;
+        }
+        return false;
+    };
+}
+// The ground the marshal can walk to from the lift, as a test of a point (within `within` of a walkable grid cell).
+function walkable(layout) {
+    const hits = solidsHash(layout);
+    const b = bounds(layout);
+    const w = Math.ceil((b.maxX - b.minX) / FLOOD_STEP) + 1, h = Math.ceil((b.maxZ - b.minZ) / FLOOD_STEP) + 1;
+    const seen = new Uint8Array(w * h);
+    const cellX = i => Math.round(b.minX / FLOOD_STEP) * FLOOD_STEP + i * FLOOD_STEP, cellZ = j => Math.round(b.minZ / FLOOD_STEP) * FLOOD_STEP + j * FLOOD_STEP;
+    const ox = Math.round(b.minX / FLOOD_STEP) * FLOOD_STEP, oz = Math.round(b.minZ / FLOOD_STEP) * FLOOD_STEP;
+    const start = [Math.round((0 - ox) / FLOOD_STEP), Math.round((0 - oz) / FLOOD_STEP)];
+    const stack = [start];
+    seen[start[1] * w + start[0]] = 1;
+    while(stack.length) {
+        const [i, j] = stack.pop();
+        for(const [di, dj] of [[1, 0], [-1, 0], [0, 1], [0, -1]]) {
+            const ni = i + di, nj = j + dj;
+            if(ni < 0 || nj < 0 || ni >= w || nj >= h || seen[nj * w + ni]) continue;
+            const x = cellX(ni), z = cellZ(nj);
+            if(!isOpen(layout, x, z) || hits(x, z, FLOOD_RADIUS)) continue;
+            seen[nj * w + ni] = 1;
+            stack.push([ni, nj]);
+        }
+    }
+    const near = (x, z, within) => {
+        const reach = Math.ceil(within / FLOOD_STEP);
+        const ci = Math.round((x - ox) / FLOOD_STEP), cj = Math.round((z - oz) / FLOOD_STEP);
+        let best = null, bestD = Infinity;
+        for(let i = ci - reach; i <= ci + reach; i++) for(let j = cj - reach; j <= cj + reach; j++) {
+            if(i < 0 || j < 0 || i >= w || j >= h || !seen[j * w + i]) continue;
+            const d = Math.hypot(cellX(i) - x, cellZ(j) - z);
+            if(d <= within && d < bestD) { bestD = d; best = [cellX(i), cellZ(j)]; }
+        }
+        return best;
+    };
+    return { near, seen, w, h, cellX, cellZ };
+}
+
+// The places the marshal must be able to reach, with how close a walkable cell has to be: the shaft, every chamber, alcove and treasure room, the
+// chests and every extra cavern and gallery.
+function mustReach(layout) {
+    const targets = [[layout.shaft[0], layout.shaft[1], 6]];
+    for(const n of layout.nodes) targets.push([n.x, n.z, 9]);
+    for(const [x, z] of layout.chests) targets.push([x, z, 7.5]);
+    layout.shapes.slice(layout.nodes.length + layout.tunnels.length).forEach(shape => {
+        const [a, b] = shape.kind === 'capsule' ? [[shape.x1, shape.z1], [shape.x2, shape.z2]] : [[shape.x, shape.z], [shape.x, shape.z]];
+        targets.push([a[0], a[1], 9], [b[0], b[1], 9], [(a[0] + b[0]) / 2, (a[1] + b[1]) / 2, 9]);
+    });
+    return targets;
+}
+
+// Dice-placed props sometimes close a narrow passage. Walk the cave; for anything that cannot be reached, take away the columns, crates and
+// carts standing between it and the nearest ground that can. Repeats until every way is open (a few times at most). Returns a test of "can the
+// marshal walk to (x, z)" for the cave as it now stands.
+function openBlockedWays(layout) {
+    for(let round = 0; round < 12; round++) {
+        const walk = walkable(layout);
+        const blocked = mustReach(layout).filter(([x, z, within]) => isOpen(layout, x, z) && !walk.near(x, z, within));
+        if(!blocked.length) return (x, z) => !!walk.near(x, z, FLOOD_STEP * 1.5);
+        for(const [tx, tz] of blocked) {
+            // the nearest walkable cell, however far
+            let best = null, bestD = Infinity;
+            for(let j = 0; j < walk.h; j++) for(let i = 0; i < walk.w; i++) {
+                if(!walk.seen[j * walk.w + i]) continue;
+                const d = Math.hypot(walk.cellX(i) - tx, walk.cellZ(j) - tz);
+                if(d < bestD) { bestD = d; best = [walk.cellX(i), walk.cellZ(j)]; }
+            }
+            if(!best) continue;
+            const between = (x, z, pad) => segmentDistance(x, z, tx, tz, best[0], best[1]) < pad;
+            layout.pillars = layout.pillars.filter(([x, z, r]) => !between(x, z, r + 6));
+            layout.rockfalls = layout.rockfalls.filter(([x, z]) => layout.pillars.some(p => p[0] === x && p[1] === z));
+            layout.clusters = layout.clusters.filter(([x, z]) => !between(x, z, 2.6 + 6));
+            layout.carts = layout.carts.filter(([x, z]) => !between(x, z, 1.9 + 6));
+        }
+    }
+    const walk = walkable(layout);
+    return (x, z) => !!walk.near(x, z, FLOOD_STEP * 1.5);
 }
 
 // ---------- looking things up ----------
@@ -359,7 +473,7 @@ function wallCirclesOf(layout) {
     const circles = [];
     for(const [x, z] of gridPoints(layout, CELL, WALL_DEPTH + 1)) {
         const d = distance(layout, x, z);
-        if(d >= 0 && d < WALL_DEPTH) circles.push({ x, z, r: WALL_RADIUS, kind: 'wall' });
+        if(d >= -WALL_INSET && d < WALL_DEPTH) circles.push({ x, z, r: WALL_RADIUS, kind: 'wall' });
     }
     return circles;
 }
