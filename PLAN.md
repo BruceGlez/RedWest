@@ -56,8 +56,7 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 - **Story** (`STORY_BIBLE.md`): story cards, the Case File, town barks and opening/ending panels are built. Open: chapter-two hook, story props in town, and the Drifter legend (decided, not built).
 
 ### 4. Later
-- Art coherence: one-page style guide, then modelled town buildings and restyled characters (parked by the owner). Rig the snake
-  and horse in Blender.
+- Art coherence: one-page style guide, then modelled town buildings and restyled characters (parked by the owner). The snake is modelled and rigged (`public/models/rattler.glb`, not yet loaded by `enemySystem.js`); the horse is still to do.
 - Growth: vertical videos recorded on a phone; Android via the same RevenueCat setup; Game Center and controller support.
 - Tech health: KTX2 and meshopt compression if downloads matter.
 

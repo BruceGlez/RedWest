@@ -71,7 +71,9 @@ humanoids only; animals must stay in place on their own).
 - **Wolf: done (2026-09-29).** `public/models/wolf.glb` (584 KB, clips idle, run, dead). `enemySystem.js` swaps
   it in for the box wolf (`attachWolfModel`) and `main.js` preloads it; without the file the box wolf is used.
   `createCharacterInstance` already handles a model with no gun: `combat()` just plays idle or run.
-- **Snake and horse with rider: not done.** They still use `createRattlerMesh` and `createRiderMesh`. Each
+- **Snake: model and rig done (2026-10-05).** `public/models/rattler.glb` (236 KB, clips idle, run, dead), built by
+  `rattler_rig.py` with no Meshy step. Not yet loaded by `enemySystem.js`; the box snake is still used.
+- **Horse with rider: not done.** They still use `createRattlerMesh` and `createRiderMesh`. It
   needs its own rig and clips, and the same few lines in `enemySystem.js` to load it.
 - The wolf's `dead` clip is not played yet: killed enemies are removed at once, as before.
 - The wolf's picture on the NEW ENEMY card and in the Bounty Book is rendered from the model once it has
