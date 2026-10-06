@@ -5,6 +5,7 @@
 // src/townPanel.js starts the run.
 import { floorName } from './mineMap.js';
 import { maxOreOnFloor, startFloors } from './mineProgress.js';
+import { createLightRun, kitForRun, usedKit, lanternLit } from './mineLight.js';
 
 export const MINE_ATMOSPHERE_ID = 'mine'; // the look of the mine (src/atmosphere.js), not one of the outlaws' stages
 
@@ -13,6 +14,7 @@ export const mine = {
     floor: 1,       // the depth being fought
     startFloor: 1,  // the floor the run began on (floor 1, or a checkpoint of his: src/mineProgress.js)
     ore: 0,         // the ore carried in this run: kept if he rides the lift up, lost if he falls
+    light: null,    // the lantern, oil, torches and matches of this run (src/mineLight.js, createLightRun)
     shaftDx: 0,     // where the shaft down and the lift up are from the marshal (src/gameLoop.js keeps these up to date), for the HUD
     shaftDz: 0,
     liftDx: 0,
@@ -27,6 +29,7 @@ function reset() {
     mine.floor = 1;
     mine.startFloor = 1;
     mine.ore = 0;
+    mine.light = null;
     mine.shaftDx = mine.shaftDz = mine.liftDx = mine.liftDz = 0;
     mine.liftArmed = false;
     mine.opened = [];
@@ -41,6 +44,7 @@ export function beginMineRun(floor = 1, record = null) {
     reset();
     const start = startFloors(record ?? { checkpoint: 0 }).includes(Math.floor(floor)) ? Math.floor(floor) : 1;
     mine.floor = mine.startFloor = start;
+    mine.light = createLightRun(kitForRun(record?.light)); // what he owns (or the free kit until the shops are open)
 }
 
 export function endMineRun() {
@@ -125,7 +129,8 @@ export function resultText(result, floor, ore = 0) {
 
 // What the run reports when it ends (src/mineProgress.js, applyMineRun): where it began, how deep, the ore carried, and how it ended.
 export function runSummary(result, seconds) {
-    return { startFloor: mine.startFloor, depth: mine.floor, ore: mine.ore, outcome: result === 'mine-win' ? 'up' : 'fell', seconds: Math.max(0, Math.round(seconds)) };
+    return { startFloor: mine.startFloor, depth: mine.floor, ore: mine.ore, outcome: result === 'mine-win' ? 'up' : 'fell', seconds: Math.max(0, Math.round(seconds)),
+        used: mine.light ? usedKit(mine.light) : { oil: 0, torches: 0, matches: 0 } };
 }
 
 // The line under the result once the run is saved (`outcome` is what applyMineRun returned).
@@ -140,4 +145,13 @@ export const PRACTICE_NOTE = 'The Hollow Claim gives no stars and no money. Savi
 export const SAVE_FAILED_NOTE = 'The Hollow Claim gives no stars and no money. Your deepest floor could not be saved this time.';
 
 // The HUD line for the lift, with the ore carried.
-export const statusText = (dx, dz, ore) => ore ? `${liftHint(dx, dz)}  ORE ${ore}` : liftHint(dx, dz);
+// and the light he has left: torches, and the oil as minutes.
+export const statusText = (dx, dz, ore, light = null) => {
+    const bits = [liftHint(dx, dz)];
+    if(ore) bits.push(`ORE ${ore}`);
+    if(light) {
+        bits.push(`TORCHES ${light.torches}`);
+        if(light.lantern) bits.push(lanternLit(light) ? `OIL ${Math.ceil(light.oil / 60)}m` : 'LANTERN OUT');
+    }
+    return bits.join('  ');
+};

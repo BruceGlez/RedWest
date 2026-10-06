@@ -154,6 +154,18 @@ try {
                 await page.waitForFunction(() => S.enemies.some(e => e.userData.sense?.state === 'hunting'), null, { timeout: 8000 });
                 await put(0, 0);
             }
+            // Light: T puts a torch down where the marshal stands (a second one on the same spot is refused), the HUD counts them, and the dark layer's
+            // radius is the lantern's while it has oil.
+            const kit = await page.evaluate(() => ({ torches: M.mine.light.torches, placed: M.mine.light.placed.length }));
+            await page.keyboard.press('KeyT');
+            await page.waitForFunction(n => M.mine.light.placed.length === n + 1, kit.placed);
+            assert.equal(await page.evaluate(() => M.mine.light.torches), kit.torches - 1);
+            await page.keyboard.press('KeyT');
+            await page.waitForTimeout(300);
+            assert.equal(await page.evaluate(() => M.mine.light.placed.length), kit.placed + 1, 'not a second torch on the same spot');
+            assert.match(await page.locator('#status-msg').textContent(), new RegExp(`TORCHES ${kit.torches - 1}`));
+            assert.ok(await page.locator('#mine-torch-btn').isVisible(), 'a TORCH button for a touch screen');
+            await put(0, 0);
             // The four monsters that live only down here spawn, wear their own look, and run their behaviours without a fault.
             const monsters = await page.evaluate(async () => {
                 const { spawnEnemy } = await import('/src/enemySystem.js');

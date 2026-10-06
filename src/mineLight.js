@@ -38,6 +38,11 @@ const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key)
 export const isLightItem = id => has(LIGHT_ITEMS, id);
 export const priceOf = (id, shop = 'grimsby') => Math.ceil(LIGHT_ITEMS[id].dollars * (has(SHOP_MARKUP, shop) ? SHOP_MARKUP[shop] : 1));
 
+// Until the light shops (Mr. Grimsby's and the general store) are open, nobody could buy a lantern and the mine would be black for everyone, so
+// a run starts with a full kit of its own. When the shops open, set this to true: the run then starts with what he owns (profile.mine.light).
+export const LIGHT_NEEDS_SHOP = false;
+export const FREE_KIT = { lantern: true, oil: OIL_CAPACITY, torches: CARRY_LIMIT, matches: MATCH_LIMIT };
+
 // ---------- what a player owns (profile.mine.light) ----------
 
 const whole = value => Math.max(0, Math.floor(Number(value)) || 0);
@@ -95,7 +100,10 @@ export function spendKit(kit, used) {
 
 // ---------- a run (client side; nothing here is saved until the run's summary is reported) ----------
 
-// The state of the light for one run, taken from what he owns when he goes down.
+// What a run starts with: what he owns, or the free kit while LIGHT_NEEDS_SHOP is false.
+export const kitForRun = own => LIGHT_NEEDS_SHOP ? normalizeLightKit(own) : { ...FREE_KIT };
+
+// The state of the light for one run, taken from the kit he goes down with.
 export function createLightRun(kit) {
     const own = normalizeLightKit(kit);
     return { lantern: own.lantern, oil: own.oil, oilStart: own.oil, torches: own.torches, torchesStart: own.torches, matches: own.matches, matchesStart: own.matches,

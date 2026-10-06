@@ -115,7 +115,7 @@ test('the run reports where it began, how deep, the ore carried and how it ended
     beginMineRun(1);
     mine.floor = 4;
     mine.ore = 17;
-    assert.deepEqual(runSummary('mine-win', 123.6), { startFloor: 1, depth: 4, ore: 17, outcome: 'up', seconds: 124 });
+    assert.deepEqual(runSummary('mine-win', 123.6), { startFloor: 1, depth: 4, ore: 17, outcome: 'up', seconds: 124, used: { oil: 0, torches: 0, matches: 0 } });
     assert.equal(runSummary('died', -5).outcome, 'fell');
     assert.equal(runSummary('died', -5).seconds, 0);
     const record = createMineProgress();
@@ -133,4 +133,21 @@ test('the run reports where it began, how deep, the ore carried and how it ended
     assert.equal(statusText(0, -50, 0), liftHint(0, -50));
     assert.equal(statusText(0, -50, 9), `${liftHint(0, -50)}  ORE 9`);
     endMineRun();
+});
+
+test('the run starts with a light kit and reports what it used; the HUD shows the torches and the oil', () => {
+    beginMineRun(1);
+    assert.ok(mine.light, 'a run has a light');
+    assert.equal(mine.light.lantern, true, 'with the free kit until the shops are open (LIGHT_NEEDS_SHOP)');
+    mine.light.oil -= 125.2;
+    mine.light.torches -= 2;
+    assert.deepEqual(runSummary('mine-win', 60).used, { oil: 126, torches: 2, matches: 0 });
+    assert.equal(statusText(0, -30, 0, mine.light), `${liftHint(0, -30)}  TORCHES ${mine.light.torches}  OIL ${Math.ceil(mine.light.oil / 60)}m`);
+    mine.light.oil = 0;
+    assert.match(statusText(0, -30, 5, mine.light), /ORE 5  TORCHES \d+  LANTERN OUT$/);
+    mine.light.lantern = false;
+    assert.doesNotMatch(statusText(0, -30, 0, mine.light), /OIL|LANTERN/, 'no lantern, nothing to say about it');
+    endMineRun();
+    assert.equal(mine.light, null);
+    assert.deepEqual(runSummary('died', 5).used, { oil: 0, torches: 0, matches: 0 }, 'no run, nothing used');
 });
