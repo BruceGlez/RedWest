@@ -962,7 +962,7 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
         }
 
         // --- MOVEMENT ---
-        if(moveDir && dist > 2.0) {
+        if(moveDir && (dist > 2.0 || u.behavior === 'eater')) { // (a light eater walks to its torch even when the marshal stands beside it)
             const moveX = moveDir.x * speed * dt;
             const moveZ = moveDir.z * speed * dt;
             const colRad = (u.type === 'boss' || u.heavy) ? 1.2 : 0.5;

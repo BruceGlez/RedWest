@@ -174,7 +174,7 @@ try {
                 spawnEnemy(window.__redWest.scene, p, 'lighteater', { x: p.x + 14, z: p.z });
                 S.enemies.at(-1).userData.mineNode = 0;
             });
-            await page.waitForFunction(() => M.mine.light.placed.some(t => !t.lit), null, { timeout: 20000 });
+            await page.waitForFunction(() => M.mine.light.placed.some(t => !t.lit), null, { timeout: 20000 }).catch(async error => { throw new Error(`${error.message}: ${JSON.stringify(await page.evaluate(() => ({ placed: M.mine.light.placed, eaters: S.enemies.filter(e => e.userData.type === 'lighteater').map(e => ({ at: [e.position.x, e.position.z], sense: e.userData.sense?.state, eating: e.userData.eating, hp: S.playerStats.hp })), floor: M.mine.floor })))}`); });
             assert.equal(await page.evaluate(() => S.playerStats.hp), hearts, 'a light eater never hurts him');
             const matches = await page.evaluate(() => M.mine.light.matches);
             await page.evaluate(() => { for(const e of S.enemies.splice(0)) e.parent.remove(e); }); // (the eater would only go for it again)
