@@ -28,6 +28,9 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 - `npm test`
 - `npm run test:store`
 
+## Built: Copper Bit's route
+- `POST /api/town/saloon`: `saloonAction(user.profile, body, now())` (src/saloon.js), same shape as `/api/town/orders`, answers `{ result, profile }`. The server clock decides the day, so paid shifts per day, a night's crowd and the menu are the server's, whatever the client sends. Tested in `tests/server.test.js`.
+
 ## Built: hosting-ready
 - `GET /healthz`: process up and `store.ping()` answers (the file store checks its folder is writable). 200 `{ ok, store }` or 503; no auth, no paths or secrets. `/health` stays for Render.
 - `Dockerfile` (non-root, `NODE_ENV=production`, `/data` volume, `HEALTHCHECK` on `/healthz`) and `.dockerignore`. The image holds only `server/` and `src/`; the web game is still a static build elsewhere.

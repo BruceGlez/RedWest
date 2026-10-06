@@ -6,6 +6,7 @@ import { AGE_BANDS } from '../src/privacy.js';
 import { collectJail, upgradeBuilding } from '../src/town.js';
 import { farmAction } from '../src/farm.js';
 import { ordersAction } from '../src/farmOrders.js';
+import { saloonAction } from '../src/saloon.js';
 import { applyMineRun } from '../src/mineProgress.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 import { createApple, AppleError } from './apple.js';
@@ -428,6 +429,12 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 // Vane's Crossing orders (src/farmOrders.js): the server clock decides which day's orders are on the board.
                 if(url.pathname === '/api/town/orders' && req.method === 'POST') {
                     const result = ordersAction(user.profile, body, now());
+                    save();
+                    return send(res, 200, { result, profile: user.profile });
+                }
+                // Copper Bit's shifts (src/saloon.js): the server clock decides the day, so how many shifts pay and what a night's crowd holds.
+                if(url.pathname === '/api/town/saloon' && req.method === 'POST') {
+                    const result = saloonAction(user.profile, body, now());
                     save();
                     return send(res, 200, { result, profile: user.profile });
                 }

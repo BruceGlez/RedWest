@@ -436,6 +436,56 @@ test('Vane\'s Crossing is shut until Silas Vane is beaten, then the orders follo
     }
 });
 
+test('Copper Bit is shut until Dusty Pete is beaten, then shifts pay by the server clock and nothing else changes', async () => {
+    const s = await startAdminServer();
+    try {
+        const a = await s.account();
+        const saloon = body => s.call('/api/town/saloon', { token: a.token, body });
+        const shift = (night, served) => saloon({ action: 'shift', night, served });
+        const plates = n => Array.from({ length: n }, () => ({ dish: 'beans', tip: 2 }));
+        assert.equal((await s.call('/api/town/saloon', { body: {} })).status, 401, 'no token, no saloon');
+        assert.equal((await shift(1, plates(3))).data.code, 'locked');
+        const pete = OUTLAWS.findIndex(o => o.id === 'dusty-pete');
+        for(let outlawIndex = 0; outlawIndex <= pete; outlawIndex++) {
+            await s.call('/api/run', { token: a.token, body: { score: 900, seconds: 120, outlawIndex, bounty: 'banked', kills: {} } });
+            s.advanceDays(1 / 24);
+        }
+        const open = (await s.call('/api/profile', { token: a.token })).data.profile;
+        const outside = p => { const { balances, town, ...rest } = JSON.parse(JSON.stringify(p)); const { saloon: _s, ...townRest } = town; return { rest, townRest, balances }; };
+
+        const first = await shift(1, plates(3));
+        assert.equal(first.status, 200);
+        assert.equal(first.data.result.paid, true);
+        assert.equal(first.data.profile.balances.dollars, open.balances.dollars + first.data.result.dollars);
+        assert.deepEqual(outside(first.data.profile).rest, outside(open).rest, 'nothing outside balances and the saloon changes');
+        assert.deepEqual(outside(first.data.profile).townRest, outside(open).townRest);
+        assert.equal(first.data.profile.town.saloon.paid, 1);
+
+        const big = await shift(1, plates(500));
+        assert.equal(big.data.result.served, 3, 'night 1 holds a crowd of 3, however many the client claims');
+        assert.equal((await shift(1, [{ dish: 'nope', tip: 0 }, { dish: 'beans', tip: 99 }])).data.result.served, 1, 'a dish off the menu is not served');
+        assert.equal((await shift(1, plates(3))).data.result.paid, false, 'only three shifts a day pay');
+        assert.equal((await shift(2, plates(4))).status, 200, 'night 2 is open with the stars from night 1');
+        assert.equal((await shift(4, plates(6))).data.code, 'night_shut', 'a night opens with a star on the one before');
+        assert.equal((await shift(99, plates(1))).data.code, 'no_night');
+        assert.equal((await saloon({ action: 'sing' })).data.code, 'bad_action');
+        assert.equal((await saloon({})).data.code, 'bad_action');
+
+        const dollars = (await s.call('/api/profile', { token: a.token })).data.profile.balances.dollars;
+        s.advanceDays(1);
+        const nextDay = await shift(1, plates(3));
+        assert.equal(nextDay.data.result.paid, true, 'a new day brings the paid shifts back');
+        assert.equal(nextDay.data.profile.balances.dollars, dollars + nextDay.data.result.dollars);
+        assert.equal(nextDay.data.profile.town.saloon.paid, 1);
+        s.advanceDays(-2);
+        const back = await shift(1, plates(3));
+        assert.equal(back.data.profile.town.saloon.paid, 2, 'a clock moved back brings no paid shifts back');
+        assert.equal(JSON.stringify(s.store.getUser(a.userId).profile.town.saloon), JSON.stringify(back.data.profile.town.saloon), 'the shift is saved');
+    } finally {
+        await s.close();
+    }
+});
+
 test('/healthz answers without a token, says whether the store is reachable, and shows nothing else', async () => {
     const down = { ...createMemoryStore(), ping: () => { throw new Error('disk gone: /secret/path'); } };
     const fine = createMemoryStore();
