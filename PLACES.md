@@ -325,6 +325,10 @@ Deacon Graves. North edge, between Tres Rios and the Foundry.
   (shared), the same way as `saloon`. **Not built yet:** the place (the hill, the lanterns you walk up to, the oil stand, the bell, the chapel growing in the town), the
   look, sounds, and the other places' bonus (Pete's meals and the Wash's finds speeding a piece).
 
+**Built (2026-10-06): the vigil place.** `src/hillLayout.js` (map, doors, labels), `src/places/hill.js` (steps, bell card, settle through `wallet.vigil`),
+`src/placeHill.js` (box placeholder scene, cross-lane on purpose; the art lane owns the look from here). The chapel district is now `interior: 'hill'`;
+it opens only after Deacon Graves is beaten (`vigilOpen`). Not yet built: graves cards, bonuses from other places.
+
 ### Extra places that are not an outlaw's
 
 - **Mr. Grimsby's cellar** (built 2026-10-06, `MINE_PLAN.md` slice 5): the room under his parlour. The way down to the Hollow Claim is a hidden door in its wall that

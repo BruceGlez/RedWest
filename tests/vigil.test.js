@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { PIECES, POSTS, HILL_START, OIL_STAND, HILL_AREA, MAX_LIGHT, OIL_CAPACITY, DOLLARS_PER_LANTERN, FULL_NIGHT_BONUS, TOUCH_SECONDS, getPost, vigilOpen, createChapel, normalizeChapel,
-    piecesBuilt, lightToNext, vigilNight, referenceRoute, vigilRoute, tonight, settleVigil, vigilAction } from '../src/vigil.js';
+    piecesBuilt, lightToNext, vigilNight, referenceRoute, vigilRoute, tonight, settleVigil, vigilAction, canStep, runState, STEP_WORDS } from '../src/vigil.js';
 import { createProfile, normalizeProfile } from '../src/profile.js';
 import { OUTLAWS } from '../src/outlaws.js';
 import { JAIL_BOUNTY_SHARE, normalizeTown, jailRate, jailStored } from '../src/town.js';
@@ -235,4 +235,43 @@ test('saved state survives rubbish and old saves', () => {
     p.town.chapel.light = 55;
     assert.equal(normalizeProfile(JSON.parse(JSON.stringify(p))).town.chapel.light, 55, 'and it is saved with the profile');
     assert.equal(OIL_CAPACITY, 3);
+});
+
+test('the screen can play a night a step at a time with the same rules the server replays', () => {
+    for(let day = 0; day < 60; day++) for(const pieces of [0, 2, 4]) {
+        const night = vigilNight({ day, pieces });
+        const order = [];
+        for(const id of referenceRoute(night)) {
+            const step = canStep(night, order, id);
+            assert.equal(step.ok, true, `${id} on day ${day}`);
+            order.push(id);
+        }
+        assert.deepEqual(vigilRoute(night, order).lit.length, night.lanterns.length);
+        const state = runState(night, order);
+        assert.equal(state.lit.length, night.lanterns.length);
+        assert.ok(state.left >= 0 && state.left < night.limit);
+    }
+});
+
+test('a refused step says why in words, and a step the server would cut is refused on the screen', () => {
+    const night = vigilNight({ day: 40, pieces: 2 });
+    const gated = night.lanterns.find(l => l.needs);
+    const dry = night.lanterns.find(l => l.dry && !l.needs);
+    assert.deepEqual([canStep(night, [], gated.id).ok, canStep(night, [], gated.id).why], [false, STEP_WORDS.out_of_reach]);
+    assert.equal(canStep(night, [], dry.id).why, STEP_WORDS.no_oil);
+    assert.equal(canStep(night, [], 'zz').why, STEP_WORDS.unknown);
+    assert.equal(canStep(night, ['oil', dry.id], dry.id).why, STEP_WORDS.twice);
+    assert.equal(canStep({ ...night, limit: 3 }, [], night.lanterns.find(l => !l.dry && !l.needs).id).why, STEP_WORDS.bell);
+    // Filling the can again when it is already full is a step that takes time and lights nothing: allowed, as the rules allow it.
+    assert.equal(canStep(night, ['oil'], 'oil').ok, true);
+    assert.ok(canStep(night, [], dry.id).left >= 0);
+});
+
+test('the state of the can after some steps', () => {
+    const night = vigilNight({ day: 40, pieces: 2 });
+    const dry = night.lanterns.filter(l => l.dry && !l.needs);
+    assert.equal(runState(night, []).oil, 0);
+    assert.equal(runState(night, ['oil']).oil, OIL_CAPACITY);
+    assert.equal(runState(night, ['oil', dry[0].id]).oil, OIL_CAPACITY - 1);
+    assert.deepEqual(runState(night, ['oil']).lit, []);
 });

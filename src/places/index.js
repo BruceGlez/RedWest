@@ -8,6 +8,7 @@ import { createStorePlace } from './store.js';
 import { createVanePlace } from './vane.js';
 import { createChannelPlace } from './channel.js';
 import { createSaloonPlace } from './saloon.js';
+import { createHillPlace } from './hill.js';
 
 registerPlace(createFarmPlace);
 registerPlace(createUndertakerPlace);
@@ -16,5 +17,6 @@ registerPlace(createStorePlace);
 registerPlace(createVanePlace);
 registerPlace(createChannelPlace);
 registerPlace(createSaloonPlace);
+registerPlace(createHillPlace);
 
 export { createPlaces } from './registry.js';

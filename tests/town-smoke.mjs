@@ -245,7 +245,7 @@ try {
     {
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 7, 7, 7, 7, 7, 7, 7, 7, 7] } }));
         const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
-        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 7); // the town and six districts: the farm, the Crossing, the Channel and Copper Bit are places of their own
+        await page.waitForFunction(() => window.__redWestTown.town3d.walkMap().areas.length === 6); // the town and five districts: the farm, the Crossing, the Channel, Copper Bit and the Hill are places of their own
 
         // You are told once, with a banner, and what was announced is remembered.
         await page.locator('#town-news').waitFor({ state: 'visible' });
@@ -266,7 +266,7 @@ try {
         assert.match(await page.locator('.walk-bubble').textContent(), /Hollow Hill is open/, `${folk} talks of the newest district`);
 
         // The places of the districts that are ground in the town can each be reached and read.
-        for(const [id, label, pattern] of [['grave', 'THE OLD STONE', /struck out/], ['landing', 'THE GANGWAY', /played straight/], ['gatling', 'THE GATLING', /one page is missing/], ['den', 'THE DEN', /wolf pups/], ['bell', 'THE CHAPEL BELL', /bell rings once at dusk/]]) {
+        for(const [id, label, pattern] of [['grave', 'THE OLD STONE', /struck out/], ['landing', 'THE GANGWAY', /played straight/], ['gatling', 'THE GATLING', /one page is missing/], ['den', 'THE DEN', /wolf pups/]]) {
             const door = await page.evaluate(id => {
                 const d = window.__redWestTown.town3d.walkMap().doors.find(d => d.id === id);
                 window.__redWestTown.walk.place(d.x, d.z);
@@ -288,8 +288,8 @@ try {
         await page.evaluate(() => { window.__redWestTown.enterPlace('ranch'); });
         await page.waitForFunction(() => window.__redWestTown.place === 'ranch');
         await page.evaluate(() => window.__redWestTown.leavePlace());
-        // So do the Crossing, the Channel and Copper Bit.
-        for(const id of ['crossing', 'canal', 'copper']) {
+        // So do the Crossing, the Channel, Copper Bit and the Hill.
+        for(const id of ['crossing', 'canal', 'copper', 'chapel']) {
             await page.evaluate(id => { window.__redWestTown.enterPlace(id); }, id);
             await page.waitForFunction(id => window.__redWestTown.place === id, id);
             await page.evaluate(() => window.__redWestTown.leavePlace());
