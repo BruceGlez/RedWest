@@ -64,7 +64,7 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 ## How we work (lanes)
 The repo is split into 11 lanes so several agents can work at once: art, mine, town (farm and places), scale, combat, audio, ui, story, money, qa, growth. Ownership is in `lanes.json`, the rules in `AGENTS.md`, each lane's brief in `docs/lanes/`. One lane per branch and PR; shared files change in small separate PRs.
 
-Server scale: the plan for moving players from the JSON file to Postgres (async store interface, schema, concurrency, migration, and when Redis is needed) is written in `docs/lanes/scale.md`; no code yet.
+Server scale: the plan for moving players from the JSON file to Postgres (async store interface, schema, concurrency, migration, and when Redis is needed) is written in `docs/lanes/scale.md`; step 1 (the async store interface and named lookups) is built; the Postgres store and the migration follow.
 
 ## How to verify
 `npm test`, `npm run build`, then the browser smokes: `test:smoke`, `test:static`, `test:mobile`, `test:enemies`, `test:store`,
