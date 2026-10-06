@@ -34,6 +34,8 @@ const spreadOf = id => TOWN_LAYOUT.find(spot => spot.id === id);
 
 // The undertaker's (scenery beside the stable, src/townScene.js): the cellar hatch to the mine stands beside it (src/townSpots.js).
 export const UNDERTAKER_AT = spread(-31, 6);
+// The general store's (a building on the west street, src/townScene.js): its door opens the store, a place of its own (src/places/store.js).
+export const STORE_AT = spread(-31, -4);
 
 // A point that belongs to a building: where it was relative to the building, kept relative to the building's new place.
 export function near(id, x, z) {

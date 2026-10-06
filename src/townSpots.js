@@ -5,7 +5,7 @@
 
 // object: where the prop stands (x, z) and the box it blocks (half sizes), or null when something else blocks the way.
 // stand: where the marshal stands to use it; the prompt shows within reach of this point.
-import { near, spread, STATION, UNDERTAKER_AT } from './townSpace.js';
+import { near, spread, STATION, UNDERTAKER_AT, STORE_AT } from './townSpace.js';
 
 // Each stands where it was designed against its building (the train in front of the depot, the cash box in the jail yard) and
 // moves with that building; the board stands in main street and spreads with the town (src/townSpace.js).
@@ -18,12 +18,15 @@ const boardStand = spread(-3.4, 0);
 // The undertaker's door (src/townScene.js draws the building beside the stable): it opens Mr. Grimsby's parlour, and the cellar
 // stairs behind it go down to the Hollow Claim (src/mine.js). The door is the small block at the right of the front wall.
 const undertakerDoor = [UNDERTAKER_AT[0] + 3.2, UNDERTAKER_AT[1] + 4.9];
+// The general store's door (src/townScene.js draws the building on the west street): it opens the store, where light is sold (src/places/store.js).
+const storeDoor = [STORE_AT[0] + 3.2, STORE_AT[1] + 4.9];
 export const SPOTS = [
     { id: 'train', verb: 'RIDE', object: null, stand: train }, // in front of the locomotive on the depot's rails
     { id: 'platform', verb: 'RIDE', object: null, stand: platformStand }, // the town train's platform, on the south road (the train itself is drawn in src/townScene.js)
     { id: 'cashbox', verb: 'COLLECT', object: { x: cash[0], z: cash[1], hx: 1.25, hz: 0.85 }, stand: cashStand }, // the jail yard
     { id: 'board', verb: 'READ', object: { x: board[0], z: board[1], hx: 1.7, hz: 0.5 }, stand: boardStand }, // main street
-    { id: 'undertaker', verb: 'ENTER', object: null, stand: undertakerDoor } // the undertaker's door: the building itself blocks the way
+    { id: 'undertaker', verb: 'ENTER', object: null, stand: undertakerDoor }, // the undertaker's door: the building itself blocks the way
+    { id: 'store', verb: 'ENTER', object: null, stand: storeDoor } // the general store's door: the building itself blocks the way
 ];
 
 export const COIN_SLOTS = 8; // coins drawn in the cash box when it is full
@@ -39,6 +42,7 @@ export function spotLabel(id, ctx = {}) {
     if(id === 'cashbox') return ctx.stored > 0 ? `COLLECT $${Math.round(ctx.stored).toLocaleString()}` : 'JAIL CASH BOX';
     if(id === 'board') return ctx.jobsLeft > 0 ? `BOUNTY BOARD: ${ctx.jobsLeft} LEFT` : 'BOUNTY BOARD';
     if(id === 'undertaker') return 'MR. GRIMSBY, UNDERTAKER';
+    if(id === 'store') return 'THE GENERAL STORE';
     return '';
 }
 
