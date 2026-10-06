@@ -57,3 +57,37 @@ export function muzzleFlash(stats) {
     const size = Math.min(2.4, 0.9 + stats.size * 0.5 + (stats.pellets > 1 ? 0.35 : 0));
     return { size, life: 0.07 };
 }
+
+// ---------- how a monster of the mine senses the marshal (MINE_PLAN.md, slice 5) ----------
+// Fate style: a monster is asleep until the marshal comes within its sense radius, takes a moment to wake (it turns to look, the tell), then hunts
+// him. If he gets away past its leash it gives up and walks back to where it came from, and sleeps again. A shot that hits wakes it at once.
+// The Wanted Road does not use this: everyone there hunts from the start.
+export const WAKE_SECONDS = 0.7;      // how long a monster takes to wake and start for him
+export const HOME_REACHED = 2.5;      // how near its post a returning monster must be to count as back
+
+export function createSense(radius, leash, home) {
+    return { radius, leash: Math.max(leash, radius + 20), home: { x: home.x, z: home.z }, state: 'asleep', wake: 0 };
+}
+
+// One step of the rules. `dist`: how far the marshal is; `homeDist`: how far the monster is from its post; `alerted`: it was just shot.
+// Returns the new state ('asleep' | 'waking' | 'hunting' | 'returning'), and changes `sense` to match.
+export function senseStep(sense, dist, homeDist, dt, alerted = false) {
+    switch(sense.state) {
+    case 'asleep':
+        if(dist <= sense.radius || alerted) { sense.state = 'waking'; sense.wake = alerted ? 0 : WAKE_SECONDS; }
+        break;
+    case 'waking':
+        sense.wake -= dt;
+        if(dist > sense.leash && !alerted) sense.state = 'asleep';
+        else if(sense.wake <= 0) sense.state = 'hunting';
+        break;
+    case 'hunting':
+        if(dist > sense.leash && !alerted) sense.state = 'returning';
+        break;
+    case 'returning':
+        if(dist <= sense.radius * 0.6 || alerted) sense.state = 'hunting';   // he came back: it has seen him already, no new wake-up
+        else if(homeDist <= HOME_REACHED) sense.state = 'asleep';
+        break;
+    }
+    return sense.state;
+}
