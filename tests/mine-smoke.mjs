@@ -15,6 +15,8 @@ try {
     browser = await chromium.launch({ executablePath: findChrome(), headless: true, args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--no-proxy-server'] });
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     await context.addInitScript(answeredPrivacy);
+    // The hidden door in the cellar opens once Deacon Graves has a star (MINE_PLAN.md, slice 5): start with him beaten, once (a reload keeps the saved run).
+    await context.addInitScript(() => { if(!localStorage.getItem('redWestProfile.v1')) localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [0, 0, 7, 0, 0, 0, 0, 0, 0, 0] } })); });
     const page = await context.newPage();
     page.setDefaultTimeout(60000);
     const errors = [];
@@ -69,10 +71,20 @@ try {
 
     // The stairs at the back: the prompt names the mine, and using it closes the town and starts the descent.
     await goTo('cellar');
-    await page.locator('.walk-prompt').filter({ hasText: 'HOLLOW CLAIM' }).waitFor({ state: 'visible' });
+    await page.locator('.walk-prompt').filter({ hasText: 'THE CELLAR STAIRS' }).waitFor({ state: 'visible' });
     assert.match(await page.locator('.walk-prompt').textContent(), /DESCEND/);
     await page.waitForTimeout(1200);
     await shot('parlour-stairs');
+    // The stairs lead to the cellar, a room of its own; the way on is a hidden door in its wall that only shows when you are beside it.
+    await page.keyboard.press('e');
+    await page.waitForFunction(() => window.__redWestTown.place === 'cellar');
+    const atWall = () => page.evaluate(() => { const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === 'wall'); window.__redWestTown.placeWalk.place(d.x, d.z); });
+    await page.evaluate(() => window.__redWestTown.placeWalk.place(0, 5.2));
+    await page.waitForTimeout(300);
+    assert.equal(await page.locator('.walk-prompt').filter({ hasText: 'HIDDEN DOOR' }).count(), 0, 'nothing shows the door from across the room');
+    await atWall();
+    await page.locator('.walk-prompt').filter({ hasText: 'THE HIDDEN DOOR: THE HOLLOW CLAIM' }).waitFor({ state: 'visible' });
+    await shot('cellar-door');
     await page.evaluate(async () => {
         window.S = await import('/src/state.js');
         window.M = await import('/src/mine.js');
@@ -80,6 +92,8 @@ try {
         window.MMON = await import('/src/mineMonsters.js');
     });
     await page.keyboard.press('e');
+    await page.locator('#town-sheet').waitFor({ state: 'visible' });
+    await page.locator('#town-grid [data-descend="1"]').click();
     await page.locator('#town-screen').waitFor({ state: 'hidden' });
     await page.waitForFunction(() => S.gameState.isGameStarted, null, { timeout: 60000 });
     assert.equal(await page.evaluate(() => M.mine.enabled), true, 'a mine run');
@@ -282,7 +296,7 @@ try {
     assert.equal(saved.mine.deepest, 5);
     assert.equal(saved.mine.checkpoint, 5);
     assert.ok(saved.mine.ore > 0 && saved.mine.runs === 1);
-    assert.deepEqual([saved.balances.dollars, saved.stats.stageStars.reduce((a, b) => a + b, 0)], [0, 0], 'the mine paid no dollars and gave no stars');
+    assert.deepEqual([saved.balances.dollars, saved.stats.stageStars.reduce((a, b) => a + b, 0)], [0, 7], 'the mine paid no dollars and gave no stars (only the Deacon\'s, which it started with)');
 
     // Back to town: the Wanted Road rules are back (no mine, no cave, the ordinary arena limit).
     await page.locator('#restart-msg').waitFor({ state: 'visible' });
@@ -300,7 +314,11 @@ try {
     await page.keyboard.press('e');
     await page.waitForFunction(() => window.__redWestTown.place === 'undertaker');
     await page.evaluate(() => { const door = window.__redWestTown.parlour3d.walkMap().doors.find(d => d.id === 'cellar'); window.__redWestTown.parlourWalk.place(door.x, door.z); });
-    await page.locator('.walk-prompt').filter({ hasText: 'HOLLOW CLAIM' }).waitFor({ state: 'visible' });
+    await page.locator('.walk-prompt').filter({ hasText: 'THE CELLAR STAIRS' }).waitFor({ state: 'visible' });
+    await page.keyboard.press('e');
+    await page.waitForFunction(() => window.__redWestTown.place === 'cellar');
+    await page.evaluate(() => { const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === 'wall'); window.__redWestTown.placeWalk.place(d.x, d.z); });
+    await page.locator('.walk-prompt').filter({ hasText: 'THE HIDDEN DOOR' }).waitFor({ state: 'visible' });
     await page.keyboard.press('e');
     await page.locator('#town-sheet').waitFor({ state: 'visible' });
     assert.deepEqual(await page.locator('#town-grid [data-descend]').evaluateAll(buttons => buttons.map(b => b.dataset.descend)), ['1', '5']);

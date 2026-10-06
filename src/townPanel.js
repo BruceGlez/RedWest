@@ -457,6 +457,8 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
         openBuilding,
         closeCard: () => { openId = null; render(); },
         leave: leavePlace,
+        // On the next tick, so the key press that used the stairs is not also read by the place it leads to (its walk is listening too).
+        goTo: id => setTimeout(() => { const target = byId(id); if(!target?.canEnter()) return; leavePlace(); enterPlace(target); }, 0),
         markVisited: id => { news = markVisited(news, id); saveNews(news); },
         onDescend: floor => onDescend(floor)
     });
