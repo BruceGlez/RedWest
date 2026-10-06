@@ -519,11 +519,16 @@ try {
         await page.keyboard.press('e');
         await toast('Harvested 2 wheat');
         // An empty plot offers the crops; planting starts the clock.
-        await stand('plot-1');
-        await prompt('EMPTY PLOT');
-        await page.keyboard.press('e');
+        // Pressed at once, with no frame drawn in between (as on a slow machine): the card is for the plot he stands at, not for plot 0 he has just left.
+        // (Both prompts read "EMPTY PLOT", so waiting for the prompt cannot tell them apart.)
+        await page.evaluate(() => {
+            const d = window.__redWestTown.farm3d.walkMap().doors.find(d => d.id === 'plot-1');
+            window.__redWestTown.farmWalk.place(d.x, d.z);
+            window.dispatchEvent(new KeyboardEvent('keydown', { code: 'KeyE' })); // the same moment: no frame between the move and the key
+        });
         await page.locator('#town-sheet').waitFor({ state: 'visible' });
         assert.equal(await page.locator('[data-plant]').count(), 3);
+        assert.equal(await page.locator('[data-plant="corn"]').getAttribute('data-plot'), '1', 'the card is for the plot he stands at');
         await page.locator('[data-plant="corn"]').click();
         await toast('Planted corn');
         await page.locator('#town-sheet').waitFor({ state: 'hidden' });
