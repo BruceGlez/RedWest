@@ -61,6 +61,15 @@ calls, town quality switch, privacy and age handling, account deletion, analytic
 - Growth: vertical videos recorded on a phone; Android via the same RevenueCat setup; Game Center and controller support.
 - Tech health: KTX2 and meshopt compression if downloads matter.
 
+### Parked backlog (noted 2026-10-06, nothing here is started; the owner's usage limits are short)
+Done so far in the dark mine and around it: cellar and hidden door, lantern, oil, torches, matches, shops (Mr. Grimsby's and the general store), light eater, thin air from floor 15 (torches fail), small floors, sense radius, grave quests, Hollow Hill vigil rules and server route, load test, leaderboard query. When the open PRs are merged, pick up from here, one lane at a time:
+- **Dark mine (mine lane):** wire the oxygen rules (`src/mineAir.js`, `OXYGEN_ENABLED`) into the mine mode once the bar exists; the owner confirmed the defaults (drain by time on a thin floor, refill at the lift and beside a lit torch, slower and dimmer at empty, never a lost heart). Checkpoints and boss floors (slice 3). Quest generator from the graves (slice 6) wiring. A lit marshal sensed from farther.
+- **UI lane:** the oxygen bar HUD from floor 15 (spec in `MINE_PLAN.md`, "The oxygen bar: spec for the ui lane"). No ui agent has been started yet.
+- **Art lane:** the light eater's own model, the look of the Hollow Hill scene (`src/placeHill.js`) and of the general store (`src/placeStore.js`), torch and lantern polish.
+- **Town lane:** shop cards show the exact oil top-up price (`priceOf('oil', shop, kit)`); the vigil's cards and rewards polish; Foundry Yard, Fort Pell, Tres Rios, Whisper Wash, Silver Belle (`PLACES.md`).
+- **Scale lane (on hold until the owner says):** Postgres service in CI; unique names. After the owner's own setup (VPS, Coolify, Postgres, `STORE=postgres`, migration dry run, domain), the first deploy.
+- **Owner's own tasks:** VPS and Coolify, domain, secrets, App Store, Stripe and RevenueCat accounts; prices of the light (first guess: lantern 60, oil 15, torches x5 20, matches x5 5) not yet confirmed.
+
 ## How we work (lanes)
 The repo is split into 11 lanes so several agents can work at once: art, mine, town (farm and places), scale, combat, audio, ui, story, money, qa, growth. Ownership is in `lanes.json`, the rules in `AGENTS.md`, each lane's brief in `docs/lanes/`. One lane per branch and PR; shared files change in small separate PRs.
 
