@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { LANTERN_RADIUS } from './mineLight.js';
 
 // The dark of the mine (MINE_PLAN.md, slice 5), made in code: one full-screen layer drawn over the world that is truly black outside a dim
 // radius around the marshal. Every pixel is traced to the ground, and the further that spot is from the light the blacker it goes, so the
@@ -9,7 +10,7 @@ import * as THREE from 'three';
 // module is not merged yet, so the radius comes through ONE hook, `setMineLightSource`, and until then a named constant stands in.
 
 export const MIN_RADIUS = 6; // the faint ring: you can always see your own feet and a step around them, with no light at all
-export const LANTERN_RADIUS = 15; // stand-in for "lantern lit" until the mine lane's light module says so
+export { LANTERN_RADIUS }; // "lantern lit": the mine lane's number (src/mineLight.js), used until a light source is set
 export const DARK_RENDER_ORDER = 5; // the dark layer; the lift and shaft glow are drawn above it
 export const GLOW_RENDER_ORDER = 20;
 const MAX_HOLES = 16; // the lift and the shaft, then up to 12 of the mine lane's torches (src/mineLight.js MAX_HOLES)
