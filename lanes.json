@@ -41,6 +41,7 @@
     "POLISH_PLAN.md",
     "tests/atmosphere.test.js",
     "tests/placeDark.test.js",
+    "tests/placeTorch.test.js",
     "tests/animationClips.test.js",
     "tests/townQuality.test.js",
     "src/particleSystem.js",

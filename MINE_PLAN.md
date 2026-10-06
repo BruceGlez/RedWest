@@ -267,7 +267,8 @@ What we already do and what it means:
 ### Art status (art lane, code art only for now)
 
 1. **The dark: built** (`src/placeDark.js`, `src/mineScene.js`). One screen-space layer, black outside a dim radius around the marshal; the lift (cold white beam) and the shaft (gold beam) glow above it and have a lit patch, so they are found from far away. The radius comes through one hook, `setMineLightSource(() => ({ radius, holes }))` in `src/placeDark.js`; the mine lane's light module should call it (lantern lit, torch near, out of oil = `MIN_RADIUS`, the faint ring). Until then a named constant (`LANTERN_RADIUS`) stands in. Waiting on: the **mine** lane's light rules.
-2. Torches and lantern, 3. light eater, 4. hidden door: next, each its own PR.
+2. **Torches and lantern: built** (`src/placeTorch.js`). `setMineTorches([{ x, z, lit }])` in `src/mineScene.js` shows them (lit ones burn, flicker and clear the dark; unlit ones are charred stubs with smoke, which is what a light eater leaves); `setMineLantern(false)` puts the marshal's lantern out. The **mine** lane calls these from its torch rules. Up to 48 torches, five draw calls in all.
+3. Light eater, 4. hidden door: next, each its own PR.
 
 ### Still open (ask the owner before building on these)
 

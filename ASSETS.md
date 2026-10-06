@@ -47,3 +47,4 @@ commercial use.
 - AI voices: stock or properly licensed voices only; no voice clones of real people.
 - Music and effects from other sources need a licence that covers games and their ads (a "sync" licence
   for trailers and ads).
+| Torch (lit, and put-out stub with smoke) and the marshal's lantern | `src/placeTorch.js`, `src/mineScene.js` | Made in code: boxes, cones, cylinders, additive glow sprites drawn from a canvas gradient; five instanced meshes for all torches, no real point lights | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. A later art pass may replace it. |

@@ -85,7 +85,7 @@ export function createMineDark(scene, permanent = []) {
 
     const marshal = scene.children.find(o => o.userData?.muzzle) ?? null; // the marshal's group (src/playerSystem.js)
     let lastTime = 0;
-    const state = { mesh, uniforms, radius: LANTERN_RADIUS, flicker: 0, enabled: true };
+    const state = { mesh, uniforms, radius: LANTERN_RADIUS, flicker: 0, enabled: true, extraHoles: [] }; // extraHoles: lit places the scene knows of (its torches)
     mesh.onBeforeRender = (renderer, _scene, camera) => {
         uniforms.uInvProjection.value.copy(camera.projectionMatrixInverse);
         uniforms.uCameraWorld.value.copy(camera.matrixWorld);
@@ -102,7 +102,7 @@ export function createMineDark(scene, permanent = []) {
         uniforms.uRadius.value = state.radius * (1 + state.flicker);
         let n = 0;
         for(const [x, z, r, k] of permanent) uniforms.uHoles.value[n++].set(x, z, r, k);
-        for(const h of light.holes ?? []) { if(n >= MAX_HOLES) break; uniforms.uHoles.value[n++].set(h.x, h.z, h.r, h.k ?? 1); }
+        for(const h of [...state.extraHoles, ...(light.holes ?? [])]) { if(n >= MAX_HOLES) break; uniforms.uHoles.value[n++].set(h.x, h.z, h.r, h.k ?? 1); }
         uniforms.uHoleCount.value = n;
         mesh.visible = state.enabled;
     };

@@ -4,6 +4,7 @@ import { obstacles, gameState } from './state.js';
 import { markObstacleGridDirty } from './physics.js';
 import { toonVertexColorMaterial } from './assets.js';
 import { createMineDark, glowMaterial, GLOW_RENDER_ORDER } from './placeDark.js';
+import { createTorchLayer, createLantern, torchHoles } from './placeTorch.js';
 import { floorLayout, bounds, distance, gridPoints, wallCircles, propCircles, setActiveFloor } from './mineMap.js';
 
 // Draws one floor of the Hollow Claim (src/mineMap.js has the shape of the cave and every rule). It is all built from simple shapes
@@ -341,6 +342,13 @@ export function showMineFloor(scene, floor) {
     // The dark: black outside the marshal's light, with the lift and the shaft always a little lit (never a lost player).
     const dark = createMineDark(scene, [[0, 0, 11, 0.85], [shaft.x, shaft.z, 11, 0.85]]);
     group.add(dark.mesh);
+    const torches = createTorchLayer();
+    group.add(torches.group);
+    const marshal = scene.children.find(o => o.userData?.muzzle) ?? null;
+    const lantern = createLantern();
+    lantern.group.position.set(-0.6, 1.2, 0.7); // in his hand
+    lantern.group.scale.setScalar(1.6);
+    marshal?.add(lantern.group);
 
     scene.add(group);
     const markers = solidMarkers(layout);
@@ -349,13 +357,15 @@ export function showMineFloor(scene, floor) {
     setActiveFloor(layout);
     const b = bounds(layout, 0);
     gameState.MAP_SIZE = Math.ceil(Math.max(-b.minX, b.maxX, -b.minZ, b.maxZ)) + 40; // the marshal can walk the whole cave
-    current = { floor, layout, group, shaft, lift, chests, markers, dark };
+    current = { floor, layout, group, shaft, lift, chests, markers, dark, torches, torchList: [], lantern, marshal };
     return current;
 }
 
 export function clearMineFloor(scene) {
     if(!current) { setActiveFloor(null); return; }
     scene.remove(current.group);
+    current.lantern.group.parent?.remove(current.lantern.group);
+    current.lantern.group.traverse(o => { if(o.isMesh) { o.geometry.dispose(); o.material.map?.dispose(); o.material.dispose(); } });
     current.group.traverse(o => {
         if(!o.isMesh) return;
         o.geometry.dispose();
@@ -371,6 +381,15 @@ export function clearMineFloor(scene) {
 
 export const mineFloorOnShow = () => current;
 
+// The torches on show: [{ x, z, lit }]. The mine lane's rules decide where they stand and which are lit; lit ones burn and clear the dark, the
+// others are charred stubs that smoke (what a light eater leaves). The marshal's lantern: `setMineLantern(false)` puts it out.
+export function setMineTorches(list) {
+    if(!current) return;
+    current.torchList = list;
+    current.torches.set(list);
+}
+export const setMineLantern = lit => current?.lantern.setLit(lit);
+
 // Opens chest `index` (the lid lifts, the glow goes out).
 export function openMineChest(index) {
     const chest = current?.chests[index];
@@ -385,7 +404,10 @@ export function openMineChest(index) {
 export function updateMineScene(timeInSeconds) {
     const shaft = current?.shaft;
     if(!shaft) return;
+    if(current.marshal) current.dark.extraHoles = torchHoles(current.torchList, current.marshal.position);
     current.dark.update(timeInSeconds);
+    current.torches.update(timeInSeconds);
+    current.lantern.update(timeInSeconds);
     current.lift.beam.material.opacity = 0.13 + (0.5 + 0.5 * Math.sin(timeInSeconds * 1.9 + 1)) * 0.08;
     const pulse = 0.5 + 0.5 * Math.sin(timeInSeconds * 2.4);
     shaft.beam.material.opacity = 0.16 + pulse * 0.1;
