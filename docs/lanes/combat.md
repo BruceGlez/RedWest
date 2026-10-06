@@ -38,6 +38,10 @@ Money never buys combat power; unit tests enforce it. Buildings and places never
 - `src/perks.js`
 - `tests/progress.test.js`
 
+## Backlog: monsters sense you by distance (owner's brief, `MINE_PLAN.md`, "Slice 5")
+- A sense radius per monster, Fate style: idle or asleep outside it, a short wake-up when you come inside it, and a leash distance past which it gives up and goes back. Today the mine uses fixed 45 and 100 unit chamber rules; this makes it per monster. Keep the Wanted Road's numbers unless the owner says otherwise.
+- Behaviour for the light eater (it walks to the nearest lit torch of yours and puts it out; easy to kill), together with the mine lane's rules for it.
+
 Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `node tools/lanes.mjs diff` before opening a PR.
 
 ## Before you open a PR
