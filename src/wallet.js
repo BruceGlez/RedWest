@@ -4,6 +4,7 @@ import { collectJail, upgradeBuilding } from './town.js';
 import { applyMineRun } from './mineProgress.js';
 import { farmAction } from './farm.js';
 import { ordersAction } from './farmOrders.js';
+import { saloonAction } from './saloon.js';
 import { validateName } from './names.js';
 import { loadProgress } from './progress.js';
 
@@ -81,6 +82,7 @@ export function createLocalWallet() {
         async upgradeBuilding(id) { upgradeBuilding(profile, id); persist(); return snapshot(); },
         async farm(body) { const result = farmAction(profile, body, new Date()); persist(); return { result, profile: snapshot() }; },
         async orders(body) { const result = ordersAction(profile, body, new Date()); persist(); return { result, profile: snapshot() }; },
+        async saloon(body) { const result = saloonAction(profile, body, new Date()); persist(); return { result, profile: snapshot() }; },
         async leaderboard() { throw new Error('Leaderboards need the Red West server. Your records are saved on this device.'); },
         nameHidden: false,
         statsSender: null, // offline: statistics are never collected
@@ -173,6 +175,7 @@ export function createRemoteWallet(apiBase) {
         async upgradeBuilding(id) { return (await call('/api/town/upgrade', { building: id })).profile; },
         async farm(body) { return call('/api/town/farm', body); },
         async orders(body) { return call('/api/town/orders', body); },
+        async saloon(body) { return call('/api/town/saloon', body); },
         async leaderboard(board) { return call(`/api/leaderboard?board=${encodeURIComponent(board)}`); },
         async reportRun(summary) { return call('/api/run', summary); },
         async reportMineRun(summary) { return call('/api/mine/run', summary); }
