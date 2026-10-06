@@ -26,7 +26,9 @@ The mine never gives stars and never sells speed-ups. Rules live in `mine.js` wi
 - Light rules first, as a pure module with tests: the lantern, the torches you carry and place, the dim ring (always visible: your feet, the lift and the shaft), what a placed torch lights.
 - The light eater (rules, floors from about 8 on, goes for your lit torches), after torches and the combat lane's sense radius exist.
 - The lift and shaft stay visible in the dark (glow, beam, the HUD arrow that is already there); a player with no light can always walk back to the lift.
-- Ask the owner about the "Still open" list in `MINE_PLAN.md` before building on lantern oil, torch count, price, burn time or relighting.
+- **Make the floors smaller and slower-growing first** (owner, 2026-10-06): targets and the measured table are in `MINE_PLAN.md`, "Level size and torches". Torches are about one per 40 units, so floor 1 needs about 6, not 14 or more.
+- The lantern runs out of oil and needs refilling; everything light costs earned Bounty Dollars (never nuggets). Torches are permanent down to floor 14; from floor 15 it is undecided (one named setting, default permanent; propose options to the owner). Relighting costs a little. Light eaters from about floor 8, more annoying with depth but capped and never harmful. All decided answers are in `MINE_PLAN.md`, "Decided by the owner".
+- Quest targets for Slice 6 (kills and finds counted in `profile.mine`) come after the dark mine.
 
 Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `node tools/lanes.mjs diff` before opening a PR.
 
