@@ -48,3 +48,4 @@ commercial use.
 - Music and effects from other sources need a licence that covers games and their ads (a "sync" licence
   for trailers and ads).
 | Torch (lit, and put-out stub with smoke) and the marshal's lantern | `src/placeTorch.js`, `src/mineScene.js` | Made in code: boxes, cones, cylinders, additive glow sprites drawn from a canvas gradient; five instanced meshes for all torches, no real point lights | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. A later art pass may replace it. |
+| Light eater (small bug that puts torches out) | `src/assets.js` (`createLightEaterMesh`) | Made in code: boxes baked with the quadruped bones like the crawler, plus an unlit amber abdomen | Ours, original | 2026-10-06 | Art lane, MINE_PLAN.md slice 5. Not wired to a monster yet: the mine and combat lanes add `look: 'lighteater'` and the mesh in `src/enemySystem.js`. A later art pass may replace it. |
