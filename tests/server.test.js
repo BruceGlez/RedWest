@@ -636,3 +636,180 @@ test('light is bought with Bounty Dollars only, the server sets every price, and
         await s.close();
     }
 });
+
+// ---- Hollow Hill's dusk vigil (src/vigil.js, POST /api/town/vigil) ----
+async function vigilSetup() {
+    const { tonight, referenceRoute, vigilRoute, vigilOpen } = await import('../src/vigil.js');
+    const { dayNumber } = await import('../src/farmOrders.js');
+    const s = await startAdminServer();
+    const T0 = Date.UTC(2026, 8, 28, 12);
+    let elapsed = 0;
+    const adv = days => { s.advanceDays(days); elapsed += days * 86400000; };
+    const nowDate = () => new Date(T0 + elapsed);
+    const a = await s.account();
+    const vigil = body => s.call('/api/town/vigil', { token: a.token, body });
+    const profile = async () => (await s.call('/api/profile', { token: a.token })).data.profile;
+    const beatGraves = async () => {
+        const graves = OUTLAWS.findIndex(o => o.id === 'deacon-graves');
+        for(let outlawIndex = 0; outlawIndex <= graves; outlawIndex++) {
+            await s.call('/api/run', { token: a.token, body: { score: 900, seconds: 120, outlawIndex, bounty: 'banked', kills: {} } });
+            adv(1 / 24);
+        }
+        assert.ok(vigilOpen(await profile()));
+    };
+    const night = async () => tonight(await profile(), nowDate());
+    return { s, a, vigil, profile, beatGraves, night, adv, nowDate, dayNumber, referenceRoute, vigilRoute };
+}
+const outside = p => { const { balances, town, ...rest } = JSON.parse(JSON.stringify(p)); const { chapel: _c, ...townRest } = town; return { rest, townRest }; };
+
+test('the vigil is shut until Deacon Graves has a star, and asks for a real route', async () => {
+    const v = await vigilSetup();
+    try {
+        assert.equal((await v.s.call('/api/town/vigil', { body: { action: 'light', order: [] } })).status, 401, 'no token, no vigil');
+        assert.equal((await v.vigil({ action: 'light', order: ['p0'] })).data.code, 'locked');
+        const shut = await v.profile();
+        await v.beatGraves();
+        for(const [body, code] of [[{}, 'bad_action'], [{ action: 'sing' }, 'bad_action'], [{ action: 'light' }, 'bad_order'], [{ action: 'light', order: 'p0' }, 'bad_order'], [{ action: 'light', order: { 0: 'p0' } }, 'bad_order']]) {
+            const answer = await v.vigil(body);
+            assert.equal(answer.status, 400, JSON.stringify(body));
+            assert.equal(answer.data.code, code, JSON.stringify(body));
+        }
+        assert.equal(shut.town.chapel.light, 0);
+    } finally {
+        await v.s.close();
+    }
+});
+
+test('the server replays the route: unknown posts, repeats, out of reach and no oil cut it at the first bad step, and nothing the client claims counts', async () => {
+    const v = await vigilSetup();
+    try {
+        await v.beatGraves();
+        const night = await v.night();
+        const dry = night.lanterns.find(l => l.dry && !l.needs);
+        const gated = night.lanterns.find(l => l.needs);
+        const free = night.lanterns.find(l => !l.needs && !l.dry);
+        assert.ok(dry && gated && free, 'the night has a dry, a gated and a free lantern to test with');
+        const before = await v.profile();
+        // Each of these is cut before it lights anything, so nothing is paid and the day is not used up.
+        for(const order of [['nope'], [7], [null], ['__proto__'], ['constructor'], [dry.id], [gated.id], ['oil', 'p99'], [{ id: free.id }], ['p0'.repeat(1000)]]) {
+            const answer = await v.vigil({ action: 'light', order });
+            const expected = v.vigilRoute(night, order);
+            assert.equal(answer.status, 200, JSON.stringify(order));
+            assert.equal(answer.data.result.lit, expected.lit.length, JSON.stringify(order));
+            assert.equal(answer.data.result.stoppedBy, expected.stoppedBy, JSON.stringify(order));
+        }
+        assert.equal((await v.vigil({ action: 'light', order: [dry.id] })).data.result.stoppedBy, 'no_oil');
+        assert.equal((await v.vigil({ action: 'light', order: [gated.id] })).data.result.stoppedBy, 'out_of_reach');
+        assert.equal((await v.vigil({ action: 'light', order: ['zzz'] })).data.result.stoppedBy, 'unknown');
+        assert.equal((await v.profile()).balances.dollars, before.balances.dollars, 'nothing was lit, so nothing was paid');
+        assert.equal((await v.profile()).town.chapel.counted, false, 'a route that lit nothing does not use up the day');
+
+        // A repeat is cut at the second visit; the first still counts. Lantern ids and extra fields from the client mean nothing.
+        const answer = await v.vigil({ action: 'light', order: [free.id, free.id, free.id], lit: 99, dollars: 9999, light: 400, counted: false, of: 1 });
+        assert.equal(answer.data.result.lit, 1);
+        assert.equal(answer.data.result.stoppedBy, 'twice');
+        assert.equal(answer.data.result.dollars, 2, 'two dollars a lantern, as the rules say');
+        assert.equal(answer.data.profile.town.chapel.light, 1);
+    } finally {
+        await v.s.close();
+    }
+});
+
+test('a route that would take longer than the bell is cut where the bell stops it', async () => {
+    const v = await vigilSetup();
+    try {
+        await v.beatGraves();
+        // Bouncing between the oil stand and the lanterns is the slowest walk a route can be; find a night it overruns the bell on.
+        let night, order, expected;
+        for(let day = 0; day < 8; day++) {
+            night = await v.night();
+            order = night.lanterns.filter(l => !l.needs).flatMap(l => ['oil', l.id]);
+            expected = v.vigilRoute(night, order);
+            if(expected.stoppedBy === 'bell') break;
+            v.adv(1);
+        }
+        assert.equal(expected.stoppedBy, 'bell', 'one of the next nights is long enough to overrun the bell this way');
+        const answer = await v.vigil({ action: 'light', order });
+        assert.equal(answer.status, 200);
+        assert.equal(answer.data.result.stoppedBy, 'bell');
+        assert.equal(answer.data.result.lit, expected.lit.length);
+        assert.ok(answer.data.result.lit < night.lanterns.length, 'not the whole hill');
+        assert.ok(answer.data.result.seconds <= night.limit, 'what was counted fits inside the bell');
+        assert.equal(answer.data.result.full, false);
+        assert.equal(answer.data.result.dollars, expected.lit.length * 2, 'no full-night bonus for a cut route');
+    } finally {
+        await v.s.close();
+    }
+});
+
+test('a good route pays once a day, a clock moved back brings nothing back, and nothing outside the chapel and the reward changes', async () => {
+    const v = await vigilSetup();
+    try {
+        await v.beatGraves();
+        const open = await v.profile();
+        const night = await v.night();
+        const good = v.referenceRoute(night);
+
+        const first = await v.vigil({ action: 'light', order: good });
+        assert.equal(first.status, 200);
+        const r = first.data.result;
+        assert.deepEqual({ lit: r.lit, of: r.of, full: r.full, counted: r.counted, stoppedBy: r.stoppedBy }, { lit: night.lanterns.length, of: night.lanterns.length, full: true, counted: true, stoppedBy: null });
+        assert.equal(r.dollars, night.lanterns.length * 2 + 10, 'two dollars a lantern and the full-night bonus');
+        assert.equal(first.data.profile.balances.dollars, open.balances.dollars + r.dollars);
+        assert.equal(first.data.profile.town.chapel.light, night.lanterns.length);
+        assert.deepEqual(outside(first.data.profile), outside(open), 'nothing outside the chapel and the dollars changed');
+        assert.equal(first.data.profile.balances.nuggets, open.balances.nuggets, 'a vigil never touches nuggets');
+
+        // Only the first vigil of a day counts: the same route again is free practice.
+        const second = await v.vigil({ action: 'light', order: good });
+        assert.equal(second.data.result.counted, false);
+        assert.equal(second.data.result.dollars, 0);
+        assert.equal(second.data.result.lit, night.lanterns.length, 'it can still be walked, it just pays nothing');
+        assert.equal(second.data.profile.balances.dollars, first.data.profile.balances.dollars);
+        assert.equal(second.data.profile.town.chapel.light, first.data.profile.town.chapel.light);
+
+        // The next day counts again, built on the light so far.
+        v.adv(1);
+        const next = await v.night();
+        const tomorrow = await v.vigil({ action: 'light', order: v.referenceRoute(next) });
+        assert.equal(tomorrow.data.result.counted, true);
+        assert.equal(tomorrow.data.profile.town.chapel.light, night.lanterns.length + next.lanterns.length);
+        const afterTomorrow = tomorrow.data.profile;
+
+        // A clock moved back to an earlier day brings no vigil back: the newest day seen is the day.
+        v.adv(-2);
+        const back = await v.vigil({ action: 'light', order: v.referenceRoute(next) });
+        assert.equal(back.data.result.counted, false);
+        assert.equal(back.data.result.dollars, 0);
+        assert.equal(back.data.profile.balances.dollars, afterTomorrow.balances.dollars);
+        assert.equal(back.data.profile.town.chapel.light, afterTomorrow.town.chapel.light);
+        assert.equal(back.data.profile.town.chapel.day, afterTomorrow.town.chapel.day, 'the day does not go back');
+        assert.equal(JSON.stringify(v.s.store.getUser(v.a.userId).profile.town.chapel), JSON.stringify(back.data.profile.town.chapel), 'it is saved');
+    } finally {
+        await v.s.close();
+    }
+});
+
+test('the chapel is built piece by piece from the light, and a built piece stays built', async () => {
+    const v = await vigilSetup();
+    try {
+        await v.beatGraves();
+        let built = [];
+        for(let day = 0; day < 12 && !built.includes('window'); day++) {
+            const night = await v.night();
+            const answer = await v.vigil({ action: 'light', order: v.referenceRoute(night) });
+            assert.equal(answer.data.result.counted, true);
+            built = answer.data.profile.town.chapel.light >= 30 ? ['window'] : [];
+            if(answer.data.result.built.length) assert.deepEqual(answer.data.result.built, ['window'], 'the first piece the light builds is the window');
+            v.adv(1);
+        }
+        assert.ok(built.includes('window'), 'a few vigils build the window');
+        const light = (await v.profile()).town.chapel.light;
+        v.adv(5); // five missed nights cost only the nights
+        assert.equal((await v.profile()).town.chapel.light, light);
+        const after = await v.vigil({ action: 'light', order: [] });
+        assert.equal(after.data.profile.town.chapel.light, light, 'a missed night costs only the night');
+    } finally {
+        await v.s.close();
+    }
+});

@@ -7,6 +7,7 @@ import { collectJail, upgradeBuilding } from '../src/town.js';
 import { farmAction } from '../src/farm.js';
 import { ordersAction } from '../src/farmOrders.js';
 import { saloonAction } from '../src/saloon.js';
+import { vigilAction } from '../src/vigil.js';
 import { applyMineRun } from '../src/mineProgress.js';
 import { buyLight, LIGHT_ITEMS, SHOP_MARKUP } from '../src/mineLight.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
@@ -456,6 +457,13 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 }
                 // Light for the Hollow Claim (src/mineLight.js): Bounty Dollars only. The client names the item and the shop; the price, the limits and
                 // the balance are the server's. A refused buy changes nothing (buyLight checks everything before it spends).
+                // Hollow Hill's dusk vigil (src/vigil.js): the client reports only the order it walked; the server builds tonight's hill from its own
+                // clock and the chapel, replays the route (speed, reach, oil, the bell) and pays for what could have been walked, once a day.
+                if(url.pathname === '/api/town/vigil' && req.method === 'POST') {
+                    const result = vigilAction(user.profile, body, now());
+                    await save();
+                    return send(res, 200, { result, profile: user.profile });
+                }
                 if(url.pathname === '/api/mine/buy' && req.method === 'POST') {
                     if(!allow('shop', id)) return tooMany(res);
                     // Own names only: an id like "constructor" must not reach the price table.
