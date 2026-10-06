@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { floorLayout, floorName, chamberCount, distance, isOpen, bounds, gridPoints, wallCircles, propCircles, spawnPoint, steerTarget, lineOpen, nearestNode,
+import { floorLayout, floorName, chamberCount, roadLength, distance, isOpen, bounds, gridPoints, wallCircles, propCircles, spawnPoint, steerTarget, lineOpen, nearestNode,
     shaftReached, liftReached, chestWithin, setActiveFloor, activeFloor, MAX_CHAMBERS, MIN_SPAWN_DISTANCE, MAX_SPAWN_DISTANCE, SHAFT_REACH, LIFT_REACH, CHEST_REACH } from '../src/mineMap.js';
 
 const MARSHAL = 1.5; // the radius the player's movement checks (src/playerSystem.js)
@@ -51,19 +51,18 @@ test('a depth always makes the same cave, and every floor is bigger than the one
     const again = floorLayout(4);
     assert.equal(again.shaft.join(), floorLayout(4).shaft.join());
     assert.equal(floorLayout(0), floorLayout(1), 'a floor below the first is the first');
-    let lastShaft = 0, lastChambers = 0;
-    for(let floor = 1; floor <= 5; floor++) {
+    let lastChambers = 0;
+    for(let floor = 1; floor <= 10; floor++) {
         const layout = floorLayout(floor);
-        const toShaft = Math.hypot(layout.shaft[0], layout.shaft[1]);
+        assert.equal(layout.main, 3 + floor, `floor ${floor}: 3 + the floor chambers for the first ten floors`);
         assert.ok(layout.main > lastChambers, `floor ${floor} has more chambers than floor ${floor - 1}`);
-        assert.ok(toShaft > lastShaft * 1.15, `floor ${floor}: the shaft is much farther than on floor ${floor - 1} (${toShaft.toFixed(0)} against ${lastShaft.toFixed(0)})`);
-        lastShaft = toShaft;
         lastChambers = layout.main;
     }
     assert.ok(Math.hypot(...floorLayout(1).shaft) >= 180, 'even the first floor is a real walk, far larger than the old hand-made caves');
     assert.equal(chamberCount(1), 4);
+    assert.deepEqual([10, 11, 15, 20, 30].map(chamberCount), [13, 13, 14, 15, 17], 'after the tenth floor, a chamber every five floors');
     assert.equal(chamberCount(100), MAX_CHAMBERS, 'the caves stop growing once they are as big as the game can draw');
-    assert.ok(extent(floorLayout(5)) > extent(floorLayout(1)) * 3, 'floor 5 covers several times the ground of floor 1');
+    assert.ok(extent(floorLayout(5)) > extent(floorLayout(1)) * 2, 'floor 5 covers a lot more ground than floor 1');
     assert.equal(floorName(1), 'THE UPPER GALLERY');
     assert.equal(floorName(12), 'THE LOST LEVEL 12');
 });
@@ -237,7 +236,7 @@ test('floors get twin caverns, long galleries and rockfalls with depth, and the 
         for(const e of layout.extras) assert.ok(e.owner > 0 && e.owner < layout.main - 1, `floor ${floor}: never on the lift's chamber or the shaft's`);
         for(const e of layout.extras.filter(e => e.kind === 'gallery')) assert.ok(floor >= 3, 'galleries start on floor 3');
         for(const [x, z, r] of layout.rockfalls) {
-            assert.ok(r >= 4.6 && isOpen(layout, x, z, r + 7), `floor ${floor}: a rockfall has a wide way round it`);
+            assert.ok(r >= 3.6 && isOpen(layout, x, z, r + 5), `floor ${floor}: a rockfall has a wide way round it`);
             assert.ok(layout.pillars.some(p => p[0] === x && p[1] === z && p[2] === r), 'and is solid like a column');
         }
     }
@@ -257,5 +256,33 @@ test('every floor from 1 to 30 can be walked from the lift to the shaft and to e
         }
         assert.ok(isOpen(layout, 0, 0, 12), `floor ${floor}: the lift still has room`);
         assert.ok(layout.main > 2, `floor ${floor}: still a descent`);
+    }
+});
+
+// The mine is dark and the way back is marked with torches (MINE_PLAN.md, "Level size and torches"), so a floor is only so long: the road from the
+// lift to the shaft is about 250 on the first floor, 500 on the fifth, 800 on the tenth and 1,500 by the thirtieth, a torch every 40 units.
+test('the road from the lift to the shaft is short on the first floors and grows slowly', () => {
+    for(const [floor, target] of [[1, 250], [5, 500], [10, 800], [30, 1500]]) {
+        const length = roadLength(floorLayout(floor));
+        assert.ok(Math.abs(length - target) <= target * 0.15, `floor ${floor}: a road of about ${target} (${Math.round(length)})`);
+    }
+    let last = roadLength(floorLayout(1));
+    for(let floor = 2; floor <= 30; floor++) {
+        const length = roadLength(floorLayout(floor));
+        assert.ok(length >= last * 0.9 && length <= last * 1.4, `floor ${floor}: no jump from ${Math.round(last)} to ${Math.round(length)}`);
+        last = length;
+    }
+    assert.ok(roadLength(floorLayout(10)) < 900 && roadLength(floorLayout(5)) < 600, 'the first ten floors stay small');
+    // About one torch every 40 units: floor 1 needs only a handful, and the deep floors never more than about forty.
+    assert.ok(Math.ceil(roadLength(floorLayout(1)) / 40) <= 8);
+    assert.ok(Math.ceil(roadLength(floorLayout(30)) / 40) <= 40);
+});
+
+test('every way a floor needs is open: the shaft, every chamber, alcove, treasure room, chest and extra cavern can be walked to', () => {
+    for(const floor of [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 12, 15, 17, 20, 25, 30]) {
+        const layout = floorLayout(floor);
+        const cells = reachable(layout, solidsOf(layout), [0, 0]);
+        for(const [i, n] of layout.nodes.entries()) assert.ok(near(cells, [n.x, n.z], 9), `floor ${floor}: ${n.kind} ${i} can be reached`);
+        for(const [x, z, node] of layout.spawns) assert.ok(near(cells, [x, z]), `floor ${floor}: the tunnel mouth in chamber ${node} can be reached`);
     }
 });

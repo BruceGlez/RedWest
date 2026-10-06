@@ -64,7 +64,7 @@ test('the furniture is in the room, apart from each other, and leaves room to wa
 
 test('the prompts say where each door goes', () => {
     assert.equal(parlourLabel({ id: 'grimsby' }), 'MR. GRIMSBY, UNDERTAKER');
-    assert.match(parlourLabel({ id: 'cellar' }), /HOLLOW CLAIM/);
+    assert.match(parlourLabel({ id: 'cellar' }), /CELLAR STAIRS/);
     assert.equal(parlourLabel({ id: 'leave' }), 'BACK TO THE STREET');
     assert.equal(parlourLabel({ id: 'other', label: 'OTHER' }), 'OTHER');
 });

@@ -1,6 +1,8 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { TEMPLATES, GRAVE_COUNT, SOULS, graveQuest, graveQuests, questProgress, goalText, huntable, plural } from '../src/graveQuests.js';
+import { TEMPLATES, GRAVE_COUNT, SOULS, REWARD_CAP_DOLLARS, RANK_TITLES, graveQuest, graveQuests, questProgress, questReward, gravesOpen, goalText, huntable, plural } from '../src/graveQuests.js';
+import { MAX_DOLLARS_PER_RUN, createProfile } from '../src/profile.js';
+import { OUTLAWS } from '../src/outlaws.js';
 import { mineRoster, monsterDef } from '../src/mineMonsters.js';
 
 const ALL = ({ depths = [0, 1, 3, 6, 12, 25], days = 60 } = {}) => depths.flatMap(deepest => Array.from({ length: days }, (_, day) => graveQuests({ seed: 7, day, deepest }).map(q => ({ q, deepest }))).flat());
@@ -77,7 +79,7 @@ test('quests grow with the player: what is asked from a deeper player is deeper 
     assert.ok(huntable(2).length >= 1, 'floor 2 has something to hunt');
 });
 
-test('a quest names no reward, no timer, and nothing that can be bought or sold', () => {
+test('a quest itself names no reward, timer or price: what it pays is questReward, apart from the quest', () => {
     for(const { q } of ALL({ days: 10 })) {
         const keys = JSON.stringify(Object.keys(q)) + JSON.stringify(q.goals.map(g => Object.keys(g)));
         assert.ok(!/reward|nugget|dollar|star|expires|timer|minutes|price/i.test(keys), keys);
@@ -104,4 +106,45 @@ test('the words read plainly, with the right plural', () => {
     assert.equal(goalText({ type: 'kill', monster: 'bat', count: 1, floor: 2 }), 'Kill 1 CAVE BAT on floor 2 or deeper.');
     assert.equal(goalText({ type: 'ore', count: 7, floor: 4 }), 'Bring up 7 ore from floor 4 or deeper.');
     for(const { q } of ALL({ days: 5 })) for(const g of q.goals) assert.ok(goalText(g).length > 12 && goalText(g).length <= 170, goalText(g));
+});
+
+test('the graves appear only once Deacon Graves has a star, and no other outlaw opens them', () => {
+    const p = createProfile(new Date('2026-10-01T08:00:00Z'));
+    assert.equal(gravesOpen(p), false);
+    assert.equal(gravesOpen(null), false);
+    for(const id of ['dusty-pete', 'rattlesnake-rosa', 'calloway-gang', 'iron-jack', 'lucky-lou']) p.stats.stageStars[OUTLAWS.findIndex(o => o.id === id)] = 7;
+    assert.equal(gravesOpen(p), false);
+    p.stats.stageStars[OUTLAWS.findIndex(o => o.id === 'deacon-graves')] = 6; // stars without the "beaten" bit do not open it
+    assert.equal(gravesOpen(p), false);
+    p.stats.stageStars[OUTLAWS.findIndex(o => o.id === 'deacon-graves')] = 1;
+    assert.equal(gravesOpen(p), true);
+});
+
+test('a deeper quest pays clearly more, and every quest stays far under a Wanted Road run', () => {
+    const pay = (template, floor, main = false) => questReward({ template, main, goals: [{ type: 'ore', count: 5, floor }] });
+    for(const template of TEMPLATES) {
+        assert.ok(pay(template, 12).dollars > pay(template, 4).dollars + 10, `${template}: floor 12 pays well over floor 4`);
+        assert.ok(pay(template, 20).dollars > pay(template, 12).dollars, `${template}: and floor 20 over floor 12`);
+        assert.ok(pay(template, 12).ore >= pay(template, 4).ore);
+    }
+    assert.ok(pay('clear', 10, true).dollars > pay('mix', 10).dollars, 'the main quest pays most for the same floor');
+    const everything = ALL({ depths: [0, 3, 8, 15, 30, 60, 120], days: 40 });
+    for(const { q } of everything) {
+        const r = questReward(q);
+        assert.ok(Number.isInteger(r.dollars) && r.dollars >= 8 && r.dollars <= REWARD_CAP_DOLLARS, `${r.dollars}`);
+        assert.ok(Number.isInteger(r.ore) && r.ore >= 1);
+        assert.ok(r.title === null || RANK_TITLES.some(t => t.name === r.title));
+        assert.equal(r.title !== null, q.main && Math.max(...q.goals.map(g => g.floor)) >= RANK_TITLES[0].from, 'only the main quest earns a title');
+        assert.deepEqual(Object.keys(r).sort(), ['dollars', 'ore', 'title'], 'dollars, ore and a title: no nuggets, no stars, nothing else');
+    }
+    for(let day = 0; day < 60; day++) for(const deepest of [0, 10, 40]) {
+        const total = graveQuests({ seed: 1, day, deepest }).reduce((sum, q) => sum + questReward(q).dollars, 0);
+        assert.ok(total < MAX_DOLLARS_PER_RUN, `a day's six graves (${total}) pay less than one Wanted Road run can (${MAX_DOLLARS_PER_RUN})`);
+    }
+});
+
+test('the reward table in the design note matches the numbers', () => {
+    const at = (template, floor, main = false) => questReward({ template, main, goals: [{ type: 'ore', count: 1, floor }] }).dollars;
+    assert.deepEqual([at('clear', 2), at('clear', 6), at('clear', 10), at('clear', 20), at('clear', 40)], [14, 30, 46, 86, 90]);
+    assert.deepEqual([at('find', 10), at('hunt', 10), at('mix', 10), at('clear', 10, true)], [37, 55, 64, 83]);
 });

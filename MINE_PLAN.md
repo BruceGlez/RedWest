@@ -31,7 +31,7 @@ walking back to it brings you up with whatever you got. Deeper is stranger, hard
 | **1e** | Floor variety: twin caverns, long galleries and rockfalls you walk round, deterministic per depth | small | **built 2026-10-05** ("The maps", below) |
 | **1f** | Six more monsters for floors 15 to 20, built only from behaviours and looks the game already has (`look` field, see "Deeper monsters") | small | **built 2026-10-05**; own models wait for the art lane |
 | **2** | A deepest floor that is saved, a checkpoint every few floors, ore picked up on the way down, ore lost when you fall and kept when you ride up | medium | **2a built 2026-10-06** (the data contract, below); **2b built 2026-10-06** (the mine side: stairs, ore, saving; "Slice 2b" below); the server endpoint is still to do |
-| **5** | The dark mine (owner's brief, 2026-10-06): a cellar and a hidden door that Deacon Graves's defeat unlocks, a mine with no light of its own, a lantern and torches you buy and place, monsters that sense you by distance, light eaters from the deep floors, and a lift and shaft you can see | large; five parts, below | **planned**, assigned by lane ("Slice 5") |
+| **5** | The dark mine (owner's brief, 2026-10-06): a cellar and a hidden door that Deacon Graves's defeat unlocks, a mine with no light of its own, a lantern and torches you buy and place, monsters that sense you by distance, light eaters from the deep floors, and a lift and shaft you can see | large; five parts, below | **in progress** ("Slice 5"): the cellar and the hidden door are built (town lane, 2026-10-06); the rest is planned by lane |
 | **6** | Quests from the graves: Deacon Graves's graveyard in town gives generated jobs, the fallen souls asking for revenge or for their unfinished quests to be finished (find an item, kill a creature, kill a number, or a mix), many of them in the mine | medium | planned, owner said yes 2026-10-06 ("Slice 6") |
 | **3** | Boss floors (every 5th), more of Mr. Grimsby's talk and rumours, a pet that follows you down | medium | planned |
 | **4** | The art pass for the maps and the monsters: modelled rock, timber, carts, a real lift and shaft, painted textures (`POLISH_PLAN.md`, section 6) | large | parked, like the other art passes. The maps are made of boxes so this can replace them one builder at a time. |
@@ -211,6 +211,8 @@ authenticated like `/api/run`, returning `{ result, profile }`.
 Written down as the owner gave it, then split by lane. Decisions he made when asked are marked **decided**; anything else is an assumption and is
 listed under "Still open" so an agent asks before building on it.
 
+**Built so far (town lane, 2026-10-06): the cellar and the hidden door.** The parlour's stairs now lead to the cellar, a small room of its own (`src/cellarLayout.js`, `src/places/cellar.js`, a placeholder scene `src/placeCellar.js`). The way down is a hidden door in its east wall, a door that only shows its prompt when the marshal is within about 1.6 of it (a per-door `reach` in `nearestDoor`, `src/townWalkLogic.js`), so he has to walk the wall to find it. Until Deacon Graves has a star the wall only "rings hollow" (a card names him); once he has, the door offers FLOOR 1 and every checkpoint, as the stairs card used to. Nothing new is saved: finding the door is walking to it, so a save keeps its deepest floor, checkpoints and ore (`tests/cellarLayout.test.js`). A player who had reached the mine before the Deacon is beaten keeps all of it and gets back in when he is. `tests/mine-smoke.mjs` now starts with the Deacon beaten and goes down through the cellar. The parlour's stairs prompt reads THE CELLAR STAIRS (`src/undertakerLayout.js`, mine lane's file, one line).
+
 ### The brief
 
 1. **A cellar before the mine, and a hidden door.** Today the cellar stairs go straight down. Instead the cellar is a small place of its own
@@ -268,6 +270,7 @@ What we already do and what it means:
 ### Art status (art lane, code art only for now)
 
 3. **Light eater model: built** (`createLightEaterMesh` in `src/assets.js`): a small dark bug with pale mandibles, four running legs and a dim amber abdomen (`userData.ember`, an unlit child the rules may dim or brighten). Waiting on the **mine** lane (its rules and floors) and **combat** (its behaviour): they add the monster with `look: 'lighteater'` and the mesh in `MINE_MESHES` (`src/enemySystem.js`).
+4. **Hidden door: built** as a part (`src/placeHiddenDoor.js`, `createHiddenDoor()`): `group.position`/`rotation.y` from the cellar layout, `update(t, distanceFromMarshal)` each frame (a faint seam of light, dust at the foot and a draught when near, nothing from far away), `setOpen(true)` swings it on a lit passage. Waiting on the **town** lane: the cellar layout and placeholder scene (`src/placeCellar.js`) that place it on a wall spot, say how wide the wall spot is (the door is 3.2 x 4.6 units; ask the art lane to change that), and call `setOpen` once Deacon Graves has a star.
 
 ### Decided by the owner (2026-10-06, answers to the "still open" list)
 
@@ -296,6 +299,38 @@ Measured from `floorLayout(depth)` (`src/mineMap.js`; "main road" is the chain f
 
 So floor 1 is already about 400 and it is 1,900 by floor 5: marking the way back would take 60 or more torches, which is too many to carry, buy or place. **Targets for the mine agent** (the numbers are a start, to tune by playing): a main road of about 250 on floor 1, about 500 by floor 5, about 800 on floor 10, then growing slowly to about 1,500 by floor 30 and staying there; chambers `3 + floor` for the first 10 floors, then slowly; a torch roughly every 40 units, so about 6 torches on floor 1, 12 on floor 5, 20 on floor 10 and not more than about 38 deep down. Carry limit around 10 to 12, bought in stacks of a few, plus oil to match. Floors stay deterministic per depth (the generator is unchanged); only the sizes change, and `tests/mine*.test.js` pin the new targets.
 
+**Built 2026-10-06 (slice 5, part 0: the floors are smaller).** `chamberCount` is now `3 + floor` for the first ten floors and one more chamber every five
+floors after (up to `MAX_CHAMBERS` 17); chambers are 22 to 30 units wide (growing from the tenth floor) and spaced so the road (`roadLength`, the rails from
+the lift to the shaft, one number the torches have to mark) is about 270 on floor 1, 550 on floor 5, 840 on floor 10, 990 on floor 15, 1,180 on floor 20 and
+1,500 on floor 30 (`tests/mineMap.test.js` pins each target within 15% and says no floor jumps by more than 40%). A torch every 40 units is then 7 on floor 1,
+14 on floor 5, 21 on floor 10 and 38 at the deepest. **Note on the table above:** it measured a longer "main road" than the rails (404 on floor 1); the
+straight distance lift to shaft quoted in "The descent" (237 on floor 1) matches `roadLength`, so the targets are applied to `roadLength`. Two generator fixes
+came with it, because new floors meant new dice: props are kept off the way into every alcove and treasure room, and a repair pass (`openBlockedWays`)
+walks the cave after the props go in and takes away any column, crate or cart that shuts a way to the shaft, a chamber, a chest or an extra cavern; tunnel
+mouths are only put where the marshal can walk. The wall ring also stands 1.2 units inside the open ground (`WALL_INSET`), so a thin spit of rock between two
+caves cannot slip between its circles. Rockfalls are a little smaller (3.6 to 5.4) so they still fit the smaller chambers. Smaller chambers hold fewer
+monsters (a chamber's danger grows with its area), so the early floors are quieter: tune `nodeBudget` if a playtest says so.
+
+**Built 2026-10-06 (slice 5, part (a): the light rules).** `src/mineLight.js` (pure, with `tests/mineLight.test.js`) and a `light` field in `profile.mine`:
+`{ lantern, oil, torches, matches }` (what he owns, kept inside its limits by `normalizeLightKit`). What it says:
+- **Numbers:** `DIM_RING` 6 (always: your own feet), `LANTERN_RADIUS` 15 (lit, while it has oil), `TORCH_RADIUS` 12, a torch every `TORCH_SPACING` 40 units of the
+  road (`torchesFor(roadLength)`: 7 on floor 1), `MIN_TORCH_GAP` 14, carry limit `CARRY_LIMIT` 10 torches and `MATCH_LIMIT` 20 matches, `OIL_CAPACITY` 900 seconds of burn.
+- **What is sold** (`LIGHT_ITEMS`, in Bounty Dollars only; `buyLight(profile, id, shop)` spends `balances.dollars` and nothing else, and refuses without changing
+  anything): the lantern (once, comes full), lamp oil (fills it), torches x5, matches x5 (a relight costs one match). Mr. Grimsby's and the general store
+  charge the same except `SHOP_MARKUP` (the store 10% more, rounded up). The test fails if any price is in nuggets or any real-money product sells light.
+- **Running out:** with no lantern or no oil the radius falls to the dim ring, never to nothing, so nobody is ever stuck (and the lift and shaft stay visible: part (c)).
+- **A run:** `createLightRun(kit)`, `burnLantern`, `placeTorch` (not within `MIN_TORCH_GAP` of another on the same floor), `putOutTorch` (a light eater, part (d)),
+  `relightTorch` (one match), `burnTorches` (only from `TORCHES_BURN_OUT_FROM`, default `Infinity`: permanent), `isLit`, and `lightSource(run, floor, at)` which returns
+  `{ radius, holes: [{ x, z, r, k }] }` (at most 12 torches, nearest first): exactly what `setMineLightSource` in the art lane's `src/placeDark.js` reads.
+- **Saving:** the run's summary carries `used: { oil, torches, matches }` and `applyMineRun` takes that from the kit (never below nothing, whatever happened to the
+  marshal). Placed torches stay on their floor and are not returned. The server cannot see the run, so a client could under-report what it used: that gives free light,
+  not money or power, and a server-issued run token (already proposed for the depth) would close it.
+- **Owner to confirm (OPEN):** the prices (lantern 60, oil 15, torches x5 20, matches x5 5; a first kit 85 and a refill 35 against what a short Wanted Road run earns),
+  the oil in a refill (a full lantern is 15 minutes of burn), and what torches do from floor 15 (`TORCHES_BURN_OUT_FROM`; options: stay permanent, burn out after
+  `TORCH_BURN_SECONDS` 10 minutes, or need a match to relight each floor).
+- **Still to do for the light:** the wallet and server calls to buy (`POST /api/mine/buy`, scale; `wallet.buyLight`, money), the shop cards (town), and the mine mode
+  using it (a button to place a torch, burning the lantern, calling `setMineLightSource`): after the dark layer (#56) and the shops exist.
+
 ## Slice 6: quests from the graves (owner's brief, 2026-10-06)
 
 The owner said yes to a quest generator, with a theme: **the graves in Deacon Graves's place are the quest givers, fallen souls who want
@@ -323,11 +358,26 @@ kill one creature, kill a number of creatures, or a mix, plus a main quest that 
 - **What the mine lane has to count** (a tally since the quest was taken): `{ kills: { monsterId: n }, ore: n }`. `questProgress(quest, tally)` reads it and says
   which goals are done. The state in the profile and the server (`profile.quests`: the quest ids taken, their tallies, the ones finished) is the data contract for
   the next PR, once the reward is decided.
-- **No reward is named on purpose, and a test fails if one appears.** No timer, no stars, no Gold Nuggets.
-- **Open for the owner: what a quest pays.** Options: (1) a small amount of Bounty Dollars (fair, since light costs money and the mine pays none; it must stay
-  well under the jail's rate, and quests are once a day per grave), (2) ore, (3) cosmetic titles or markings for the marshal, (4) only the words of the soul (the
-  Calloway farm's epilogue style), or a mix of (3) and (1). Bounty Dollars from the graves would be the one place the mine's rule "no money from the mine" bends,
-  so it is the owner's call.
+- **The graves appear only after Deacon Graves has a star** (`gravesOpen`, the same unlock as the cellar's hidden door), and they stand in his own section, Hollow Hill
+  (owner, 2026-10-06). Same quests for every player on the same day (`seed` 0), made when a grave is opened.
+- **What a quest pays (owner's answers, 2026-10-06): it depends on the quest and pays more the deeper it goes.** `questReward(quest)` gives `{ dollars, ore, title }`:
+  earned Bounty Dollars, ore, and for the main quest a cosmetic rank title; never Gold Nuggets, stars or anything that changes a fight. `dollars = (6 + 4 x floor)`
+  times the template's share (find 0.8, clear 1, hunt 1.2, mix 1.4, main 1.8), rounded, at most **$90** a quest; `ore = floor / 2` (the main quest: 1.5 x floor), at least 1;
+  the main quest's title by its floor: 10 DELVER, 15 DEEP DELVER, 25 LAMPLESS, 40 THE LONG DARK. A quest is never timed.
+
+  | Floor asked | find | clear | hunt | mix | main |
+  |---|---|---|---|---|---|
+  | 2 | $11 | $14 | $17 | $20 | (the main quest is never above floor 10) |
+  | 6 | $24 | $30 | $36 | $42 | |
+  | 10 | $37 | $46 | $55 | $64 | $83 and DELVER |
+  | 20 | $69 | $86 | $90 | $90 | $90 and DEEP DELVER |
+  | 40 | $90 | $90 | $90 | $90 | $90 and THE LONG DARK |
+
+  The most the six graves of a day can pay together is six times the cap, $540, always less than the $600 a single Wanted Road run can bank
+  (`MAX_DOLLARS_PER_RUN`); the table is pinned by `tests/graveQuests.test.js`. Since light costs money and the mine pays none, this is where the
+  mine's money comes back, only through the graves and only for the deeper trips; ore and titles are banked and shown the same way as before.
+- **Not built yet:** the state in the profile and the server (`profile.quests`: the quests taken, their tallies, the ones finished and paid), the cards on the hill, and
+  the mine lane's counting. The data contract goes next.
 
 ## Open questions
 

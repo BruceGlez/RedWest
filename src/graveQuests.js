@@ -1,4 +1,5 @@
 import { MINE_LADDER, mineRoster, monsterDef } from './mineMonsters.js';
+import { OUTLAWS } from './outlaws.js';
 
 // Quests from the graves (MINE_PLAN.md, slice 6). The graves on Deacon Graves's hill are the quest givers: fallen souls who want revenge, or want
 // the job they left unfinished finished. A quest is made when you open a grave, from a template, never kept in a list: the same seed, day,
@@ -11,10 +12,16 @@ import { MINE_LADDER, mineRoster, monsterDef } from './mineMonsters.js';
 // - Everything asked is in the mine and is something the player can do from his deepest floor: a target kind lives on the floor that is asked
 //   (`mineRoster`), and an ordinary quest is never deeper than two floors below the deepest he has reached. The main quest is the long goal: it
 //   asks for floor 10 or three below his deepest, whichever is deeper.
-// - No quest has a timer, and none gives stars or Gold Nuggets (nor anything else here: the reward is open).
+// - No quest has a timer, and none gives stars, Gold Nuggets or anything that changes a fight. What a quest pays is `questReward`: earned Bounty Dollars,
+//   ore and, for the main quest, a cosmetic title, all growing with how deep the quest goes (the owner's answer, 2026-10-06).
+// - The graves are on Deacon Graves's own hill and only appear once he has a star (`gravesOpen`), the same unlock as the cellar's hidden door.
 // - The mine lane counts what is killed and found (`profile.mine`); `questProgress` is how those counts are read against a quest.
 
 export const TEMPLATES = ['find', 'hunt', 'clear', 'mix'];
+
+// The graves open with Deacon Graves's first star, like the hidden door (src/cellarLayout.js). Nothing else is read.
+const DEACON_INDEX = OUTLAWS.findIndex(o => o.id === 'deacon-graves');
+export const gravesOpen = profile => ((profile?.stats?.stageStars?.[DEACON_INDEX]) & 1) !== 0;
 export const GRAVE_COUNT = 6;
 
 // Fallen souls. `mood`: 'revenge' wants something killed, 'unfinished' wants a job finished. Names and lives are our own.
@@ -120,4 +127,24 @@ export function goalText(goal) {
     if(goal.posse) return `Kill ${goal.named}, a ${def.name} bigger and tougher than the rest, on ${floor}, with the ${goal.posse} ${plural(monsterDef(goal.posseKind).name)} that follow it.`;
     if(goal.named) return `Hunt down ${goal.named}, a ${def.name} the miners talk about, on ${floor}.`;
     return `Kill ${goal.count} ${goal.count === 1 ? def.name : plural(def.name)} on ${floor}.`;
+}
+
+// ---------- what a quest pays ----------
+// Earned Bounty Dollars and ore, and for the main quest a cosmetic title, never Gold Nuggets and never anything that changes a fight. It grows with the
+// deepest floor the quest asks for, so a deep quest pays clearly more than a shallow one, and it is capped well under what a Wanted Road run earns
+// (a run can pay up to MAX_DOLLARS_PER_RUN, 600): one quest never pays more than REWARD_CAP_DOLLARS, and the six graves of a day together at most six caps.
+//   dollars = (REWARD_BASE + REWARD_PER_FLOOR x floor) x the template's share, rounded, never more than the cap.
+export const REWARD_BASE = 6;
+export const REWARD_PER_FLOOR = 4;
+export const REWARD_SHARE = { find: 0.8, hunt: 1.2, clear: 1, mix: 1.4, main: 1.8 };
+export const REWARD_CAP_DOLLARS = 90;
+export const RANK_TITLES = [{ from: 10, name: 'DELVER' }, { from: 15, name: 'DEEP DELVER' }, { from: 25, name: 'LAMPLESS' }, { from: 40, name: 'THE LONG DARK' }];
+
+export function questReward(quest) {
+    const floor = Math.max(1, ...quest.goals.map(g => g.floor));
+    const share = quest.main ? REWARD_SHARE.main : REWARD_SHARE[quest.template] ?? 1;
+    const dollars = Math.min(REWARD_CAP_DOLLARS, Math.round((REWARD_BASE + REWARD_PER_FLOOR * floor) * share));
+    const ore = Math.max(1, Math.round(floor * (quest.main ? 1.5 : 0.5)));
+    const title = quest.main ? [...RANK_TITLES].reverse().find(t => floor >= t.from)?.name ?? null : null;
+    return { dollars, ore, title };
 }

@@ -92,3 +92,8 @@ Purchases and webhooks must be idempotent on the transaction id inside the same 
 2. Postgres store + contract tests + `STORE`/`DATABASE_URL` + Dockerfile `npm ci --omit=dev`.
 3. Migration script and the cut-over steps in `docs/DEPLOY.md`.
 4. (Only with a second instance) Redis limiter.
+
+## Built: the async store (PR 1 of the Postgres plan, a pure refactor)
+- `server/app.js` now `await`s every store call, and the four full-user scans became the lookups the design named: `findUserByAppleSub`, `findUserByPaymentIntent`, `findUserByName(name, exceptId)` (name taken, and name reports; one lookup instead of the design's `nameTaken` plus `reportsForName`), `listReportedUsers`, `listBoardUsers`, `removeReporter`. The interface is written at the top of `server/store.js`.
+- The JSON/memory stores still answer at once and still scan (same behaviour, same speed); `await` accepts both. `listUsers()` is not part of the interface and stays for tools and tests. `save()` is still called after writes; the Postgres store makes it a no-op, and it goes away with the JSON store.
+- No behaviour change: `tests/server.test.js` and the other suites are unchanged and green.

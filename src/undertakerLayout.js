@@ -37,7 +37,7 @@ export function parlourMap() {
 export function parlourLabel(door) {
     switch(door.id) {
         case 'grimsby': return 'MR. GRIMSBY, UNDERTAKER';
-        case 'cellar': return 'THE CELLAR STAIRS: THE HOLLOW CLAIM';
+        case 'cellar': return 'THE CELLAR STAIRS';
         case 'leave': return 'BACK TO THE STREET';
         default: return door.label;
     }
