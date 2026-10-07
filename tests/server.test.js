@@ -462,7 +462,7 @@ test('Copper Bit is shut until Dusty Pete is beaten, then shifts pay by the serv
         assert.equal(first.data.profile.town.saloon.paid, 1);
 
         const big = await shift(1, plates(500));
-        assert.equal(big.data.result.served, 3, 'night 1 holds a crowd of 3, however many the client claims');
+        assert.equal(big.data.result.served, 5, 'night 1 holds a crowd of 5, however many the client claims');
         assert.equal((await shift(1, [{ dish: 'nope', tip: 0 }, { dish: 'beans', tip: 99 }])).data.result.served, 1, 'a dish off the menu is not served');
         assert.equal((await shift(1, plates(3))).data.result.paid, false, 'only three shifts a day pay');
         assert.equal((await shift(2, plates(4))).status, 200, 'night 2 is open with the stars from night 1');

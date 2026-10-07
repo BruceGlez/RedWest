@@ -1,4 +1,4 @@
-import { crowd, menu } from './saloon.js';
+import { crowd, menu, starNeeds } from './saloon.js';
 
 // One shift behind Dusty Pete's bar (PLACES.md, section 8). The rules of the game, with no rendering, so tests/saloonShift.test.js can play
 // whole shifts. src/saloonShiftView.js draws it; src/saloon.js settles the summary (the server never trusts this file: it clamps what a
@@ -7,21 +7,33 @@ import { crowd, menu } from './saloon.js';
 // - Customers arrive over the first part of the shift and sit at one of SEATS places. Each wants one dish and has a patience bar that runs
 //   down. The three stations (the stove, the barrel, the oven) each cook one thing at a time, so what you cook first is the game.
 // - COOK a seat's dish at its station; when it is ready SERVE it. Serve while the customer still has half their patience and it is a QUICK
-//   serve (a tip). A QUICK serve with nobody having walked out yet is a PERFECT serve (the biggest tip).
-// - A customer whose patience runs out walks out: a miss, and the combo starts again.
+//   serve (a tip). The third quick serve in a row, and every one after it until the streak breaks, is a PERFECT serve (the biggest tip).
+// - A customer whose patience runs out walks out: a miss, and the streak starts again. A slow serve breaks it too.
+// - From night 3 customers come in RUSHES: bunches of three within two seconds, wanting different things (docs/design/copper-bit-shift.md, P1, P2).
 // - The same night, farm state and seed always give the same shift, so a test can replay it.
 
 export const SHIFT_SECONDS = 120;
+// Customers keep arriving over this share of the shift; the last ones are served in the time that is left. A shift ends when the last customer
+// has been served or has walked out (the clock only shows SHIFT_SECONDS; nothing is cut off at it). HARD_STOP is only a guard for a stuck shift.
+export const ARRIVAL_SHARE = 0.75;
+export const HARD_STOP = SHIFT_SECONDS + 40;
+// A quick serve is perfect when it makes this many quick serves in a row.
+export const STREAK_FOR_BIG_TIP = 3;
+// Rushes: how many customers in one, how many seconds a rush spreads over, and where in the arrival span each one lands, by night.
+export const RUSH_SIZE = 3;
+export const RUSH_SPREAD = 2;
+export const RUSH_NIGHT_ONE = 3;
+export const RUSHES = night => (night >= 7 ? [0.25, 0.5, 0.75] : night >= RUSH_NIGHT_ONE ? [0.35, 0.7] : []);
 export const SEATS = 4;
 export const STATIONS = ['stove', 'barrel', 'oven'];
 // Seconds a station takes for a dish.
-export const COOK_SECONDS = { sarsaparilla: 1.5, beans: 3, cornbread: 4, eggs: 3.5, pie: 5 };
+export const COOK_SECONDS = { sarsaparilla: 1.5, beans: 3, cornbread: 4, eggs: 3.5, pie: 5, stew: 4 };
 // A customer waiting for a free seat gives up after this long (a miss).
 export const SEAT_WAIT = 8;
 // Share of a customer's patience that must be left for a serve to be quick.
 export const QUICK_SHARE = 0.5;
-// Seconds of patience at the start of a night: the later nights are less patient, never under 16.
-export const patience = night => Math.max(16, 40 - night * 2);
+// Seconds of patience at the start of a night: 28 on night 1, 14 on night 10, never under 14.
+export const patience = night => Math.max(14, Math.round(30 - 1.7 * night));
 
 // A small repeatable random stream (mulberry32), so a night's crowd depends only on the night, the farm and the seed.
 function stream(seed) {
@@ -38,12 +50,23 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
     const next = stream(seed * 7919 + night * 104729);
     const dishes = menu(night, farm);
     const total = crowd(night);
-    const span = SHIFT_SECONDS * 0.7;
-    // Who comes, when, and what they want: spread over the first part of the shift with a little jitter.
-    const arrivals = Array.from({ length: total }, (_, i) => ({
-        at: Math.max(0, (i * span) / total + (next() - 0.5) * (span / total) * 0.6),
-        dish: dishes[Math.floor(next() * dishes.length)].id
-    })).sort((a, b) => a.at - b.at);
+    const span = SHIFT_SECONDS * ARRIVAL_SHARE;
+    const dishAt = () => dishes[Math.floor(next() * dishes.length)];
+    // Who comes, when, and what they want. The rushes first: bunches that want at most two things from the same station, so what to cook first is a choice.
+    const rushes = RUSHES(night).slice(0, Math.floor(total / RUSH_SIZE));
+    const arrivals = [];
+    rushes.forEach((share, rush) => {
+        let group = [];
+        for(let tries = 0; tries < 12; tries++) {
+            group = Array.from({ length: RUSH_SIZE }, dishAt);
+            if(new Set(group.map(d => d.station)).size > 1 || new Set(dishes.map(d => d.station)).size < 2) break;
+        }
+        group.forEach((d, i) => arrivals.push({ at: share * span + (i * RUSH_SPREAD) / (RUSH_SIZE - 1) + next() * 0.2, dish: d.id, rush }));
+    });
+    // The rest arrive evenly over the span with a little jitter.
+    const rest = total - arrivals.length;
+    for(let i = 0; i < rest; i++) arrivals.push({ at: Math.max(0, ((i + 0.5) * span) / rest + (next() - 0.5) * (span / rest) * 0.6), dish: dishAt().id });
+    arrivals.sort((a, b) => a.at - b.at);
     const full = patience(night);
 
     const state = {
@@ -67,7 +90,7 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
     }
     function finishIfDone() {
         if(!state.pending.length && !state.queue.length && state.seats.every(s => s === null)) state.over = true;
-        if(state.time >= SHIFT_SECONDS) state.over = true;
+        if(state.time >= HARD_STOP) state.over = true;
     }
 
     return {
@@ -94,7 +117,7 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
             const s = state.seats[index];
             if(state.over || !s || !s.ready) return -1;
             const quick = s.left / full >= QUICK_SHARE;
-            const tip = quick ? (state.missed === 0 ? 2 : 1) : 0;
+            const tip = quick ? (state.combo + 1 >= STREAK_FOR_BIG_TIP ? 2 : 1) : 0;
             state.served.push({ dish: s.dish, tip });
             state.combo = quick ? state.combo + 1 : 0;
             state.bestCombo = Math.max(state.bestCombo, state.combo);
@@ -133,6 +156,14 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
                 return true;
             });
             finishIfDone();
+        },
+        // What the screen needs to show how the shift is going: served so far against the crowd and the star notches (starNeeds), the streak and how
+        // many more quick serves make the next big tip.
+        progress() {
+            return {
+                served: state.served.length, crowd: total, needs: starNeeds(night), stars: state.served.length >= total ? 3 : starNeeds(night).filter(n => state.served.length >= n).length,
+                combo: state.combo, bestCombo: state.bestCombo, streakLeft: Math.max(0, STREAK_FOR_BIG_TIP - state.combo), missed: state.missed
+            };
         },
         // What the shift reports to src/saloon.js: { night, served: [{ dish, tip }] }.
         summary() { return { action: 'shift', night, served: state.served.map(s => ({ ...s })) }; },

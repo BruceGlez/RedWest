@@ -1,7 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PAID_SHIFTS_PER_DAY, NIGHTS, DISHES, TIP_RATES, FARM_TIP_BONUS, crowd, menu, saloonOpen, createSaloon, normalizeSaloon, nightsOpen, paidShiftsLeft, starsFor, shiftPay, settleShift, saloonAction,
-    SHIFT_PAY_CEILING, UPGRADES, MAX_REGULAR_VISITS, MAX_REGULARS, getUpgrade, buyUpgrade } from '../src/saloon.js';
+import { PAID_SHIFTS_PER_DAY, NIGHTS, DISHES, TIP_RATES, FARM_TIP_BONUS, crowd, menu, saloonOpen, createSaloon, normalizeSaloon, nightsOpen, paidShiftsLeft, starsFor, starNeeds, shiftPay, settleShift, saloonAction,
+    SHIFT_PAY_CEILING, UPGRADES, getDish, MAX_REGULAR_VISITS, MAX_REGULARS, getUpgrade, buyUpgrade } from '../src/saloon.js';
 import { dayNumber } from '../src/farmOrders.js';
 import { createProfile, normalizeProfile } from '../src/profile.js';
 import { OUTLAWS } from '../src/outlaws.js';
@@ -43,10 +43,14 @@ test('it opens with Dusty Pete alone, and reads no other outlaw', () => {
 test('the menu grows with the nights, and the farm adds dishes without being needed', () => {
     assert.deepEqual(menu(1, false).map(d => d.id), ['sarsaparilla', 'beans']);
     assert.deepEqual(menu(2, false).map(d => d.id), ['sarsaparilla', 'beans', 'cornbread']);
-    assert.deepEqual(menu(10, false).map(d => d.id), ['sarsaparilla', 'beans', 'cornbread'], 'without the farm the menu stops at the saloon\'s own dishes');
+    assert.deepEqual(menu(4, false).map(d => d.id), ['sarsaparilla', 'beans', 'cornbread']);
+    assert.deepEqual(menu(5, false).map(d => d.id), ['sarsaparilla', 'beans', 'cornbread', 'stew'], 'night 5 brings a farm-free dish');
+    assert.deepEqual(menu(10, false).map(d => d.id), ['sarsaparilla', 'beans', 'cornbread', 'stew'], 'without the farm the menu stops at the saloon\'s own dishes');
+    assert.deepEqual(getDish('stew'), { id: 'stew', name: 'STEW', station: 'stove', price: 6, from: 5, farm: false });
+    assert.ok(getDish('stew').price < getDish('pie').price && getDish('stew').price > getDish('cornbread').price, 'between cornbread and the pie');
     assert.deepEqual(menu(10, true).map(d => d.id), DISHES.map(d => d.id));
     assert.ok(menu(3, true).some(d => d.id === 'eggs') && !menu(4, true).some(d => d.id === 'pie') && menu(5, true).some(d => d.id === 'pie'));
-    assert.ok(crowd(1) < crowd(5) && crowd(10) === 10 && crowd(7) === 9 && crowd(0) === 3);
+    assert.ok(crowd(1) < crowd(5) && crowd(1) === 5 && crowd(10) === 14 && crowd(7) === 11 && crowd(0) === 5 && crowd(99) === 14);
 });
 
 test('a shift pays prices and tips, never for a dish that is not on the menu or a crowd that did not come', () => {
@@ -61,9 +65,14 @@ test('a shift pays prices and tips, never for a dish that is not on the menu or 
 });
 
 test('stars come from how much of the crowd was served', () => {
-    const n = crowd(7); // nine customers
-    assert.equal(n, 9);
-    assert.deepEqual([9, 7, 6, 5, 4, 0].map(served => starsFor(7, served)), [3, 2, 1, 1, 0, 0]);
+    const n = crowd(7); // eleven customers
+    assert.equal(n, 11);
+    assert.deepEqual([11, 9, 8, 6, 5, 0].map(served => starsFor(7, served)), [3, 2, 1, 1, 0, 0]);
+    for(let night = 1; night <= NIGHTS; night++) {
+        const needs = starNeeds(night);
+        assert.deepEqual(needs.map(need => starsFor(night, need)), [1, 2, 3], `night ${night}: the star bar's notches are the real thresholds`);
+        assert.deepEqual(needs.map(need => starsFor(night, need - 1)), [0, 1, 2], `night ${night}: one short of a notch is the star before`);
+    }
 });
 
 test('a night opens with a star on the one before it', () => {
