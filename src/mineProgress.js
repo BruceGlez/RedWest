@@ -66,7 +66,7 @@ export function oreKept(carried, outcome) {
     return outcome === 'up' ? ore : Math.floor(ore * FALL_KEEPS);
 }
 
-// A finished mine run: summary = { startFloor, depth, ore, outcome: 'up' | 'fell', seconds, used: { oil, torches, matches } } (what the light used, src/mineLight.js).
+// A finished mine run: summary = { startFloor, depth, ore, collected (ore picked up from a death pile, optional), outcome: 'up' | 'fell', seconds, used: { oil, torches, matches } } (what the light used, src/mineLight.js).
 // Changes `mine` only (the caller's profile.mine) and returns what the result screen shows. Nothing is rejected: a summary that cannot be
 // true is cut down to what could be (a start floor that is not a checkpoint of his is floor 1; a depth no walk could reach, or more ore than
 // the floors can hold, is cut), because the client is not trusted.
@@ -77,7 +77,10 @@ export function applyMineRun(mine, summary) {
     const seconds = Number(summary?.seconds);
     const reachable = Number.isFinite(seconds) && seconds > 0 ? startFloor + Math.floor(seconds / MIN_SECONDS_PER_FLOOR) : startFloor;
     const depth = Math.min(Math.max(startFloor, whole(summary?.depth)), reachable, MAX_FLOOR);
-    const carried = Math.min(whole(summary?.ore), maxOreForRun(startFloor, depth));
+    // Ore picked up from a death pile is carried too, but it is not found on the floors: the report names it (`collected`) and the run may carry that
+    // much more than the floors hold. The caller that answers a pile collection (the server) should cap `collected` to what it handed out.
+    const collected = Math.min(whole(summary?.collected), MAX_ORE);
+    const carried = Math.min(whole(summary?.ore), maxOreForRun(startFloor, depth) + collected);
     const kept = oreKept(carried, outcome);
     spendKit(mine.light, summary?.used); // the oil burned and the torches and matches used: they are gone, whatever happened to the marshal
     const before = { deepest: mine.deepest, checkpoint: mine.checkpoint };
