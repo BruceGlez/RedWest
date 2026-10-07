@@ -136,3 +136,14 @@ test('slice 7: the pile is picked up on its own floor only, once', () => {
     assert.equal(mine.pile, null);
     assert.equal(collectPile(mine, 4), 0);
 });
+
+test('slice 7: ore picked up from a death pile may be carried on top of what the floors hold', () => {
+    const base = { startFloor: 1, depth: 1, seconds: 100 };
+    const cap = maxOreForRun(1, 1);
+    const plain = createMineProgress();
+    assert.equal(applyMineRun(plain, { ...base, ore: cap + 40, outcome: 'up' }).kept, cap, 'without an allowance the floors cap it');
+    const m = createMineProgress();
+    assert.equal(applyMineRun(m, { ...base, ore: cap + 40, collected: 40, outcome: 'up' }).kept, cap + 40);
+    assert.equal(applyMineRun(createMineProgress(), { ...base, ore: cap + 99, collected: 40, outcome: 'up' }).kept, cap + 40, 'only the allowance is added');
+    assert.equal(applyMineRun(createMineProgress(), { ...base, ore: 5, collected: -9, outcome: 'up' }).kept, 5);
+});

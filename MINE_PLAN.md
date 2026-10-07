@@ -497,3 +497,6 @@ walkable town.
 
 ## Slice 7 data contract: the resume point and the pile (owner confirmed 2026-10-07; ore only for now)
 Built in `src/mineProgress.js`, pure rules the server will apply (the brief and the reasoning are in "Slice 7: dying and coming back up", from the oil-bar PR). `profile.mine.resume = { floor, torches: [[floor, x, z, lit], ...], clock }` and `profile.mine.pile = { floor, x, z, ore, full }`, both `null` when absent (`full` is what was dropped, so the monsters' floor of one half is known). `applyMineResume` (lift up: banks the ore, saves the resume point), `applyMineDeath` (pile at the spot, remains of an older pile added, resume cleared, `thrownTo(floor)` is 5 up and never above 1), `monsterTakes` (a quarter of what is left, never below half of `full`), `collectPile` (own floor only). Waiting on the scale lane for the endpoints; the mine mode consumes them in the next PR.
+
+### Contract addition: `collected` (Slice 7c)
+Ore picked up from a death pile is carried in the run but is not found on the floors, so a run report may name it: `summary.collected`. `applyMineRun` lets the run carry `maxOreForRun(startFloor, depth) + collected` (never more than `MAX_ORE`). The server should cap `collected` to what it handed out when the pile was collected.
