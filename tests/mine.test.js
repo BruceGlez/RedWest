@@ -193,3 +193,19 @@ test('slice 7: riding the lift up remembers the floor, and the next descent can 
     assert.deepEqual(startFloors(withResume(record)), [1, 5]);
     forgetResume();
 });
+
+test('slice 7: the lift reports a resume save with the torches left standing', async () => {
+    const { beginMineRun, endMineRun, resumeSummary, mine } = await import('../src/mine.js');
+    const { placeTorch } = await import('../src/mineLight.js');
+    const { forgetResume } = await import('../src/mineResume.js');
+    forgetResume();
+    beginMineRun(1, { deepest: 3, checkpoint: 0, light: { lantern: true, oil: 300, torches: 5, matches: 2 } });
+    placeTorch(mine.light, 1, 2, 1);
+    mine.ore = 7;
+    const summary = resumeSummary(42);
+    assert.equal(summary.action, 'save');
+    assert.equal(summary.outcome, 'up');
+    assert.equal(summary.ore, 7);
+    assert.deepEqual(summary.torches, [[1, 1, 2, 1]]);
+    endMineRun();
+});

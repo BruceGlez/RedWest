@@ -141,6 +141,11 @@ export function runSummary(result, seconds) {
         used: mine.light ? usedKit(mine.light) : { oil: 0, torches: 0, matches: 0 } };
 }
 
+// What the lift reports on the way up (POST /api/mine/resume, { action: 'save' }): the run's summary and the torches left standing.
+export function resumeSummary(seconds) {
+    return { ...runSummary('mine-win', seconds), action: 'save', torches: mine.light ? standingTorches(mine.light) : [] };
+}
+
 // The lift went up with the run still open to come back to: remember the floor, the torches he left and the clock (src/mineResume.js).
 export function rideUp(seconds) {
     rememberResume(mine.floor, mine.light ? standingTorches(mine.light) : [], Math.round(seconds + mine.clockBase));
