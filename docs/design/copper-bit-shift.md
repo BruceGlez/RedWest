@@ -4,6 +4,15 @@ Lane: `design` (advisory). Asked by the owner: make the Copper Bit shift feel li
 
 "Cake Mania" is named here only to describe the kind of game (a mechanic, not a look). Nothing in the build may use its names, art or characters (`AGENTS.md` rule 6, `ASSETS.md`).
 
+## Owner decisions (2026-10-07)
+
+The owner has decided on this spec, relayed by the coordinator. They override anything below that says otherwise.
+
+1. **Approved: all recommended proposals P1 to P17 as written.**
+2. **The upgrade shop is a shelf in the 3D saloon**, not only the bar's card. P7 changes: the bar's card shows the numbers (what each upgrade changes, the next price, your dollars); the shelf in the scene is the place you buy. The art lane builds the shelf; the town lane owns the rule and the `upgrade` action.
+3. **The shift screen moves to the ui lane.** `src/saloonShiftView.js` and `styles/townSaloon.css` change owner in `lanes.json` (the coordinator merges that as its own PR). So the screen work (build PRs 6 and 7, and the view parts of PR 8) is ui's; town keeps the rules, the bar's card and the upgrade action.
+4. **A farm-free STEW dish around night 5** (P12). The story lane names it (original name), price within the pay ceiling (P15). It goes into the rules PR.
+
 ## 0. What I measured
 
 I could not play the shift in a browser from this session, so I played it with a bot instead: `createShift()` driven by a greedy player (serve whatever is ready, otherwise cook the seat with the least patience whose station is free) with a fixed delay between actions. 20 seeds per night, farm open unless said. The script is not committed (design owns docs only); the numbers are reproducible from the constants below.
@@ -72,7 +81,7 @@ Rules check: no money, no combat, no randomness spend; the same seed still gives
 ### P3. Show the door
 Customers waiting for a seat (`state.queue`, 8 s `SEAT_WAIT`) are invisible today; they walk out and cost a miss without warning. Show them as a row of small door tokens above the seats, each with the dish icon and an 8 s ring. With 4 seats and rushes this is where the "oh no" moments live.
 Rules check: display only.
-**Decision for the owner:** yes or no. Cost: small. Lane: town (it owns `saloonShiftView.js`); art supplies the icon (P5).
+**Decision for the owner:** yes or no. Cost: small. Lane: ui (the screen); art supplies the icon (P5).
 
 ### P4. One tap per action
 Today a seat needs a labelled button ("COOK ON THE STOVE", "SERVE") and the station row does nothing. Proposal:
@@ -81,7 +90,7 @@ Today a seat needs a labelled button ("COOK ON THE STOVE", "SERVE") and the stat
 - Each station shows its cook progress ring and "READY" glow; the plate sits on the seat, as today.
 
 Rules check: no timers sold, no money. Same game rules, a better surface.
-**Decision for the owner:** one-tap seats and a one-deep queue per station (recommended), or tap-to-cook with no queue. Cost: medium (state for the queue in `saloonShift.js` plus the view). Lane: town for the rule and view, ui to review tap sizes.
+**Decision for the owner:** one-tap seats and a one-deep queue per station (recommended), or tap-to-cook with no queue. Cost: medium (state for the queue in `saloonShift.js` plus the view). Lane: town for the queue rule in `saloonShift.js`, ui for the view and tap sizes.
 
 ### P5. Order readability
 - Each dish gets an icon and a **station colour** (stove warm red, barrel blue, oven amber, same colours on the seat edge and the station box). The player reads colour first, icon second, name never.
@@ -90,7 +99,7 @@ Rules check: no timers sold, no money. Same game rules, a better surface.
 - Dish names stay as text for accessibility (screen readers) and as the aria label.
 
 Rules check: art and HUD only. Original icons and faces, each with a row in `ASSETS.md`.
-**Decision for the owner:** order the icon set (5 dishes now, 3 faces, 3 station glyphs: about 11 small drawings) from the art lane. Cost: medium for art, small for the view. Lane: art for the icons, town for the view.
+**Decision for the owner:** order the icon set (5 dishes now, 3 faces, 3 station glyphs: about 11 small drawings) from the art lane. Cost: medium for art, small for the view. Lane: art for the icons, ui for the view.
 
 ## 3. Stations and upgrades
 
@@ -114,13 +123,16 @@ Rules check:
 
 **Decision for the owner:** approve the five upgrades and the prices, or give me a total budget to fit them to. Open question for the town lane: check that $440 does not clash with building prices elsewhere in the town (not read in this task). Cost: medium (state, a `buy` action in `saloonAction`, normalizing, tests). Lane: town. The server route and both wallets already pass the body straight to `saloonAction` (`src/wallet.js:87`, `server/app.js:450`), so **no scale-lane or shared-file change is needed** for a new `upgrade` action.
 
-### P7. Buy order and where you buy
-Recommended first-time order (and the order of the shop's list): Hotter stove I - Extra stool - Bigger oven I - Two taps - Hotter stove II - Cushioned stools - Bigger oven II. The felt reason for each: nights 1 to 3 are stove-heavy (beans), the fourth seat fills from night 3 with rushes, the oven matters when cornbread (night 2) and pie (night 5) enter.
-- Buy on the **bar's card** (`src/places/saloon.js`), between shifts, never mid-shift. Each upgrade shows what it changes in numbers ("beans 3.0 s to 2.25 s"), the next price, and the dollars you have. No "limited time", no countdown, no discount that expires.
-- Show a little "new" tick on an upgrade you can afford. No bounce, no red dot that never clears.
+### P7. Buy order and where you buy (changed by owner decision 2)
+Recommended first-time order (and the order of the list): Hotter stove I - Extra stool - Bigger oven I - Two taps - Hotter stove II - Cushioned stools - Bigger oven II. The felt reason for each: nights 1 to 3 are stove-heavy (beans), the fourth seat fills from night 3 with rushes, the oven matters when cornbread (night 2) and pie (night 5) enter.
+- **The shelf is where you buy.** A shelf of the saloon's upgrade pieces stands in the 3D saloon scene (inside the bar, reachable by walking up to it like the piano). Walking up opens its card; each piece on the shelf is one upgrade, and bought pieces change what the shelf shows (an owned upgrade looks installed, a locked one is dim). The scene reads the upgrade list and prices from the town lane's rules; it never invents them (`AGENTS.md`, art and function contract).
+- **The bar's card keeps the numbers**: each upgrade with what it changes ("beans 3.0 s to 2.25 s"), the next price, and the dollars you have, plus the star and paid-shift lines. Buying works from the shelf's card; the bar's card may link to it ("the shelf is by the door") but does not need its own buy button.
+- Never mid-shift. No "limited time", no countdown, no discount that expires.
+- A little "new" tick on a piece you can afford. No bounce, no red dot that never clears.
+- **Layout contract:** the shelf's door id and footprint come from `src/saloonLayout.js` (town adds the spot first; art builds the shelf in `src/placeSaloon.js` after it merges). `walkMap()` stays valid and the shelf stays reachable.
 
-Rules check: no timer, no scarcity, no dark pattern.
-**Decision for the owner:** shop on the bar's card (recommended) or a separate shelf in the 3D saloon. The shelf is nicer but it is the art lane's scene and adds build cost. Cost: small on the card, medium for a shelf. Lane: town for the card, art for any shelf.
+Rules check: no timer, no scarcity, no dark pattern; dollars are earned in the game, never bought with real money.
+**Decision for the owner:** decided: the shelf, with the card for the numbers. Cost: small for the card and the layout spot (town), medium for the shelf scene (art; keep it few merged meshes inside the saloon's draw-call budget). Lane: town for the rule, the `upgrade` action and the layout spot; art for the shelf.
 
 ## 4. Combos, tips, regulars, stars
 
@@ -139,7 +151,7 @@ Rules check: same tip rates and ceiling; money is earned by skill, not bought; n
 - Haptics and sounds on serve, tip and walk-out are for the audio lane to name; I only ask that every cue has a visual twin (no information only by sound).
 
 Rules check: pure feedback. The feedback is for the player's own play; nothing is variable-ratio, nothing nudges a purchase.
-**Decision for the owner:** approve the HUD pieces (floating tips, streak meter, star bar, richer result card). Cost: medium. Lane: town owns `saloonShiftView.js` and `styles/townSaloon.css` today; the owner may move those two files to the ui lane in `lanes.json` for this work (ui builds HUD, town keeps the rules). Audio cues: audio lane.
+**Decision for the owner:** approve the HUD pieces (floating tips, streak meter, star bar, richer result card). Cost: medium. Lane: ui (owner decision 3 moves `saloonShiftView.js` and `styles/townSaloon.css` to ui); town supplies the numbers the HUD shows (star thresholds, streak rule). Audio cues: audio lane.
 
 ### P10. Customer types and regulars
 - **Types** (from night 4; `PLACES.md` already lists "patience that differs by customer" as not built): *Hurried* (patience x0.6, tip x1.5 when quick), *Easygoing* (patience x1.4, no tip premium). A small badge on the card tells which. The tip premium is within the existing tiers: it raises the chance of tier 1 and 2 serves only, never the price.
@@ -171,8 +183,8 @@ Numbers use P1's formulas. "New" is what the player meets on that night.
 | 9 | 13 | 15 s | 3 | Two regulars at once. |
 | 10 | 14 | 14 s | 3 | Saturday night: everyone, every rush. |
 
-Problem to flag: with the farm shut the menu is only sarsaparilla, beans and cornbread (from night 2 on), so the "new dish" beats at nights 3 and 5 do not exist. The other novelties (rushes, types, regulars) still arrive, so the saloon still works on its own, as `PLACES.md` requires.
-**Decision for the owner:** approve this curve as the target, and say whether a farm-free dish should join the menu around night 5 (for example a stew on the stove, original name, price within the ceiling) so a player without the farm still gets a new dish. Cost: small for the table, small to medium for a dish. Lane: town for rules and prices; story for the dish name.
+Farm-free dish (owner decision 4): with the farm shut the menu would be only sarsaparilla, beans and cornbread from night 2, so the "new dish" beats at nights 3 and 5 would not exist. A **STEW** joins the menu on **night 5 without the farm needed** (`farm: false`), cooked on the **stove**, cook time 4 s, price **$6** (between cornbread $4 and pie $8, so it fits P15's ceiling: the priciest dish stays pie at $8). The story lane gives it its original name and a line from Pete; "STEW" is a placeholder. Night 5 then adds pie (farm) and stew (everyone), and the other novelties (rushes, types, regulars) are unchanged. Tip: with the stove being the busiest station, stew is also what makes Hotter stove II worth buying.
+**Decision for the owner:** decided: approve the curve and add the farm-free stew. Cost: small (one row in `DISHES`, one `COOK_SECONDS` entry, test updates for the menu counts and the bound in `tests/saloon.test.js`). Lane: town for the rules and price (in the rules PR, build PR 2); story for the name.
 
 ### P13. The first five minutes
 Today: walk in, read the bar card (night chips, menu chips, paid shifts text, a list of buttons), tap START NIGHT 1. Night 1 has 3 customers, 38 s of patience, and takes 60 s of mostly waiting. A new player has no goal on screen, no idea what a tip is, and ends with `***` on a result card.
@@ -186,7 +198,7 @@ Target script (about 5 minutes from walking through the gate):
 
 The three-paid-shifts-a-day rule is told on the card, not by an interruption.
 Rules check: no dark pattern; nothing is hidden about the free-practice rule; no forced replay.
-**Decision for the owner:** approve the script and the guided night 1. Cost: medium (guide hints in the view, a smaller bar card). Lane: town for the card and rules; ui for the hint look.
+**Decision for the owner:** approve the script and the guided night 1. Cost: medium (guide hints in the view, a smaller bar card). Lane: town for the bar's card and rules; ui for the guide hints on the shift screen.
 
 ## 6. Phone play
 
@@ -202,7 +214,7 @@ What the view does now (`styles/townSaloon.css`, `saloonShiftView.js`): seats in
 - On desktop, number keys 1 to 5 tap seats.
 
 Rules check: input and layout only.
-**Decision for the owner:** approve the portrait layout, the confirm on CLOSE UP and auto-pause. Cost: medium. Lane: town today (it owns the files); ui is the right owner for the layout work if the owner moves `saloonShiftView.js` and `styles/townSaloon.css` (see P9).
+**Decision for the owner:** approve the portrait layout, the confirm on CLOSE UP and auto-pause. Cost: medium. Lane: ui (owns the shift screen after owner decision 3).
 
 ## 7. Session length against the income rule
 
@@ -229,20 +241,24 @@ Rules check: this is the "no dark patterns" rule applied. Free practice already 
 
 ## 8. Build PRs (small, one lane each, data contract first)
 
-Order matters: contract first, then consumers. Each PR keeps `npm test`, `npm run build` and the lane's checks green. Everything marked town touches only town-lane files (`saloon*.js`, `src/places/saloon.js`, `styles/townSaloon.css`, tests); none touches a shared file.
+Updated for the owner decisions. Order matters: contract first, then consumers. Each PR keeps `npm test`, `npm run build` and the lane's checks green. Prerequisite (the coordinator's own PR, already planned): `lanes.json` moves `src/saloonShiftView.js` and `styles/townSaloon.css` to the ui lane. After that, none of these PRs touches a shared file.
 
-1. **town: the data contract (P6 state, P10 regulars state, P15).** In `src/saloon.js`: `upgrades` and `regulars` in `createSaloon`/`normalizeSaloon`, `SHIFT_PAY_CEILING`, an `upgrade` action in `saloonAction` (check dollars, one level at a time, clamp). Tests in `tests/saloon.test.js` including a "ceiling keeps three paid shifts under $400" case and "upgrades touch nothing outside the saloon". No wallet or server change.
-2. **town: the shift rules (P1, P2, P8).** `crowd`, `patience`, arrivals with rushes, streak-based tier 2, shift clock to 120 s. Tests replay seeds. Move `crowd`/`patience` numbers behind named constants so P12's table is data.
-3. **town: the balance bot test (P17).** `tests/saloonBalance.test.js`: a bot with 1.5 s and 4 s per action over 20 seeds; assert the targets from P1 (1.5 s: 3 stars on nights 1 to 3 in at least 90 percent of seeds; 4 s: no better than 2 stars on average from night 7), peak seats at least 3 on night 5 and later, and mean shift length at least 95 s. This is what turns "feel" into a check. Tune PR 2's numbers with it.
-4. **town: upgrades in the shift (P6).** `createShift({ upgrades })` reads cook-time multipliers, station capacity, seats, patience. Extend the bot test with an upgraded bot.
-5. **art: the icon set (P5).** 5 dish icons, 3 station glyphs, 3 customer faces, each with an `ASSETS.md` row (append at the end). Delivered as files; no code.
-6. **town: the shift screen, readability and one tap (P3, P4, P5, P9).** Seat card as the button, queue, station progress, step colours with the quick notch, floating tips, streak meter, star bar. `styles/townSaloon.css` only. If the owner has moved the view and stylesheet to the `ui` lane, this PR is ui's instead.
-7. **ui (or town): phone layout (P14).** Portrait thumb-zone layout, 48 px targets, CLOSE UP confirm, pause, auto-pause, reduced motion, number keys.
-8. **town: the bar's card and the shop (P7, P11, P13).** Shorter card, one START button, a fold for the rest, the upgrade list with numbers, next-star text. Guided night 1 hints.
-9. **town: customer types (P10 types).** Hurried and Easygoing, from night 4.
-10. **story + town: regulars (P10 regulars).** Story supplies names, favourite dishes and Pete's lines as data in the story lane's file; town adds the rule and the badge; art adds faces.
-11. **audio: cues for serve, tip, streak, walk-out.** After PR 6 so cues have events to attach to (names agreed in the PR, not by messaging other sessions).
-12. **town: docs.** Update `docs/lanes/town.md` and the town plan doc for this slice, and reword the income line in `PLACES.md` ("best day"). `PLAN.md` is the coordinator's.
+| # | Lane | PR | Proposals |
+|---|---|---|---|
+| 1 | town | **Data contract.** In `src/saloon.js`: `upgrades` and `regulars` in `createSaloon`/`normalizeSaloon`, `SHIFT_PAY_CEILING`, an `upgrade` action in `saloonAction` (check dollars, one level at a time, clamp). Tests in `tests/saloon.test.js`, including "the ceiling keeps three paid shifts under $400" and "upgrades touch nothing outside the saloon". No wallet or server change (the body already passes straight to `saloonAction`). | P6 state, P10 state, P15 |
+| 2 | town | **Shift rules and menu.** `crowd`, `patience`, arrivals with rushes, streak-based tier 2, shift clock to 120 s, the **farm-free STEW** (`farm: false`, night 5, stove, 4 s, $6; the name is a placeholder until story names it), named constants so P12's table is data. Replay tests with seeds. | P1, P2, P8, P12 |
+| 3 | town | **Balance bot test** `tests/saloonBalance.test.js`: 1.5 s and 4 s per action over 20 seeds; assert P1's targets (1.5 s: 3 stars on nights 1 to 3 in at least 90 percent of seeds; 4 s: no better than 2 stars on average from night 7), peak seats at least 3 on night 5 and later, mean shift length at least 95 s. Tune PR 2's numbers with it. | P17 |
+| 4 | town | **Upgrades in the shift.** `createShift({ upgrades })` reads the cook-time multipliers, station capacity, seats and patience. Extend the bot test with an upgraded bot. | P6 |
+| 5 | town | **Shelf spot in the layout.** `src/saloonLayout.js`: a `shelf` door id, footprint and position (reachable, `walkMap()` valid; `tests/saloonLayout.test.js` extended), and the shelf's card in `src/places/saloon.js` listing the upgrades, prices, owned state and a buy button calling the `upgrade` action. The bar's card gets the numbers and the "shelf is by the door" line. | P7 |
+| 6 | art | **Icon set.** 5 dish icons plus the stew (6), 3 station glyphs, 3 customer faces, each with an `ASSETS.md` row appended at the end. Files, no code. | P5 |
+| 7 | art | **The upgrade shelf in the scene** (`src/placeSaloon.js`), built after PR 5 has merged, read from the layout's `shelf` spot; owned pieces look installed, locked ones dim. Cross-lane note: it reads, never invents, the upgrade list. Merged meshes, inside the draw-call budget. | P7 |
+| 8 | ui | **Shift screen, readability and one tap** (`src/saloonShiftView.js`, `styles/townSaloon.css`): the seat card as the button, the door queue, station progress, step colours with the quick notch, floating tips, streak meter, star bar, richer result card. Needs PRs 2 and 6. (The one-deep queue rule itself is town's, in `saloonShift.js`, and goes in PR 2 or its own small town PR before this one.) | P3, P4, P5, P9, P11 |
+| 9 | ui | **Phone layout:** portrait thumb-zone layout, 48 px targets, CLOSE UP confirm, pause and auto-pause, reduced motion, number keys. | P14 |
+| 10 | town + ui | **The bar's card, guided night 1.** Town: a shorter bar card with one START button and a fold for the rest, next-star text, the rule that night 1 is guided (a flag the shift reads). ui: the hint look on the shift screen (separate small PR after town's). | P11, P13 |
+| 11 | town | **Customer types** (Hurried, Easygoing) from night 4. | P10 |
+| 12 | story + town + ui | **Regulars.** Story: names, favourite dishes and Pete's lines as data in the story lane's file. Town: the rule. ui: the badge on the seat. Art: faces. | P10 |
+| 13 | audio | **Cues** for serve, tip, streak, walk-out, after PR 8 so the events exist (names agreed in the PR). | P9 |
+| 14 | town | **Docs.** `docs/lanes/town.md` and the town plan doc for this slice; reword the income line in `PLACES.md` to "best day". `PLAN.md` is the coordinator's. | P15 |
 
 ### P17. The acceptance test is the bot
 Without a number a "Cake Mania feel" cannot be checked. PR 3 puts the bot in the test suite so every later balance change (types, regulars, upgrades, crowds) runs against it. Cost: small. Lane: town.
@@ -260,6 +276,8 @@ Without a number a "Cake Mania feel" cannot be checked. PR 3 puts the bot in the
 
 ## 10. Decisions summary for the owner
 
+On 2026-10-07 the owner approved all of P1 to P17 as recommended, with the changes in "Owner decisions" at the top.
+
 | # | Decision | Recommended |
 |---|---|---|
 | P1 | More customers, 90 s arrivals, shorter patience | Yes |
@@ -267,12 +285,12 @@ Without a number a "Cake Mania feel" cannot be checked. PR 3 puts the bot in the
 | P3 | Show the door queue | Yes |
 | P4 | One-tap seats, one-deep queue per station | Yes |
 | P5 | Icons, station colours, step bars, faces | Yes (art: about 11 drawings) |
-| P6/P7 | Five upgrades, $440 total, bought on the bar's card | Yes, check prices against town |
+| P6/P7 | Five upgrades, $440 total, bought at a **shelf in the 3D saloon**, numbers on the bar's card | **Decided** (price check against town still open) |
 | P8 | Streak of 3 gives the big tip | Yes |
-| P9 | Floating tips, streak meter, star bar, better result card | Yes; consider moving the view and its CSS to ui |
+| P9 | Floating tips, streak meter, star bar, better result card | **Decided**; built by ui (the view moves to ui) |
 | P10 | Customer types now, regulars later | Types yes, regulars after upgrades |
 | P11 | Star bar and next-star hints | Yes |
-| P12 | The ten-night curve; a farm-free dish around night 5? | Yes / owner's call |
+| P12 | The ten-night curve with a farm-free STEW on night 5 | **Decided** |
 | P13 | Guided night 1 and a shorter bar card | Yes |
 | P14 | Thumb-zone layout, confirm on CLOSE UP, pause | Yes |
 | P15 | $130 per-shift ceiling and "best day" wording | Yes |
