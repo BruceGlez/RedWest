@@ -77,7 +77,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     };
 
     // What a run mode (src/modes/registry.js) may use of this loop. Function declarations below are hoisted, so this can sit up here.
-    const modeCtx = { scene, camera, playerSystem, ui, cameraOffset, spawn, finishRun, beginWave, updateWaveFlow, openBountyChoice, ask };
+    const modeCtx = { scene, camera, playerSystem, ui, cameraOffset, spawn, finishRun, beginWave, updateWaveFlow, openBountyChoice, ask, economy };
 
     // Spawn and record first sightings for the Bounty Book (with a NEW ENEMY card in play).
     function spawn(type, at = null) { // `at`: a place to put it (the mine fills each chamber with its own), else the mode's usual way
@@ -117,6 +117,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             showDemoEnd(result === 'died' ? 'SHOT DOWN!' : 'OUTLAW DOWN!');
             return;
         }
+        if(result === 'died' && activeMode().onDeath?.(modeCtx, gameState.runTime)) return; // a mode may carry on after a death (the mine throws him up a few floors)
         track('run_end');
         setMusicTrack('home');
         if(result === 'banked' || result === 'escaped') {

@@ -4,7 +4,7 @@
 // (the Arena's rule, src/arena.js). The rules live here with no rendering, so they can be unit tested; src/gameLoop.js plays a floor and
 // src/townPanel.js starts the run.
 import { floorName } from './mineMap.js';
-import { maxOreOnFloor, startFloors } from './mineProgress.js';
+import { maxOreOnFloor, startFloors, normalizePile } from './mineProgress.js';
 import { createLightRun, kitForRun, usedKit, lanternLit, restoreTorches, standingTorches } from './mineLight.js';
 import { withResume, rememberResume, forgetResume } from './mineResume.js';
 
@@ -15,6 +15,8 @@ export const mine = {
     floor: 1,       // the depth being fought
     startFloor: 1,  // the floor the run began on (floor 1, or a checkpoint of his: src/mineProgress.js)
     ore: 0,         // the ore carried in this run: kept if he rides the lift up, lost if he falls
+    pile: null,     // the ore he dropped when he died: { floor, x, z, ore, full } (src/mineProgress.js), until he finds it
+    collected: 0,   // the ore picked up from a pile in this run (the report names it)
     clockBase: 0,   // seconds the run had already taken when it was resumed (a lift ride up does not end it)
     light: null,    // the lantern, oil, torches and matches of this run (src/mineLight.js, createLightRun)
     shaftDx: 0,     // where the shaft down and the lift up are from the marshal (src/gameLoop.js keeps these up to date), for the HUD
@@ -32,6 +34,8 @@ function reset() {
     mine.startFloor = 1;
     mine.ore = 0;
     mine.clockBase = 0;
+    mine.pile = null;
+    mine.collected = 0;
     mine.light = null;
     mine.shaftDx = mine.shaftDz = mine.liftDx = mine.liftDz = 0;
     mine.liftArmed = false;
@@ -48,6 +52,7 @@ export function beginMineRun(floor = 1, record = null) {
     const own = withResume(record);
     const start = startFloors(own).includes(Math.floor(floor)) ? Math.floor(floor) : 1;
     mine.floor = mine.startFloor = start;
+    mine.pile = normalizePile(record?.pile);
     mine.light = createLightRun(kitForRun(record?.light)); // what he owns (or the free kit until the shops are open)
     if(own.resume && start === own.resume.floor) { // back to the floor he rode up from: his torches still stand and the run's clock goes on
         restoreTorches(mine.light, own.resume.torches);
@@ -137,7 +142,7 @@ export function resultText(result, floor, ore = 0) {
 
 // What the run reports when it ends (src/mineProgress.js, applyMineRun): where it began, how deep, the ore carried, and how it ended.
 export function runSummary(result, seconds) {
-    return { startFloor: mine.startFloor, depth: mine.floor, ore: mine.ore, outcome: result === 'mine-win' ? 'up' : 'fell', seconds: Math.max(0, Math.round(seconds + mine.clockBase)),
+    return { startFloor: mine.startFloor, depth: mine.floor, ore: mine.ore, collected: mine.collected, outcome: result === 'mine-win' ? 'up' : 'fell', seconds: Math.max(0, Math.round(seconds + mine.clockBase)),
         used: mine.light ? usedKit(mine.light) : { oil: 0, torches: 0, matches: 0 } };
 }
 
@@ -173,3 +178,18 @@ export const statusText = (dx, dz, ore, light = null) => {
     }
     return bits.join('  ');
 };
+
+// He died on this floor: what he carried is gone from him (the server turns it into a pile), the lantern's and the torches' books start again from what
+// is left (the server has charged what was used), and the run goes on from the floor he was thrown up to.
+export function startAgainFrom(floor) {
+    mine.ore = 0;
+    mine.collected = 0;
+    mine.startFloor = 1;
+    mine.floor = floor;
+    mine.liftArmed = false;
+    mine.opened = [];
+    mine.confirm = null;
+    mine.blocked = null;
+    const run = mine.light;
+    if(run) { run.oilStart = run.oil; run.torchesStart = run.torches; run.matchesStart = run.matches; }
+}
