@@ -13,7 +13,7 @@ import { disposeBaked } from '../meshMerge.js';
 import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
 import { showMineFloor, openMineChest, updateMineScene, setMineTorches, setMineLantern } from '../mineScene.js';
 import { setMineLightSource } from '../placeDark.js';
-import { burnLantern, burnTorches, placeTorch, relightTorch, nearestOutTorch, lanternLit, lightSource, DIM_RING } from '../mineLight.js';
+import { burnLantern, burnTorches, placeTorch, relightTorch, nearestOutTorch, lanternLit, lightSource, tankSeconds, DIM_RING } from '../mineLight.js';
 import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE, SHAFT_REACH, LIFT_REACH } from '../mineMap.js';
 import { MINE_MONSTERS, newOn, isMineMonster, planNode, WAKE_DISTANCE, LEAVE_DISTANCE } from '../mineMonsters.js';
 
@@ -147,11 +147,40 @@ function showControls() {
         font: 'inherit', fontWeight: 'bold', letterSpacing: '1px', color: '#ffd9a0', background: 'rgba(40,22,10,0.8)', border: '2px solid #c8863a', borderRadius: '10px' });
     torchButton.addEventListener('click', event => { event.stopPropagation(); putTorchDown(); });
     document.body.appendChild(torchButton);
+    makeOilBar();
+}
+// The lantern's oil, as a bar down the right-hand side of the screen: how much is left of the tank, going red when it is nearly out. It is only there while he
+// has a lantern.
+const LOW_OIL = 0.2; // below this share of the tank the bar goes red
+let oilBar = null, oilFill = null;
+function makeOilBar() {
+    oilBar = document.createElement('div');
+    oilBar.id = 'mine-oil-bar';
+    oilBar.title = 'LANTERN OIL';
+    Object.assign(oilBar.style, { position: 'fixed', right: '6px', top: '30%', width: '16px', height: '34%', zIndex: 20, boxSizing: 'border-box', border: '2px solid #c8863a', borderRadius: '8px',
+        background: 'rgba(20,10,4,0.75)', overflow: 'hidden', pointerEvents: 'none', display: 'none' });
+    oilFill = document.createElement('div');
+    Object.assign(oilFill.style, { position: 'absolute', left: 0, right: 0, bottom: 0, height: '100%', background: '#f2a93b' });
+    oilBar.appendChild(oilFill);
+    document.body.appendChild(oilBar);
+}
+function updateOilBar() {
+    if(!oilBar) return;
+    const run = mine.light;
+    oilBar.style.display = run?.lantern ? '' : 'none';
+    if(!run?.lantern) return;
+    const share = Math.max(0, Math.min(1, run.oil / tankSeconds(run)));
+    oilBar.dataset.oil = String(Math.round(share * 100));
+    oilFill.style.height = `${share * 100}%`;
+    oilFill.style.background = share < LOW_OIL ? '#d8412f' : '#f2a93b';
+    oilBar.title = `LANTERN OIL: ${Math.ceil(run.oil / 60)} MIN LEFT`;
 }
 function hideControls() {
     window.removeEventListener('keydown', onKey);
     torchButton?.remove();
     torchButton = null;
+    oilBar?.remove();
+    oilBar = oilFill = null;
 }
 
 // A chest: it opens when the marshal walks up to it, for score and either a heart or a spell of triple shot.
@@ -206,6 +235,7 @@ function updateFlow(ctx, dt) {
         burnLantern(mine.light, dt);
         for(const t of burnTorches(mine.light, mine.floor, dt)) floatText('THE AIR IS THIN: A TORCH WENT OUT', new THREE.Vector3(t.x, 3, t.z), 'hot');
         syncLantern();
+        updateOilBar();
         const lit = mine.light.placed.filter(t => t.floor === mine.floor).map(t => t.lit ? 1 : 0).join('');
         if(lit !== torchesLit) { torchesLit = lit; syncTorches(); } // a light eater put one out
     }

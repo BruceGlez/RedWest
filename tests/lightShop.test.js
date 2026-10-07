@@ -71,19 +71,18 @@ test('a button is offered exactly when the rules would take the sale (the same r
     }
 });
 
-test('the oil row shows the top-up price the sale will charge', () => {
+test('the oil row shows the flask price the sale will charge', () => {
     for(const shop of ['grimsby', 'store']) {
         const p = profile({ dollars: 500, light: { lantern: true, oil: OIL_CAPACITY / 2 } });
         const row = shopRows(p, shop).find(r => r.id === 'oil');
         assert.equal(row.price, priceOf('oil', shop, p.mine.light));
         assert.equal(buyLight(JSON.parse(JSON.stringify(p)), 'oil', shop).price, row.price, 'the card says what the sale charges');
-        assert.ok(row.price < priceOf('oil', shop), 'half a flask costs less than a full one');
     }
 });
 
 test('the kit line says what he has', () => {
     assert.equal(kitLine(profile()), 'NO LANTERN, 0 TORCHES, 0 MATCHES');
-    assert.equal(kitLine(profile({ light: { lantern: true, oil: 900, torches: 1, matches: 5 } })), 'LANTERN: 15m OF OIL, 1 TORCH, 5 MATCHES');
+    assert.equal(kitLine(profile({ light: { lantern: true, oil: 300, torches: 1, matches: 5 } })), 'LANTERN: 5m OF OIL, 1 TORCH, 5 MATCHES');
     assert.equal(kitLine({}), 'NO LANTERN, 0 TORCHES, 0 MATCHES', 'an unloaded profile has an empty kit');
 });
 

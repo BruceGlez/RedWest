@@ -17,7 +17,7 @@ try {
     await context.addInitScript(answeredPrivacy);
     // The hidden door in the cellar opens once Deacon Graves has a star (MINE_PLAN.md, slice 5): start with him beaten, once (a reload keeps the saved run).
     // (he has bought a kit at the light shop: a run starts with what he owns)
-    await context.addInitScript(() => { if(!localStorage.getItem('redWestProfile.v1')) localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [0, 0, 7, 0, 0, 0, 0, 0, 0, 0] }, mine: { light: { lantern: true, oil: 900, torches: 10, matches: 5 } } })); });
+    await context.addInitScript(() => { if(!localStorage.getItem('redWestProfile.v1')) localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [0, 0, 7, 0, 0, 0, 0, 0, 0, 0] }, mine: { light: { lantern: true, oil: 300, torches: 10, matches: 5 } } })); });
     const page = await context.newPage();
     page.setDefaultTimeout(60000);
     const errors = [];
@@ -166,6 +166,9 @@ try {
             assert.equal(await page.evaluate(() => M.mine.light.placed.length), kit.placed + 1, 'not a second torch on the same spot');
             assert.match(await page.locator('#status-msg').textContent(), new RegExp(`TORCHES ${kit.torches - 1}`));
             assert.ok(await page.locator('#mine-torch-btn').isVisible(), 'a TORCH button for a touch screen');
+            assert.ok(await page.locator('#mine-oil-bar').isVisible(), 'the lantern oil is a bar down the side of the screen');
+            const oilNow = Number(await page.locator('#mine-oil-bar').getAttribute('data-oil'));
+            assert.ok(oilNow > 0 && oilNow <= 100, `the bar shows what is left of the tank (${oilNow}%)`);
             await put(0, 0);
             // A light eater goes for the torch and gnaws it out without touching the marshal; T beside the stub relights it with a match.
             const hearts = await page.evaluate(() => S.playerStats.hp);
@@ -183,6 +186,7 @@ try {
             await page.keyboard.press('KeyT');
             await page.waitForFunction(() => M.mine.light.placed.every(t => t.lit));
             assert.equal(await page.evaluate(() => M.mine.light.matches), matches - 1, 'a relight costs one match');
+            assert.ok(Number(await page.locator('#mine-oil-bar').getAttribute('data-oil')) < 100, 'and it goes down as the lantern burns');
             await page.waitForTimeout(300);
             // The four monsters that live only down here spawn, wear their own look, and run their behaviours without a fault.
             const monsters = await page.evaluate(async () => {
@@ -339,7 +343,7 @@ try {
     assert.equal(saved.mine.deepest, 5);
     assert.equal(saved.mine.checkpoint, 5);
     assert.ok(saved.mine.ore > 0 && saved.mine.runs === 1);
-    assert.ok(saved.mine.light.lantern && saved.mine.light.torches < 10 && saved.mine.light.matches < 5 && saved.mine.light.oil < 900, `what the run used came off his kit: ${JSON.stringify(saved.mine.light)}`);
+    assert.ok(saved.mine.light.lantern && saved.mine.light.torches < 10 && saved.mine.light.matches < 5 && saved.mine.light.oil < 300, `what the run used came off his kit: ${JSON.stringify(saved.mine.light)}`);
     assert.deepEqual([saved.balances.dollars, saved.stats.stageStars.reduce((a, b) => a + b, 0)], [0, 7], 'the mine paid no dollars and gave no stars (only the Deacon\'s, which it started with)');
 
     // Back to town: the Wanted Road rules are back (no mine, no cave, the ordinary arena limit).
