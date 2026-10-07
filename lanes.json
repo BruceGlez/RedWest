@@ -94,7 +94,8 @@
     "src/townDistricts.js",
     "src/arena.js",
     "src/steps.js",
-    "styles/town*.css",
+    "styles/town.css",
+    "styles/town-*.css",
     "styles/farm.css",
     "styles/arena.css",
     "PLACES.md",
@@ -119,7 +120,6 @@
     "tests/cellarLayout.test.js",
     "src/saloonLayout.js",
     "src/saloonShift.js",
-    "src/saloonShiftView.js",
     "tests/saloonShift.test.js",
     "src/places/saloon.js",
     "tests/saloonLayout.test.js",
@@ -241,7 +241,9 @@
     "styles/platform.css",
     "styles/entry.css",
     "tests/touchControls.test.js",
-    "tests/mobile-smoke.mjs"
+    "tests/mobile-smoke.mjs",
+    "src/saloonShiftView.js",
+    "styles/townSaloon.css"
    ],
    "checks": [
     "npm test",
