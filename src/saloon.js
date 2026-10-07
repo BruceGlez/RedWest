@@ -34,6 +34,26 @@ export const TIP_RATES = [0, 0.25, 0.5];
 // With the farm open the tips are a fifth bigger.
 export const FARM_TIP_BONUS = 1.2;
 
+// The most one shift may pay (docs/design/copper-bit-shift.md, P15). Three paid shifts then bank at most 3 x 130 = 390 a day, under the farm's
+// 400 a check-in and a small part of the jail's top day, whatever the shift later learns to do (more customers, regulars, upgrades).
+export const SHIFT_PAY_CEILING = 130;
+
+// The shelf's upgrades (P6), bought one level at a time with earned Bounty Dollars and nothing else. `levels` are the prices of level 1, 2, ...
+// They change how a shift plays (src/saloonShift.js reads them), never a dish's price, a tip rate or the ceiling above, and nothing outside the
+// saloon. In the order the shelf shows them.
+export const UPGRADES = [
+    { id: 'stove', name: 'HOTTER STOVE', blurb: 'The stove cooks faster.', levels: [30, 90] },
+    { id: 'stool', name: 'EXTRA STOOL', blurb: 'A fifth seat at the bar.', levels: [60] },
+    { id: 'oven', name: 'BIGGER OVEN', blurb: 'The oven cooks faster.', levels: [40, 120] },
+    { id: 'taps', name: 'TWO TAPS', blurb: 'The barrel pours two at once.', levels: [30] },
+    { id: 'cushions', name: 'CUSHIONED STOOLS', blurb: 'Customers wait a little longer.', levels: [70] }
+];
+const BY_UPGRADE = new Map(UPGRADES.map(u => [u.id, u]));
+export const getUpgrade = id => (typeof id === 'string' ? BY_UPGRADE.get(id) ?? null : null);
+// Regulars (P10) are named by the story lane; here only a visit count per id is kept, up to this many visits, for this many people.
+export const MAX_REGULAR_VISITS = 3;
+export const MAX_REGULARS = 12;
+
 const SALOON_INDEX = OUTLAWS.findIndex(o => o.id === SALOON_OUTLAW);
 const BY_DISH = new Map(DISHES.map(d => [d.id, d]));
 export const getDish = id => BY_DISH.get(id) ?? null;
@@ -50,7 +70,10 @@ export const menu = (night, farm) => DISHES.filter(d => d.from <= night && (farm
 
 // Saved state: the newest day seen (a clock moved back never gives a day's paid shifts again), how many paid shifts today, and the
 // stars earned on each night.
-export const createSaloon = (now = new Date()) => ({ day: dayNumber(now), paid: 0, nights: Array(NIGHTS).fill(0) });
+// `upgrades` is the level bought of each upgrade, `regulars` the visits of each regular.
+export const createSaloon = (now = new Date()) => ({
+    day: dayNumber(now), paid: 0, nights: Array(NIGHTS).fill(0), upgrades: Object.fromEntries(UPGRADES.map(u => [u.id, 0])), regulars: {}
+});
 
 export function normalizeSaloon(raw, now = new Date()) {
     const saloon = createSaloon(now);
@@ -59,6 +82,14 @@ export function normalizeSaloon(raw, now = new Date()) {
     if(Number.isFinite(day) && day > saloon.day) saloon.day = day;
     if(saloon.day === Math.floor(Number(raw.day))) saloon.paid = Math.min(PAID_SHIFTS_PER_DAY, Math.max(0, Math.floor(Number(raw.paid)) || 0));
     for(let i = 0; i < NIGHTS; i++) saloon.nights[i] = Math.min(MAX_NIGHT_STARS, Math.max(0, Math.floor(Number(raw.nights?.[i])) || 0));
+    for(const u of UPGRADES) saloon.upgrades[u.id] = Math.min(u.levels.length, Math.max(0, Math.floor(Number(raw.upgrades?.[u.id])) || 0));
+    if(raw.regulars && typeof raw.regulars === 'object') {
+        for(const [id, visits] of Object.entries(raw.regulars)) {
+            if(Object.keys(saloon.regulars).length >= MAX_REGULARS) break;
+            const n = Math.min(MAX_REGULAR_VISITS, Math.max(0, Math.floor(Number(visits)) || 0));
+            if(/^[a-z0-9-]{1,24}$/.test(id) && n > 0) saloon.regulars[id] = n;
+        }
+    }
     return saloon;
 }
 
@@ -95,7 +126,7 @@ export function shiftPay(night, served, farm) {
         const tip = TIP_RATES[Math.min(TIP_RATES.length - 1, Math.max(0, Math.floor(Number(s.tip)) || 0))];
         return sum + dish.price * (1 + tip * bonus);
     }, 0));
-    return { served: ok.length, dollars };
+    return { served: ok.length, dollars: Math.min(SHIFT_PAY_CEILING, dollars) };
 }
 
 // Settle one shift: { night, served: [{ dish, tip }] }. Returns { served, stars, dollars, paid, paidLeft }.
@@ -118,10 +149,28 @@ export function settleShift(profile, body, now = new Date()) {
     return { served, stars, dollars: paid ? dollars : 0, paid, paidLeft: PAID_SHIFTS_PER_DAY - saloon.paid };
 }
 
-// One entry point for the wallets and the server: { action: 'shift', night, served }.
+// Buy the next level of an upgrade: { id }. Earned dollars only, one level at a time, never mid-shift (a shift is settled when it ends).
+// Returns { id, level, price }. The profile is unchanged when it throws.
+export function buyUpgrade(profile, body, now = new Date()) {
+    if(!saloonOpen(profile)) throw new EconomyError('locked', "Copper Bit is shut until Dusty Pete is beaten.");
+    const upgrade = getUpgrade(body?.id);
+    if(!upgrade) throw new EconomyError('unknown_upgrade', 'The shelf has no such thing.');
+    const saloon = normalizeSaloon(profile.town.saloon, now);
+    const level = saloon.upgrades[upgrade.id];
+    if(level >= upgrade.levels.length) throw new EconomyError('owned', 'You already have the best of that.');
+    const price = upgrade.levels[level];
+    if(!(profile.balances.dollars >= price)) throw new EconomyError('funds', 'Not enough bounty dollars.');
+    profile.balances.dollars -= price;
+    saloon.upgrades[upgrade.id] = level + 1;
+    profile.town.saloon = saloon;
+    return { id: upgrade.id, level: level + 1, price };
+}
+
+// One entry point for the wallets and the server: { action: 'shift', night, served } or { action: 'upgrade', id }.
 export function saloonAction(profile, body, now = new Date()) {
     switch(body?.action) {
         case 'shift': return settleShift(profile, body, now);
+        case 'upgrade': return buyUpgrade(profile, body, now);
         default: throw new EconomyError('bad_action', 'That is not something the saloon does.');
     }
 }

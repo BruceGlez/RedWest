@@ -500,3 +500,7 @@ Built in `src/mineProgress.js`, pure rules the server will apply (the brief and 
 
 ### Contract addition: `collected` (Slice 7c)
 Ore picked up from a death pile is carried in the run but is not found on the floors, so a run report may name it: `summary.collected`. `applyMineRun` lets the run carry `maxOreForRun(startFloor, depth) + collected` (never more than `MAX_ORE`). The server should cap `collected` to what it handed out when the pile was collected.
+### Built: (b) the lift no longer ends the run, on the client (Slice 7)
+- `src/mineResume.js`: the resume point held in memory behind a small `store` adapter (get/set/clear), to be pointed at the scale lane's endpoint when it exists. `withResume(record)` merges it into the record the stairs and `beginMineRun` read.
+- Riding the lift up (`rideUp`) remembers the floor, the torches left standing and the run's clock. The ore is banked as before. `startFloors` now also offers the resume floor, so the cellar card shows it ("back where you left off"). Descending to it restores the torches (not paid for twice, `restoreTorches`) and carries the clock into the run summary; any other start forgets it.
+- Not yet: the server keeps no resume point, so a page reload forgets it and the server (which does not know the resume floor) cuts a resumed run's start to floor 1 when it reports. Both go away when the endpoint lands. The lift's question now says the ore is banked and he can come back. One line of `src/places/cellar.js` (town lane) calls `withResume`: cross-lane on purpose.

@@ -75,7 +75,7 @@ test('the shaft and the lift ask first, and say what they will do', () => {
     const up = confirmText('up', 6);
     assert.equal(up.title, 'RIDE THE LIFT UP?');
     assert.match(up.text, /depth 6/);
-    assert.match(up.text, /ends the run/);
+    assert.match(up.text, /come back down to this floor/);
     assert.equal(up.yes, 'RIDE UP');
     assert.equal(up.no, 'STAY');
     beginMineRun();
@@ -167,4 +167,29 @@ test('the light shops are open: a run starts with what he owns and nothing else,
     assert.equal(mine.light.oil, 0, 'oil without a lantern is nothing');
     assert.equal(mine.light.torches, 3);
     endMineRun();
+});
+
+test('slice 7: riding the lift up remembers the floor, and the next descent can go back to it with its torches', async () => {
+    const { beginMineRun, endMineRun, rideUp, runSummary, mine } = await import('../src/mine.js');
+    const { placeTorch } = await import('../src/mineLight.js');
+    const { forgetResume, withResume } = await import('../src/mineResume.js');
+    const { startFloors } = await import('../src/mineProgress.js');
+    const record = { deepest: 7, checkpoint: 5, light: { lantern: true, oil: 300, torches: 5, matches: 2 } };
+    forgetResume();
+    beginMineRun(1, record);
+    mine.floor = 4;
+    placeTorch(mine.light, 3, 4, 4);
+    rideUp(100);
+    endMineRun();
+    assert.deepEqual(startFloors(withResume(record)), [1, 5, 4]);
+    beginMineRun(4, record);
+    assert.equal(mine.floor, 4);
+    assert.equal(mine.light.placed.length, 1, 'the torch he left is standing');
+    assert.equal(mine.light.torches, 5, 'it is not paid for twice');
+    assert.equal(runSummary('mine-win', 20).seconds, 120, 'the run clock goes on');
+    endMineRun();
+    beginMineRun(5, record); // starting anywhere else gives the resume point up
+    endMineRun();
+    assert.deepEqual(startFloors(withResume(record)), [1, 5]);
+    forgetResume();
 });

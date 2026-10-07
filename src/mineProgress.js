@@ -41,10 +41,12 @@ export function normalizeMineProgress(raw) {
     return mine;
 }
 
-// The floors a run may begin on: the first, and every checkpoint reached.
+// The floors a run may begin on: the first, every checkpoint reached, and the floor he rode up from if he has a resume point.
 export function startFloors(mine) {
     const floors = [1];
     for(let floor = CHECKPOINT_EVERY; floor <= mine.checkpoint; floor += CHECKPOINT_EVERY) floors.push(floor);
+    const back = mine.resume?.floor; // the floor the lift took him up from: he may go back to it (slice 7)
+    if(back > 1 && !floors.includes(back)) floors.push(back);
     return floors;
 }
 

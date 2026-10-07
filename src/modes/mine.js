@@ -10,7 +10,7 @@ import { clearHazards } from '../enemySystem.js';
 import { clearParticles } from '../particleSystem.js';
 import { clearDecals } from '../decals.js';
 import { disposeBaked } from '../meshMerge.js';
-import { mine, endMineRun, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
+import { mine, endMineRun, rideUp, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
 import { showMineFloor, openMineChest, updateMineScene, setMineTorches, setMineLantern } from '../mineScene.js';
 import { setMineLightSource } from '../placeDark.js';
 import { burnLantern, burnTorches, placeTorch, relightTorch, nearestOutTorch, lanternLit, lightSource, tankSeconds, DIM_RING } from '../mineLight.js';
@@ -207,6 +207,7 @@ function askMine(ctx, kind) {
         mine.confirm = null;
         if(!yes) { mine.blocked = kind; return; }
         if(kind === 'up') {
+            rideUp(gameState.runTime); // the run can be picked up again from this floor (slice 7)
             ctx.finishRun('mine-win');
         } else {
             gameState.score += descentScore(mine.floor);

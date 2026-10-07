@@ -8,7 +8,7 @@ import { farmAction } from '../src/farm.js';
 import { ordersAction } from '../src/farmOrders.js';
 import { saloonAction } from '../src/saloon.js';
 import { vigilAction } from '../src/vigil.js';
-import { applyMineRun } from '../src/mineProgress.js';
+import { applyMineRun, applyMineResume, applyMineDeath, monsterTakes, collectPile } from '../src/mineProgress.js';
 import { buyLight, LIGHT_ITEMS, SHOP_MARKUP } from '../src/mineLight.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 import { createApple, AppleError } from './apple.js';
@@ -29,7 +29,8 @@ const LIMITS = {
     report: { max: 30, windowMs: 24 * 60 * 60 * 1000 },
     restore: { max: 5, windowMs: 10 * 60 * 1000 },
     name: { max: 20, windowMs: 60 * 60 * 1000 },
-    shop: { max: 120, windowMs: 60 * 60 * 1000 } // buying light: a few a session is normal, a script is not
+    shop: { max: 120, windowMs: 60 * 60 * 1000 }, // buying light: a few a session is normal, a script is not
+    minetrip: { max: 240, windowMs: 60 * 60 * 1000 } // clearing the resume point, collecting the pile, a monster at the pile
 };
 const REFUND_EVENTS = new Set(['CANCELLATION']); // RevenueCat reports a refunded one-off purchase this way
 const MAX_ACTIVE_DAYS = 400;
@@ -458,6 +459,50 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 // clock and the chapel, replays the route (speed, reach, oil, the bell) and pays for what could have been walked, once a day.
                 if(url.pathname === '/api/town/vigil' && req.method === 'POST') {
                     const result = vigilAction(user.profile, body, now());
+                    await save();
+                    return send(res, 200, { result, profile: user.profile });
+                }
+                // Coming back up and dying (src/mineProgress.js, slice 7). Everything here changes profile.mine and nothing else, and the client is not trusted:
+                // the rules cut a report down to what the floors, the time and the ore a run can hold allow. A report that banks ore or drops a pile
+                // (resume save, death) counts as a mine run and shares its minimum gap, so alternating routes cannot do more than /api/mine/run allows.
+                const mineReportRefused = () => {
+                    const gap = (now().getTime() - (user.lastMineRunAt || 0)) / 1000;
+                    if(gap < MIN_SECONDS_BETWEEN_RUNS) { send(res, 429, { code: 'too_fast', message: 'Runs are reported too quickly.' }); return true; }
+                    user.lastMineRunAt = now().getTime();
+                    return false;
+                };
+                // { action: 'save', startFloor, depth, ore, seconds, used, torches }: the lift up (banks the carried ore, remembers where he was);
+                // { action: 'clear' }: he starts again from the stairs, so the resume point goes.
+                if(url.pathname === '/api/mine/resume' && req.method === 'POST') {
+                    if(body?.action === 'clear') {
+                        if(!allow('minetrip', id)) return tooMany(res);
+                        user.profile.mine.resume = null;
+                        await save();
+                        return send(res, 200, { result: { cleared: true }, profile: user.profile });
+                    }
+                    if(body?.action !== 'save') throw new EconomyError('bad_action', 'That is not something the lift does.');
+                    if(mineReportRefused()) return;
+                    const result = applyMineResume(user.profile.mine, body);
+                    await save();
+                    return send(res, 200, { result, profile: user.profile });
+                }
+                // { startFloor, depth, ore, seconds, used, x, z }: he died. What he carried drops where he fell; he is thrown 5 floors up (never above 1).
+                if(url.pathname === '/api/mine/death' && req.method === 'POST') {
+                    if(mineReportRefused()) return;
+                    const result = applyMineDeath(user.profile.mine, body);
+                    await save();
+                    return send(res, 200, { result, profile: user.profile });
+                }
+                // { action: 'collect', floor }: he walks onto the pile (it is his again, carried and not banked until he rides up; only on its own floor);
+                // { action: 'monster' }: a monster reaches it and takes a share (a quarter of what is left, never below half of what was dropped).
+                if(url.pathname === '/api/mine/pile' && req.method === 'POST') {
+                    if(!allow('minetrip', id)) return tooMany(res);
+                    const mine = user.profile.mine;
+                    let result;
+                    if(body?.action === 'collect') result = { ore: collectPile(mine, body.floor) };
+                    else if(body?.action === 'monster') { const taken = monsterTakes(mine.pile); mine.pile = taken.pile; result = { taken: taken.taken }; }
+                    else throw new EconomyError('bad_action', 'That is not something the pile does.');
+                    result.pile = mine.pile;
                     await save();
                     return send(res, 200, { result, profile: user.profile });
                 }

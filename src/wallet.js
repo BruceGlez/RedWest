@@ -1,7 +1,7 @@
 import { CONFIG } from './config.js';
 import { createProfile, normalizeProfile, buyItem, equipItem, applyRun, refreshJobs, setName, importProgress } from './profile.js';
 import { collectJail, upgradeBuilding } from './town.js';
-import { applyMineRun } from './mineProgress.js';
+import { applyMineRun, applyMineResume, applyMineDeath, monsterTakes, collectPile } from './mineProgress.js';
 import { farmAction } from './farm.js';
 import { ordersAction } from './farmOrders.js';
 import { saloonAction } from './saloon.js';
@@ -101,7 +101,18 @@ export function createLocalWallet() {
             persist();
             return { ...result, profile: snapshot() };
         },
-        async reportMineRun(summary) { const result = applyMineRun(profile.mine, summary); persist(); return { result, profile: snapshot() }; }
+        async reportMineRun(summary) { const result = applyMineRun(profile.mine, summary); persist(); return { result, profile: snapshot() }; },
+        async mineResume(body) { const result = body?.action === 'clear' ? (profile.mine.resume = null, { cleared: true }) : applyMineResume(profile.mine, body); persist(); return { result, profile: snapshot() }; },
+        async mineDeath(body) { const result = applyMineDeath(profile.mine, body); persist(); return { result, profile: snapshot() }; },
+        async minePile(body) {
+            const mine = profile.mine;
+            let result;
+            if(body?.action === 'monster') { const hit = monsterTakes(mine.pile); mine.pile = hit.pile; result = { taken: hit.taken }; }
+            else result = { ore: collectPile(mine, body?.floor) };
+            result.pile = mine.pile;
+            persist();
+            return { result, profile: snapshot() };
+        }
     };
 }
 
@@ -184,7 +195,10 @@ export function createRemoteWallet(apiBase) {
         async buyLight(body) { return call('/api/mine/buy', body); },
         async leaderboard(board) { return call(`/api/leaderboard?board=${encodeURIComponent(board)}`); },
         async reportRun(summary) { return call('/api/run', summary); },
-        async reportMineRun(summary) { return call('/api/mine/run', summary); }
+        async reportMineRun(summary) { return call('/api/mine/run', summary); },
+        async mineResume(body) { return call('/api/mine/resume', body); },
+        async mineDeath(body) { return call('/api/mine/death', body); },
+        async minePile(body) { return call('/api/mine/pile', body); }
     };
 }
 
