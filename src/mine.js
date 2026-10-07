@@ -5,7 +5,8 @@
 // src/townPanel.js starts the run.
 import { floorName } from './mineMap.js';
 import { maxOreOnFloor, startFloors } from './mineProgress.js';
-import { createLightRun, kitForRun, usedKit, lanternLit } from './mineLight.js';
+import { createLightRun, kitForRun, usedKit, lanternLit, restoreTorches, standingTorches } from './mineLight.js';
+import { withResume, rememberResume, forgetResume } from './mineResume.js';
 
 export const MINE_ATMOSPHERE_ID = 'mine'; // the look of the mine (src/atmosphere.js), not one of the outlaws' stages
 
@@ -14,6 +15,7 @@ export const mine = {
     floor: 1,       // the depth being fought
     startFloor: 1,  // the floor the run began on (floor 1, or a checkpoint of his: src/mineProgress.js)
     ore: 0,         // the ore carried in this run: kept if he rides the lift up, lost if he falls
+    clockBase: 0,   // seconds the run had already taken when it was resumed (a lift ride up does not end it)
     light: null,    // the lantern, oil, torches and matches of this run (src/mineLight.js, createLightRun)
     shaftDx: 0,     // where the shaft down and the lift up are from the marshal (src/gameLoop.js keeps these up to date), for the HUD
     shaftDz: 0,
@@ -29,6 +31,7 @@ function reset() {
     mine.floor = 1;
     mine.startFloor = 1;
     mine.ore = 0;
+    mine.clockBase = 0;
     mine.light = null;
     mine.shaftDx = mine.shaftDz = mine.liftDx = mine.liftDz = 0;
     mine.liftArmed = false;
@@ -42,9 +45,14 @@ function reset() {
 export function beginMineRun(floor = 1, record = null) {
     mine.enabled = true;
     reset();
-    const start = startFloors(record ?? { checkpoint: 0 }).includes(Math.floor(floor)) ? Math.floor(floor) : 1;
+    const own = withResume(record);
+    const start = startFloors(own).includes(Math.floor(floor)) ? Math.floor(floor) : 1;
     mine.floor = mine.startFloor = start;
     mine.light = createLightRun(kitForRun(record?.light)); // what he owns (or the free kit until the shops are open)
+    if(own.resume && start === own.resume.floor) { // back to the floor he rode up from: his torches still stand and the run's clock goes on
+        restoreTorches(mine.light, own.resume.torches);
+        mine.clockBase = own.resume.clock;
+    } else forgetResume(); // any other start gives the resume point up
 }
 
 export function endMineRun() {
@@ -116,7 +124,7 @@ export function liftHint(dx, dz) {
 
 // What the mine asks at the shaft and at the lift. Nothing happens until the answer is yes.
 export function confirmText(kind, floor) {
-    if(kind === 'up') return { title: 'RIDE THE LIFT UP?', text: `Ride back up from depth ${floor}. This ends the run, and the monsters stay where they are.`, yes: 'RIDE UP', no: 'STAY' };
+    if(kind === 'up') return { title: 'RIDE THE LIFT UP?', text: `Ride back up from depth ${floor}. The ore you carry is banked, and you can come back down to this floor. The monsters stay where they are.`, yes: 'RIDE UP', no: 'STAY' };
     return { title: 'GO DOWN?', text: `Take the shaft down to depth ${floor + 1}. Everything on this floor stays behind.`, yes: 'DESCEND', no: 'STAY' };
 }
 
@@ -129,8 +137,13 @@ export function resultText(result, floor, ore = 0) {
 
 // What the run reports when it ends (src/mineProgress.js, applyMineRun): where it began, how deep, the ore carried, and how it ended.
 export function runSummary(result, seconds) {
-    return { startFloor: mine.startFloor, depth: mine.floor, ore: mine.ore, outcome: result === 'mine-win' ? 'up' : 'fell', seconds: Math.max(0, Math.round(seconds)),
+    return { startFloor: mine.startFloor, depth: mine.floor, ore: mine.ore, outcome: result === 'mine-win' ? 'up' : 'fell', seconds: Math.max(0, Math.round(seconds + mine.clockBase)),
         used: mine.light ? usedKit(mine.light) : { oil: 0, torches: 0, matches: 0 } };
+}
+
+// The lift went up with the run still open to come back to: remember the floor, the torches he left and the clock (src/mineResume.js).
+export function rideUp(seconds) {
+    rememberResume(mine.floor, mine.light ? standingTorches(mine.light) : [], Math.round(seconds + mine.clockBase));
 }
 
 // The line under the result once the run is saved (`outcome` is what applyMineRun returned).

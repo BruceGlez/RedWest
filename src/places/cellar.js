@@ -5,6 +5,7 @@ import { createCellarScene } from '../placeCellar.js';
 import { createTownWalk } from '../townWalk.js';
 import { CELLAR_START, hiddenDoorOpen, cellarLabel } from '../cellarLayout.js';
 import { startFloors, normalizeMineProgress } from '../mineProgress.js';
+import { withResume } from '../mineResume.js';
 import { OUTLAWS } from '../outlaws.js';
 
 const CELLAR_SKY = { top: '#070504', middle: '#0d0907', horizon: '#18110c' };
@@ -20,8 +21,8 @@ export function createCellarPlace(host) {
         if(!hiddenDoorOpen(profile)) {
             return card('A HOLLOW SEAM', `<p class="town-blurb">You run a hand along the cold stone. One seam rings hollow, but it will not give. Whatever is behind it is waiting for ${DEACON} to be put right first.</p>`);
         }
-        const record = normalizeMineProgress(profile.mine);
-        const buttons = startFloors(record).map(floor => `<button type="button" class="shop-action collect farm-crop" data-descend="${floor}">${floor === 1 ? 'FLOOR 1' : `FLOOR ${floor}`}<small>${floor === 1 ? 'from the top' : 'checkpoint'}</small></button>`).join('');
+        const record = withResume(normalizeMineProgress(profile.mine)); // + the floor he rode up from (slice 7, one line on purpose)
+        const buttons = startFloors(record).map(floor => `<button type="button" class="shop-action collect farm-crop" data-descend="${floor}">${floor === 1 ? 'FLOOR 1' : `FLOOR ${floor}`}<small>${floor === 1 ? 'from the top' : floor === record.resume?.floor ? 'back where you left off' : 'checkpoint'}</small></button>`).join('');
         return card('THE HIDDEN DOOR', `<p class="town-blurb">The seam gives. Behind it the old claim goes down into the dark. Your deepest floor is ${record.deepest}. Begin where you like: the lift always brings you back, and nothing down there gives stars or money.</p>`
             + `<div class="town-actions farm-actions">${buttons}</div>`);
     }
