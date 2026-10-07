@@ -137,9 +137,9 @@ test('the run reports where it began, how deep, the ore carried and how it ended
 });
 
 test('the run starts with a light kit and reports what it used; the HUD shows the torches and the oil', () => {
-    beginMineRun(1, { checkpoint: 0, light: { lantern: true, oil: 900, torches: 10, matches: 0 } });
+    beginMineRun(1, { checkpoint: 0, light: { lantern: true, oil: 300, torches: 10, matches: 0 } });
     assert.ok(mine.light, 'a run has a light');
-    assert.deepEqual([mine.light.lantern, mine.light.oil, mine.light.torches], [true, 900, 10], 'it starts with what he owns');
+    assert.deepEqual([mine.light.lantern, mine.light.oil, mine.light.torches], [true, 300, 10], 'it starts with what he owns');
     mine.light.oil -= 125.2;
     mine.light.torches -= 2;
     assert.deepEqual(runSummary('mine-win', 60).used, { oil: 126, torches: 2, matches: 0 });
