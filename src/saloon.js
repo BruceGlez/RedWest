@@ -27,9 +27,12 @@ export const DISHES = [
     { id: 'beans', name: 'BEANS', station: 'stove', price: 3, from: 1, farm: false },
     { id: 'cornbread', name: 'CORNBREAD', station: 'oven', price: 4, from: 2, farm: false },
     { id: 'eggs', name: 'EGG PLATE', station: 'stove', price: 5, from: 3, farm: true },
-    { id: 'pie', name: 'PUMPKIN PIE', station: 'oven', price: 8, from: 5, farm: true }
+    { id: 'pie', name: 'PUMPKIN PIE', station: 'oven', price: 8, from: 5, farm: true },
+    // The farm-free dish of night 5 (owner decision 4): "STEW" is a placeholder name until the story lane gives it one. Its price stays under the pie's, so the
+    // priciest dish, and with it the pay ceiling's reasoning, does not move.
+    { id: 'stew', name: 'STEW', station: 'stove', price: 6, from: 5, farm: false }
 ];
-// How much of a dish's price a tip adds, by tip tier: none, a quick serve, a quick serve with no miss in the shift.
+// How much of a dish's price a tip adds, by tip tier: none, a quick serve, a quick serve that is the third (or later) quick serve in a row (P8).
 export const TIP_RATES = [0, 0.25, 0.5];
 // With the farm open the tips are a fifth bigger.
 export const FARM_TIP_BONUS = 1.2;
@@ -62,8 +65,8 @@ export function saloonOpen(profile) {
     return ((profile.stats?.stageStars?.[SALOON_INDEX]) & 1) !== 0;
 }
 
-// How many customers a night brings.
-export const crowd = night => Math.min(10, 2 + Math.max(1, night));
+// How many customers a night brings: 5 on night 1, 14 from night 10 (docs/design/copper-bit-shift.md, P1).
+export const crowd = night => Math.min(14, 4 + Math.max(1, night));
 
 // What Pete can cook on a night. `farm`: whether the farm is open.
 export const menu = (night, farm) => DISHES.filter(d => d.from <= night && (farm || !d.farm));
@@ -115,6 +118,12 @@ export function starsFor(night, served) {
     const share = served / crowd(night);
     return share >= 1 ? 3 : share >= 0.75 ? 2 : share >= 0.5 ? 1 : 0;
 }
+
+// The served counts that earn one, two and three stars on a night (what the star bar shows).
+export const starNeeds = night => {
+    const total = crowd(night);
+    return [Math.ceil(total / 2), Math.ceil(total * 0.75), total];
+};
 
 // What a list of served customers pays on a night: [{ dish, tip }] with the dishes on the menu and no more than the crowd.
 export function shiftPay(night, served, farm) {
