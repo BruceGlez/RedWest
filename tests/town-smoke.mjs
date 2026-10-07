@@ -745,9 +745,9 @@ try {
             layer.querySelectorAll('[data-serve]').forEach(b => b.click());
             layer.querySelectorAll('[data-cook]:not([disabled])').forEach(b => b.click());
             return /Served/.test(layer.querySelector('.saloon-result').textContent);
-        }, null, { polling: 100, timeout: 90000 });
+        }, null, { polling: 100, timeout: 150000 });
         const till = await page.locator('.saloon-result').textContent();
-        assert.match(till, /Served 3 of 3/);
+        assert.match(till, /Served 5 of 5/);
         assert.match(till, /\$\d+ in wages and tips\. 2 paid shifts left/);
         const dollarsAfter = Number((await page.locator('#town-dollars').textContent()).replace(/,/g, ''));
         assert.ok(dollarsAfter > dollarsBefore, 'the wages landed in the wallet');
