@@ -1,6 +1,7 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { PAID_SHIFTS_PER_DAY, NIGHTS, DISHES, TIP_RATES, FARM_TIP_BONUS, crowd, menu, saloonOpen, createSaloon, normalizeSaloon, nightsOpen, paidShiftsLeft, starsFor, shiftPay, settleShift, saloonAction } from '../src/saloon.js';
+import { PAID_SHIFTS_PER_DAY, NIGHTS, DISHES, TIP_RATES, FARM_TIP_BONUS, crowd, menu, saloonOpen, createSaloon, normalizeSaloon, nightsOpen, paidShiftsLeft, starsFor, shiftPay, settleShift, saloonAction,
+    SHIFT_PAY_CEILING, UPGRADES, MAX_REGULAR_VISITS, MAX_REGULARS, getUpgrade, buyUpgrade } from '../src/saloon.js';
 import { dayNumber } from '../src/farmOrders.js';
 import { createProfile, normalizeProfile } from '../src/profile.js';
 import { OUTLAWS } from '../src/outlaws.js';
@@ -154,4 +155,78 @@ test('saved state survives rubbish and old saves', () => {
     const p = createProfile(T0);
     p.town.saloon.nights[0] = 2;
     assert.equal(normalizeProfile(JSON.parse(JSON.stringify(p))).town.saloon.nights[0], 2, 'and it is saved with the profile');
+});
+
+test('one shift never pays more than the ceiling, so three paid shifts stay under the farm\'s 400 and a small part of the jail', () => {
+    const jailDay = OUTLAWS.reduce((sum, o) => sum + o.bounty, 0) * JAIL_BOUNTY_SHARE * 24;
+    assert.equal(SHIFT_PAY_CEILING, 130);
+    assert.ok(SHIFT_PAY_CEILING * PAID_SHIFTS_PER_DAY < 400);
+    assert.ok(SHIFT_PAY_CEILING * PAID_SHIFTS_PER_DAY < jailDay / 5);
+    const huge = Array.from({ length: 5000 }, () => ({ dish: 'pie', tip: 2 }));
+    assert.equal(shiftPay(10, huge, true).dollars <= SHIFT_PAY_CEILING, true);
+    assert.equal(shiftPay(1, [{ dish: 'beans', tip: 0 }], false).dollars, 3, 'a small shift is not touched by the ceiling');
+});
+
+test('the shelf sells one level at a time for earned dollars and nothing else', () => {
+    const p = profileWith();
+    p.balances.dollars = 100;
+    assert.deepEqual(saloonAction(p, { action: 'upgrade', id: 'stove' }, T0), { id: 'stove', level: 1, price: 30 });
+    assert.equal(p.balances.dollars, 70);
+    assert.equal(p.town.saloon.upgrades.stove, 1);
+    assert.throws(() => saloonAction(p, { action: 'upgrade', id: 'stove' }, T0), { code: 'funds' }, 'level 2 costs 90');
+    assert.equal(p.balances.dollars, 70, 'a refused purchase takes nothing');
+    p.balances.dollars = 1000;
+    saloonAction(p, { action: 'upgrade', id: 'stove' }, T0);
+    assert.throws(() => saloonAction(p, { action: 'upgrade', id: 'stove' }, T0), { code: 'owned' }, 'no level past the last');
+    assert.equal(p.balances.dollars, 1000 - 90);
+    for(const id of ['constructor', '__proto__', 'toString', '', null, 7, undefined]) assert.throws(() => saloonAction(p, { action: 'upgrade', id }, T0), { code: 'unknown_upgrade' }, String(id));
+    assert.equal(getUpgrade('constructor'), null);
+    assert.throws(() => saloonAction(profileWith({ pete: false }), { action: 'upgrade', id: 'stool' }, T0), { code: 'locked' });
+    const total = UPGRADES.reduce((sum, u) => sum + u.levels.reduce((a, b) => a + b, 0), 0);
+    assert.equal(total, 440, 'the whole shelf is 440 dollars (the design doc, P6)');
+    const q = profileWith();
+    q.balances.dollars = total;
+    for(const u of UPGRADES) for(let i = 0; i < u.levels.length; i++) buyUpgrade(q, { id: u.id }, T0);
+    assert.equal(q.balances.dollars, 0);
+    assert.deepEqual(Object.values(q.town.saloon.upgrades), UPGRADES.map(u => u.levels.length));
+});
+
+test('upgrades and regulars touch nothing outside the saloon, and do not change what a shift pays', () => {
+    const p = profileWith({ farm: true });
+    p.balances.dollars = 500;
+    const snap = () => JSON.stringify({ stars: p.stats.stageStars, levels: p.town.levels, jail: p.town.jailCollectedAt, rate: jailRate(p), stored: jailStored(p, later(10)), farm: p.town.farm, orders: p.town.orders, chapel: p.town.chapel, districts: unlockedDistricts(p.stats.stageStars) });
+    const before = snap();
+    const pay = shiftPay(5, plates(5, true, 2), true);
+    for(const u of UPGRADES) buyUpgrade(p, { id: u.id }, T0);
+    assert.equal(snap(), before);
+    assert.deepEqual(shiftPay(5, plates(5, true, 2), true), pay, 'dish prices, tips and the pay do not move with upgrades');
+});
+
+test('saved upgrades and regulars survive rubbish, old saves and a new day', () => {
+    assert.deepEqual(createSaloon(T0).upgrades, { stove: 0, stool: 0, oven: 0, taps: 0, cushions: 0 });
+    assert.deepEqual(createSaloon(T0).regulars, {});
+    const messy = normalizeSaloon({ day: dayNumber(T0), upgrades: { stove: 9, stool: -2, oven: 'x', taps: 1.9, cushions: null, bogus: 5 }, regulars: { 'tall-tom': 99, '__proto__': 2, 'Bad Name': 1, ghost: 0, rose: 'x', ada: 2 } }, T0);
+    assert.deepEqual(messy.upgrades, { stove: 2, stool: 0, oven: 0, taps: 1, cushions: 0 });
+    assert.deepEqual(messy.regulars, { 'tall-tom': MAX_REGULAR_VISITS, ada: 2 });
+    assert.equal(Object.getPrototypeOf(messy.regulars), Object.prototype);
+    const many = normalizeSaloon({ regulars: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`r${i}`, 1])) }, T0);
+    assert.equal(Object.keys(many.regulars).length, MAX_REGULARS);
+    const tomorrow = normalizeSaloon({ day: dayNumber(T0) - 1, paid: 3, upgrades: { stove: 1 }, regulars: { ada: 3 } }, T0);
+    assert.equal(tomorrow.paid, 0);
+    assert.equal(tomorrow.upgrades.stove, 1, 'what you bought stays bought');
+    assert.equal(tomorrow.regulars.ada, 3);
+    assert.equal(normalizeTown({ levels: {} }, T0).saloon.upgrades.stove, 0, 'an old save has an empty shelf');
+    const p = createProfile(T0);
+    p.balances.dollars = 50;
+    p.stats.stageStars[index('dusty-pete')] = 1;
+    buyUpgrade(p, { id: 'taps' }, T0);
+    assert.equal(normalizeProfile(JSON.parse(JSON.stringify(p))).town.saloon.upgrades.taps, 1, 'and it is saved with the profile');
+});
+
+test('a shift keeps what was bought on the shelf', () => {
+    const p = profileWith();
+    p.balances.dollars = 40;
+    buyUpgrade(p, { id: 'oven' }, T0);
+    settleShift(p, { night: 1, served: plates(1, false) }, T0);
+    assert.equal(p.town.saloon.upgrades.oven, 1);
 });
