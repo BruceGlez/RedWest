@@ -1,6 +1,6 @@
 # Working on Red West with several agents
 
-The repo is split into **11 lanes**. Each lane owns a set of files (`lanes.json`), has a short brief in `docs/lanes/<id>.md`, and a list
+The repo is split into **12 lanes**. Each lane owns a set of files (`lanes.json`), has a short brief in `docs/lanes/<id>.md`, and a list
 of checks to run. Agents in different lanes should almost never touch the same file. Start with `PLAN.md` for the big picture.
 
 | Lane | Id | Brief |
@@ -16,6 +16,7 @@ of checks to run. Agents in different lanes should almost never touch the same f
 | 9 Monetization, legal, App Store | `money` | [docs/lanes/money.md](docs/lanes/money.md) |
 | 10 QA and release | `qa` | [docs/lanes/qa.md](docs/lanes/qa.md) |
 | 11 Growth and live ops | `growth` | [docs/lanes/growth.md](docs/lanes/growth.md) |
+| 12 Game design and specs (advisory) | `design` | [docs/lanes/design.md](docs/lanes/design.md) |
 
 ## Rules
 

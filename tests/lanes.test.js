@@ -11,7 +11,7 @@ test('every tracked file has an owner lane or is shared', () => {
 });
 
 test('there are eleven lanes, each with a doc that exists and checks to run', () => {
-    assert.equal(config.lanes.length, 11);
+    assert.equal(config.lanes.length, 12);
     for(const lane of config.lanes) {
         assert.ok(lane.checks.length > 0, `${lane.id} has no checks`);
         assert.ok(existsSync(lane.doc), `${lane.id}: missing ${lane.doc}`);

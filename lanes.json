@@ -348,6 +348,17 @@
     "npm run test:event",
     "npm run test:demo"
    ]
+  },
+  {
+   "id": "design",
+   "name": "Game design and specs",
+   "doc": "docs/lanes/design.md",
+   "owns": [
+    "docs/design/**"
+   ],
+   "checks": [
+    "npm test"
+   ]
   }
  ],
  "shared": [
