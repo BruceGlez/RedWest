@@ -21,17 +21,24 @@ export const TORCH_SPACING = 40;      // about one torch every this many units o
 export const MIN_TORCH_GAP = 14;      // a torch cannot be put closer than this to another (nothing gained by a pile)
 export const CARRY_LIMIT = 10;        // torches he can carry (and own): about the most the first ten floors need
 export const MATCH_LIMIT = 20;        // matches (a relight costs one)
-export const OIL_CAPACITY = 900;      // seconds of lantern burn in a full lantern (OPEN: oil per refill)
+// Oil (owner, 2026-10-07): the tank is short, about FIVE MINUTES, so the oil has to be used wisely, and oil is sold by the FLASK: two flasks fill a tank. The tank is an
+// upgradeable value (the owner will sell a bigger lantern later): `tankSeconds(kit)` is the one place that says how big a lantern's tank is, and the flask is a
+// separate size, so how many flasks fill a tank (`flasksPerTank`) is derived, never written down as 2.
+export const TANK_SECONDS = 300;      // seconds of burn in a full tank of the lantern as it is bought (a bigger lantern will have a bigger one)
+export const FLASK_SECONDS = 150;     // seconds of burn in one flask of oil
+export const tankSeconds = kit => TANK_SECONDS; // (later: read the lantern's upgrade from the kit)
+export const flasksPerTank = kit => tankSeconds(kit) / FLASK_SECONDS;
+export const OIL_CAPACITY = TANK_SECONDS; // the tank as the lantern is bought (kept for the shop card, which names it)
 export const THIN_AIR_FROM_FLOOR = 15; // from here the air is thin: a few placed torches go out by themselves, and the marshal has an oxygen bar (src/mineAir.js)
-export const OIL_MIN_PRICE = 2;       // the least a top-up of oil costs, in dollars
 export const MAX_HOLES = 12;          // how many torches the dark layer can show at once (src/placeDark.js)
 
 // What the shops sell (Mr. Grimsby's and the general store, the town lane's cards): ids, what they give and their price in Bounty Dollars.
-// OPEN, the owner confirms: exact prices. These are tuned so a first descent (lantern, a refill and a handful of torches) costs about what a
-// short Wanted Road run earns, because the mine pays no money itself. Prices differ a little between the two shops (`SHOP_MARKUP`), nothing else.
+// OPEN, the owner confirms: exact prices. These are tuned so a first descent (lantern, which comes with a full tank, and a handful of torches) costs about what
+// a short Wanted Road run earns, because the mine pays no money itself. Prices differ a little between the two shops (`SHOP_MARKUP`), nothing else.
+// A flask is 6 dollars (a full tank is two of them: 12), so a minute of light costs about 2 or 3 dollars and a torch (4 dollars) about as much as a minute and a half.
 export const LIGHT_ITEMS = {
-    lantern: { name: 'LANTERN', blurb: 'Lights the ground around you while it has oil. Bought once.', dollars: 60 },
-    oil: { name: 'LAMP OIL', blurb: 'Fills the lantern.', dollars: 15 },
+    lantern: { name: 'LANTERN', blurb: `Lights the ground around you while it has oil. Comes with a full tank (${TANK_SECONDS / 60} minutes). Bought once.`, dollars: 60 },
+    oil: { name: 'OIL FLASK', blurb: `${FLASK_SECONDS / 60} minutes of light: ${flasksPerTank()} fill the lantern.`, dollars: 6, gives: FLASK_SECONDS },
     torches: { name: 'TORCHES x5', blurb: 'Five torches to place along the road. They light their place.', dollars: 20, gives: 5 },
     matches: { name: 'MATCHES x5', blurb: 'Relights a torch that went out.', dollars: 5, gives: 5 }
 };
@@ -39,14 +46,9 @@ export const SHOP_MARKUP = { grimsby: 1.0, store: 1.1 }; // the general store ch
 // Ids and shop names come from the network: only the ones listed count ("constructor" and "__proto__" are not items or shops).
 const has = (table, key) => typeof key === 'string' && Object.hasOwn(table, key);
 export const isLightItem = id => has(LIGHT_ITEMS, id);
-// What a thing costs in a shop. Oil is sold by what the lantern is missing, so nobody pays the price of a full flask to add a minute: pass the kit (what he
-// owns) for the top-up price; without it the price is the full flask's.
+// What a thing costs in a shop, in dollars: the list price, and a little more at the general store. (`kit` is accepted and unused: oil is a flask at a flat price now.)
 export const priceOf = (id, shop = 'grimsby', kit = null) => {
     const markup = has(SHOP_MARKUP, shop) ? SHOP_MARKUP[shop] : 1;
-    if(id === 'oil' && kit && typeof kit === 'object') {
-        const missing = Math.max(0, Math.min(OIL_CAPACITY, OIL_CAPACITY - whole(kit.oil)));
-        return Math.max(OIL_MIN_PRICE, Math.ceil(LIGHT_ITEMS.oil.dollars * markup * missing / OIL_CAPACITY));
-    }
     return Math.ceil(LIGHT_ITEMS[id].dollars * markup);
 };
 
@@ -68,7 +70,7 @@ export function normalizeLightKit(raw) {
     const kit = createLightKit();
     if(!raw || typeof raw !== 'object') return kit;
     kit.lantern = raw.lantern === true;
-    kit.oil = kit.lantern ? Math.min(whole(raw.oil), OIL_CAPACITY) : 0;
+    kit.oil = kit.lantern ? Math.min(whole(raw.oil), tankSeconds(kit)) : 0;
     kit.torches = Math.min(whole(raw.torches), CARRY_LIMIT);
     kit.matches = Math.min(whole(raw.matches), MATCH_LIMIT);
     return kit;
@@ -83,14 +85,14 @@ export function buyLight(profile, id, shop = 'grimsby') {
     const kit = profile.mine.light;
     if(id === 'lantern' && kit.lantern) throw lightError('owned', 'You already have a lantern.');
     if(id === 'oil' && !kit.lantern) throw lightError('no_lantern', 'You need a lantern to put oil in.');
-    if(id === 'oil' && kit.oil >= OIL_CAPACITY) throw lightError('full', 'The lantern is full.');
+    if(id === 'oil' && kit.oil >= tankSeconds(kit)) throw lightError('full', 'The lantern is full.');
     if(id === 'torches' && kit.torches >= CARRY_LIMIT) throw lightError('full', `You cannot carry more than ${CARRY_LIMIT} torches.`);
     if(id === 'matches' && kit.matches >= MATCH_LIMIT) throw lightError('full', `You cannot carry more than ${MATCH_LIMIT} matches.`);
-    const price = priceOf(id, shop, kit); // (oil: by what the lantern is missing)
+    const price = priceOf(id, shop, kit);
     if(profile.balances.dollars < price) throw lightError('funds', 'Not enough bounty dollars.');
     profile.balances.dollars -= price;
-    if(id === 'lantern') { kit.lantern = true; kit.oil = OIL_CAPACITY; } // it comes full
-    else if(id === 'oil') kit.oil = OIL_CAPACITY;
+    if(id === 'lantern') { kit.lantern = true; kit.oil = tankSeconds(kit); } // it comes with a full tank
+    else if(id === 'oil') kit.oil = Math.min(tankSeconds(kit), kit.oil + item.gives); // a flask: what it holds, up to the tank
     else if(id === 'torches') kit.torches = Math.min(CARRY_LIMIT, kit.torches + item.gives);
     else if(id === 'matches') kit.matches = Math.min(MATCH_LIMIT, kit.matches + item.gives);
     return { id, price };
@@ -104,7 +106,7 @@ function lightError(code, message) {
 // After a run: take away what was used (`used` = { oil, torches, matches }, from the run's summary). Never below nothing, never more than he had.
 export function spendKit(kit, used) {
     const u = used && typeof used === 'object' ? used : {};
-    kit.oil = Math.max(0, kit.oil - Math.min(whole(u.oil), OIL_CAPACITY));
+    kit.oil = Math.max(0, kit.oil - Math.min(whole(u.oil), tankSeconds(kit)));
     kit.torches = Math.max(0, kit.torches - whole(u.torches));
     kit.matches = Math.max(0, kit.matches - whole(u.matches));
     return kit;

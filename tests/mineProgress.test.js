@@ -1,12 +1,12 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { createMineProgress, normalizeMineProgress, checkpointFor, startFloors, maxOreOnFloor, maxOreForRun, oreKept, applyMineRun, CHECKPOINT_EVERY, MAX_FLOOR, MAX_ORE, FALL_KEEPS } from '../src/mineProgress.js';
+import { createMineProgress, normalizeMineProgress, checkpointFor, startFloors, maxOreOnFloor, maxOreForRun, oreKept, applyMineRun, applyMineResume, applyMineDeath, thrownTo, monsterTakes, collectPile, normalizeResume, normalizePile, CHECKPOINT_EVERY, MAX_FLOOR, MAX_ORE, FALL_KEEPS } from '../src/mineProgress.js';
 import { createProfile, normalizeProfile, applyRun, CURRENCIES } from '../src/profile.js';
 import { PRODUCTS } from '../src/products.js';
 import { SHOP_ITEMS } from '../src/cosmetics.js';
 
 test('a new profile has an empty mine record, and old saves without one get it', () => {
-    assert.deepEqual(createProfile().mine, { version: 1, deepest: 0, checkpoint: 0, ore: 0, runs: 0, light: { lantern: false, oil: 0, torches: 0, matches: 0 } });
+    assert.deepEqual(createProfile().mine, { version: 1, deepest: 0, checkpoint: 0, ore: 0, runs: 0, resume: null, pile: null, light: { lantern: false, oil: 0, torches: 0, matches: 0 } });
     const old = createProfile();
     delete old.mine;
     assert.deepEqual(normalizeProfile(old).mine, createMineProgress());
@@ -14,12 +14,12 @@ test('a new profile has an empty mine record, and old saves without one get it',
 });
 
 test('normalizing keeps real numbers, cuts tampered ones, and derives the checkpoint from the deepest floor', () => {
-    assert.deepEqual(normalizeMineProgress({ deepest: 13.9, checkpoint: 500, ore: '40', runs: 3 }), { version: 1, deepest: 13, checkpoint: 10, ore: 40, runs: 3, light: createMineProgress().light });
+    assert.deepEqual(normalizeMineProgress({ deepest: 13.9, checkpoint: 500, ore: '40', runs: 3 }), { version: 1, deepest: 13, checkpoint: 10, ore: 40, runs: 3, resume: null, pile: null, light: createMineProgress().light });
     assert.equal(normalizeMineProgress({ deepest: 1e9 }).deepest, MAX_FLOOR);
     assert.equal(normalizeMineProgress({ ore: 1e12 }).ore, MAX_ORE);
     assert.deepEqual(normalizeMineProgress({ deepest: -4, ore: -1, runs: 'x' }), createMineProgress());
     assert.deepEqual(normalizeMineProgress('nope'), createMineProgress());
-    assert.deepEqual(normalizeProfile({ mine: { deepest: 7, ore: 12 } }).mine, { version: 1, deepest: 7, checkpoint: 5, ore: 12, runs: 0, light: createMineProgress().light });
+    assert.deepEqual(normalizeProfile({ mine: { deepest: 7, ore: 12 } }).mine, { version: 1, deepest: 7, checkpoint: 5, ore: 12, runs: 0, resume: null, pile: null, light: createMineProgress().light });
     const once = normalizeMineProgress({ deepest: 22, ore: 5, runs: 9 });
     assert.deepEqual(normalizeMineProgress(once), once, 'normalizing twice changes nothing');
 });
@@ -82,4 +82,57 @@ test('the mine gives no stars, no dollars, no score records, and ore is not a cu
     // A normal run does not touch the mine record either.
     applyRun(profile, { score: 400, bounty: 'none', outlawIndex: 0, seconds: 120, kills: {} });
     assert.equal(profile.mine.ore, 30);
+});
+
+test('slice 7: the resume point and the pile are cut down to what could be true', () => {
+    assert.equal(normalizeResume(null), null);
+    assert.equal(normalizeResume({ floor: 0 }, 9), null);
+    assert.equal(normalizeResume({ floor: 12 }, 7).floor, 7, 'never deeper than the deepest reached');
+    const r = normalizeResume({ floor: 4, clock: 90.7, torches: [[4, 1, 2, true], [9, 0, 0, 1], 'x', [2, 'a', 3, 0]] }, 6);
+    assert.deepEqual(r, { floor: 4, torches: [[4, 1, 2, 1], [2, 0, 3, 0]], clock: 90 });
+    assert.equal(normalizeResume({ floor: 2, torches: Array(999).fill([1, 0, 0, 1]) }, 5).torches.length, 200);
+    assert.equal(normalizePile({ floor: 3, ore: 0 }, 5), null);
+    assert.deepEqual(normalizePile({ floor: 3, x: 4, z: -5, ore: 20 }, 5), { floor: 3, x: 4, z: -5, ore: 20, full: 20 });
+    assert.equal(normalizePile({ floor: 3, ore: 50, full: 10 }, 5).ore, 10, 'a pile cannot hold more than was dropped');
+    const saved = normalizeMineProgress({ deepest: 6, resume: { floor: 4, clock: 5 }, pile: { floor: 2, ore: 8 } });
+    assert.deepEqual(normalizeMineProgress(saved), saved);
+});
+
+test('slice 7: riding the lift up banks the ore and saves where to come back to', () => {
+    const mine = createMineProgress();
+    const result = applyMineResume(mine, { startFloor: 1, depth: 3, ore: 12, seconds: 200, torches: [[3, 5, 6, 1]] });
+    assert.equal(mine.ore, 12);
+    assert.deepEqual(mine.resume, { floor: 3, torches: [[3, 5, 6, 1]], clock: 200 });
+    assert.equal(result.resume.floor, 3);
+});
+
+test('slice 7: dying drops what he carried as a pile, throws him up, and clears the resume point', () => {
+    assert.deepEqual([1, 3, 6, 7, 20].map(thrownTo), [1, 1, 1, 2, 15]);
+    const mine = createMineProgress();
+    mine.resume = { floor: 2, torches: [], clock: 1 };
+    const first = applyMineDeath(mine, { startFloor: 1, depth: 4, ore: 10, seconds: 300, x: 7, z: 8 });
+    assert.equal(mine.ore, 0, 'nothing is banked by dying');
+    assert.deepEqual(mine.pile, { floor: 4, x: 7, z: 8, ore: 10, full: 10 });
+    assert.equal(mine.resume, null);
+    assert.equal(first.thrownTo, 1);
+    applyMineDeath(mine, { startFloor: 1, depth: 3, ore: 5, seconds: 300, x: 1, z: 2 });
+    assert.deepEqual(mine.pile, { floor: 3, x: 1, z: 2, ore: 15, full: 15 }, 'a second death adds the remains');
+});
+
+test('slice 7: monsters take a quarter at most and never more than half of what was dropped', () => {
+    let { pile } = { pile: { floor: 2, x: 0, z: 0, ore: 100, full: 100 } };
+    assert.equal(monsterTakes(pile).taken, 25);
+    for(let i = 0; i < 50; i++) pile = monsterTakes(pile).pile;
+    assert.equal(pile.ore, 50);
+    assert.equal(monsterTakes(null).taken, 0);
+    assert.equal(monsterTakes({ floor: 1, x: 0, z: 0, ore: 3, full: 3 }).taken, 0, 'a tiny pile is left alone');
+});
+
+test('slice 7: the pile is picked up on its own floor only, once', () => {
+    const mine = createMineProgress();
+    mine.pile = { floor: 4, x: 0, z: 0, ore: 9, full: 12 };
+    assert.equal(collectPile(mine, 3), 0);
+    assert.equal(collectPile(mine, 4), 9);
+    assert.equal(mine.pile, null);
+    assert.equal(collectPile(mine, 4), 0);
 });

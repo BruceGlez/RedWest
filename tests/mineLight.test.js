@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { DIM_RING, LANTERN_RADIUS, TORCH_RADIUS, MIN_TORCH_GAP, CARRY_LIMIT, MATCH_LIMIT, OIL_CAPACITY, MAX_HOLES, TORCH_SPACING, LIGHT_ITEMS, SHOP_MARKUP, priceOf,
     createLightKit, normalizeLightKit, buyLight, spendKit, createLightRun, lanternLit, burnLantern, placeTorch, putOutTorch, relightTorch, burnTorches,
-    lightSource, isLit, usedKit, torchesFor, isLightItem, nearestLitTorch, nearestOutTorch, THIN_AIR_FROM_FLOOR, OIL_MIN_PRICE, TORCH_FAIL_MIN_SECONDS, TORCH_FAIL_SPREAD_SECONDS, torchFailChance, torchFailAfter } from '../src/mineLight.js';
+    lightSource, isLit, usedKit, torchesFor, isLightItem, nearestLitTorch, nearestOutTorch, THIN_AIR_FROM_FLOOR, TANK_SECONDS, FLASK_SECONDS, tankSeconds, flasksPerTank, TORCH_FAIL_MIN_SECONDS, TORCH_FAIL_SPREAD_SECONDS, torchFailChance, torchFailAfter } from '../src/mineLight.js';
 import { createProfile, normalizeProfile, CURRENCIES } from '../src/profile.js';
 import { applyMineRun, createMineProgress, normalizeMineProgress } from '../src/mineProgress.js';
 import { floorLayout, roadLength } from '../src/mineMap.js';
@@ -38,11 +38,10 @@ test('buying: the lantern once, oil to fill it, torches and matches up to what h
     assert.deepEqual([p.mine.light.lantern, p.mine.light.oil, p.balances.dollars], [true, OIL_CAPACITY, 500 - LIGHT_ITEMS.lantern.dollars], 'the lantern comes full');
     assert.throws(() => buyLight(p, 'lantern'), error => error.code === 'owned');
     assert.throws(() => buyLight(p, 'oil'), error => error.code === 'full');
-    p.mine.light.oil = 100;
+    p.mine.light.oil = OIL_CAPACITY - 40;
     const before = p.balances.dollars;
-    const topUp = priceOf('oil', 'grimsby', p.mine.light); // (by what the lantern is missing)
     buyLight(p, 'oil');
-    assert.deepEqual([p.mine.light.oil, p.balances.dollars], [OIL_CAPACITY, before - topUp]);
+    assert.deepEqual([p.mine.light.oil, p.balances.dollars], [OIL_CAPACITY, before - LIGHT_ITEMS.oil.dollars], 'a flask that would overfill fills the tank and no more');
     buyLight(p, 'torches'); buyLight(p, 'torches');
     assert.equal(p.mine.light.torches, CARRY_LIMIT, 'two stacks fill the carry limit');
     const kept = p.balances.dollars;
@@ -168,27 +167,32 @@ test('torches are permanent down to floor 14; from floor 15 a few go out by them
     assert.ok(relightTorch(run, doomed) && doomed.lit && doomed.burned === 0 && doomed.relights === 1);
 });
 
-test('oil is sold by what the lantern is missing, with a small minimum, and a full flask costs the list price', () => {
-    const full = LIGHT_ITEMS.oil.dollars;
-    assert.equal(priceOf('oil'), full, 'no kit named: the full flask');
-    assert.equal(priceOf('oil', 'grimsby', { oil: 0 }), full);
-    assert.equal(priceOf('oil', 'grimsby', { oil: OIL_CAPACITY / 2 }), Math.ceil(full / 2));
-    assert.equal(priceOf('oil', 'grimsby', { oil: OIL_CAPACITY - 60 }), OIL_MIN_PRICE, 'a minute missing costs the minimum, not a flask');
-    assert.ok(priceOf('oil', 'store', { oil: 0 }) >= priceOf('oil', 'grimsby', { oil: 0 }));
+test('the tank is five minutes, oil is sold by the flask (two fill a tank), and the sizes are separate so a bigger lantern can come later', () => {
+    assert.equal(TANK_SECONDS, 300, 'about five minutes, so the oil has to be used wisely');
+    assert.equal(OIL_CAPACITY, TANK_SECONDS);
+    assert.equal(FLASK_SECONDS, 150);
+    assert.equal(flasksPerTank(), 2, 'two flasks fill a tank, derived from the two sizes');
+    assert.equal(flasksPerTank(), tankSeconds() / FLASK_SECONDS);
+    assert.equal(LIGHT_ITEMS.oil.gives, FLASK_SECONDS);
+    assert.match(LIGHT_ITEMS.oil.blurb, /2\.5 minutes of light: 2 fill the lantern/);
+    // The price is a flat flask, in dollars only, and the general store charges a little more.
+    assert.equal(priceOf('oil'), LIGHT_ITEMS.oil.dollars);
+    assert.equal(priceOf('oil', 'grimsby', { oil: 0 }), priceOf('oil', 'grimsby', { oil: 250 }), 'a flask costs the same whatever is in the tank');
+    assert.ok(priceOf('oil', 'store') >= priceOf('oil', 'grimsby'));
     const p = rich(500);
     buyLight(p, 'lantern');
-    p.mine.light.oil = OIL_CAPACITY - 60;
+    p.mine.light.oil = 0;
     const before = p.balances.dollars;
-    assert.equal(buyLight(p, 'oil').price, OIL_MIN_PRICE);
-    assert.deepEqual([p.balances.dollars, p.mine.light.oil], [before - OIL_MIN_PRICE, OIL_CAPACITY], 'the top-up fills the lantern');
-    assert.throws(() => buyLight(p, 'oil'), error => error.code === 'full');
-    // Never cheaper by buying twice: two half-top-ups cost at least one whole one.
-    const q = rich(500);
-    buyLight(q, 'lantern');
-    q.mine.light.oil = 0;
-    q.mine.light.oil = OIL_CAPACITY / 2; // (a half tank)
-    const half = priceOf('oil', 'grimsby', q.mine.light);
-    assert.ok(half * 2 >= full - 1, 'the price is in proportion to the oil, not a bargain');
+    assert.equal(buyLight(p, 'oil').price, LIGHT_ITEMS.oil.dollars);
+    assert.equal(p.mine.light.oil, FLASK_SECONDS, 'one flask is half a tank');
+    buyLight(p, 'oil');
+    assert.equal(p.mine.light.oil, TANK_SECONDS, 'two flasks fill it');
+    assert.equal(p.balances.dollars, before - 2 * LIGHT_ITEMS.oil.dollars, 'a full tank costs two flasks');
+    assert.throws(() => buyLight(p, 'oil'), error => error.code === 'full', 'no third flask into a full tank');
+    assert.equal(normalizeLightKit({ lantern: true, oil: 900 }).oil, TANK_SECONDS, 'an old save with a bigger tank is cut to the tank');
+    // A first descent is within reach, and a refill is cheap against a short Wanted Road run.
+    assert.ok(priceOf('lantern') + priceOf('torches') + priceOf('matches') <= 120);
+    assert.ok(2 * priceOf('oil') + priceOf('torches') <= 60, 'a full tank and a fresh handful of torches');
 });
 
 test('the dark layer is told the radius and at most MAX_HOLES torches, the nearest first', () => {

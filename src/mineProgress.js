@@ -19,7 +19,7 @@ export const FALL_KEEPS = 0;           // the share of the ore carried in a run 
 const whole = value => Math.max(0, Math.floor(Number(value)) || 0);
 
 export function createMineProgress() {
-    return { version: 1, deepest: 0, checkpoint: 0, ore: 0, runs: 0, light: createLightKit() }; // light: the lantern, oil, torches and matches he owns (src/mineLight.js)
+    return { version: 1, deepest: 0, checkpoint: 0, ore: 0, runs: 0, resume: null, pile: null, light: createLightKit() }; // resume, pile: see below; light: the lantern, oil, torches and matches he owns (src/mineLight.js)
 }
 
 // The checkpoint a floor gives: the highest multiple of CHECKPOINT_EVERY that is not deeper than it (0 before the first).
@@ -36,6 +36,8 @@ export function normalizeMineProgress(raw) {
     mine.ore = Math.min(whole(raw.ore), MAX_ORE);
     mine.runs = whole(raw.runs);
     mine.light = normalizeLightKit(raw.light);
+    mine.resume = normalizeResume(raw.resume, mine.deepest);
+    mine.pile = normalizePile(raw.pile, mine.deepest);
     return mine;
 }
 
@@ -86,4 +88,75 @@ export function applyMineRun(mine, summary) {
         newDeepest: depth > before.deepest,
         newCheckpoint: mine.checkpoint > before.checkpoint ? mine.checkpoint : 0
     };
+}
+
+// ---- Slice 7: coming back up (MINE_PLAN.md). Two saved things, both in profile.mine and both bounded, because the client is not trusted. ----
+
+export const DEATH_THROW = 5;          // floors the marshal is thrown up when he dies (never above floor 1)
+export const PILE_TAKE = 0.25;         // the most of what is left a monster takes each time
+export const PILE_KEEPS = 0.5;         // the share of the pile as dropped that always survives the monsters
+export const MAX_RESUME_TORCHES = 200; // placed torches remembered across the whole mine
+
+const finite = (value, limit) => Number.isFinite(Number(value)) ? Math.max(-limit, Math.min(limit, Number(value))) : 0;
+
+// profile.mine.resume = { floor, torches: [[floor, x, z, lit], ...], clock } or null. Where the lift took him up from, the torches he left
+// standing and the seconds the run had taken (so a resumed run cannot claim depth it did not walk, MIN_SECONDS_PER_FLOOR). The floor can
+// never be deeper than the deepest he has reached.
+export function normalizeResume(raw, deepest = MAX_FLOOR) {
+    if(!raw || typeof raw !== 'object') return null;
+    const floor = Math.min(whole(raw.floor), MAX_FLOOR, whole(deepest));
+    if(floor < 1) return null;
+    const torches = (Array.isArray(raw.torches) ? raw.torches : []).slice(0, MAX_RESUME_TORCHES)
+        .map(t => Array.isArray(t) ? [Math.min(whole(t[0]), MAX_FLOOR), finite(t[1], 5000), finite(t[2], 5000), t[3] ? 1 : 0] : null)
+        .filter(t => t && t[0] >= 1 && t[0] <= floor);
+    return { floor, torches, clock: Math.min(whole(raw.clock), 86400) };
+}
+
+// profile.mine.pile = { floor, x, z, ore, full } or null. What he dropped where he died. `ore` is what is left; `full` is what was dropped
+// (the monsters never take the pile below PILE_KEEPS of it). Ore only today; a dollars field can sit beside it later.
+export function normalizePile(raw, deepest = MAX_FLOOR) {
+    if(!raw || typeof raw !== 'object') return null;
+    const floor = Math.min(whole(raw.floor), MAX_FLOOR, whole(deepest));
+    const full = Math.min(whole(raw.full ?? raw.ore), MAX_ORE);
+    const ore = Math.min(whole(raw.ore), full);
+    if(floor < 1 || ore < 1) return null;
+    return { floor, x: finite(raw.x, 5000), z: finite(raw.z, 5000), ore, full };
+}
+
+// Riding the lift up does not end the run: carried ore is banked (as always on the way up) and the resume point is saved.
+export function applyMineResume(mine, summary) {
+    const result = applyMineRun(mine, { ...summary, outcome: 'up' });
+    mine.resume = normalizeResume({ floor: summary?.depth, torches: summary?.torches, clock: summary?.seconds }, mine.deepest);
+    return { ...result, resume: mine.resume };
+}
+
+// Where a death throws him: DEATH_THROW floors up, never above floor 1.
+export const thrownTo = floor => Math.max(1, whole(floor) - DEATH_THROW);
+
+// He died: what he carried drops where he fell. An older pile is not lost: its remains join the new one (on the new spot).
+// Light is spent as in any run and the depth he reached still counts; the resume point is cleared (he starts again from the stairs).
+export function applyMineDeath(mine, summary) {
+    const result = applyMineRun(mine, { ...summary, outcome: 'fell' });
+    const floor = Math.min(Math.max(1, whole(summary?.depth)), mine.deepest);
+    const old = mine.pile;
+    const ore = Math.min(MAX_ORE, result.carried + (old ? old.ore : 0));
+    mine.pile = normalizePile({ floor, x: summary?.x, z: summary?.z, ore, full: Math.min(MAX_ORE, result.carried + (old ? old.full : 0)) }, mine.deepest);
+    mine.resume = null;
+    return { ...result, thrownTo: thrownTo(floor), pile: mine.pile };
+}
+
+// A monster reaches the pile: it takes at most a quarter of what is left, and the pile never drops below half of what was dropped.
+export function monsterTakes(pile) {
+    if(!pile) return { pile: null, taken: 0 };
+    const floor = Math.ceil(pile.full * PILE_KEEPS);
+    const taken = Math.max(0, Math.min(Math.floor(pile.ore * PILE_TAKE), pile.ore - floor));
+    return { pile: { ...pile, ore: pile.ore - taken }, taken };
+}
+
+// He walks onto the pile: it is his again, as ore carried in the run (not banked until he rides up). Only on its own floor.
+export function collectPile(mine, floor) {
+    if(!mine.pile || mine.pile.floor !== whole(floor)) return 0;
+    const ore = mine.pile.ore;
+    mine.pile = null;
+    return ore;
 }
