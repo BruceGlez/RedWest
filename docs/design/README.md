@@ -4,4 +4,4 @@ Written by the `design` lane (`docs/lanes/design.md`). One file per topic. Each 
 
 | Spec | Status |
 |---|---|
-| `copper-bit-shift.md` (Copper Bit as a Cake Mania style shift game) | to be written |
+| `copper-bit-shift.md` (Copper Bit as a Cake Mania style shift game) | written 2026-10-07, 17 proposals (P1 to P17), waiting for the owner's decisions; nothing built |
