@@ -812,3 +812,203 @@ test('the chapel is built piece by piece from the light, and a built piece stays
         await v.s.close();
     }
 });
+
+// ---- Coming back up and dying (src/mineProgress.js slice 7): /api/mine/resume, /api/mine/death, /api/mine/pile ----
+async function mineTripSetup(deepest = 12) {
+    const { maxOreForRun, MAX_RESUME_TORCHES } = await import('../src/mineProgress.js');
+    const s = await startAdminServer();
+    const a = await s.account();
+    const call = (path, body) => s.call(path, { token: a.token, body });
+    const profile = async () => (await s.call('/api/profile', { token: a.token })).data.profile;
+    const wait = seconds => s.advanceDays(seconds / 86400);
+    // A first honest run, so he has been deep enough for a resume point and a pile to make sense.
+    const first = await call('/api/mine/run', { startFloor: 1, depth: deepest, ore: 20, outcome: 'up', seconds: deepest * 8 });
+    assert.equal(first.status, 200);
+    wait(25);
+    const outside = p => { const { mine, ...rest } = JSON.parse(JSON.stringify(p)); return rest; };
+    return { s, a, call, profile, wait, outside, maxOreForRun, MAX_RESUME_TORCHES };
+}
+
+test('riding the lift up banks the ore and saves a resume point that is cut to what he could have walked', async () => {
+    const t = await mineTripSetup(12);
+    try {
+        for(const path of ['/api/mine/resume', '/api/mine/death', '/api/mine/pile']) {
+            assert.equal((await t.s.call(path, { body: {} })).status, 401, `${path}: no token, no mine`);
+        }
+        const before = await t.profile();
+        const saved = await t.call('/api/mine/resume', { action: 'save', startFloor: 1, depth: 8, ore: 10, seconds: 100, torches: [[8, 3, 4, true], [3, -2, 7, false], [9, 0, 0, true], [8, 1e9, -1e9, 1]] });
+        assert.equal(saved.status, 200);
+        const resume = saved.data.profile.mine.resume;
+        assert.equal(resume.floor, 8);
+        assert.equal(resume.clock, 100);
+        assert.deepEqual(resume.torches, [[8, 3, 4, 1], [3, -2, 7, 0], [8, 5000, -5000, 1]], 'a torch deeper than the resume floor is dropped; positions are bounded');
+        assert.equal(saved.data.profile.mine.ore, before.mine.ore + 10, 'the carried ore is banked on the way up, as always');
+        assert.equal(saved.data.profile.mine.pile, null);
+        assert.deepEqual(t.outside(saved.data.profile), t.outside(before), 'nothing outside profile.mine changed: no stars, dollars, nuggets or records');
+
+        // A report that comes too soon is refused, and the answer is the same as for /api/mine/run.
+        assert.equal((await t.call('/api/mine/resume', { action: 'save', depth: 9, ore: 1, seconds: 100 })).status, 429);
+        assert.equal((await t.call('/api/mine/run', { startFloor: 1, depth: 2, ore: 0, outcome: 'up', seconds: 30 })).status, 429, 'resume and run share one gap');
+        t.wait(25);
+
+        // A forged report is cut down: not deeper than the time allows, the ore not more than the floors can hold, torches no more than the cap.
+        const forged = await t.call('/api/mine/resume', { action: 'save', startFloor: 50, depth: 400, ore: 99999, seconds: 1, torches: Array.from({ length: 500 }, (_, i) => [1, i, i, 1]) });
+        assert.equal(forged.status, 200);
+        assert.equal(forged.data.result.depth, 1, 'no walk reaches a deep floor in one second');
+        assert.ok(forged.data.result.kept <= t.maxOreForRun(1, 1));
+        assert.ok(forged.data.profile.mine.resume.torches.length <= t.MAX_RESUME_TORCHES);
+        assert.ok(forged.data.profile.mine.resume.floor <= forged.data.profile.mine.deepest, 'never deeper than the deepest he has reached');
+
+        // Starting again from the stairs clears the resume point; clearing needs no wait and changes only that.
+        const midway = await t.profile();
+        const cleared = await t.call('/api/mine/resume', { action: 'clear' });
+        assert.equal(cleared.status, 200);
+        assert.deepEqual(cleared.data.result, { cleared: true });
+        assert.equal(cleared.data.profile.mine.resume, null);
+        assert.deepEqual({ ...cleared.data.profile.mine, resume: null }, { ...midway.mine, resume: null });
+        assert.equal((await t.call('/api/mine/resume', { action: 'clear' })).status, 200, 'clearing again is fine');
+        for(const body of [{}, { action: 'fly' }, { depth: 3 }]) {
+            const answer = await t.call('/api/mine/resume', body);
+            assert.equal(answer.status, 400, JSON.stringify(body));
+            assert.equal(answer.data.code, 'bad_action');
+        }
+    } finally {
+        await t.s.close();
+    }
+});
+
+test('a death drops what he carried where he fell, throws him 5 floors up, and a client cannot invent a bigger pile than the run could carry', async () => {
+    const t = await mineTripSetup(12);
+    try {
+        const before = await t.profile();
+        await t.call('/api/mine/resume', { action: 'save', depth: 9, ore: 0, seconds: 100, torches: [[9, 1, 1, 1]] });
+        t.wait(25);
+        assert.ok((await t.profile()).mine.resume, 'there is a resume point to clear');
+
+        const died = await t.call('/api/mine/death', { startFloor: 1, depth: 9, ore: 30, seconds: 100, x: 12.5, z: -7 });
+        assert.equal(died.status, 200);
+        const r = died.data.result;
+        assert.equal(r.thrownTo, 4, 'thrown 5 floors up from floor 9');
+        assert.deepEqual(r.pile, { floor: 9, x: 12.5, z: -7, ore: r.carried, full: r.carried });
+        assert.ok(r.carried > 0 && r.carried <= 30);
+        assert.equal(r.kept, 0, 'what he carried is not banked when he dies');
+        const mine = died.data.profile.mine;
+        assert.equal(mine.ore, before.mine.ore, 'banked ore is safe');
+        assert.equal(mine.resume, null, 'dying clears the resume point');
+        assert.deepEqual(mine.pile, r.pile);
+        assert.deepEqual(t.outside(died.data.profile), t.outside(before), 'nothing outside profile.mine changed');
+
+        // Never above floor 1.
+        t.wait(25);
+        const shallow = await t.call('/api/mine/death', { startFloor: 1, depth: 2, ore: 0, seconds: 100, x: 0, z: 0 });
+        assert.equal(shallow.data.result.thrownTo, 1);
+
+        // A second death before he found the first pile: its remains join the new one, on the new spot. Replaying the same report adds only what a run could carry.
+        t.wait(25);
+        const again = await t.call('/api/mine/death', { startFloor: 1, depth: 9, ore: 30, seconds: 100, x: -3, z: 4 });
+        const pile = again.data.profile.mine.pile;
+        assert.equal(pile.floor, 9);
+        assert.deepEqual([pile.x, pile.z], [-3, 4]);
+        assert.equal(pile.full, r.carried + again.data.result.carried);
+        assert.equal((await t.call('/api/mine/death', { startFloor: 1, depth: 9, ore: 30, seconds: 100 })).status, 429, 'the same report straight away is refused');
+
+        // He cannot claim a bigger pile than the floors could hold, however much ore he says or how deep, or what position.
+        t.wait(25);
+        const forged = await t.call('/api/mine/death', { startFloor: 1, depth: 9, ore: 1e12, seconds: 100, x: 1e12, z: -1e12 });
+        assert.equal(forged.data.result.carried, t.maxOreForRun(1, 9), 'cut to what floors 1 to 9 can hold');
+        assert.ok(forged.data.profile.mine.pile.full <= 99999);
+        assert.deepEqual([forged.data.profile.mine.pile.x, forged.data.profile.mine.pile.z], [5000, -5000]);
+        t.wait(25);
+        const impossible = await t.call('/api/mine/death', { startFloor: 1, depth: 400, ore: 99999, seconds: 5, x: 0, z: 0 });
+        assert.ok(impossible.data.result.depth <= 12, 'not deeper than time allows');
+        assert.ok(impossible.data.result.carried <= t.maxOreForRun(1, impossible.data.result.depth));
+        t.wait(25);
+        const junk = await t.call('/api/mine/death', 'nope');
+        assert.equal(junk.status, 200, 'junk is cut to nothing, not an error');
+    } finally {
+        await t.s.close();
+    }
+});
+
+test('the pile is collected once and only on its own floor, and monsters take a share but never more than half', async () => {
+    const t = await mineTripSetup(12);
+    try {
+        const nothing = await t.call('/api/mine/pile', { action: 'collect', floor: 5 });
+        assert.deepEqual(nothing.data.result, { ore: 0, pile: null }, 'no pile, nothing to collect');
+        assert.deepEqual((await t.call('/api/mine/pile', { action: 'monster' })).data.result, { taken: 0, pile: null });
+
+        await t.call('/api/mine/death', { startFloor: 1, depth: 10, ore: 1000, seconds: 120, x: 4, z: 5 });
+        const dropped = (await t.profile()).mine.pile;
+        assert.ok(dropped && dropped.ore === dropped.full && dropped.ore > 40);
+        const before = await t.profile();
+
+        // Wrong floors collect nothing and leave the pile where it is.
+        for(const floor of [9, 11, 1, 0, -10, 'ten', null, undefined, 1e9]) {
+            const answer = await t.call('/api/mine/pile', { action: 'collect', floor });
+            assert.equal(answer.status, 200);
+            assert.equal(answer.data.result.ore, 0, `floor ${floor}`);
+        }
+        assert.deepEqual((await t.profile()).mine.pile, dropped);
+
+        // Monsters: a quarter of what is left each time, never below half of what was dropped.
+        let left = dropped.ore;
+        const floorOf = Math.ceil(dropped.full / 2);
+        let takes = 0;
+        for(let i = 0; i < 12; i++) {
+            const hit = await t.call('/api/mine/pile', { action: 'monster' });
+            assert.equal(hit.status, 200);
+            const expected = Math.max(0, Math.min(Math.floor(left * 0.25), left - floorOf));
+            assert.equal(hit.data.result.taken, expected, `take ${i + 1}`);
+            left -= expected;
+            assert.equal(hit.data.result.pile.ore, left);
+            assert.equal(hit.data.result.pile.full, dropped.full, 'what was dropped does not change');
+            if(expected) takes++;
+        }
+        assert.ok(takes >= 2 && left >= floorOf, 'monsters took something, but never more than half');
+        assert.equal(left, floorOf, 'hammering the pile ends at half');
+
+        // He collects what is left, once. The ore is his to carry; it is not banked until he rides up.
+        const got = await t.call('/api/mine/pile', { action: 'collect', floor: 10 });
+        assert.equal(got.data.result.ore, left);
+        assert.equal(got.data.profile.mine.pile, null);
+        assert.equal(got.data.profile.mine.ore, before.mine.ore, 'not banked by picking it up');
+        assert.equal((await t.call('/api/mine/pile', { action: 'collect', floor: 10 })).data.result.ore, 0, 'a second collect gets nothing');
+        assert.deepEqual(t.outside(got.data.profile), t.outside(before), 'nothing outside profile.mine changed');
+
+        for(const body of [{}, { action: 'steal' }, { floor: 10 }]) {
+            const answer = await t.call('/api/mine/pile', body);
+            assert.equal(answer.status, 400, JSON.stringify(body));
+            assert.equal(answer.data.code, 'bad_action');
+        }
+        // The pile calls are limited per hour, so they cannot be used to hammer the server.
+        let refused = 0;
+        for(let i = 0; i < 260 && !refused; i++) if((await t.call('/api/mine/pile', { action: 'collect', floor: 10 })).status === 429) refused++;
+        assert.equal(refused, 1, 'a flood is told to slow down');
+    } finally {
+        await t.s.close();
+    }
+});
+
+test('a clock moved back gains nothing: reports are refused until the server clock passes the last one, and a replayed death cannot add up past the cap', async () => {
+    const t = await mineTripSetup(12);
+    try {
+        const first = await t.call('/api/mine/death', { startFloor: 1, depth: 10, ore: 50, seconds: 120, x: 1, z: 1 });
+        assert.equal(first.status, 200);
+        t.s.advanceDays(-1); // the server's clock goes back a day
+        assert.equal((await t.call('/api/mine/death', { startFloor: 1, depth: 10, ore: 50, seconds: 120, x: 1, z: 1 })).status, 429, 'a report dated before the last one is refused');
+        assert.equal((await t.call('/api/mine/resume', { action: 'save', depth: 5, ore: 5, seconds: 60 })).status, 429);
+        t.s.advanceDays(1 + 25 / 86400);
+        const later = await t.call('/api/mine/death', { startFloor: 1, depth: 10, ore: 50, seconds: 120, x: 1, z: 1 });
+        assert.equal(later.status, 200, 'once the clock has passed the last report plus the gap it works again');
+
+        // Replays, one every gap, never push the pile past the cap on what can be banked.
+        let pile = later.data.profile.mine.pile;
+        for(let i = 0; i < 6; i++) {
+            t.wait(25);
+            pile = (await t.call('/api/mine/death', { startFloor: 1, depth: 12, ore: 1e9, seconds: 200, x: 0, z: 0 })).data.profile.mine.pile;
+        }
+        assert.ok(pile.full <= 99999 && pile.ore <= pile.full);
+    } finally {
+        await t.s.close();
+    }
+});
