@@ -162,6 +162,16 @@ export function placeTorch(run, x, z, floor) {
     return torch;
 }
 
+// Torches he left standing on an earlier trip down (profile.mine.resume.torches, [[floor, x, z, lit], ...]) are there again. They cost nothing now: they were
+// paid for when they were put down, so the run's torch count is not touched.
+export function restoreTorches(run, list) {
+    for(const [floor, x, z, lit] of list ?? []) {
+        const index = run.placed.filter(t => t.floor === floor).length;
+        run.placed.push({ x, z, floor, lit: !!lit, burned: 0, index, relights: 0, failAfter: torchFailAfter(floor, index, 0) });
+    }
+}
+export const standingTorches = run => run.placed.map(t => [t.floor, t.x, t.z, t.lit ? 1 : 0]);
+
 // A torch is put out (by a light eater, src/mineMonsters.js, or by the thin air below).
 export function putOutTorch(torch) { torch.lit = false; }
 
