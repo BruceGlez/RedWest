@@ -15,7 +15,9 @@ import { crowd, menu, starNeeds } from './saloon.js';
 export const SHIFT_SECONDS = 120;
 // Customers keep arriving over this share of the shift; the last ones are served in the time that is left. A shift ends when the last customer
 // has been served or has walked out (the clock only shows SHIFT_SECONDS; nothing is cut off at it). HARD_STOP is only a guard for a stuck shift.
-export const ARRIVAL_SHARE = 0.75;
+export const ARRIVAL_SHARE = 0.8; // 96 s: tuned with tests/saloonBalance.test.js so a good player is busy to about 100 s
+// The first customer of the even stream comes in about now.
+const FIRST_AT = 2;
 export const HARD_STOP = SHIFT_SECONDS + 40;
 // A quick serve is perfect when it makes this many quick serves in a row.
 export const STREAK_FOR_BIG_TIP = 3;
@@ -23,7 +25,7 @@ export const STREAK_FOR_BIG_TIP = 3;
 export const RUSH_SIZE = 3;
 export const RUSH_SPREAD = 2;
 export const RUSH_NIGHT_ONE = 3;
-export const RUSHES = night => (night >= 7 ? [0.25, 0.5, 0.75] : night >= RUSH_NIGHT_ONE ? [0.35, 0.7] : []);
+export const RUSHES = night => (night >= 7 ? [0.25, 0.55, 0.85] : night >= RUSH_NIGHT_ONE ? [0.4, 0.85] : []);
 export const SEATS = 4;
 export const STATIONS = ['stove', 'barrel', 'oven'];
 // Seconds a station takes for a dish.
@@ -33,7 +35,7 @@ export const SEAT_WAIT = 8;
 // Share of a customer's patience that must be left for a serve to be quick.
 export const QUICK_SHARE = 0.5;
 // Seconds of patience at the start of a night: 28 on night 1, 14 on night 10, never under 14.
-export const patience = night => Math.max(14, Math.round(30 - 1.7 * night));
+export const patience = night => Math.max(14, Math.round(30 - 1.8 * night));
 
 // A small repeatable random stream (mulberry32), so a night's crowd depends only on the night, the farm and the seed.
 function stream(seed) {
@@ -65,7 +67,8 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
     });
     // The rest arrive evenly over the span with a little jitter.
     const rest = total - arrivals.length;
-    for(let i = 0; i < rest; i++) arrivals.push({ at: Math.max(0, ((i + 0.5) * span) / rest + (next() - 0.5) * (span / rest) * 0.6), dish: dishAt().id });
+    const gap = span / Math.max(1, rest - 1);
+    for(let i = 0; i < rest; i++) arrivals.push({ at: Math.min(span, Math.max(0, FIRST_AT + (i * (span - FIRST_AT)) / Math.max(1, rest - 1) + (next() - 0.5) * gap * 0.5)), dish: dishAt().id });
     arrivals.sort((a, b) => a.at - b.at);
     const full = patience(night);
 

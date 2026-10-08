@@ -135,7 +135,8 @@
     "tests/vigil.test.js",
     "src/hillLayout.js",
     "src/places/hill.js",
-    "tests/hillLayout.test.js"
+    "tests/hillLayout.test.js",
+    "tests/saloonBalance.test.js"
    ],
    "checks": [
     "npm test",

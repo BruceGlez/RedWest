@@ -108,7 +108,7 @@ test('the shift ends by the clock and nothing happens after it', () => {
 
 test('later nights are harder: shorter patience and bigger crowds', () => {
     assert.ok(patience(1) > patience(5) && patience(5) > patience(10) && patience(NIGHTS) >= 14);
-    assert.deepEqual([1, 2, 5, 10].map(patience), [28, 27, 22, 14], 'the design doc\'s table');
+    assert.deepEqual([1, 2, 5, 10].map(patience), [28, 26, 21, 14], 'the design doc\'s table, tuned by the balance bot (tests/saloonBalance.test.js)');
     assert.ok(patience(40) === 14, 'never under 14');
     assert.ok(SEATS >= 3 && STATIONS.length === 3);
 });
