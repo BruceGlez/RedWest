@@ -13,7 +13,10 @@ export const SALOON = { x: 0, z: -12, hx: 9, hz: 4 };
 export const PIANO = { x: -16, z: -3, hx: 1.4, hz: 0.8 };
 export const KEGS = { x: 18, z: -6, hx: 1.6, hz: 1.2 };
 export const RAIL = { x: 14, z: 7, hx: 3.2, hz: 0.3 };
-export const BLOCKS = [SALOON, PIANO, KEGS, RAIL];
+// The upgrade shelf stands against the saloon's front wall, to the right of the door (docs/design/copper-bit-shift.md, P7). The art lane builds it
+// in src/placeSaloon.js from this footprint; the rules and the list are src/saloonShelf.js.
+export const SHELF = { x: 5.5, z: SALOON.z + SALOON.hz + 0.4, hx: 1.6, hz: 0.4 };
+export const BLOCKS = [SALOON, PIANO, KEGS, RAIL, SHELF];
 
 const box = ({ x, z, hx, hz }) => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, maxZ: z + hz });
 
@@ -21,6 +24,7 @@ const box = ({ x, z, hx, hz }) => ({ minX: x - hx, maxX: x + hx, minZ: z - hz, m
 export const SPOTS = [
     { id: 'bar', verb: 'ENTER', x: SALOON.x, z: SALOON.z + SALOON.hz + 1.4 },
     { id: 'piano', verb: 'READ', x: PIANO.x, z: PIANO.z + PIANO.hz + 1.4 },
+    { id: 'shelf', verb: 'SHOP', x: SHELF.x, z: SHELF.z + SHELF.hz + 1.4 },
     { id: 'leave', verb: 'LEAVE', x: 0, z: 22.4 }
 ];
 
@@ -38,6 +42,7 @@ export function saloonLabel(door, profile = null, now = new Date()) {
             return `DUSTY PETE'S BAR: ${left} PAID ${left === 1 ? 'SHIFT' : 'SHIFTS'} LEFT`;
         }
         case 'piano': return 'THE BROKEN PIANO';
+        case 'shelf': return 'THE UPGRADE SHELF';
         case 'leave': return 'THE ROAD TO TOWN';
         default: return door.label;
     }

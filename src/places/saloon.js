@@ -11,6 +11,7 @@ import { NIGHTS, PAID_SHIFTS_PER_DAY, saloonOpen, menu, nightsOpen, paidShiftsLe
 import { SALOON_START, saloonLabel } from '../saloonLayout.js';
 import { getDistrict } from '../townDistricts.js';
 import { OUTLAWS } from '../outlaws.js';
+import { shelfHtml, shelfNumbersHtml, shelfBuyer } from '../saloonShelf.js';
 
 const PETE = OUTLAWS.find(o => o.id === 'dusty-pete').name;
 
@@ -30,7 +31,7 @@ export function createSaloonPlace(host) {
         const left = paidShiftsLeft(profile, now);
         const note = left ? `${left} of ${PAID_SHIFTS_PER_DAY} paid shifts left today. After that a shift is free practice for stars.` : 'Today\'s paid shifts are done. A shift now is free practice for stars; the wages start again tomorrow.';
         return card('bar', "DUSTY PETE'S BAR", `<p class="town-blurb">Pete wipes the bar. &ldquo;Busy night ahead. Mind the tips.&rdquo;</p><p class="town-stat">Tonight is night ${night} of ${NIGHTS}. ${note}</p>`
-            + `<div class="farm-chips">${nights}</div><p class="town-stat">On the menu</p><div class="farm-chips">${dishes}</div>`
+            + `<div class="farm-chips">${nights}</div><p class="town-stat">On the menu</p><div class="farm-chips">${dishes}</div>${shelfNumbersHtml(profile)}`
             + `<div class="town-actions farm-actions">${Array.from({ length: night }, (_, i) => `<button type="button" class="shop-action ${i + 1 === night ? 'collect' : 'upgrade'}" data-shift="${i + 1}">${i + 1 === night ? 'START NIGHT' : 'REPLAY NIGHT'} ${i + 1}</button>`).reverse().join('')}</div>`);
     }
     function saloonCard(id) {
@@ -39,9 +40,11 @@ export function createSaloonPlace(host) {
         switch(id) {
             case 'bar': return barCard(profile);
             case 'piano': return card('piano', 'THE BROKEN PIANO', "<p class=\"town-blurb\">Dusty Pete runs the bar, and the broken piano stays broken: he says the sour notes keep the tune honest. The first drink of the day is on the house.</p>");
+            case 'shelf': return saloonOpen(profile) ? card('shelf', 'THE UPGRADE SHELF', `<p class="town-blurb">Pete keeps the good pieces on a shelf by the door. Earn the dollars, take what you need.</p>${shelfHtml(profile)}`) : '';
             default: return '';
         }
     }
+    const buyUpgrade = shelfBuyer(host);
     // A shift behind the bar: the screen plays it and hands the summary here, and the wallet settles it (here or on the server).
     function startShift(night) {
         if(shift?.active || !host.profile() || !saloonOpen(host.profile())) return;
@@ -82,8 +85,9 @@ export function createSaloonPlace(host) {
         entered() { host.markVisited('copper'); },
         resize: (w, h) => scene3d?.resize(w, h),
         card: saloonCard,
-        // The START NIGHT buttons on the bar's card. Returns true when the click was the saloon's.
+        // The START NIGHT buttons on the bar's card and the BUY buttons on the shelf's. Returns true when the click was the saloon's.
         click(button) {
+            if(buyUpgrade(button)) return true;
             if(!button.dataset.shift) return false;
             startShift(Number(button.dataset.shift));
             return true;

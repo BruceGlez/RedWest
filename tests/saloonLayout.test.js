@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SALOON_AREA, SALOON_START, BLOCKS, SPOTS, saloonMap, saloonLabel } from '../src/saloonLayout.js';
+import { SALOON_AREA, SALOON_START, SALOON, BLOCKS, SHELF, SPOTS, saloonMap, saloonLabel } from '../src/saloonLayout.js';
 import { createSaloonPlace } from '../src/places/saloon.js';
 import { settleShift, PAID_SHIFTS_PER_DAY } from '../src/saloon.js';
 import { createProfile } from '../src/profile.js';
@@ -18,10 +18,10 @@ const withStars = ids => {
 };
 const host = profile => ({ profile: () => profile, markVisited: () => {} });
 
-test('Copper Bit is one flat map: ground, walls and a door for the bar, the piano and the way out', () => {
+test('Copper Bit is one flat map: ground, walls and a door for the bar, the piano, the upgrade shelf and the way out', () => {
     assert.deepEqual(map.areas, [SALOON_AREA]);
     assert.equal(map.boxes.length, BLOCKS.length);
-    assert.deepEqual(map.doors.map(d => d.id).sort(), ['bar', 'leave', 'piano']);
+    assert.deepEqual(map.doors.map(d => d.id).sort(), ['bar', 'leave', 'piano', 'shelf']);
     assert.ok(standable(...SALOON_START) && inside(SALOON_AREA, SALOON_START[0], SALOON_START[1], PLAYER_RADIUS));
 });
 
@@ -56,6 +56,7 @@ test('the bar prompt says how many paid shifts are left today', () => {
     assert.equal(saloonLabel({ id: 'bar' }), "DUSTY PETE'S BAR");
     assert.equal(saloonLabel({ id: 'leave' }), 'THE ROAD TO TOWN');
     assert.equal(saloonLabel({ id: 'piano' }), 'THE BROKEN PIANO');
+    assert.equal(saloonLabel({ id: 'shelf' }), 'THE UPGRADE SHELF');
 });
 
 test('the saloon cannot be entered until Dusty Pete has a star, and only its own gate leads in', () => {
@@ -100,4 +101,15 @@ test('only the START NIGHT buttons are the saloon\'s, and a shut saloon starts n
     const place = createSaloonPlace({ ...host(createProfile(T0)), closeCard: () => { throw new Error('a shut saloon must not start a shift'); } });
     assert.equal(place.click({ dataset: { shift: '1' }, hasAttribute: () => false }), true);
     assert.equal(place.click({ dataset: { plant: 'wheat' }, hasAttribute: () => false }), false);
+});
+
+test('the shelf stands against the saloon\'s front wall, clear of the door, and its spot is in front of it', () => {
+    assert.ok(BLOCKS.includes(SHELF));
+    assert.ok(SHELF.z - SHELF.hz >= SALOON.z + SALOON.hz - 1e-9, 'the shelf is outside the building');
+    assert.ok(Math.abs(SHELF.x - SALOON.x) - SHELF.hx > 1.5, 'and does not block the bar\'s door');
+    const shelf = map.doors.find(d => d.id === 'shelf');
+    const bar = map.doors.find(d => d.id === 'bar');
+    assert.equal(shelf.verb, 'SHOP');
+    assert.ok(shelf.z > SHELF.z + SHELF.hz, 'in front, on the +z side');
+    assert.ok(Math.hypot(shelf.x - bar.x, shelf.z - bar.z) > 2.8 * 1.5, 'far enough from the bar that each prompt is its own');
 });
