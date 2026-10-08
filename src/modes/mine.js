@@ -10,7 +10,7 @@ import { clearHazards } from '../enemySystem.js';
 import { clearParticles } from '../particleSystem.js';
 import { clearDecals } from '../decals.js';
 import { disposeBaked } from '../meshMerge.js';
-import { mine, endMineRun, rideUp, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
+import { mine, endMineRun, rideUp, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, resumeSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
 import { showMineFloor, openMineChest, updateMineScene, setMineTorches, setMineLantern } from '../mineScene.js';
 import { setMineLightSource } from '../placeDark.js';
 import { burnLantern, burnTorches, placeTorch, relightTorch, nearestOutTorch, lanternLit, lightSource, tankSeconds, DIM_RING } from '../mineLight.js';
@@ -272,7 +272,9 @@ export const mineMode = {
     // replaced when the answer comes back. A wallet with no mine call, or a failed one, only says so; the run itself never fails.
     settle: ({ economy, result, seconds }, say) => {
         if(!economy?.reportMineRun) return;
-        economy.reportMineRun(runSummary(result, seconds)).then(reply => say(savedText(reply.result))).catch(() => say(SAVE_FAILED_NOTE));
+        // Riding up keeps the run open to come back to: the server banks the ore and keeps the resume point (src/mineResume.js remembers it meanwhile).
+        const report = result === 'mine-win' && economy.mineResume ? economy.mineResume(resumeSummary(seconds)) : economy.reportMineRun(runSummary(result, seconds));
+        report.then(reply => say(savedText(reply.result))).catch(() => say(SAVE_FAILED_NOTE));
     },
     reset: () => { hideControls(); setMineLightSource(null); modeCtx = null; endMineRun(); }
 };

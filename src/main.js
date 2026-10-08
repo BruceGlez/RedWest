@@ -144,6 +144,7 @@ const town = createTownPanel({
     // the mine sends no outlaw.
     onDescend: floor => {
         beginMineRun(floor, profile?.mine);
+        if(profile?.mine?.resume && profile.mine.resume.floor !== floor) economy.mineResume?.({ action: 'clear' }).catch(() => {}); // starting anywhere else gives the resume point up
         ui.hidePanels();
         keys.startRequested = true;
     },
@@ -364,7 +365,11 @@ const economy = {
     reportMineRun: summary => wallet.reportMineRun(summary).then(reply => {
         applyProfile(reply.profile);
         return reply;
-    })
+    }),
+    // Coming back up and dying (src/mineProgress.js, slice 7): each answers with the profile it changed.
+    mineResume: body => wallet.mineResume(body).then(reply => { applyProfile(reply.profile); return reply; }),
+    mineDeath: body => wallet.mineDeath(body).then(reply => { applyProfile(reply.profile); return reply; }),
+    minePile: body => wallet.minePile(body).then(reply => { applyProfile(reply.profile); return reply; })
 };
 
 const gameLoop = createGameLoop(scene, camera, renderer, playerSystem, ui, progress, economy);
