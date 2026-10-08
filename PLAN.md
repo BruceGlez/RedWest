@@ -67,6 +67,7 @@ Done so far in the dark mine and around it: cellar and hidden door, lantern, oil
 - **Art lane:** the light eater's own model, the look of the Hollow Hill scene (`src/placeHill.js`) and of the general store (`src/placeStore.js`), torch and lantern polish.
 - **Town lane:** shop cards show the exact oil top-up price (`priceOf('oil', shop, kit)`); the vigil's cards and rewards polish; Foundry Yard, Fort Pell, Tres Rios, Whisper Wash, Silver Belle (`PLACES.md`).
 - **Scale lane (on hold until the owner says):** Postgres service in CI; unique names. After the owner's own setup (VPS, Coolify, Postgres, `STORE=postgres`, migration dry run, domain), the first deploy.
+- **Copper Bit walking kitchen (owner decided 2026-10-08: replace the flat shift):** specs in `docs/design/copper-bit-kitchen.md`; the handoff for whoever codes next is `docs/design/HANDOFF.md`.
 - **Owner's own tasks:** VPS and Coolify, domain, secrets, App Store, Stripe and RevenueCat accounts; prices of the light (first guess: lantern 60, oil 15, torches x5 20, matches x5 5) not yet confirmed.
 
 ## How we work (lanes)
