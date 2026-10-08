@@ -116,7 +116,7 @@ test('the run reports where it began, how deep, the ore carried and how it ended
     beginMineRun(1);
     mine.floor = 4;
     mine.ore = 17;
-    assert.deepEqual(runSummary('mine-win', 123.6), { startFloor: 1, depth: 4, ore: 17, outcome: 'up', seconds: 124, used: { oil: 0, torches: 0, matches: 0 } });
+    assert.deepEqual(runSummary('mine-win', 123.6), { startFloor: 1, depth: 4, ore: 17, collected: 0, outcome: 'up', seconds: 124, used: { oil: 0, torches: 0, matches: 0 } });
     assert.equal(runSummary('died', -5).outcome, 'fell');
     assert.equal(runSummary('died', -5).seconds, 0);
     const record = createMineProgress();
@@ -207,5 +207,21 @@ test('slice 7: the lift reports a resume save with the torches left standing', a
     assert.equal(summary.outcome, 'up');
     assert.equal(summary.ore, 7);
     assert.deepEqual(summary.torches, [[1, 1, 2, 1]]);
+    endMineRun();
+});
+
+test('slice 7c: after a death the run starts its books again from the floor he was thrown up to', async () => {
+    const { startAgainFrom, runSummary: summary } = await import('../src/mine.js');
+    const { burnLantern } = await import('../src/mineLight.js');
+    beginMineRun(1, { deepest: 9, checkpoint: 5, light: { lantern: true, oil: 300, torches: 5, matches: 2 }, pile: { floor: 8, x: 1, z: 2, ore: 9 } });
+    assert.deepEqual(mine.pile, { floor: 8, x: 1, z: 2, ore: 9, full: 9 }, 'a pile saved earlier is waiting');
+    mine.floor = 8; mine.ore = 12; mine.collected = 4;
+    burnLantern(mine.light, 100);
+    startAgainFrom(3);
+    assert.equal(mine.floor, 3);
+    assert.equal(mine.ore, 0);
+    assert.equal(mine.collected, 0);
+    assert.equal(summary('mine-win', 10).used.oil, 0, 'what was burned has been charged already');
+    assert.equal(mine.light.oil, 200, 'he keeps what is left');
     endMineRun();
 });

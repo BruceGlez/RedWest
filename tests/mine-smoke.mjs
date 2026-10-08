@@ -188,6 +188,30 @@ try {
             assert.equal(await page.evaluate(() => M.mine.light.matches), matches - 1, 'a relight costs one match');
             assert.ok(Number(await page.locator('#mine-oil-bar').getAttribute('data-oil')) < 100, 'and it goes down as the lantern burns');
             await page.waitForTimeout(300);
+            // Death (slice 7c): he is thrown up (floor 1 stays floor 1), the ore he carried drops where he fell, and walking back onto it picks it up.
+            await page.evaluate(() => { M.mine.ore = 9; }); // (floor 1 holds at most 9: the server cuts a report to what the floors allow)
+            await put(5, 0);
+            await page.evaluate(async () => {
+                S.playerStats.invulnerabilityTimer = 0;
+                S.playerStats.hp = 1;
+                const { spawnEnemy } = await import('/src/enemySystem.js');
+                const p = window.__redWest.playerGroup.position;
+                spawnEnemy(window.__redWest.scene, p, 'crawler');
+                const crawler = S.enemies.at(-1);
+                window.__death = setInterval(() => { crawler.position.set(p.x + 1, 0, p.z); S.playerStats.invulnerabilityTimer = Math.min(S.playerStats.invulnerabilityTimer, 0); }, 50); // (stays on top of him until he falls)
+            });
+            await page.waitForFunction(() => M.mine.pile && M.mine.ore === 0, null, { timeout: 15000 }).catch(async error => { throw new Error(`${error.message} ERRORS ${JSON.stringify(errors)}: ${JSON.stringify(await page.evaluate(() => ({ hp: S.playerStats.hp, inv: S.playerStats.invulnerabilityTimer, ore: M.mine.ore, over: S.gameState.isGameOver, conf: S.gameState.isConfirming, p: [window.__redWest.playerGroup.position.x, window.__redWest.playerGroup.position.z], e: S.enemies.map(e => ({ t: e.userData.type, at: [e.position.x, e.position.z], sense: e.userData.sense?.state })) })))}`); });
+            assert.equal(await page.evaluate(() => S.gameState.isGameOver), false, 'a death in the mine does not end the run');
+            assert.equal(await page.evaluate(() => S.playerStats.hp), await page.evaluate(() => S.playerStats.maxHp), 'he gets up with full hearts');
+            await page.evaluate(() => clearInterval(window.__death));
+            const pile = await page.evaluate(() => M.mine.pile);
+            assert.equal(pile.ore, 9);
+            assert.equal(pile.floor, 1);
+            await page.evaluate(() => { for(const e of S.enemies.splice(0)) e.parent.remove(e); });
+            await put(pile.x, pile.z);
+            await page.waitForFunction(() => M.mine.ore === 9 && M.mine.collected === 9 && M.mine.pile === null, null, { timeout: 15000 });
+            await page.evaluate(() => { M.mine.ore = 0; M.mine.collected = 0; }); // (the chest ore of the rest of the test starts clean)
+            await put(0, 0);
             // The four monsters that live only down here spawn, wear their own look, and run their behaviours without a fault.
             const monsters = await page.evaluate(async () => {
                 const { spawnEnemy } = await import('/src/enemySystem.js');
@@ -342,7 +366,7 @@ try {
     const saved = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestProfile.v1')));
     assert.equal(saved.mine.deepest, 5);
     assert.equal(saved.mine.checkpoint, 5);
-    assert.ok(saved.mine.ore > 0 && saved.mine.runs === 1);
+    assert.ok(saved.mine.ore > 0 && saved.mine.runs === 2);
     assert.ok(saved.mine.light.lantern && saved.mine.light.torches < 10 && saved.mine.light.matches < 5 && saved.mine.light.oil < 300, `what the run used came off his kit: ${JSON.stringify(saved.mine.light)}`);
     assert.deepEqual([saved.balances.dollars, saved.stats.stageStars.reduce((a, b) => a + b, 0)], [0, 7], 'the mine paid no dollars and gave no stars (only the Deacon\'s, which it started with)');
 

@@ -10,11 +10,13 @@ import { clearHazards } from '../enemySystem.js';
 import { clearParticles } from '../particleSystem.js';
 import { clearDecals } from '../decals.js';
 import { disposeBaked } from '../meshMerge.js';
-import { mine, endMineRun, rideUp, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, resumeSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
+import { mine, endMineRun, rideUp, startAgainFrom, nextFloor, floorStage, floorWave, floorBanner, descentScore, chestReward, oreInChest, confirmText, resultText, shaftHint, statusText, runSummary, resumeSummary, savedText, MINE_ATMOSPHERE_ID, PRACTICE_NOTE, SAVE_FAILED_NOTE } from '../mine.js';
 import { showMineFloor, openMineChest, updateMineScene, setMineTorches, setMineLantern } from '../mineScene.js';
 import { setMineLightSource } from '../placeDark.js';
 import { burnLantern, burnTorches, placeTorch, relightTorch, nearestOutTorch, lanternLit, lightSource, tankSeconds, DIM_RING } from '../mineLight.js';
 import { activeFloor, shaftReached, liftReached, chestWithin, LIFT_ARM_DISTANCE, SHAFT_REACH, LIFT_REACH } from '../mineMap.js';
+import { thrownTo, monsterTakes, collectPile } from '../mineProgress.js';
+import { showPile, hidePile, PILE_REACH } from '../minePile.js';
 import { MINE_MONSTERS, newOn, isMineMonster, planNode, WAKE_DISTANCE, LEAVE_DISTANCE } from '../mineMonsters.js';
 
 // Going down: the last floor's monsters, pickups, footprints and flying things stay behind.
@@ -32,8 +34,8 @@ function leaveFloorBehind(scene) {
 // A mine floor (src/mine.js): its cave (src/mineMap.js), then a pursuit that never ends and gets stranger with depth (src/mineMonsters.js).
 // There is nothing to clear: the shaft down is always open, and the lift you came on is always a walk back. Every floor starts with the
 // marshal standing on its lift.
-function beginFloor(ctx, floor) {
-    if(floor > 1) {
+function beginFloor(ctx, floor, force = false) {
+    if(floor > 1 || force) {
         leaveFloorBehind(ctx.scene);
         ctx.playerSystem.playerGroup.position.set(0, 0, 0);
         ctx.camera.position.copy(ctx.cameraOffset());
@@ -49,6 +51,7 @@ function beginFloor(ctx, floor) {
     gameState.isIntermission = false;
     gameState.intermissionTimer = 0;
     gameState.waveBossSpawned = false;
+    showPile(ctx.scene, mine.pile, floor); // his ore, if he died on this floor
     syncTorches(); // (the torches he put down on an earlier floor are not on this one)
     mineNodes = activeFloor().nodes.map(() => false); // no chamber has been filled yet
     minePending = [];
@@ -56,7 +59,8 @@ function beginFloor(ctx, floor) {
     gameState.runStats.waveReached = Math.max(gameState.runStats.waveReached, floor);
     // Each floor says what is new on it. A monster of the Wanted Road shows its own NEW ENEMY card when it first appears.
     const fresh = newOn(floor).filter(isMineMonster).map(id => `\nNEW: ${MINE_MONSTERS[id].name}`).join('');
-    ctx.ui.showWaveBanner(`${floorBanner(floor)}${fresh}`, floor === 1 ? 2800 : 2400);
+    const lost = mine.pile?.floor === floor ? `\nYOUR ORE LIES ON THIS FLOOR: ${mine.pile.ore}` : '';
+    ctx.ui.showWaveBanner(`${floorBanner(floor)}${fresh}${lost}`, floor === 1 ? 2800 : 2400);
 }
 
 // Who lives where (src/mineMonsters.js, planNode): each chamber fills when the marshal comes near, stays quiet once he has killed what is in
@@ -183,6 +187,85 @@ function hideControls() {
     oilBar = oilFill = null;
 }
 
+// ---------- the pile (src/minePile.js, MINE_PLAN.md slice 7c) ----------
+// He finds it by walking onto it; a monster that gets to it takes a share. The server is the keeper (wallet.minePile); with no wallet call the same rules
+// run here on the pile in `mine.pile`.
+let pileBusy = false;      // a call about the pile is on its way
+let pileCheckIn = 0;
+let monsterCooldown = 0;   // seconds before another monster may take from it
+const MONSTER_PILE_GAP = 15;
+function pileCall(ctx, body, local) {
+    return ctx.economy?.minePile ? ctx.economy.minePile(body).then(reply => reply.result) : Promise.resolve(local());
+}
+function updatePile(ctx, dt) {
+    const pile = mine.pile;
+    monsterCooldown = Math.max(0, monsterCooldown - dt);
+    if(!pile || pile.floor !== mine.floor || pileBusy) return;
+    pileCheckIn -= dt;
+    if(pileCheckIn > 0) return;
+    pileCheckIn = 0.25;
+    const at = ctx.playerSystem.playerGroup.position;
+    if(Math.hypot(at.x - pile.x, at.z - pile.z) < PILE_REACH) {
+        pileBusy = true;
+        pileCall(ctx, { action: 'collect', floor: pile.floor }, () => { const holder = { pile }; const ore = collectPile(holder, pile.floor); return { ore, pile: holder.pile }; })
+            .then(result => {
+                const ore = Math.max(0, Math.floor(Number(result?.ore)) || 0);
+                mine.ore += ore;
+                mine.collected += ore;
+                mine.pile = result?.pile ?? null;
+                showPile(ctx.scene, mine.pile, mine.floor);
+                floatText(ore ? `+${ore} ORE: YOUR PILE` : 'YOUR PILE WAS EMPTY', new THREE.Vector3(pile.x, 2.5, pile.z), 'hot');
+                if(ore) playSound('powerup');
+                ctx.ui.updateHUD();
+            })
+            .catch(() => { pileCheckIn = 5; }) // could not reach the server: try again in a moment
+            .finally(() => { pileBusy = false; });
+        return;
+    }
+    if(monsterCooldown > 0) return;
+    const reach = PILE_REACH + 1.5;
+    if(!enemies.some(e => e.userData.mineNode !== undefined && !e.userData.harmless && Math.hypot(e.position.x - pile.x, e.position.z - pile.z) < reach)) return;
+    monsterCooldown = MONSTER_PILE_GAP;
+    pileBusy = true;
+    pileCall(ctx, { action: 'monster' }, () => { const hit = monsterTakes(mine.pile); return { taken: hit.taken, pile: hit.pile }; })
+        .then(result => {
+            if(result?.pile) mine.pile = result.pile;
+            if(result?.taken) floatText(`A MONSTER TOOK ${result.taken} ORE`, new THREE.Vector3(pile.x, 2.5, pile.z), 'hot');
+        })
+        .catch(() => {})
+        .finally(() => { pileBusy = false; });
+}
+
+// He died (src/gameLoop.js asks the mode first): he is thrown up DEATH_THROW floors (never above floor 1), the ore he carried becomes a pile where he fell
+// and the run goes on with what he owns. Returns true: the run is not over.
+let dying = false;
+function onDeath(ctx, seconds) {
+    if(!mine.enabled) return false;
+    if(dying) return true;
+    dying = true;
+    const at = ctx.playerSystem.playerGroup.position;
+    const floor = mine.floor;
+    const carried = mine.ore;
+    const report = { ...runSummary('died', seconds), x: at.x, z: at.z };
+    const old = mine.pile;
+    // The pile at once, from the same rules the server uses; the server's answer replaces it.
+    const local = carried + (old?.ore ?? 0) > 0 ? { floor, x: at.x, z: at.z, ore: carried + (old?.ore ?? 0), full: carried + (old?.full ?? 0) } : null;
+    mine.pile = local;
+    const thrown = thrownTo(floor);
+    playerStats.hp = playerStats.maxHp;
+    playerStats.invulnerabilityTimer = 3;
+    startAgainFrom(thrown);
+    beginFloor(ctx, thrown, true);
+    ctx.ui.showWaveBanner(`YOU FELL ON DEPTH ${floor}\nCARRIED UP TO DEPTH ${thrown}${local ? `\nYOUR ${local.ore} ORE LIES WHERE YOU FELL` : ''}`, 3200);
+    ctx.ui.updateHUD();
+    pileBusy = true;
+    (ctx.economy?.mineDeath ? ctx.economy.mineDeath(report).then(reply => reply.result.pile ?? null) : Promise.resolve(local))
+        .then(pile => { mine.pile = pile; showPile(ctx.scene, mine.pile, mine.floor); })
+        .catch(() => {}) // the local pile stands
+        .finally(() => { pileBusy = false; dying = false; });
+    return true;
+}
+
 // A chest: it opens when the marshal walks up to it, for score and either a heart or a spell of triple shot.
 function openChest(ctx, index, cave) {
     mine.opened.push(index);
@@ -240,6 +323,7 @@ function updateFlow(ctx, dt) {
         const lit = mine.light.placed.filter(t => t.floor === mine.floor).map(t => t.lit ? 1 : 0).join('');
         if(lit !== torchesLit) { torchesLit = lit; syncTorches(); } // a light eater put one out
     }
+    updatePile(ctx, dt);
     updatePopulation(ctx, dt);
 }
 
@@ -266,6 +350,7 @@ export const mineMode = {
         beginFloor(ctx, mine.startFloor); // floor 1, or the checkpoint picked at the stairs
     },
     update: updateFlow,
+    onDeath,
     updateScene: (ctx, t) => updateMineScene(t),
     resultText: result => resultText(result, mine.floor, mine.ore),
     // The run is over: report it, so the deepest floor, the checkpoint and the ore are saved (src/mineProgress.js). The result screen's line is
@@ -276,5 +361,5 @@ export const mineMode = {
         const report = result === 'mine-win' && economy.mineResume ? economy.mineResume(resumeSummary(seconds)) : economy.reportMineRun(runSummary(result, seconds));
         report.then(reply => say(savedText(reply.result))).catch(() => say(SAVE_FAILED_NOTE));
     },
-    reset: () => { hideControls(); setMineLightSource(null); modeCtx = null; endMineRun(); }
+    reset: () => { hidePile(); pileBusy = dying = false; monsterCooldown = 0; hideControls(); setMineLightSource(null); modeCtx = null; endMineRun(); }
 };
