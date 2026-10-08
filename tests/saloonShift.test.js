@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { SHIFT_SECONDS, ARRIVAL_SHARE, HARD_STOP, STREAK_FOR_BIG_TIP, RUSH_SIZE, RUSH_SPREAD, RUSHES, SEATS, STATIONS, COOK_SECONDS, QUICK_SHARE, patience, createShift } from '../src/saloonShift.js';
+import { COOK_FACTOR, EXTRA_PATIENCE, shiftUpgrades, seatCount, barrelPours, cookSeconds, SHIFT_SECONDS, ARRIVAL_SHARE, HARD_STOP, STREAK_FOR_BIG_TIP, RUSH_SIZE, RUSH_SPREAD, RUSHES, SEATS, STATIONS, COOK_SECONDS, QUICK_SHARE, patience, createShift } from '../src/saloonShift.js';
 import { crowd, menu, getDish, starNeeds, settleShift, shiftPay, starsFor, NIGHTS } from '../src/saloon.js';
 import { createProfile } from '../src/profile.js';
 import { OUTLAWS } from '../src/outlaws.js';
@@ -209,4 +209,90 @@ test('progress tells the screen how the shift is going', () => {
     const done = play(createShift({ night: 1, seed: 1 }));
     assert.equal(done.progress().stars, 3);
     assert.equal(done.progress().served, crowd(1));
+});
+
+const ALL = { stove: 2, stool: 1, oven: 2, taps: 1, cushions: 1 };
+
+test('what the shift believes about upgrades: own keys, whole levels, no more than the shelf sells', () => {
+    assert.deepEqual(shiftUpgrades(null), { stove: 0, stool: 0, oven: 0, taps: 0, cushions: 0 });
+    assert.deepEqual(shiftUpgrades({ stove: 9, oven: -1, taps: 'x', stool: 1.9, cushions: null, free: 5 }), { stove: 2, stool: 1, oven: 0, taps: 0, cushions: 0 });
+    assert.equal(shiftUpgrades(Object.create({ stove: 2 })).stove, 0, 'only own keys');
+    assert.equal(shiftUpgrades('stove').stove, 0);
+});
+
+test('the stove and the oven cook faster by the level bought, and only their own dishes', () => {
+    assert.equal(cookSeconds('beans', 'stove', null), COOK_SECONDS.beans);
+    assert.equal(cookSeconds('beans', 'stove', { stove: 1 }), COOK_SECONDS.beans * COOK_FACTOR.stove[1]);
+    assert.ok(Math.abs(cookSeconds('beans', 'stove', { stove: 1 }) - 2.25) < 1e-9 && Math.abs(cookSeconds('beans', 'stove', { stove: 2 }) - 1.65) < 1e-9);
+    assert.ok(Math.abs(cookSeconds('pie', 'oven', { oven: 2 }) - 2.75) < 1e-9 && Math.abs(cookSeconds('cornbread', 'oven', { oven: 1 }) - 3) < 1e-9);
+    assert.equal(cookSeconds('beans', 'stove', { oven: 2, taps: 1 }), COOK_SECONDS.beans, 'the oven does not help the stove');
+    assert.equal(cookSeconds('sarsaparilla', 'barrel', ALL), COOK_SECONDS.sarsaparilla, 'the barrel\'s time does not change');
+    assert.equal(cookSeconds('stew', 'stove', { stove: 2 }), COOK_SECONDS.stew * 0.55);
+    const shift = createShift({ night: 1, seed: 1, upgrades: { stove: 2 } });
+    while(!shift.view().some(s => s?.station === 'stove')) shift.update(0.25);
+    const s = shift.view().find(c => c?.station === 'stove');
+    shift.cook(s.seat);
+    shift.update(COOK_SECONDS[s.dish] * 0.55 + 0.01);
+    assert.equal(shift.view()[s.seat].ready, true, 'ready after the shorter time');
+});
+
+test('the extra stool, the taps and the cushions change the seats, the barrel and the patience', () => {
+    assert.equal(seatCount(null), SEATS);
+    assert.equal(seatCount({ stool: 1 }), SEATS + 1);
+    assert.equal(createShift({ night: 1, upgrades: { stool: 1 } }).state.seats.length, SEATS + 1);
+    assert.equal(createShift({ night: 1, upgrades: { stool: 1 } }).seatCount, SEATS + 1);
+    assert.equal(createShift({ night: 1 }).state.seats.length, SEATS);
+    assert.equal(barrelPours(null), 1);
+    assert.equal(barrelPours({ taps: 1 }), 2);
+    const first = up => {
+        const shift = createShift({ night: 1, seed: 1, upgrades: up });
+        while(!shift.view().some(Boolean)) shift.update(0.25);
+        return shift.view().find(Boolean).share;
+    };
+    assert.equal(first(null) <= 1, true);
+    const plain = createShift({ night: 1, seed: 1 });
+    const soft = createShift({ night: 1, seed: 1, upgrades: { cushions: 1 } });
+    for(const sh of [plain, soft]) while(!sh.view().some(Boolean)) sh.update(0.25);
+    const left = sh => sh.state.seats.find(Boolean).left;
+    assert.ok(Math.abs(left(soft) - left(plain) - EXTRA_PATIENCE) < 1e-9, 'three more seconds of patience');
+});
+
+test('with the taps the barrel pours two at once, and the stove still takes one', () => {
+    const drinks = (up, want) => {
+        const shift = createShift({ night: 1, seed: 1, upgrades: up });
+        shift.state.seats[0] = { dish: 'sarsaparilla', left: 28, cooking: null, ready: false };
+        shift.state.seats[1] = { dish: 'sarsaparilla', left: 28, cooking: null, ready: false };
+        shift.state.seats[2] = { dish: 'sarsaparilla', left: 28, cooking: null, ready: false };
+        return [shift.cook(0), shift.cook(1), shift.cook(2), shift];
+    };
+    assert.deepEqual(drinks(null).slice(0, 3), [true, false, false]);
+    const [a, b, c, shift] = drinks({ taps: 1 });
+    assert.deepEqual([a, b, c], [true, true, false], 'two at once, the third waits');
+    assert.ok(shift.state.stations.barrel, 'the screen reads the barrel as busy once it is full');
+    shift.update(COOK_SECONDS.sarsaparilla + 0.01);
+    assert.equal(shift.view()[0].ready && shift.view()[1].ready, true);
+    assert.equal(shift.state.stations.barrel, null);
+    assert.equal(shift.cook(2), true, 'free again');
+});
+
+test('a customer who walks out frees only their own job at the barrel', () => {
+    const shift = createShift({ night: 1, seed: 1, upgrades: { taps: 1 } });
+    shift.state.seats[0] = { dish: 'sarsaparilla', left: 0.05, cooking: null, ready: false };
+    shift.state.seats[1] = { dish: 'sarsaparilla', left: 28, cooking: null, ready: false };
+    shift.cook(0);
+    shift.cook(1);
+    shift.update(0.1);
+    assert.equal(shift.state.seats[0], null);
+    assert.deepEqual(shift.state.jobs.barrel.map(j => j.seat), [1]);
+    assert.equal(shift.state.stations.barrel, null, 'room for one more');
+});
+
+test('upgrades never change what a dish pays or what a shift may report', () => {
+    const plain = play(createShift({ night: 10, farm: true, seed: 2 })).summary();
+    const upgraded = play(createShift({ night: 10, farm: true, seed: 2, upgrades: ALL })).summary();
+    assert.equal(upgraded.action, 'shift');
+    assert.deepEqual(Object.keys(upgraded), Object.keys(plain));
+    assert.ok(shiftPay(10, upgraded.served, true).dollars <= 130);
+    assert.equal(createShift({ night: 4, seed: 3, upgrades: ALL }).state.pending.length, crowd(4));
+    assert.deepEqual(createShift({ night: 4, seed: 3, upgrades: ALL }).state.pending, createShift({ night: 4, seed: 3 }).state.pending, 'the same crowd comes');
 });

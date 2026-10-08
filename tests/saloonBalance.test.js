@@ -10,8 +10,8 @@ import { starsFor, shiftPay, NIGHTS, PAID_SHIFTS_PER_DAY, SHIFT_PAY_CEILING } fr
 const DT = 0.1;
 const SEEDS = Array.from({ length: 20 }, (_, i) => i + 1);
 
-function runBot(night, farm, seed, delay) {
-    const shift = createShift({ night, farm, seed });
+function runBot(night, farm, seed, delay, upgrades = null) {
+    const shift = createShift({ night, farm, seed, upgrades });
     let wait = 0, peak = 0;
     while(!shift.over) {
         wait -= DT;
@@ -29,10 +29,11 @@ function runBot(night, farm, seed, delay) {
 }
 const mean = list => list.reduce((a, b) => a + b, 0) / list.length;
 const results = {}; // computed once: [delay][farm][night] -> list of runs
-function runs(delay, farm, night) {
-    const key = `${delay}/${farm}/${night}`;
-    return (results[key] ??= SEEDS.map(seed => runBot(night, farm, seed, delay)));
+function runs(delay, farm, night, upgrades = null) {
+    const key = `${delay}/${farm}/${night}/${JSON.stringify(upgrades)}`;
+    return (results[key] ??= SEEDS.map(seed => runBot(night, farm, seed, delay, upgrades)));
 }
+const ALL_UPGRADES = { stove: 2, stool: 1, oven: 2, taps: 1, cushions: 1 };
 
 test('a fast player (1.5 s a tap) three-stars the first nights, with or without the farm', () => {
     for(const farm of [false, true]) {
@@ -84,4 +85,27 @@ test('the income rule: the best bot shift stays inside the ceiling, so three pai
     for(let night = 1; night <= NIGHTS; night++) for(const farm of [false, true]) best = Math.max(best, ...runs(1.5, farm, night).map(r => r.pay));
     assert.ok(best <= SHIFT_PAY_CEILING, `${best}`);
     assert.ok(best * PAID_SHIFTS_PER_DAY < 400);
+});
+
+test('upgrades are felt: a fully upgraded slow player does clearly better on the hard nights, and none of them hurts', () => {
+    for(const farm of [false, true]) {
+        const stars = (up, delay = 4) => [5, 6, 7, 8, 9, 10].reduce((sum, night) => sum + mean(runs(delay, farm, night, up).map(r => r.stars)), 0);
+        const plain = stars(null), full = stars(ALL_UPGRADES);
+        assert.ok(full >= plain + 3, `farm ${farm}: ${full.toFixed(2)} stars over six nights against ${plain.toFixed(2)} without upgrades`);
+        for(const [id, level] of [['stove', 2], ['stool', 1], ['oven', 2], ['taps', 1], ['cushions', 1]]) {
+            for(const delay of [1.5, 2.5, 4]) assert.ok(stars({ [id]: level }, delay) >= stars(null, delay) - 0.05, `farm ${farm}: ${id} does not hurt at ${delay} s a tap`);
+        }
+        // The bot taps one thing at a time, so the stool and the taps (more at once) show only in the rules tests (tests/saloonShift.test.js); the
+        // ones that shorten waits or forgive slowness show here.
+        for(const [id, level] of [['stove', 2], ['oven', 2], ['cushions', 1]]) {
+            const helps = [1.5, 2.5, 4].some(delay => stars({ [id]: level }, delay) > stars(null, delay));
+            assert.ok(helps, `farm ${farm}: ${id} helps a bot somewhere`);
+        }
+    }
+});
+
+test('even fully upgraded, a fast player stays inside the pay ceiling and the three-paid-shift day stays under 400', () => {
+    let best = 0;
+    for(let night = 1; night <= NIGHTS; night++) for(const farm of [false, true]) best = Math.max(best, ...runs(1.5, farm, night, ALL_UPGRADES).map(r => r.pay));
+    assert.ok(best <= SHIFT_PAY_CEILING && best * PAID_SHIFTS_PER_DAY < 400, `${best}`);
 });

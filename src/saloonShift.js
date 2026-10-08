@@ -1,4 +1,4 @@
-import { crowd, menu, starNeeds } from './saloon.js';
+import { crowd, menu, starNeeds, UPGRADES } from './saloon.js';
 
 // One shift behind Dusty Pete's bar (PLACES.md, section 8). The rules of the game, with no rendering, so tests/saloonShift.test.js can play
 // whole shifts. src/saloonShiftView.js draws it; src/saloon.js settles the summary (the server never trusts this file: it clamps what a
@@ -30,6 +30,26 @@ export const SEATS = 4;
 export const STATIONS = ['stove', 'barrel', 'oven'];
 // Seconds a station takes for a dish.
 export const COOK_SECONDS = { sarsaparilla: 1.5, beans: 3, cornbread: 4, eggs: 3.5, pie: 5, stew: 4 };
+// What the shelf's upgrades do in a shift (docs/design/copper-bit-shift.md, P6), by level bought: how long the stove and the oven take (times
+// the dish's COOK_SECONDS), the seats, how many the barrel pours at once, and the extra patience. Level 0 is the plain bar. Nothing here
+// touches a dish's price, a tip or the pay ceiling.
+export const COOK_FACTOR = { stove: [1, 0.75, 0.55], oven: [1, 0.75, 0.55] };
+export const EXTRA_PATIENCE = 3;
+const STATION_UPGRADE = { stove: 'stove', oven: 'oven' };
+// The levels a shift will believe (own keys, whole numbers, no more than the shelf sells), so a rubbish save cannot make a free kitchen.
+export function shiftUpgrades(raw) {
+    const out = {};
+    for(const u of UPGRADES) out[u.id] = Math.min(u.levels.length, Math.max(0, Math.floor(Number(Object.hasOwn(raw ?? {}, u.id) ? raw[u.id] : 0)) || 0));
+    return out;
+}
+export const seatCount = upgrades => SEATS + (shiftUpgrades(upgrades).stool ? 1 : 0);
+export const barrelPours = upgrades => (shiftUpgrades(upgrades).taps ? 2 : 1);
+// Seconds a dish takes at its station with these upgrades (the card shows it: "beans 3.0 s to 2.3 s").
+export function cookSeconds(dish, station, upgrades) {
+    const up = STATION_UPGRADE[station];
+    const level = up ? shiftUpgrades(upgrades)[up] : 0;
+    return COOK_SECONDS[dish] * (up ? COOK_FACTOR[up][level] : 1);
+}
 // A customer waiting for a free seat gives up after this long (a miss).
 export const SEAT_WAIT = 8;
 // Share of a customer's patience that must be left for a serve to be quick.
@@ -48,7 +68,8 @@ function stream(seed) {
     };
 }
 
-export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
+export function createShift({ night = 1, farm = false, seed = 1, upgrades = null } = {}) {
+    const levels = shiftUpgrades(upgrades);
     const next = stream(seed * 7919 + night * 104729);
     const dishes = menu(night, farm);
     const total = crowd(night);
@@ -70,13 +91,15 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
     const gap = span / Math.max(1, rest - 1);
     for(let i = 0; i < rest; i++) arrivals.push({ at: Math.min(span, Math.max(0, FIRST_AT + (i * (span - FIRST_AT)) / Math.max(1, rest - 1) + (next() - 0.5) * gap * 0.5)), dish: dishAt().id });
     arrivals.sort((a, b) => a.at - b.at);
-    const full = patience(night);
+    const full = patience(night) + (levels.cushions ? EXTRA_PATIENCE : 0);
+    const pours = barrelPours(levels);
 
     const state = {
         night, time: 0, over: false,
-        seats: Array.from({ length: SEATS }, () => null), // { dish, left, cooking: seconds left or null, ready }
+        seats: Array.from({ length: seatCount(levels) }, () => null), // { dish, left, cooking: seconds left or null, ready }
         queue: [], // { dish, waited }
-        stations: Object.fromEntries(STATIONS.map(s => [s, null])), // { seat, left } while busy
+        stations: Object.fromEntries(STATIONS.map(s => [s, null])), // { seat, left } while the station can take no more (the screen's "busy")
+        jobs: Object.fromEntries(STATIONS.map(s => [s, []])), // every job in progress at a station: { seat, left } (the barrel can hold two with the taps)
         served: [], missed: 0, combo: 0, bestCombo: 0, pending: arrivals.slice()
     };
     const stationOf = dish => menu(night, true).find(d => d.id === dish).station;
@@ -87,6 +110,9 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
         state.seats[free] = { dish: customer.dish, left: full, cooking: null, ready: false };
         return true;
     }
+    const capacity = station => (station === 'barrel' ? pours : 1);
+    // `state.stations[station]` is the first job once the station is full and null while it has room, as the screen has always read it.
+    const settleStation = station => { state.stations[station] = state.jobs[station].length >= capacity(station) ? state.jobs[station][0] : null; };
     function miss() {
         state.missed++;
         state.combo = 0;
@@ -111,8 +137,10 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
             if(state.over || !s || s.cooking !== null || s.ready) return false;
             const station = stationOf(s.dish);
             if(state.stations[station]) return false;
-            state.stations[station] = { seat: index, left: COOK_SECONDS[s.dish] };
-            s.cooking = COOK_SECONDS[s.dish];
+            const seconds = cookSeconds(s.dish, station, levels);
+            state.jobs[station].push({ seat: index, left: seconds });
+            settleStation(station);
+            s.cooking = seconds;
             return true;
         },
         // Serve a ready plate. Returns the tip tier (0 plain, 1 quick, 2 perfect), or -1 when there is nothing ready for that seat.
@@ -133,20 +161,22 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
             if(state.over) return;
             state.time += dt;
             for(const station of STATIONS) {
-                const job = state.stations[station];
-                if(!job) continue;
-                job.left -= dt;
-                if(job.left <= 0) {
+                for(const job of state.jobs[station]) job.left -= dt;
+                for(const job of state.jobs[station].filter(j => j.left <= 0)) {
                     const s = state.seats[job.seat];
                     if(s) { s.ready = true; s.cooking = 0; }
-                    state.stations[station] = null;
                 }
+                state.jobs[station] = state.jobs[station].filter(j => j.left > 0);
+                settleStation(station);
             }
             state.seats.forEach((s, i) => {
                 if(!s) return;
                 s.left -= dt;
                 if(s.left <= 0) { // walked out: its station frees up
-                    for(const station of STATIONS) if(state.stations[station]?.seat === i) state.stations[station] = null;
+                    for(const station of STATIONS) {
+                        state.jobs[station] = state.jobs[station].filter(j => j.seat !== i);
+                        settleStation(station);
+                    }
                     state.seats[i] = null;
                     miss();
                 }
@@ -168,6 +198,9 @@ export function createShift({ night = 1, farm = false, seed = 1 } = {}) {
                 combo: state.combo, bestCombo: state.bestCombo, streakLeft: Math.max(0, STREAK_FOR_BIG_TIP - state.combo), missed: state.missed
             };
         },
+        // The upgrades this shift runs with (what the shelf sold, clamped), for the screen to show the extra seat and the like.
+        upgrades: levels,
+        get seatCount() { return state.seats.length; },
         // What the shift reports to src/saloon.js: { night, served: [{ dish, tip }] }.
         summary() { return { action: 'shift', night, served: state.served.map(s => ({ ...s })) }; },
         get over() { return state.over; }
