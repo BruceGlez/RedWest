@@ -1012,3 +1012,73 @@ test('a clock moved back gains nothing: reports are refused until the server clo
         await t.s.close();
     }
 });
+
+test('a report can claim no more `collected` ore than the pile-collect call handed out, and an accepted report spends it', async () => {
+    const t = await mineTripSetup(12);
+    try {
+        const run = async (route, extra) => t.call(route, { startFloor: 1, depth: 3, seconds: 200, ...extra });
+        const room = t.maxOreForRun(1, 3); // what floors 1 to 3 can hold
+        const profileOf = async () => (await t.profile());
+
+        // A death on floor 10 drops a pile; picking it up hands that much ore out.
+        const died = await t.call('/api/mine/death', { startFloor: 1, depth: 10, ore: 1e9, seconds: 200, x: 2, z: 3 });
+        const pile = died.data.profile.mine.pile.ore;
+        assert.ok(pile > room, 'the pile is more than a short run could find on its own');
+        assert.equal(t.s.store.getUser(t.a.userId).mineCollected ?? 0, 0, 'nothing handed out yet');
+
+        // Nothing handed out yet: claiming `collected` gets nothing extra, whatever the number.
+        for(const collected of [1e9, pile, -5, 'many', NaN, null, {}, [1]]) {
+            t.wait(25);
+            const before = await profileOf();
+            const answer = await run('/api/mine/resume', { action: 'save', ore: 1e9, collected });
+            assert.equal(answer.status, 200, String(collected));
+            assert.equal(answer.data.result.carried, room, `collected ${JSON.stringify(collected)} with none handed out`);
+            assert.equal(answer.data.profile.mine.ore, before.mine.ore + room);
+        }
+
+        // He picks the pile up on the wrong floor, then the right one: only the right one hands anything out.
+        await t.call('/api/mine/pile', { action: 'collect', floor: 3 });
+        assert.equal(t.s.store.getUser(t.a.userId).mineCollected ?? 0, 0);
+        const got = await t.call('/api/mine/pile', { action: 'collect', floor: 10 });
+        assert.equal(got.data.result.ore, pile);
+        assert.equal(t.s.store.getUser(t.a.userId).mineCollected, pile, 'the server remembers what it handed out');
+        assert.equal(JSON.stringify(got.data.profile).includes('mineCollected'), false, 'it is kept on the user, not in the profile the client sees');
+        assert.equal((await t.call('/api/mine/pile', { action: 'collect', floor: 10 })).data.result.ore, 0);
+        assert.equal(t.s.store.getUser(t.a.userId).mineCollected, pile, 'a second collect hands out nothing more');
+
+        // A report that is refused (too soon) spends nothing.
+        assert.equal((await run('/api/mine/run', { outcome: 'up', ore: 1e9, collected: pile })).status, 429);
+        assert.equal(t.s.store.getUser(t.a.userId).mineCollected, pile);
+        t.wait(25);
+
+        // Claiming more than was handed out is cut to what was handed out: the run carries the floors' room plus the pile, no more.
+        const before = await profileOf();
+        const greedy = await run('/api/mine/run', { outcome: 'up', ore: 1e9, collected: 1e9 });
+        assert.equal(greedy.status, 200);
+        assert.equal(greedy.data.result.carried, room + pile, 'the floors\' room plus exactly the pile that was handed out');
+        assert.equal(greedy.data.profile.mine.ore, before.mine.ore + room + pile);
+        assert.equal(t.s.store.getUser(t.a.userId).mineCollected, 0, 'an accepted report spends it');
+        assert.deepEqual(t.outside(greedy.data.profile), t.outside(before), 'nothing outside profile.mine changed');
+
+        // It cannot be claimed a second time, on this route or any other.
+        t.wait(25);
+        const again = await run('/api/mine/run', { outcome: 'up', ore: 1e9, collected: pile });
+        assert.equal(again.data.result.carried, room, 'the pile was already banked once');
+        t.wait(25);
+        const elsewhere = await run('/api/mine/death', { ore: 1e9, collected: pile, x: 0, z: 0 });
+        assert.equal(elsewhere.data.result.carried, room);
+
+        // A death spends it too: the ore goes into the new pile, and picking that up hands it out again (once).
+        t.wait(25);
+        await t.call('/api/mine/pile', { action: 'collect', floor: elsewhere.data.profile.mine.pile.floor });
+        const second = t.s.store.getUser(t.a.userId).mineCollected;
+        assert.equal(second, room);
+        t.wait(25);
+        const diedWith = await run('/api/mine/death', { ore: 1e9, collected: 1e9, x: 1, z: 1 });
+        assert.equal(diedWith.data.result.carried, room + second, 'dying with it names it once');
+        assert.equal(t.s.store.getUser(t.a.userId).mineCollected, 0);
+        assert.ok(diedWith.data.profile.mine.pile.full <= 99999);
+    } finally {
+        await t.s.close();
+    }
+});

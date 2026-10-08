@@ -8,7 +8,7 @@ import { farmAction } from '../src/farm.js';
 import { ordersAction } from '../src/farmOrders.js';
 import { saloonAction } from '../src/saloon.js';
 import { vigilAction } from '../src/vigil.js';
-import { applyMineRun, applyMineResume, applyMineDeath, monsterTakes, collectPile } from '../src/mineProgress.js';
+import { applyMineRun, applyMineResume, applyMineDeath, monsterTakes, collectPile, MAX_ORE } from '../src/mineProgress.js';
 import { buyLight, LIGHT_ITEMS, SHOP_MARKUP } from '../src/mineLight.js';
 import { ANALYTICS_EVENTS } from '../src/analytics.js';
 import { createApple, AppleError } from './apple.js';
@@ -312,6 +312,13 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                 if(!auth.user) return send(res, 401, { message: 'Sign in again.' });
                 const { id, user } = auth;
                 const save = async () => { await store.putUser(id, user); await store.save(); };
+                // Ore taken from a death pile is carried on top of what the floors hold, and a run report may say how much (`collected`). The client is not
+                // trusted with that number: the server remembers what the pile-collect call handed out (`user.mineCollected`, on the user and not in the
+                // profile) and a report can claim no more than that. An accepted report spends it all: the ore was banked (lift up), dropped again (death)
+                // or the run ended, so a later run cannot claim it twice. A report that is refused (too soon) spends nothing.
+                const reported = body => ({ ...(body !== null && typeof body === 'object' && !Array.isArray(body) ? body : {}),
+                    collected: Math.min(Math.max(0, Math.floor(Number(body?.collected)) || 0), user.mineCollected || 0) });
+                const spendCollected = () => { user.mineCollected = 0; };
 
                 if(url.pathname === '/api/leaderboard' && req.method === 'GET') {
                     // Account boards: every named player's best, ranked server-side from reported runs.
@@ -338,7 +345,8 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     const seconds = (now().getTime() - (user.lastMineRunAt || 0)) / 1000;
                     if(seconds < MIN_SECONDS_BETWEEN_RUNS) return send(res, 429, { code: 'too_fast', message: 'Runs are reported too quickly.' });
                     user.lastMineRunAt = now().getTime();
-                    const result = applyMineRun(user.profile.mine, body);
+                    const result = applyMineRun(user.profile.mine, reported(body));
+                    spendCollected();
                     await save();
                     return send(res, 200, { result, profile: user.profile });
                 }
@@ -482,14 +490,16 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     }
                     if(body?.action !== 'save') throw new EconomyError('bad_action', 'That is not something the lift does.');
                     if(mineReportRefused()) return;
-                    const result = applyMineResume(user.profile.mine, body);
+                    const result = applyMineResume(user.profile.mine, reported(body));
+                    spendCollected();
                     await save();
                     return send(res, 200, { result, profile: user.profile });
                 }
                 // { startFloor, depth, ore, seconds, used, x, z }: he died. What he carried drops where he fell; he is thrown 5 floors up (never above 1).
                 if(url.pathname === '/api/mine/death' && req.method === 'POST') {
                     if(mineReportRefused()) return;
-                    const result = applyMineDeath(user.profile.mine, body);
+                    const result = applyMineDeath(user.profile.mine, reported(body));
+                    spendCollected();
                     await save();
                     return send(res, 200, { result, profile: user.profile });
                 }
@@ -499,7 +509,10 @@ export function createApp({ store, env = {}, now = () => new Date(), fetchImpl =
                     if(!allow('minetrip', id)) return tooMany(res);
                     const mine = user.profile.mine;
                     let result;
-                    if(body?.action === 'collect') result = { ore: collectPile(mine, body.floor) };
+                    if(body?.action === 'collect') {
+                        result = { ore: collectPile(mine, body.floor) };
+                        user.mineCollected = Math.min(MAX_ORE, (user.mineCollected || 0) + result.ore); // what a later report may name as `collected`
+                    }
                     else if(body?.action === 'monster') { const taken = monsterTakes(mine.pile); mine.pile = taken.pile; result = { taken: taken.taken }; }
                     else throw new EconomyError('bad_action', 'That is not something the pile does.');
                     result.pile = mine.pile;
