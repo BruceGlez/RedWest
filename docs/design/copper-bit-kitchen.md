@@ -4,6 +4,16 @@ Lane: `design` (advisory). Asked by the owner on 2026-10-08, relayed by the coor
 
 This spec builds on `docs/design/copper-bit-shift.md` (approved 2026-10-07, now largely built: crowds, rushes, streak tips, the shelf's upgrades and the balance gate are on `main` as of PR #109). Numbers quoted below come from the code on `main` at `5ea80dc`.
 
+## Owner decisions (2026-10-08)
+
+Recorded by the coordinator from the owner's answers. Nothing is built yet; the build is handed to another coding tool (see `docs/design/HANDOFF.md`).
+
+- **K1, replace or option: REPLACE.** The walking kitchen replaces the flat shift screen. Build the floor first and remove the flat screen only once the floor plays (do not delete the flat shift before its replacement works). This supersedes the "option first, default later" recommendation below; the QUICK SHIFT fallback is dropped. Open risk to handle in the build, not decided: players who cannot steer a character (reduced motion, motor access) and low-end phones; the floor's tap-to-walk and a low-end switch (PR 10) are where this is covered.
+- **K8, patience: YES.** Start with +6 s patience and base speed 5.5, tuned by the balance bot (K12).
+- **K7 / the shelf: not decided.** The owner asked what "the shelf" means. Two different things were called that: the **upgrade shelf** (the in-world spot where the player buys upgrades; today a plain wall spot at the saloon's front, `SHELF` in `src/saloonLayout.js`) and the **ingredient crates** (K7). Until the owner says otherwise, apply the recommendations: the upgrade shelf lives **inside the kitchen interior** (K9), and the crates are decorative first, farm goods in phase 2 (K7).
+- **All other proposals (K2 to K6, K9 to K12):** not individually answered; build the recommended version, which the owner's "replace" and "sure" answers are consistent with.
+- **Superseded by this decision:** the flat-screen UI work from `copper-bit-shift.md` (P3 to P5, P9, P14 as flat-screen HUD and phone layout, and the "view passes `profile.town.saloon.upgrades` and draws `shift.seatCount` seats" task) is **not** to be built on the flat screen. The same ideas (readable orders, floating tips, a streak meter, a star bar, a one-hand layout) are built on the floor HUD (build PR 9) instead. The rules already on `main` (crowds, rushes, streak tips, stew, upgrades, the $130 ceiling, the balance bot) carry over.
+
 ## 0. The short answer
 
 - **Do it, but as the same game seen from the floor, not a second game.** The rules that matter (the night's crowd, menu, rushes, patience, tips, stars, the $130 shift ceiling, three paid shifts a day) carry over unchanged, and the summary sent to the server stays `{ action: 'shift', night, served: [{ dish, tip }] }`. So **no server, wallet or settling change**: `settleShift` cannot tell the two modes apart.
