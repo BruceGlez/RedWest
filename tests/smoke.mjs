@@ -35,7 +35,10 @@ try {
     } catch {
         throw new Error(`Vite page did not create a canvas: ${pageErrors.join('; ')}`);
     }
-    await page.evaluate(async () => { window.__rwTestState = await import('/src/state.js'); });
+    await page.evaluate(async () => {
+        window.__rwSmokeTest = true;
+        window.__rwTestState = await import('/src/state.js');
+    });
     // First launch: a neutral birth-year question must be answered before anything starts.
     await page.locator('#welcome-modal').waitFor({ state: 'visible' });
     assert.ok(await page.locator('#welcome-continue').isDisabled(), 'no year chosen, no continue');
