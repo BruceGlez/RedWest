@@ -6,7 +6,7 @@ import { createSaloonScene } from '../placeSaloon.js';
 import { DAY_SKY } from '../townLook.js';
 import { createTownWalk } from '../townWalk.js';
 import { farmOpen } from '../farm.js';
-import { openShift } from '../saloonShiftView.js';
+import { openKitchenShift } from '../saloonKitchenView.js';
 import { NIGHTS, PAID_SHIFTS_PER_DAY, saloonOpen, menu, nightsOpen, paidShiftsLeft } from '../saloon.js';
 import { SALOON_START, saloonLabel } from '../saloonLayout.js';
 import { getDistrict } from '../townDistricts.js';
@@ -50,8 +50,8 @@ export function createSaloonPlace(host) {
         if(shift?.active || !host.profile() || !saloonOpen(host.profile())) return;
         host.closeCard();
         host.track('saloon_shift');
-        shift = openShift(host.screen, {
-            night, farm: farmOpen(host.profile()),
+        shift = openKitchenShift(host.screen, {
+            night, farm: farmOpen(host.profile()), upgrades: host.profile().town.saloon?.upgrades,
             finish: async summary => {
                 const response = await host.wallet.saloon(summary);
                 host.onProfile(response.profile);
