@@ -203,7 +203,11 @@
     "tests/boss-smoke.mjs",
     "tests/enemies-smoke.mjs",
     "src/perks.js",
-    "tests/progress.test.js"
+    "tests/progress.test.js",
+    "src/ammoEconomy.js",
+    "src/checkpoints.js",
+    "tests/ammoEconomy.test.js",
+    "tests/checkpoints.test.js"
    ],
    "checks": [
     "npm test",
