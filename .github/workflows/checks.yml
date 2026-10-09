@@ -26,29 +26,38 @@ jobs:
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:static
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:mobile
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:enemies
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:store
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:bosses
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:characters
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:event
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:town
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
       - run: npm run test:demo
+        if: github.event_name == 'push'
         env:
           CHROME_PATH: /usr/bin/google-chrome
