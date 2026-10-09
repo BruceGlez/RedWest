@@ -7,6 +7,8 @@
 - Ground detail, wind, horizon pieces; quality switch and bloom for the desert and arena
 - Rig the snake and horse in Blender (`tools/blender/README.md`)
 - Every new asset gets a row in `ASSETS.md` the same day
+- Built 2026-10-09: Copper Bit kitchen interior placeholder scene (`src/placeSaloonInside.js`). Next: characters and props (`docs/design/copper-bit-kitchen.md` step 7).
+
 
 ## Rules
 You own the **scene builders** of every area (`placeFarm.js`, `placeUndertaker.js`, `mineScene.js`, `townScene.js`, each new `src/place*.js`). The function agents own the layout and rules; read doors, positions and footprints from their layout files and keep `walkMap()` valid. See "Art and function on the same area" in `AGENTS.md`.
