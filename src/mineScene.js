@@ -19,7 +19,9 @@ export const MINE_MODELS = {
     arch: 'models/mine_arch.glb',
     rails: 'models/mine_rails.glb',
     chest: 'models/mine_chest.glb',
-    mushroom: 'models/mine_mushroom.glb'
+    mushroom: 'models/mine_mushroom.glb',
+    lantern: 'models/mine_lantern.glb',
+    torch: 'models/wall_torch.glb'
 };
 
 function extractMineGeometry(name, gltf) {
@@ -203,6 +205,14 @@ function archParts(layout, glow) {
             parts.push(boxAt(0.12, 0.9, 0.12, IRON, x, 4.0, z, yaw)); // the chain
         }
         glow.push(boxAt(0.5, 0.6, 0.5, LANTERN, x, 3.4, z, yaw));
+        const lanternGeom = mineGeometryCache.get('lantern');
+        if(lanternGeom) {
+            const g = lanternGeom.clone();
+            g.scale(1.3, 1.3, 1.3);
+            g.rotateY(yaw);
+            g.translate(x, 3.4, z);
+            parts.push(g);
+        }
     }
     return parts;
 }
@@ -210,6 +220,7 @@ function archParts(layout, glow) {
 // Stacked crates and barrels, as a few of them stood up against a wall or a pillar.
 function clusterParts(layout, rand, glow) {
     const parts = [];
+    const mushGeom = mineGeometryCache.get('mushroom');
     for(const [x, z] of layout.clusters) {
         const yaw = rand() * 3;
         parts.push(boxAt(2.2, 2.0, 2.2, 0xa07a4c, x - 0.9, 1.0, z, yaw));
@@ -219,6 +230,13 @@ function clusterParts(layout, rand, glow) {
         parts.push(placed(new THREE.CylinderGeometry(0.75, 0.75, 1.6, 8), TIMBER, x - 1.1, 0.8, z - 1.9, 0));
         parts.push(placed(new THREE.CylinderGeometry(0.8, 0.8, 0.14, 8), IRON, x - 1.1, 1.2, z - 1.9, 0));
         glow.push(boxAt(0.32, 0.4, 0.32, LANTERN, x + 0.1, 4.0, z + 0.1, yaw)); // a lantern left on top
+        if(mushGeom) {
+            const g = mushGeom.clone();
+            g.scale(1.2, 1.2, 1.2);
+            g.rotateY(rand() * 6.28);
+            g.translate(x + 1.5, 0, z - 1.2);
+            parts.push(g);
+        }
     }
     return parts;
 }
@@ -254,7 +272,27 @@ function cartParts(layout, rand) {
 
 // Rails: two bars on timber ties along each leg of the polyline.
 function railParts(layout) {
+    const railGeom = mineGeometryCache.get('rails');
     const parts = [];
+    if(railGeom) {
+        for(let i = 0; i < layout.rails.length - 1; i++) {
+            const [x1, z1] = layout.rails[i], [x2, z2] = layout.rails[i + 1];
+            const length = Math.hypot(x2 - x1, z2 - z1);
+            const angle = Math.atan2(z2 - z1, x2 - x1);
+            const yaw = -angle + Math.PI / 2;
+            const ux = Math.cos(angle), uz = Math.sin(angle);
+            const step = 2.0;
+            const count = Math.max(1, Math.round(length / step));
+            for(let s = 0; s < count; s++) {
+                const t = (s + 0.5) / count * length;
+                const g = railGeom.clone();
+                g.rotateY(yaw);
+                g.translate(x1 + ux * t, 0, z1 + uz * t);
+                parts.push(g);
+            }
+        }
+        return parts;
+    }
     for(let i = 0; i < layout.rails.length - 1; i++) {
         const [x1, z1] = layout.rails[i], [x2, z2] = layout.rails[i + 1];
         const length = Math.hypot(x2 - x1, z2 - z1);

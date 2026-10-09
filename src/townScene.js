@@ -17,7 +17,11 @@ export const TOWN_BUILDING_MODELS = {
     bank: 'models/bank.glb',
     sheriff: 'models/sheriff.glb',
     jail: 'models/jail.glb',
-    gunsmith: 'models/gunsmith.glb'
+    gunsmith: 'models/gunsmith.glb',
+    store: 'models/house.glb',
+    undertaker: 'models/house.glb',
+    wheel: 'models/wagon_wheel.glb',
+    torch: 'models/wall_torch.glb'
 };
 
 export function loadTownBuilding(id) {
@@ -64,6 +68,8 @@ function createBuildingFromGltf(id, gltf) {
         root.userData.smoke = new THREE.Vector3(-3.5, 11.6, -2);
     } else if(id === 'gunsmith') {
         root.userData.smoke = new THREE.Vector3(-2.8, 5.5, -1.0);
+    } else if(id === 'store' || id === 'undertaker') {
+        root.userData.smoke = new THREE.Vector3(2.4, 6.8, -0.4);
     }
     return root;
 }
@@ -288,9 +294,17 @@ const BUILDERS = {
         g.add(box(1.8, 0.2, 0.3, C.iron, -3, 1.4, -3.9));
         for(const x of [-5.3, 5.3]) g.add(box(0.4, 3, 9, C.timber, x, 1.5, 0)); // side walls
         for(const x of [-3.75, 3.75]) g.add(box(3.5, 3, 0.4, C.timber, x, 1.5, 4.3)); // front wall, with the gate between
+        const torchGltf = loadedTownBuilding('torch');
         for(const x of [-2, 2]) {
             g.add(box(0.5, 5, 0.5, C.timber, x, 2.5, 4.3)); // gateposts
-            g.add(box(0.35, 0.45, 0.35, C.glow, x, 5.3, 4.3, 1.4)); // torch sconces
+            if(torchGltf) {
+                const torch = torchGltf.scene.clone(true);
+                torch.scale.set(2.0, 2.0, 2.0);
+                torch.position.set(x, 5.3, 4.5);
+                g.add(torch);
+            } else {
+                g.add(box(0.35, 0.45, 0.35, C.glow, x, 5.3, 4.3, 1.4)); // torch sconces
+            }
         }
         g.add(box(4.8, 0.4, 0.5, C.timber, 0, 5, 4.3)); // the beam
         const s = sign('ARENA', 4);
@@ -943,19 +957,37 @@ export function createTownScene(options = {}) {
     stable.position.set(stableAt[0], 0, stableAt[1]);
     scenery.add(stable);
     const undertaker = new THREE.Group();
-    undertaker.add(box(5, 4.5, 5, C.timberDark, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+    const undertakerGltf = loadedTownBuilding('undertaker');
+    if(undertakerGltf) {
+        const b = createBuildingFromGltf('undertaker', undertakerGltf);
+        b.scale.set(0.85, 0.85, 0.85);
+        undertaker.add(b);
+        if(b.userData.smoke) smokeSources.push({ id: 'undertaker', at: new THREE.Vector3(UNDERTAKER_AT[0] + b.userData.smoke.x, b.userData.smoke.y, UNDERTAKER_AT[1] + b.userData.smoke.z) });
+    } else {
+        undertaker.add(box(5, 4.5, 5, C.timberDark, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+        undertaker.add(box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    }
     const undertakerSign = sign('UNDERTAKER', 4.4);
     undertakerSign.position.set(0, 3.6, 2.6);
-    undertaker.add(undertakerSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    undertaker.add(undertakerSign);
     const undertakerAt = UNDERTAKER_AT;
     undertaker.position.set(undertakerAt[0], 0, undertakerAt[1]);
     scenery.add(undertaker);
     // The general store (cross-lane on purpose: a plain placeholder building; its door, src/townSpots.js, opens the store, src/places/store.js).
     const store = new THREE.Group();
-    store.add(box(5, 4.5, 5, C.timber, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+    const storeGltf = loadedTownBuilding('store');
+    if(storeGltf) {
+        const b = createBuildingFromGltf('store', storeGltf);
+        b.scale.set(0.85, 0.85, 0.85);
+        store.add(b);
+        if(b.userData.smoke) smokeSources.push({ id: 'store', at: new THREE.Vector3(STORE_AT[0] + b.userData.smoke.x, b.userData.smoke.y, STORE_AT[1] + b.userData.smoke.z) });
+    } else {
+        store.add(box(5, 4.5, 5, C.timber, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+        store.add(box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    }
     const storeSign = sign('GENERAL STORE', 4.4);
     storeSign.position.set(0, 3.6, 2.6);
-    store.add(storeSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    store.add(storeSign);
     store.position.set(STORE_AT[0], 0, STORE_AT[1]);
     scenery.add(store);
 
@@ -984,11 +1016,20 @@ export function createTownScene(options = {}) {
     cover.rotation.z = Math.PI / 2;
     cover.position.y = 1.8;
     wagon.add(cover);
+    const wheelGltf = loadedTownBuilding('wheel');
     for(const [x, z] of [[-1.4, 1.2], [1.4, 1.2], [-1.4, -1.2], [1.4, -1.2]]) {
-        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.15, 12), mat(C.timberDark));
-        wheel.rotation.x = Math.PI / 2;
-        wheel.position.set(x, 0.7, z);
-        wagon.add(wheel);
+        if(wheelGltf) {
+            const wheel = wheelGltf.scene.clone(true);
+            wheel.scale.set(0.7, 0.7, 0.7);
+            wheel.position.set(x, 0.7, z);
+            if(z < 0) wheel.rotation.y = Math.PI;
+            wagon.add(wheel);
+        } else {
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.15, 12), mat(C.timberDark));
+            wheel.rotation.x = Math.PI / 2;
+            wheel.position.set(x, 0.7, z);
+            wagon.add(wheel);
+        }
     }
     const wagonAt = spread(-26, -4);
     wagon.position.set(wagonAt[0], 0, wagonAt[1]);

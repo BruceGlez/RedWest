@@ -1,7 +1,20 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { GLOW_RENDER_ORDER } from './placeDark.js';
 import { TORCH_RADIUS, MAX_HOLES } from './mineLight.js';
+import { assetUrl, DEMO } from './demo.js';
+
+const lanternLoader = new GLTFLoader();
+let lanternGltf = null;
+const activeLanterns = new Set();
+
+if(!DEMO && typeof window !== 'undefined') {
+    lanternLoader.load(assetUrl('models/mine_lantern.glb'), gltf => {
+        lanternGltf = gltf;
+        for(const item of activeLanterns) item.applyGltf(gltf);
+    }, undefined, () => {});
+}
 
 // Torches and the lantern for the dark mine (MINE_PLAN.md, slice 5), made in code: boxes, cones, planes, additive glow. No real point lights
 // (they are expensive); the glow is fake and the light that clears the dark comes from `torchHoles` (src/placeDark.js, `holes`).
@@ -132,13 +145,25 @@ export function torchHoles(list, marshal, limit = MAX_HOLES, radius = TORCH_LIGH
 export function createLantern() {
     const group = new THREE.Group();
     group.name = 'marshal-lantern';
-    const body = new THREE.Mesh(mergeGeometries([
-        painted(new THREE.BoxGeometry(0.34, 0.06, 0.34).translate(0, -0.2, 0), IRON),
-        painted(new THREE.BoxGeometry(0.3, 0.06, 0.3).translate(0, 0.2, 0), IRON),
-        painted(new THREE.ConeGeometry(0.22, 0.14, 4).translate(0, 0.3, 0), IRON),
-        painted(new THREE.TorusGeometry(0.1, 0.018, 4, 8).translate(0, 0.42, 0), IRON),
-        ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => painted(new THREE.BoxGeometry(0.035, 0.4, 0.035).translate(x * 0.14, 0, z * 0.14), IRON))
-    ], false), new THREE.MeshLambertMaterial({ vertexColors: true }));
+
+    function makeProceduralBody() {
+        return new THREE.Mesh(mergeGeometries([
+            painted(new THREE.BoxGeometry(0.34, 0.06, 0.34).translate(0, -0.2, 0), IRON),
+            painted(new THREE.BoxGeometry(0.3, 0.06, 0.3).translate(0, 0.2, 0), IRON),
+            painted(new THREE.ConeGeometry(0.22, 0.14, 4).translate(0, 0.3, 0), IRON),
+            painted(new THREE.TorusGeometry(0.1, 0.018, 4, 8).translate(0, 0.42, 0), IRON),
+            ...[[-1, -1], [1, -1], [-1, 1], [1, 1]].map(([x, z]) => painted(new THREE.BoxGeometry(0.035, 0.4, 0.035).translate(x * 0.14, 0, z * 0.14), IRON))
+        ], false), new THREE.MeshLambertMaterial({ vertexColors: true }));
+    }
+
+    function makeGltfBody(gltf) {
+        const clone = gltf.scene.clone(true);
+        clone.scale.set(0.9, 0.9, 0.9);
+        clone.position.set(0, -0.19, 0);
+        return clone;
+    }
+
+    let body = lanternGltf ? makeGltfBody(lanternGltf) : makeProceduralBody();
     const core = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.28, 0.2), new THREE.MeshBasicMaterial({ color: FLAME_HOT }));
     const halo = new THREE.Mesh(new THREE.PlaneGeometry(1.6, 1.6), new THREE.MeshBasicMaterial({ map: glowTexture('rgba(255,190,90,0.6)', 'rgba(255,140,30,0)'), transparent: true, blending: THREE.AdditiveBlending, depthWrite: false, fog: false }));
     halo.renderOrder = GLOW_RENDER_ORDER;
@@ -150,6 +175,12 @@ export function createLantern() {
         group,
         get lit() { return lit; },
         setLit(on) { lit = !!on; core.visible = halo.visible = lit; },
+        applyGltf(gltf) {
+            if(!body || !group) return;
+            group.remove(body);
+            body = makeGltfBody(gltf);
+            group.add(body);
+        },
         // Flickers, faces the camera and swings with the marshal's steps when `speed` (0..1) is given.
         update(timeInSeconds, speed = 0) {
             group.rotation.z = Math.sin(timeInSeconds * 5) * 0.08 * (0.3 + speed);
@@ -159,5 +190,6 @@ export function createLantern() {
             if(seen) halo.quaternion.copy(group.getWorldQuaternion(wq)).invert().multiply(seen.quaternion);
         }
     };
+    activeLanterns.add(lantern);
     return lantern;
 }
