@@ -275,7 +275,8 @@
     "tools/story-*.mjs",
     "public/story/**",
     "tests/story*",
-    "tests/barks.test.js"
+    "tests/barks.test.js",
+    "src/comicIntro.js"
    ],
    "checks": [
     "npm test",

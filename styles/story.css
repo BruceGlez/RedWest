@@ -37,3 +37,22 @@
 .story-hint { margin-top: 10px; padding: 8px 14px; font: 700 12px 'Roboto Mono', monospace; letter-spacing: 1px; color: #ffd54f; background: rgba(0, 0, 0, 0.45); border: 2px solid #ffd54f; border-radius: 20px; cursor: pointer; animation: story-hint-pulse 2.4s ease-in-out infinite; }
 @keyframes story-hint-pulse { 50% { box-shadow: 0 0 14px 2px rgba(255, 213, 79, 0.55); } }
 @media (prefers-reduced-motion: reduce) { .story-hint { animation: none; } }
+
+/* ---------- Prologue Comic Strip Overlay ---------- */
+.comic-overlay { position: fixed; inset: 0; z-index: 100; background: rgba(10, 8, 6, 0.92); display: flex; align-items: center; justify-content: center; padding: 16px; backdrop-filter: blur(4px); }
+.comic-card { max-width: 900px; width: 100%; max-height: 92vh; overflow-y: auto; background: #f4e8cc; border: 4px solid #3d2616; border-radius: 8px; box-shadow: 0 12px 32px rgba(0, 0, 0, 0.8); padding: 24px; color: #2a1a0c; text-align: center; }
+.comic-header { margin-bottom: 18px; border-bottom: 2px solid #3d2616; padding-bottom: 12px; }
+.comic-tag { font: 700 11px 'Roboto Mono', monospace; letter-spacing: 2px; color: #8b1f1f; background: #e2cfa2; padding: 3px 8px; border-radius: 4px; }
+.comic-title { font-family: 'Rye', serif; font-size: 28px; margin: 8px 0 4px; color: #3d2616; }
+.comic-subtitle { font: 700 13px 'Roboto Mono', monospace; color: #6b4a2b; margin: 0; }
+.comic-strip { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 14px; margin-bottom: 20px; }
+.comic-panel { background: #fffdf5; border: 3px solid #2a1a0c; border-radius: 6px; padding: 12px; display: flex; flex-direction: column; text-align: left; box-shadow: 4px 4px 0 #2a1a0c; }
+.comic-panel-header { display: flex; justify-content: space-between; font-size: 9px; font-family: 'Roboto Mono', monospace; font-weight: 700; color: #8b1f1f; margin-bottom: 8px; border-bottom: 1px dashed #c0a880; padding-bottom: 4px; }
+.comic-panel-graphic { height: 90px; background: #3d2616; border-radius: 4px; display: flex; align-items: center; justify-content: center; margin-bottom: 10px; color: #ffd54f; font-size: 38px; border: 2px solid #2a1a0c; }
+.comic-panel-body h4 { font-family: 'Rye', serif; font-size: 15px; margin: 0 0 6px; color: #2a1a0c; }
+.comic-panel-body p { font-size: 12px; line-height: 1.45; margin: 0; color: #423020; }
+.comic-footer { text-align: center; }
+.comic-btn { font: 700 14px 'Roboto Mono', monospace; letter-spacing: 1.5px; padding: 12px 28px; background: #8b1f1f; color: #fff; border: 3px solid #2a1a0c; border-radius: 6px; cursor: pointer; box-shadow: 4px 4px 0 #2a1a0c; transition: transform 0.1s; }
+.comic-btn:hover { background: #a22626; }
+.comic-btn:active { transform: translate(2px, 2px); box-shadow: 2px 2px 0 #2a1a0c; }
+
