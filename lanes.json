@@ -207,7 +207,12 @@
     "src/ammoEconomy.js",
     "src/checkpoints.js",
     "tests/ammoEconomy.test.js",
-    "tests/checkpoints.test.js"
+    "tests/checkpoints.test.js",
+    "src/peteWorldMap.js",
+    "src/bossPete.js",
+    "src/modes/peteWorld.js",
+    "tests/bossPete.test.js",
+    "tests/peteWorld.test.js"
    ],
    "checks": [
     "npm test",

@@ -3,8 +3,10 @@
 import { registerMode } from './registry.js';
 import { arenaMode } from './arena.js';
 import { mineMode } from './mine.js';
+import { peteWorldMode } from './peteWorld.js';
 
 registerMode(arenaMode);
 registerMode(mineMode);
+registerMode(peteWorldMode);
 
 export { activeMode, registeredModes, resetModes } from './registry.js';
