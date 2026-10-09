@@ -66,3 +66,7 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 - `npm test`
 - `npm run test:characters`
 - `node tools/perf.mjs`
+
+## Open-World Bounty Pursuit (Dusty Pete MVP)
+- `src/placePeteWorld.js`: 3D landmark builder for Copper Bit canyon (campfires with glow, supply crates with animated lids, 3 investigation clue props, canyon mine arches and rail spur, stronghold barricade gate).
+

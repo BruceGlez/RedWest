@@ -49,7 +49,8 @@
     "src/particleSystem.js",
     "tests/characters-smoke.mjs",
     "src/place*.js",
-    "src/mineScene.js"
+    "src/mineScene.js",
+    "tests/placePeteWorld.test.js"
    ],
    "checks": [
     "npm test",
