@@ -214,8 +214,8 @@ test('progress tells the screen how the shift is going', () => {
 const ALL = { stove: 2, stool: 1, oven: 2, taps: 1, cushions: 1 };
 
 test('what the shift believes about upgrades: own keys, whole levels, no more than the shelf sells', () => {
-    assert.deepEqual(shiftUpgrades(null), { stove: 0, stool: 0, oven: 0, taps: 0, cushions: 0 });
-    assert.deepEqual(shiftUpgrades({ stove: 9, oven: -1, taps: 'x', stool: 1.9, cushions: null, free: 5 }), { stove: 2, stool: 1, oven: 0, taps: 0, cushions: 0 });
+    assert.deepEqual(shiftUpgrades(null), { stove: 0, stool: 0, oven: 0, taps: 0, cushions: 0, boots: 0, tray: 0, burner: 0 });
+    assert.deepEqual(shiftUpgrades({ stove: 9, oven: -1, taps: 'x', stool: 1.9, cushions: null, free: 5 }), { stove: 2, stool: 1, oven: 0, taps: 0, cushions: 0, boots: 0, tray: 0, burner: 0 });
     assert.equal(shiftUpgrades(Object.create({ stove: 2 })).stove, 0, 'only own keys');
     assert.equal(shiftUpgrades('stove').stove, 0);
 });

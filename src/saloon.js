@@ -49,7 +49,10 @@ export const UPGRADES = [
     { id: 'stool', name: 'EXTRA STOOL', blurb: 'A fifth seat at the bar.', levels: [60] },
     { id: 'oven', name: 'BIGGER OVEN', blurb: 'The oven cooks faster.', levels: [40, 120] },
     { id: 'taps', name: 'TWO TAPS', blurb: 'The barrel pours two at once.', levels: [30] },
-    { id: 'cushions', name: 'CUSHIONED STOOLS', blurb: 'Customers wait a little longer.', levels: [70] }
+    { id: 'cushions', name: 'CUSHIONED STOOLS', blurb: 'Customers wait a little longer.', levels: [70] },
+    { id: 'boots', name: 'FASTER BOOTS', blurb: 'Walk faster around the kitchen.', levels: [40, 100] },
+    { id: 'tray', name: 'BIGGER TRAY', blurb: 'Carry more plates at once.', levels: [50, 130] },
+    { id: 'burner', name: 'SECOND BURNER', blurb: 'Cook two stove dishes at once.', levels: [80] }
 ];
 const BY_UPGRADE = new Map(UPGRADES.map(u => [u.id, u]));
 export const getUpgrade = id => (typeof id === 'string' ? BY_UPGRADE.get(id) ?? null : null);
