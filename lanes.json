@@ -138,7 +138,12 @@
     "tests/hillLayout.test.js",
     "tests/saloonBalance.test.js",
     "src/saloonShelf.js",
-    "tests/saloonShelf.test.js"
+    "tests/saloonShelf.test.js",
+    "src/saloonKitchenLayout.js",
+    "tests/saloonKitchenLayout.test.js",
+    "src/saloonFloor.js",
+    "tests/saloonFloor.test.js",
+    "tests/saloonFloorBalance.test.js"
    ],
    "checks": [
     "npm test",

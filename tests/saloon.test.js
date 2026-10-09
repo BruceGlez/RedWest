@@ -192,7 +192,7 @@ test('the shelf sells one level at a time for earned dollars and nothing else', 
     assert.equal(getUpgrade('constructor'), null);
     assert.throws(() => saloonAction(profileWith({ pete: false }), { action: 'upgrade', id: 'stool' }, T0), { code: 'locked' });
     const total = UPGRADES.reduce((sum, u) => sum + u.levels.reduce((a, b) => a + b, 0), 0);
-    assert.equal(total, 440, 'the whole shelf is 440 dollars (the design doc, P6)');
+    assert.equal(total, 840, 'the whole shelf is 840 dollars (440 original + 400 new kitchen upgrades)');
     const q = profileWith();
     q.balances.dollars = total;
     for(const u of UPGRADES) for(let i = 0; i < u.levels.length; i++) buyUpgrade(q, { id: u.id }, T0);
@@ -202,7 +202,7 @@ test('the shelf sells one level at a time for earned dollars and nothing else', 
 
 test('upgrades and regulars touch nothing outside the saloon, and do not change what a shift pays', () => {
     const p = profileWith({ farm: true });
-    p.balances.dollars = 500;
+    p.balances.dollars = 1000;
     const snap = () => JSON.stringify({ stars: p.stats.stageStars, levels: p.town.levels, jail: p.town.jailCollectedAt, rate: jailRate(p), stored: jailStored(p, later(10)), farm: p.town.farm, orders: p.town.orders, chapel: p.town.chapel, districts: unlockedDistricts(p.stats.stageStars) });
     const before = snap();
     const pay = shiftPay(5, plates(5, true, 2), true);
@@ -212,10 +212,10 @@ test('upgrades and regulars touch nothing outside the saloon, and do not change 
 });
 
 test('saved upgrades and regulars survive rubbish, old saves and a new day', () => {
-    assert.deepEqual(createSaloon(T0).upgrades, { stove: 0, stool: 0, oven: 0, taps: 0, cushions: 0 });
+    assert.deepEqual(createSaloon(T0).upgrades, { stove: 0, stool: 0, oven: 0, taps: 0, cushions: 0, boots: 0, tray: 0, burner: 0 });
     assert.deepEqual(createSaloon(T0).regulars, {});
-    const messy = normalizeSaloon({ day: dayNumber(T0), upgrades: { stove: 9, stool: -2, oven: 'x', taps: 1.9, cushions: null, bogus: 5 }, regulars: { 'tall-tom': 99, '__proto__': 2, 'Bad Name': 1, ghost: 0, rose: 'x', ada: 2 } }, T0);
-    assert.deepEqual(messy.upgrades, { stove: 2, stool: 0, oven: 0, taps: 1, cushions: 0 });
+    const messy = normalizeSaloon({ day: dayNumber(T0), upgrades: { stove: 9, stool: -2, oven: 'x', taps: 1.9, cushions: null, boots: 1, tray: 3, burner: 1, bogus: 5 }, regulars: { 'tall-tom': 99, '__proto__': 2, 'Bad Name': 1, ghost: 0, rose: 'x', ada: 2 } }, T0);
+    assert.deepEqual(messy.upgrades, { stove: 2, stool: 0, oven: 0, taps: 1, cushions: 0, boots: 1, tray: 2, burner: 1 });
     assert.deepEqual(messy.regulars, { 'tall-tom': MAX_REGULAR_VISITS, ada: 2 });
     assert.equal(Object.getPrototypeOf(messy.regulars), Object.prototype);
     const many = normalizeSaloon({ regulars: Object.fromEntries(Array.from({ length: 40 }, (_, i) => [`r${i}`, 1])) }, T0);

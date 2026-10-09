@@ -68,8 +68,8 @@ function stream(seed) {
     };
 }
 
-export function createShift({ night = 1, farm = false, seed = 1, upgrades = null } = {}) {
-    const levels = shiftUpgrades(upgrades);
+// Generates the customer arrival stream for a night. Shared by the flat shift view and the walking kitchen floor.
+export function generateArrivals({ night = 1, farm = false, seed = 1 } = {}) {
     const next = stream(seed * 7919 + night * 104729);
     const dishes = menu(night, farm);
     const total = crowd(night);
@@ -91,6 +91,13 @@ export function createShift({ night = 1, farm = false, seed = 1, upgrades = null
     const gap = span / Math.max(1, rest - 1);
     for(let i = 0; i < rest; i++) arrivals.push({ at: Math.min(span, Math.max(0, FIRST_AT + (i * (span - FIRST_AT)) / Math.max(1, rest - 1) + (next() - 0.5) * gap * 0.5)), dish: dishAt().id });
     arrivals.sort((a, b) => a.at - b.at);
+    return arrivals;
+}
+
+export function createShift({ night = 1, farm = false, seed = 1, upgrades = null } = {}) {
+    const levels = shiftUpgrades(upgrades);
+    const arrivals = generateArrivals({ night, farm, seed });
+    const total = crowd(night);
     const full = patience(night) + (levels.cushions ? EXTRA_PATIENCE : 0);
     const pours = barrelPours(levels);
 

@@ -18,6 +18,9 @@ export function changeText(id, level) {
         case 'stool': return `${SEATS} seats to ${SEATS + 1}`;
         case 'taps': return 'THE BARREL POURS 2 AT ONCE';
         case 'cushions': return `CUSTOMERS WAIT ${EXTRA_PATIENCE} s LONGER`;
+        case 'boots': return level === 0 ? 'SPEED 5.5 to 6.5' : 'SPEED 6.5 to 7.5';
+        case 'tray': return level === 0 ? '1 PLATE to 2' : '2 PLATES to 3';
+        case 'burner': return 'COOK 2 STOVE DISHES AT ONCE';
         default: return '';
     }
 }
