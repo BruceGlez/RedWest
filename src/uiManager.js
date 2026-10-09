@@ -394,10 +394,11 @@ export function createUIManager(gameState, playerStats) {
         els.roadTrack.innerHTML = OUTLAWS.map((outlaw, i) => {
             const unlocked = isUnlocked(progress, i);
             const classes = ['road-node', unlocked ? '' : 'locked', i === progress.selected ? 'selected' : ''].join(' ').trim();
+            const lockLabel = i === 1 ? 'COMING SOON' : 'LOCKED';
             return `<button type="button" class="${classes}" data-index="${i}"${unlocked ? '' : ' disabled'}>`
                 + `<span class="road-num">${i + 1}</span>${portraitHtml(outlaw)}`
                 + `<span class="road-name">${outlaw.name}</span><span class="road-stars">${starsHtml(progress.stars[i])}</span>`
-                + `<span class="road-reward">$${outlaw.bounty}</span>${unlocked ? '' : '<span class="road-lock">LOCKED</span>'}</button>`;
+                + `<span class="road-reward">$${outlaw.bounty}</span>${unlocked ? '' : `<span class="road-lock">${lockLabel}</span>`}</button>`;
         }).join('<span class="road-link" aria-hidden="true"></span>');
     }
 
@@ -629,15 +630,15 @@ export function createUIManager(gameState, playerStats) {
                 + `<p class="book-kills">BAGGED: <b>${progress.kills[id] || 0}</b></p></div></div>`;
         }).join('');
         els.bookOutlaws.innerHTML = OUTLAWS.map((outlaw, i) => {
-            const unlocked = isUnlocked(progress, i);
             const defeated = (progress.stars[i] & 1) !== 0;
-            const status = defeated ? 'DEFEATED' : unlocked ? 'AT LARGE' : 'LOCKED';
-            return `<div class="book-card outlaw${unlocked ? '' : ' locked'}">${portraitHtml(outlaw)}<div class="book-info">`
-                + `<h4>${unlocked ? outlaw.name : '???'}</h4><p class="book-from">${unlocked ? outlaw.title : `Stage ${i + 1}`}</p>`
-                + (unlocked ? `<p class="book-story"><b>${outlaw.home}</b> ${outlaw.bio}</p>` : '')
-                + (unlocked ? `<p class="book-tip"><b>${outlaw.signature.move}:</b> ${outlaw.signature.detail}</p>` : '')
+            const visible = i === 0 || defeated;
+            const status = defeated ? 'DEFEATED' : i === 0 ? 'AT LARGE' : 'COMING SOON';
+            return `<div class="book-card outlaw${visible ? '' : ' locked'}">${portraitHtml(outlaw)}<div class="book-info">`
+                + `<h4>${visible ? outlaw.name : '???'}</h4><p class="book-from">${visible ? outlaw.title : `Stage ${i + 1} &middot; COMING SOON`}</p>`
+                + (visible ? `<p class="book-story"><b>${outlaw.home}</b> ${outlaw.bio}</p>` : '')
+                + (visible ? `<p class="book-tip"><b>${outlaw.signature.move}:</b> ${outlaw.signature.detail}</p>` : '')
                 + `<p class="book-status ${defeated ? 'done' : ''}">${status}</p>`
-                + (unlocked && storyFor(outlaw.id) ? `<button type="button" class="story-btn" data-story="${i}">STORY ${unlockedCards(progress.stars[i]).filter(Boolean).length} / 3</button>` : '')
+                + (visible && storyFor(outlaw.id) ? `<button type="button" class="story-btn" data-story="${i}">STORY ${unlockedCards(progress.stars[i]).filter(Boolean).length} / 3</button>` : '')
                 + `<p class="poster-stars">${starsHtml(progress.stars[i])}</p></div></div>`;
         }).join('');
         renderCase();
