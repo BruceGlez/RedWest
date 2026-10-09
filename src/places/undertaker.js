@@ -17,7 +17,7 @@ export function createUndertakerPlace(host) {
         const beaten = progress ? progress.stars.filter(mask => (mask & 1) !== 0).length : 0;
         return `<div class="town-card" data-building="grimsby"><div class="town-sign"><span>MR. GRIMSBY</span></div>`
             + `<p class="town-blurb">&ldquo;${grimsbyLine(beaten)}&rdquo;</p>`
-            + `<p class="town-stat">The cellar stairs are behind the coffins: the Hollow Claim, a mine with no bottom: every floor is bigger than the last, and stranger. The way down is always open and the lift always brings you back. Your deepest floor and the ore you ride up with are kept.</p>${host.profile() ? lightShopHtml(host.profile(), 'grimsby') : ''}</div>`;
+            + `<p class="town-stat">The cellar stairs behind the coffins lead to the Hollow Claim, but they are boarded shut for the season. The mine will open in a future update.</p>${host.profile() ? lightShopHtml(host.profile(), 'grimsby') : ''}</div>`;
     }
     const buy = lightBuyer(host); // the BUY buttons on Mr. Grimsby's card (src/lightShop.js)
     // Walking up to something in the parlour (src/townWalk.js, the parlour's own instance).

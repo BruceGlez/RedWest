@@ -157,3 +157,4 @@ when its art is replaced.
   dog comes and goes.
 - The mobile draw-call guard (`tests/mobile-smoke.mjs`) still holds, so the town stays cheap on phones.
 - Play it and answer one question per step: did I walk somewhere because I wanted to, or because I had to?
+- MVP district locks (2026-10-09): for the first MVP release, only Copper Bit (Outlaw 1 - Dusty Pete) is active; Whisper Wash (Rosa) displays COMING SOON notice while locked; Mr. Grimsby's cellar/mine access is closed for the season.
