@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { createSaloonFloor } from './saloonFloor.js';
 import { SPOTS, SEAT_SPOTS } from './saloonKitchenLayout.js';
 import { crowd } from './saloon.js';
+import { HARD_STOP } from './saloonShift.js';
 
 // A self-contained 3D shift overlay. All gameplay and payouts remain in saloonFloor/saloon.
 export function openKitchenShift(host, { night, farm, upgrades, seed = Date.now() % 100000, finish, onClose, onAgain }) {
@@ -30,7 +31,6 @@ export function openKitchenShift(host, { night, farm, upgrades, seed = Date.now(
     const clickable = [];
     const dynamic = [];
     const material = color => new THREE.MeshStandardMaterial({ color, roughness: 0.9 });
-    const floorMat = material(0x896448);
     function block(x, y, z, w, h, d, color, target) {
         const mesh = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), material(color));
         mesh.position.set(x, y, z);
@@ -138,7 +138,7 @@ export function openKitchenShift(host, { night, farm, upgrades, seed = Date.now(
             mesh.material.color.setHex(seat?.state === 'ordering' ? 0xd4ad72 : 0xb49a7d);
         });
         const p = game.progress();
-        layer.querySelector('[data-clock]').textContent = `${Math.max(0, Math.ceil(120 - game.state.time))}s`;
+        layer.querySelector('[data-clock]').textContent = `${Math.max(0, Math.ceil(HARD_STOP - game.state.time))}s`;
         layer.querySelector('[data-score]').textContent = `${p.served}/${p.crowd} served · ${p.missed} missed`;
         renderer.render(scene, camera);
         if(game.over && !ended) end();
