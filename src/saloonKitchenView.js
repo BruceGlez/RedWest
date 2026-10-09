@@ -12,13 +12,13 @@ export function openKitchenShift(host, { night, farm, upgrades, seed = Date.now(
     layer.setAttribute('role', 'dialog');
     layer.setAttribute('aria-label', `Copper Bit walking kitchen, night ${night}`);
     layer.style.cssText = 'position:absolute;inset:0;z-index:30;display:flex;flex-direction:column;background:#21170f;color:#fff;';
-    layer.innerHTML = `<div class="saloon-head" style="display:flex;gap:12px;align-items:center;justify-content:space-around;flex-wrap:wrap"><b>NIGHT ${night} · WALKING KITCHEN</b><span data-clock></span><span data-score></span><button type="button" class="shop-action" data-quit>CLOSE UP</button></div><div data-stage style="position:relative;flex:1;min-height:180px;touch-action:none"></div><p style="margin:5px 12px;font-size:12px;text-align:center">Tap a station to cook or collect. Tap a customer to deliver. The marshal walks there automatically.</p><div class="saloon-result" data-result style="display:none"></div>`;
+    layer.innerHTML = `<div class="saloon-head" style="display:flex;gap:12px;align-items:center;justify-content:space-around;flex-wrap:wrap"><b>NIGHT ${night} · WALKING KITCHEN</b><span data-clock></span><span data-score></span><button type="button" class="shop-action" data-quit>CLOSE UP</button></div><div data-stage class="saloon-kitchen-stage"><div data-controls class="saloon-kitchen-controls">${['STOVE', 'BARREL', 'OVEN'].map(id => `<button type="button" class="saloon-kitchen-target station" data-station="${id}" aria-label="Walk to ${id.toLowerCase()}">${id}</button>`).join('')}${SEAT_SPOTS.map((_, i) => `<button type="button" class="saloon-kitchen-target customer" data-seat="${i}" aria-label="Customer at seat ${i + 1}" hidden></button>`).join('')}</div><div data-hands class="saloon-kitchen-hands">HANDS EMPTY</div></div><p class="saloon-kitchen-help">Tap a station to cook or collect. Tap a customer to deliver. The marshal walks there automatically.</p><div class="saloon-result" data-result style="display:none"></div>`;
     host.appendChild(layer);
     const stage = layer.querySelector('[data-stage]');
     const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 1.5));
     renderer.domElement.style.cssText = 'display:block;width:100%;height:100%;touch-action:none';
-    stage.appendChild(renderer.domElement);
+    stage.prepend(renderer.domElement);
     const scene = new THREE.Scene();
     scene.background = new THREE.Color(0x35291e);
     const camera = new THREE.PerspectiveCamera(46, 1, 0.1, 120);
@@ -80,8 +80,45 @@ export function openKitchenShift(host, { night, farm, upgrades, seed = Date.now(
         }
     }
     renderer.domElement.addEventListener('pointerdown', point);
+    const stationButtons = [...layer.querySelectorAll('[data-station]')];
+    const seatButtons = [...layer.querySelectorAll('[data-seat]')];
+    const hands = layer.querySelector('[data-hands]');
+    const projected = new THREE.Vector3();
+    function placeButton(button, spot, y) {
+        projected.set(spot.x, y, spot.z).project(camera);
+        button.style.left = `${(projected.x + 1) * 50}%`;
+        button.style.top = `${(1 - projected.y) * 50}%`;
+    }
+    function drawControls() {
+        stationButtons.forEach(button => {
+            const id = button.dataset.station;
+            const station = id.toLowerCase();
+            const jobs = game.state.jobs[station];
+            const ready = game.state.readyPlates[station];
+            placeButton(button, SPOTS[id], 2.8);
+            button.dataset.state = ready.length ? 'ready' : jobs.length ? 'cooking' : 'idle';
+            const status = ready.length ? `READY ${ready.length}` : jobs.length ? `${Math.max(1, Math.ceil(Math.min(...jobs.map(job => job.left))))}s` : '';
+            button.textContent = `${id}${status ? ` · ${status}` : ''}`;
+            button.setAttribute('aria-label', `${id.toLowerCase()}, ${status || 'idle'}`);
+        });
+        seatButtons.forEach((button, i) => {
+            const seat = game.state.seats[i];
+            button.hidden = !seat;
+            if(!seat) return;
+            placeButton(button, SEAT_SPOTS[i], 3.2);
+            const dish = seat.dish?.toUpperCase() || 'COMING IN';
+            const patience = seat.fullPatience ? Math.max(0, Math.ceil(seat.left)) : '';
+            button.dataset.state = seat.state;
+            button.dataset.dish = seat.dish || '';
+            button.textContent = `${dish}${patience !== '' ? ` · ${patience}s` : ''}`;
+            button.setAttribute('aria-label', `Customer at seat ${i + 1}, ${dish.toLowerCase()}${patience !== '' ? `, ${patience} seconds left` : ''}`);
+        });
+        hands.textContent = game.state.marshal.held.length ? `CARRYING: ${game.state.marshal.held.map(plate => plate.dish.toUpperCase()).join(' · ')}` : 'HANDS EMPTY';
+    }
     function result(message, buttons) {
         const el = layer.querySelector('[data-result]');
+        stage.style.display = 'none';
+        layer.querySelector('.saloon-kitchen-help').style.display = 'none';
         el.style.display = '';
         el.innerHTML = `<div class="town-card"><div class="town-sign"><span>NIGHT ${night}</span></div><p class="town-blurb">${message}</p><div class="town-actions farm-actions">${buttons}</div></div>`;
     }
@@ -95,6 +132,7 @@ export function openKitchenShift(host, { night, farm, upgrades, seed = Date.now(
             if(obj.isMesh) { obj.geometry.dispose(); obj.material.dispose(); }
         });
         renderer.dispose();
+        renderer.forceContextLoss();
         layer.remove();
         onClose?.();
     }
@@ -120,7 +158,9 @@ export function openKitchenShift(host, { night, farm, upgrades, seed = Date.now(
     layer.addEventListener('click', event => {
         const button = event.target.closest('button');
         if(!button) return;
-        if(button.hasAttribute('data-quit')) { if(!ended) { game.state.over = true; end(); } }
+        if(button.dataset.station) game.moveTo(button.dataset.station);
+        else if(button.dataset.seat != null) game.moveTo(`SEAT_${Number(button.dataset.seat) + 1}`);
+        else if(button.hasAttribute('data-quit')) { if(!ended) { game.state.over = true; end(); } }
         else if(button.hasAttribute('data-again')) { close(); onAgain?.(night); }
         else if(button.hasAttribute('data-done')) close();
         else if(button.hasAttribute('data-retry')) settle();
@@ -137,13 +177,16 @@ export function openKitchenShift(host, { night, farm, upgrades, seed = Date.now(
             mesh.visible = !!seat;
             mesh.material.color.setHex(seat?.state === 'ordering' ? 0xd4ad72 : 0xb49a7d);
         });
+        drawControls();
         const p = game.progress();
         layer.querySelector('[data-clock]').textContent = `${Math.max(0, Math.ceil(HARD_STOP - game.state.time))}s`;
         layer.querySelector('[data-score]').textContent = `${p.served}/${p.crowd} served · ${p.missed} missed`;
         renderer.render(scene, camera);
         if(game.over && !ended) end();
-        frame = requestAnimationFrame(tick);
+        if(!ended) frame = requestAnimationFrame(tick);
     }
+    drawControls();
+    if(import.meta.env?.DEV) layer.__redWestKitchen = { game, renderer };
     frame = requestAnimationFrame(tick);
     return { close, shift: game, get active() { return !closed; } };
 }

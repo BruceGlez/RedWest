@@ -435,6 +435,7 @@ export function createTownPanel({ wallet, onProfile, ui, onRideOut, onBoardTrain
     }
     function leavePlace() {
         if(!place) return;
+        place.depart?.();
         place.walk.exit();
         place = null;
         look?.setScene(town3d.scene, town3d.camera);

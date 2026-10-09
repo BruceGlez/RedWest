@@ -40,3 +40,4 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 
 ## Backlog: the Copper Bit shift screen (owner decision, 2026-10-07)
 - The owner moved `src/saloonShiftView.js` and `styles/townSaloon.css` from the `town` lane to this lane. The `town` lane keeps the rules (`src/saloon.js`, `src/saloonShift.js`, the place card); this lane builds the shift screen, the HUD (floating tips, streak meter, star bar, richer result card) and the one-hand phone layout. Spec: `docs/design/copper-bit-shift.md` (P3 to P5, P9, P14). The view only reads what the rules module exposes; a rule change goes to `town` first.
+- Built 2026-10-09: START NIGHT uses the Three.js walking kitchen, with phone-sized station/customer targets, order and cook status, carried-plate feedback, and WebGL teardown checks in the town smoke.

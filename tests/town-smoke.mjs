@@ -12,8 +12,8 @@ try {
     await server.listen();
     browser = await chromium.launch({ executablePath: findChrome(), headless: true, args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--no-proxy-server'] });
     const base = server.resolvedUrls.local[0];
-    const open = async (query = '', viewport = { width: 1280, height: 720 }, seed = null) => {
-        const context = await browser.newContext({ viewport });
+    const open = async (query = '', viewport = { width: 1280, height: 720 }, seed = null, contextOptions = {}) => {
+        const context = await browser.newContext({ viewport, ...contextOptions });
         await context.addInitScript(answeredPrivacy);
         if(seed) await context.addInitScript(seed);
         const page = await context.newPage();
@@ -713,7 +713,7 @@ try {
     }
     {
         const seed = () => localStorage.setItem('redWestProfile.v1', JSON.stringify({ stats: { stageStars: [7, 0, 0, 0, 0, 0, 0, 0, 0, 0] } }));
-        const { page, errors, context } = await open('', { width: 1280, height: 720 }, seed);
+        const { page, errors, context } = await open('', { width: 390, height: 844 }, seed, { hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
         const prompt = text => page.locator('.walk-prompt').filter({ hasText: text }).waitFor({ state: 'visible' });
         const stand = id => page.evaluate(id => {
             const d = window.__redWestTown.placeScene.walkMap().doors.find(d => d.id === id);
@@ -739,20 +739,48 @@ try {
         await page.locator('[data-shift="1"]').click();
         await page.locator('.saloon-shift').waitFor({ state: 'visible' });
         assert.equal(await page.locator('#town-sheet').isVisible(), false, 'the card closes when the shift starts');
+        assert.equal(await page.locator('.saloon-shift canvas').count(), 1, 'START NIGHT opens the Three.js kitchen');
+        assert.equal(await page.locator('.saloon-shift [data-cook], .saloon-shift [data-serve]').count(), 0, 'the retired flat controls are not present');
+        assert.equal(await page.locator('.saloon-kitchen-target').count(), 8, 'stations and all five customer seats have padded tap targets');
+        const stationTargets = await page.locator('.saloon-kitchen-target.station').evaluateAll(buttons => buttons.map(button => {
+            const box = button.getBoundingClientRect();
+            return { width: box.width, height: box.height, left: box.left, right: box.right };
+        }));
+        assert.ok(stationTargets.every(box => box.width >= 48 && box.height >= 48 && box.left >= 0 && box.right <= 390), `phone tap targets fit: ${JSON.stringify(stationTargets)}`);
+        await page.evaluate(() => {
+            window.__kitchenContextLost = false;
+            document.querySelector('.saloon-shift canvas').addEventListener('webglcontextlost', event => {
+                event.preventDefault();
+                window.__kitchenContextLost = true;
+            });
+        });
         await page.waitForFunction(() => {
             const layer = document.querySelector('.saloon-shift');
             if(!layer) return false;
-            layer.querySelectorAll('[data-serve]').forEach(b => b.click());
-            layer.querySelectorAll('[data-cook]:not([disabled])').forEach(b => b.click());
+            const game = layer.__redWestKitchen?.game;
+            if(!game) return false;
+            // Advance game time quickly, but choose every destination through the same visible
+            // buttons a player taps. This covers station travel, cooking, collecting and service.
+            game.update(0.5);
+            const held = game.state.marshal.held[0];
+            if(held) layer.querySelector(`[data-seat="${held.seatIndex}"]`)?.click();
+            else {
+                const ready = Object.entries(game.state.readyPlates).find(([, plates]) => plates.length);
+                const waiting = game.state.tickets.find(ticket => !game.state.jobs[ticket.station].some(job => job.customerId === ticket.customerId)
+                    && !game.state.readyPlates[ticket.station].some(plate => plate.customerId === ticket.customerId));
+                const station = ready?.[0] || waiting?.station;
+                if(station) layer.querySelector(`[data-station="${station.toUpperCase()}"]`)?.click();
+            }
             return /Served/.test(layer.querySelector('.saloon-result').textContent);
-        }, null, { polling: 100, timeout: 150000 });
+        }, null, { polling: 16, timeout: 60000 });
         const till = await page.locator('.saloon-result').textContent();
         assert.match(till, /Served 5 of 5/);
-        assert.match(till, /\$\d+ in wages and tips\. 2 paid shifts left/);
+        assert.match(till, /\$\d+ earned\. 2 paid shifts left/);
         const dollarsAfter = Number((await page.locator('#town-dollars').textContent()).replace(/,/g, ''));
         assert.ok(dollarsAfter > dollarsBefore, 'the wages landed in the wallet');
         await page.locator('[data-done]').click();
         await page.locator('.saloon-shift').waitFor({ state: 'detached' });
+        await page.waitForFunction(() => window.__kitchenContextLost);
         await prompt("DUSTY PETE'S BAR: 2 PAID SHIFTS LEFT");
         await stand('bar');
         await page.keyboard.press('e');
@@ -764,6 +792,25 @@ try {
         await page.locator('#town-sheet').waitFor({ state: 'visible' });
         assert.match(await page.locator('#town-grid').textContent(), /sour notes/);
         await page.locator('#town-sheet-close').click();
+        // Leaving the place through the town controller also tears down an active kitchen.
+        await stand('bar');
+        await prompt("DUSTY PETE'S BAR: 2 PAID SHIFTS LEFT");
+        await page.keyboard.press('e');
+        await page.locator('[data-shift="1"]').click();
+        await page.locator('.saloon-shift canvas').waitFor({ state: 'visible' });
+        await page.evaluate(() => {
+            window.__kitchenContextLost = false;
+            document.querySelector('.saloon-shift canvas').addEventListener('webglcontextlost', event => {
+                event.preventDefault();
+                window.__kitchenContextLost = true;
+            });
+            window.__redWestTown.leavePlace();
+        });
+        await page.locator('.saloon-shift').waitFor({ state: 'detached' });
+        await page.waitForFunction(() => window.__kitchenContextLost);
+        assert.equal(await page.evaluate(() => window.__redWestTown.place), null, 'leaving Copper Bit closes the kitchen');
+        await page.evaluate(() => window.__redWestTown.enterPlace('copper'));
+        await page.waitForFunction(() => window.__redWestTown.place === 'copper');
         await stand('leave');
         await prompt('THE ROAD TO TOWN');
         await page.keyboard.press('e');

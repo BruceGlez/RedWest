@@ -52,3 +52,5 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 
 ## Note: the shift screen moved to the ui lane (2026-10-07)
 `src/saloonShiftView.js` and `styles/townSaloon.css` now belong to the `ui` lane (owner decision, `docs/design/copper-bit-shift.md`). You keep the rules and the bar's card. Ask the ui lane for view changes; add data the view needs to `src/saloonShift.js` first. New `styles/town<Name>.css` files must be named `styles/town-<name>.css` to stay yours.
+
+- Integrated 2026-10-09: the bar's START NIGHT and REPLAY NIGHT actions launch `saloonKitchenView`; leaving Copper Bit calls the place's optional `depart()` hook so an active kitchen is closed cleanly.

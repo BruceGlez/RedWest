@@ -367,3 +367,5 @@ Each step ships on its own, with its rules tested in `tests/` and a walk-through
 - A server test for each action, so the server clock and the lock hold.
 - `npm run test:town` walks in through the gate, uses each thing, and walks out, and checks the draw calls.
 - Play it and answer one question: did I come back to see something, or only to press something?
+
+- Copper Bit integration validated 2026-10-09: START NIGHT launches the walking Three.js kitchen on a phone viewport; the town smoke cooks, collects and serves a full night, checks payout/save updates, and verifies WebGL cleanup on DONE and forced departure.
