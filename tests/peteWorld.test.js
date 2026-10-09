@@ -99,3 +99,21 @@ test('peteWorldRun ammo consumption tracks shots and detects dry fire', () => {
     assert.equal(peteWorldMode.hud.status().includes('AMMO 0'), true);
 });
 
+test('peteWorldMode formats interactive HUD prompt and manages scene lifecycle', () => {
+    const storage = createMockStorage();
+    const mockScene = { children: [], add: (item) => mockScene.children.push(item), remove: (item) => {
+        const idx = mockScene.children.indexOf(item);
+        if(idx !== -1) mockScene.children.splice(idx, 1);
+    }};
+
+    peteWorldMode.begin({ scene: mockScene }, storage);
+    assert.equal(mockScene.children.length > 0, true);
+
+    peteWorldRun.prompt = 'CAMPFIRE SAVED';
+    assert.equal(peteWorldMode.hud.status().includes('[ CAMPFIRE SAVED ]'), true);
+
+    peteWorldMode.reset(storage);
+    assert.equal(peteWorldRun.active, false);
+});
+
+
