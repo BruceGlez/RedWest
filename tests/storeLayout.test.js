@@ -92,3 +92,23 @@ test('a BUY at the counter goes to the wallet as the store\'s sale', async () =>
     assert.deepEqual(calls.slice(0, 2), [['wallet', { id: 'torches', shop: 'store' }], ['profile', { marker: 'new' }]]);
     assert.deepEqual(calls.at(-1), ['toast', `Bought torches x5 for $${priceOf('torches', 'store')}.`, false]);
 });
+
+test('the counter card offers ammo boxes and processes ammo purchase in Bounty Dollars', async () => {
+    const p = createProfile(T0);
+    p.balances.dollars = 50;
+    const calls = [];
+    const place = createStorePlace(host(p, {}, calls));
+    const cardHtml = place.card('counter');
+    assert.match(cardHtml, /data-buy-ammo="ammo-box"/);
+    assert.match(cardHtml, /AMMO BOX \(30 RDS\)/);
+
+    // Purchase ammo box
+    assert.equal(place.click({ dataset: { buyAmmo: 'ammo-box' } }), true);
+    await new Promise(resolve => setImmediate(resolve));
+    const profileCall = calls.find(c => c[0] === 'profile');
+    assert.ok(profileCall);
+    assert.equal(profileCall[1].balances.dollars, 35);
+    const toastCall = calls.find(c => c[0] === 'toast');
+    assert.ok(toastCall && toastCall[1].includes('Bought AMMO BOX (30 RDS)'));
+});
+
