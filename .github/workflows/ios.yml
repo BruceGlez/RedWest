@@ -4,7 +4,17 @@ name: ios
 on:
   push:
     branches: [main]
+    paths:
+      - 'ios/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - '.github/workflows/ios.yml'
   pull_request:
+    paths:
+      - 'ios/**'
+      - 'capacitor.config.json'
+      - 'package.json'
+      - '.github/workflows/ios.yml'
   workflow_dispatch:
 # A newer push to the same pull request cancels the older run (it is about to be replaced), so quick pushes do not pile up and
 # jam the hosted runners. Runs on main are never cancelled.
