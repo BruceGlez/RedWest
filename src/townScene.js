@@ -514,7 +514,8 @@ function shutGate(d) {
         g.add(box(0.25, 1.9, 0.25, C.timberDark, f.x1 + (f.x2 - f.x1) * t, 0.95, f.z1 + (f.z2 - f.z1) * t));
     }
     for(const y of [0.7, 1.5]) g.add(f.alongX ? box(f.length, 0.14, 0.14, C.timber, f.cx, y, f.cz) : box(0.14, 0.14, f.length, C.timber, f.cx, y, f.cz));
-    const notice = sign('LOCKED', 2.6);
+    const isComingSoon = d.id !== 'copper';
+    const notice = sign(isComingSoon ? 'COMING SOON' : 'LOCKED', isComingSoon ? 3.8 : 2.6);
     notice.position.set(f.cx, 2.7, f.cz);
     notice.rotation.y = f.alongX ? 0 : 0.6;
     g.add(notice, f.alongX ? box(0.2, 2.2, 0.2, C.timberDark, f.cx, 1.1, f.cz) : box(0.2, 2.2, 0.2, C.timberDark, f.cx, 1.1, f.cz));
@@ -535,16 +536,20 @@ function openGate(d) {
     return g;
 }
 
+// Districts visible in MVP build: Copper Bit (Dusty Pete) and Whisper Wash (Rosa - Coming Soon).
+const MVP_VISIBLE_DISTRICTS = new Set(['copper', 'wash']);
+
 // The fixed ground, buildings and props of each district, added to `scenery`. Returns the boxes they block.
 function districtScenery(scenery, smokeSources) {
     const blocks = [];
     for(const d of DISTRICTS) {
+        if(!MVP_VISIBLE_DISTRICTS.has(d.id)) continue;
         const a = d.area;
         scenery.add(box(a.maxX - a.minX, 0.06, a.maxZ - a.minZ, d.ground, (a.minX + a.maxX) / 2, 0.03, (a.minZ + a.maxZ) / 2));
     }
 
     // Calloway farm, seen over the fence: a barn, hay, a trough. The farm itself is a place you step into (src/placeFarm.js).
-    {
+    if(MVP_VISIBLE_DISTRICTS.has('ranch')) {
         const D = districtOffsetById('ranch'); // drawn where it was designed, then the whole district is moved out with the town's edge
         const sc = new THREE.Group();
         sc.position.set(D[0], 0, D[1]);
@@ -566,7 +571,7 @@ function districtScenery(scenery, smokeSources) {
     }
 
     // Foundry yard: Jack's furnace, an anvil, slag, crates.
-    {
+    if(MVP_VISIBLE_DISTRICTS.has('foundry')) {
         const D = districtOffsetById('foundry'); // drawn where it was designed, then the whole district is moved out with the town's edge
         const sc = new THREE.Group();
         sc.position.set(D[0], 0, D[1]);
@@ -590,7 +595,7 @@ function districtScenery(scenery, smokeSources) {
     }
 
     // Morgan's channel: water across the district, a footbridge, the warehouse, buckets, the log.
-    {
+    if(MVP_VISIBLE_DISTRICTS.has('canal')) {
         const D = districtOffsetById('canal'); // drawn where it was designed, then the whole district is moved out with the town's edge
         const sc = new THREE.Group();
         sc.position.set(D[0], 0, D[1]);
@@ -624,7 +629,7 @@ function districtScenery(scenery, smokeSources) {
     }
 
     // Vane's Crossing: a street of weathered false fronts and a clock tower whose clock has stopped.
-    {
+    if(MVP_VISIBLE_DISTRICTS.has('crossing')) {
         const D = districtOffsetById('crossing'); // drawn where it was designed, then the whole district is moved out with the town's edge
         const sc = new THREE.Group();
         sc.position.set(D[0], 0, D[1]);
@@ -657,7 +662,7 @@ function districtScenery(scenery, smokeSources) {
     }
 
     // Tres Rios: an adobe hacienda, a well, and a stone with a struck-out date.
-    {
+    if(MVP_VISIBLE_DISTRICTS.has('tresrios')) {
         const D = districtOffsetById('tresrios'); // drawn where it was designed, then the whole district is moved out with the town's edge
         const sc = new THREE.Group();
         sc.position.set(D[0], 0, D[1]);
@@ -683,7 +688,7 @@ function districtScenery(scenery, smokeSources) {
     }
 
     // The Silver Belle: a riverboat tied up at a pier, a notice post, crates.
-    {
+    if(MVP_VISIBLE_DISTRICTS.has('belle')) {
         const D = districtOffsetById('belle'); // drawn where it was designed, then the whole district is moved out with the town's edge
         const sc = new THREE.Group();
         sc.position.set(D[0], 0, D[1]);
@@ -714,7 +719,7 @@ function districtScenery(scenery, smokeSources) {
     }
 
     // Fort Pell: a palisade, barracks, a flagpole, and the gatling, oiled and pointed at the sky.
-    {
+    if(MVP_VISIBLE_DISTRICTS.has('fort')) {
         const D = districtOffsetById('fort'); // drawn where it was designed, then the whole district is moved out with the town's edge
         const sc = new THREE.Group();
         sc.position.set(D[0], 0, D[1]);
@@ -828,7 +833,7 @@ function districtScenery(scenery, smokeSources) {
     }
 
     // Hollow Hill: a small chapel rebuilt from burnt beams, its bell, and graves under the hill.
-    {
+    if(MVP_VISIBLE_DISTRICTS.has('chapel')) {
         const D = districtOffsetById('chapel'); // drawn where it was designed, then the whole district is moved out with the town's edge
         const sc = new THREE.Group();
         sc.position.set(D[0], 0, D[1]);
