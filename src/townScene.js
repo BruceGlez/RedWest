@@ -1,10 +1,78 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeByMaterial } from './meshMerge.js';
+import { assetUrl, DEMO } from './demo.js';
 import { TOWN_AREA, DISTRICTS, walkAreas, districtPlaces, getDistrict, districtOffsetById } from './townDistricts.js';
 import { TOWN_LAYOUT, SPREAD, STATION, UNDERTAKER_AT, STORE_AT, spread, near, moved } from './townSpace.js';
 import { FOLK, createWalker, stepWalker } from './townFolk.js';
 import { skyAt } from './townTime.js';
 import { SPOTS, getSpot, coinCount, cashBoxFull, boardNotes, BOARD_NOTES } from './townSpots.js';
+
+const townModelLoader = new GLTFLoader();
+const townModelCache = new Map();
+const townLoadedModels = new Map();
+
+export const TOWN_BUILDING_MODELS = {
+    saloon: 'models/saloon.glb',
+    bank: 'models/bank.glb',
+    sheriff: 'models/sheriff.glb',
+    jail: 'models/jail.glb',
+    gunsmith: 'models/gunsmith.glb',
+    store: 'models/house.glb',
+    undertaker: 'models/house.glb',
+    wheel: 'models/wagon_wheel.glb',
+    torch: 'models/wall_torch.glb'
+};
+
+export function loadTownBuilding(id) {
+    if(DEMO) return Promise.resolve(null);
+    const file = TOWN_BUILDING_MODELS[id];
+    if(!file) return Promise.resolve(null);
+    if(townLoadedModels.has(id)) return Promise.resolve(townLoadedModels.get(id));
+    if(townModelCache.has(id)) return townModelCache.get(id);
+    const p = townModelLoader.loadAsync(assetUrl(file)).then(gltf => {
+        townLoadedModels.set(id, gltf);
+        return gltf;
+    }).catch(() => {
+        townModelCache.delete(id);
+        return null;
+    });
+    townModelCache.set(id, p);
+    return p;
+}
+
+export function loadedTownBuilding(id) {
+    return townLoadedModels.get(id) || null;
+}
+
+function createBuildingFromGltf(id, gltf) {
+    const root = new THREE.Group();
+    const clone = gltf.scene.clone(true);
+    clone.traverse(o => {
+        if(o.isMesh) {
+            o.userData.building = id;
+            o.castShadow = true;
+            o.receiveShadow = true;
+            if(o.material) {
+                const mats = Array.isArray(o.material) ? o.material : [o.material];
+                for(const m of mats) {
+                    if(m.emissive && (m.emissive.r > 0 || m.emissive.g > 0 || m.emissive.b > 0)) {
+                        glowBase.set(m, m.emissiveIntensity || 1.0);
+                    }
+                }
+            }
+        }
+    });
+    root.add(clone);
+    if(id === 'saloon') {
+        root.userData.smoke = new THREE.Vector3(-3.5, 11.6, -2);
+    } else if(id === 'gunsmith') {
+        root.userData.smoke = new THREE.Vector3(-2.8, 5.5, -1.0);
+    } else if(id === 'store' || id === 'undertaker') {
+        root.userData.smoke = new THREE.Vector3(2.4, 6.8, -0.4);
+    }
+    return root;
+}
 
 // Frontier Town as a small 3D diorama at dusk (look "A" in art/town/dusk-gang-town.jpg): gaslit brick and
 // timber, chimney smoke, fog, a steam train at the depot, townsfolk in flat caps and long coats.
@@ -226,9 +294,17 @@ const BUILDERS = {
         g.add(box(1.8, 0.2, 0.3, C.iron, -3, 1.4, -3.9));
         for(const x of [-5.3, 5.3]) g.add(box(0.4, 3, 9, C.timber, x, 1.5, 0)); // side walls
         for(const x of [-3.75, 3.75]) g.add(box(3.5, 3, 0.4, C.timber, x, 1.5, 4.3)); // front wall, with the gate between
+        const torchGltf = loadedTownBuilding('torch');
         for(const x of [-2, 2]) {
             g.add(box(0.5, 5, 0.5, C.timber, x, 2.5, 4.3)); // gateposts
-            g.add(box(0.35, 0.45, 0.35, C.glow, x, 5.3, 4.3, 1.4)); // torch sconces
+            if(torchGltf) {
+                const torch = torchGltf.scene.clone(true);
+                torch.scale.set(2.0, 2.0, 2.0);
+                torch.position.set(x, 5.3, 4.5);
+                g.add(torch);
+            } else {
+                g.add(box(0.35, 0.45, 0.35, C.glow, x, 5.3, 4.3, 1.4)); // torch sconces
+            }
         }
         g.add(box(4.8, 0.4, 0.5, C.timber, 0, 5, 4.3)); // the beam
         const s = sign('ARENA', 4);
@@ -824,23 +900,45 @@ export function createTownScene(options = {}) {
             scene.remove(old.group);
             old.group.traverse(o => {
                 if(!o.isMesh) return;
-                hitMeshes.splice(hitMeshes.indexOf(o), 1);
+                const idx = hitMeshes.indexOf(o);
+                if(idx >= 0) hitMeshes.splice(idx, 1);
                 o.geometry.dispose();
             });
         }
-        // Built from dozens of boxes, drawn as one mesh per material (every mesh knows its building id).
-        const group = mergeByMaterial(BUILDERS[spot.id](level, extras[spot.id] || 0), { building: spot.id });
+        const modelGltf = loadedTownBuilding(spot.id);
+        const isModel = Boolean(modelGltf);
+        const group = isModel
+            ? createBuildingFromGltf(spot.id, modelGltf)
+            : mergeByMaterial(BUILDERS[spot.id](level, extras[spot.id] || 0), { building: spot.id });
         group.position.set(spot.x, 0, spot.z);
         group.rotation.y = spot.rotation || 0;
         group.traverse(o => { if(o.isMesh) hitMeshes.push(o); });
         scene.add(group);
         group.updateMatrixWorld(true);
         const box3 = new THREE.Box3().setFromObject(group);
-        buildings.set(spot.id, { group, key: builtKey(spot.id, level), level, box: box3, top: new THREE.Vector3((box3.min.x + box3.max.x) / 2, box3.max.y + 1.2, (box3.min.z + box3.max.z) / 2) });
+        buildings.set(spot.id, {
+            group,
+            key: builtKey(spot.id, level),
+            level,
+            box: box3,
+            top: new THREE.Vector3((box3.min.x + box3.max.x) / 2, box3.max.y + 1.2, (box3.min.z + box3.max.z) / 2),
+            isFallback: !isModel
+        });
         const smoke = smokeSources.findIndex(s => s.id === spot.id);
         if(smoke >= 0) smokeSources.splice(smoke, 1);
         if(group.userData.smoke) smokeSources.push({ id: spot.id, at: group.localToWorld(group.userData.smoke.clone()) });
+
+        if(!isModel && TOWN_BUILDING_MODELS[spot.id]) {
+            loadTownBuilding(spot.id).then(loadedGltf => {
+                if(!loadedGltf) return;
+                const currentEntry = buildings.get(spot.id);
+                if(currentEntry && currentEntry.isFallback) {
+                    placeBuilding(spot, currentEntry.level);
+                }
+            });
+        }
     }
+    for(const id of Object.keys(TOWN_BUILDING_MODELS)) loadTownBuilding(id);
     for(const spot of TOWN_LAYOUT) placeBuilding(spot);
 
     // Scenery (not tappable): a stable with horses and the undertaker's.
@@ -859,19 +957,37 @@ export function createTownScene(options = {}) {
     stable.position.set(stableAt[0], 0, stableAt[1]);
     scenery.add(stable);
     const undertaker = new THREE.Group();
-    undertaker.add(box(5, 4.5, 5, C.timberDark, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+    const undertakerGltf = loadedTownBuilding('undertaker');
+    if(undertakerGltf) {
+        const b = createBuildingFromGltf('undertaker', undertakerGltf);
+        b.scale.set(0.85, 0.85, 0.85);
+        undertaker.add(b);
+        if(b.userData.smoke) smokeSources.push({ id: 'undertaker', at: new THREE.Vector3(UNDERTAKER_AT[0] + b.userData.smoke.x, b.userData.smoke.y, UNDERTAKER_AT[1] + b.userData.smoke.z) });
+    } else {
+        undertaker.add(box(5, 4.5, 5, C.timberDark, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+        undertaker.add(box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    }
     const undertakerSign = sign('UNDERTAKER', 4.4);
     undertakerSign.position.set(0, 3.6, 2.6);
-    undertaker.add(undertakerSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    undertaker.add(undertakerSign);
     const undertakerAt = UNDERTAKER_AT;
     undertaker.position.set(undertakerAt[0], 0, undertakerAt[1]);
     scenery.add(undertaker);
     // The general store (cross-lane on purpose: a plain placeholder building; its door, src/townSpots.js, opens the store, src/places/store.js).
     const store = new THREE.Group();
-    store.add(box(5, 4.5, 5, C.timber, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+    const storeGltf = loadedTownBuilding('store');
+    if(storeGltf) {
+        const b = createBuildingFromGltf('store', storeGltf);
+        b.scale.set(0.85, 0.85, 0.85);
+        store.add(b);
+        if(b.userData.smoke) smokeSources.push({ id: 'store', at: new THREE.Vector3(STORE_AT[0] + b.userData.smoke.x, b.userData.smoke.y, STORE_AT[1] + b.userData.smoke.z) });
+    } else {
+        store.add(box(5, 4.5, 5, C.timber, 0, 2.25, 0), box(5, 1.4, 0.3, C.trim, 0, 5.1, 2.4), roof(5, 5, 1.6, C.slate, 4.5));
+        store.add(box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    }
     const storeSign = sign('GENERAL STORE', 4.4);
     storeSign.position.set(0, 3.6, 2.6);
-    store.add(storeSign, box(0.7, 2, 0.4, C.timberDark, 3.2, 0.9, 2.6));
+    store.add(storeSign);
     store.position.set(STORE_AT[0], 0, STORE_AT[1]);
     scenery.add(store);
 
@@ -900,11 +1016,20 @@ export function createTownScene(options = {}) {
     cover.rotation.z = Math.PI / 2;
     cover.position.y = 1.8;
     wagon.add(cover);
+    const wheelGltf = loadedTownBuilding('wheel');
     for(const [x, z] of [[-1.4, 1.2], [1.4, 1.2], [-1.4, -1.2], [1.4, -1.2]]) {
-        const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.15, 12), mat(C.timberDark));
-        wheel.rotation.x = Math.PI / 2;
-        wheel.position.set(x, 0.7, z);
-        wagon.add(wheel);
+        if(wheelGltf) {
+            const wheel = wheelGltf.scene.clone(true);
+            wheel.scale.set(0.7, 0.7, 0.7);
+            wheel.position.set(x, 0.7, z);
+            if(z < 0) wheel.rotation.y = Math.PI;
+            wagon.add(wheel);
+        } else {
+            const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.7, 0.15, 12), mat(C.timberDark));
+            wheel.rotation.x = Math.PI / 2;
+            wheel.position.set(x, 0.7, z);
+            wagon.add(wheel);
+        }
     }
     const wagonAt = spread(-26, -4);
     wagon.position.set(wagonAt[0], 0, wagonAt[1]);

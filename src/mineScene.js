@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { obstacles, gameState } from './state.js';
 import { markObstacleGridDirty } from './physics.js';
@@ -6,6 +7,68 @@ import { toonVertexColorMaterial } from './assets.js';
 import { createMineDark, glowMaterial, GLOW_RENDER_ORDER } from './placeDark.js';
 import { createTorchLayer, createLantern, torchHoles } from './placeTorch.js';
 import { floorLayout, bounds, distance, gridPoints, wallCircles, propCircles, setActiveFloor } from './mineMap.js';
+import { assetUrl, DEMO } from './demo.js';
+
+const mineModelLoader = new GLTFLoader();
+const mineModelCache = new Map();
+const mineLoadedModels = new Map();
+const mineGeometryCache = new Map();
+
+export const MINE_MODELS = {
+    cart: 'models/mine_cart.glb',
+    arch: 'models/mine_arch.glb',
+    rails: 'models/mine_rails.glb',
+    chest: 'models/mine_chest.glb',
+    mushroom: 'models/mine_mushroom.glb',
+    lantern: 'models/mine_lantern.glb',
+    torch: 'models/wall_torch.glb'
+};
+
+function extractMineGeometry(name, gltf) {
+    const parts = [];
+    gltf.scene.updateMatrixWorld(true);
+    gltf.scene.traverse(o => {
+        if(o.isMesh) {
+            const geom = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
+            geom.applyMatrix4(o.matrixWorld);
+            const color = o.material?.color ? o.material.color : new THREE.Color(0xffffff);
+            const count = geom.attributes.position.count;
+            const colors = new Float32Array(count * 3);
+            for(let i = 0; i < count; i++) color.toArray(colors, i * 3);
+            geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            for(const key of Object.keys(geom.attributes)) {
+                if(!['position', 'normal', 'color'].includes(key)) geom.deleteAttribute(key);
+            }
+            parts.push(geom);
+        }
+    });
+    if(!parts.length) return null;
+    return mergeGeometries(parts, false);
+}
+
+export function loadMineModel(name) {
+    if(DEMO) return Promise.resolve(null);
+    const file = MINE_MODELS[name];
+    if(!file) return Promise.resolve(null);
+    if(mineLoadedModels.has(name)) return Promise.resolve(mineLoadedModels.get(name));
+    if(mineModelCache.has(name)) return mineModelCache.get(name);
+    const p = mineModelLoader.loadAsync(assetUrl(file)).then(gltf => {
+        mineLoadedModels.set(name, gltf);
+        const geom = extractMineGeometry(name, gltf);
+        if(geom) mineGeometryCache.set(name, geom);
+        return gltf;
+    }).catch(() => {
+        mineModelCache.delete(name);
+        return null;
+    });
+    mineModelCache.set(name, p);
+    return p;
+}
+
+export function loadedMineModel(name) {
+    return mineLoadedModels.get(name) || null;
+}
+for(const name of Object.keys(MINE_MODELS)) loadMineModel(name);
 
 // Draws one floor of the Hollow Claim (src/mineMap.js has the shape of the cave and every rule). It is all built from simple shapes
 // in code, like the rest of the game, in five draw calls or so: the cave floor, the rock walls, the props (pillars, timber arches,
@@ -119,20 +182,37 @@ function pillarParts(layout, rand) {
 
 // A timber frame across a passage: two posts, a lintel, braces, and a lantern hung from the middle.
 function archParts(layout, glow) {
+    const archGeom = mineGeometryCache.get('arch');
     const parts = [];
     for(const [x, z, angle, half] of layout.arches) {
         const yaw = -angle;
-        const ux = Math.cos(angle), uz = Math.sin(angle);
-        for(const side of [-1, 1]) {
-            const px = x + ux * half * side, pz = z + uz * half * side;
-            parts.push(boxAt(0.8, 4.8, 0.8, TIMBER, px, 2.4, pz, yaw));
-            parts.push(boxAt(0.5, 0.5, 1.3, TIMBER_DARK, px, 0.25, pz, yaw)); // the sill
-            const bx = x + ux * (half - 1.1) * side, bz = z + uz * (half - 1.1) * side;
-            parts.push(boxAt(0.35, 1.9, 0.35, TIMBER_DARK, bx, 4.15, bz, yaw)); // a short strut under the lintel
+        if(archGeom) {
+            const g = archGeom.clone();
+            g.scale(half / 1.14, 1.7, 1);
+            g.rotateY(yaw);
+            g.translate(x, 0, z);
+            parts.push(g);
+        } else {
+            const ux = Math.cos(angle), uz = Math.sin(angle);
+            for(const side of [-1, 1]) {
+                const px = x + ux * half * side, pz = z + uz * half * side;
+                parts.push(boxAt(0.8, 4.8, 0.8, TIMBER, px, 2.4, pz, yaw));
+                parts.push(boxAt(0.5, 0.5, 1.3, TIMBER_DARK, px, 0.25, pz, yaw)); // the sill
+                const bx = x + ux * (half - 1.1) * side, bz = z + uz * (half - 1.1) * side;
+                parts.push(boxAt(0.35, 1.9, 0.35, TIMBER_DARK, bx, 4.15, bz, yaw)); // a short strut under the lintel
+            }
+            parts.push(boxAt(half * 2 + 1.8, 0.7, 0.9, TIMBER, x, 4.9, z, yaw));
+            parts.push(boxAt(0.12, 0.9, 0.12, IRON, x, 4.0, z, yaw)); // the chain
         }
-        parts.push(boxAt(half * 2 + 1.8, 0.7, 0.9, TIMBER, x, 4.9, z, yaw));
-        parts.push(boxAt(0.12, 0.9, 0.12, IRON, x, 4.0, z, yaw)); // the chain
         glow.push(boxAt(0.5, 0.6, 0.5, LANTERN, x, 3.4, z, yaw));
+        const lanternGeom = mineGeometryCache.get('lantern');
+        if(lanternGeom) {
+            const g = lanternGeom.clone();
+            g.scale(1.3, 1.3, 1.3);
+            g.rotateY(yaw);
+            g.translate(x, 3.4, z);
+            parts.push(g);
+        }
     }
     return parts;
 }
@@ -140,6 +220,7 @@ function archParts(layout, glow) {
 // Stacked crates and barrels, as a few of them stood up against a wall or a pillar.
 function clusterParts(layout, rand, glow) {
     const parts = [];
+    const mushGeom = mineGeometryCache.get('mushroom');
     for(const [x, z] of layout.clusters) {
         const yaw = rand() * 3;
         parts.push(boxAt(2.2, 2.0, 2.2, 0xa07a4c, x - 0.9, 1.0, z, yaw));
@@ -149,25 +230,41 @@ function clusterParts(layout, rand, glow) {
         parts.push(placed(new THREE.CylinderGeometry(0.75, 0.75, 1.6, 8), TIMBER, x - 1.1, 0.8, z - 1.9, 0));
         parts.push(placed(new THREE.CylinderGeometry(0.8, 0.8, 0.14, 8), IRON, x - 1.1, 1.2, z - 1.9, 0));
         glow.push(boxAt(0.32, 0.4, 0.32, LANTERN, x + 0.1, 4.0, z + 0.1, yaw)); // a lantern left on top
+        if(mushGeom) {
+            const g = mushGeom.clone();
+            g.scale(1.2, 1.2, 1.2);
+            g.rotateY(rand() * 6.28);
+            g.translate(x + 1.5, 0, z - 1.2);
+            parts.push(g);
+        }
     }
     return parts;
 }
 
 // An ore cart on the rails, facing along them, heaped with ore.
 function cartParts(layout, rand) {
+    const cartGeom = mineGeometryCache.get('cart');
     const parts = [];
     for(const [x, z, angle] of layout.carts) {
         const yaw = -angle;
-        const at = (lx, lz) => [x + Math.cos(angle) * lx - Math.sin(angle) * lz, z + Math.sin(angle) * lx + Math.cos(angle) * lz];
-        parts.push(boxAt(3.2, 1.0, 1.9, IRON, x, 0.95, z, yaw));
-        parts.push(boxAt(3.5, 0.2, 2.2, 0x4d4d56, x, 1.5, z, yaw)); // the rim
-        for(const lx of [-1.0, 1.0]) for(const lz of [-1.0, 1.0]) {
-            const [wx, wz] = at(lx, lz * 0.95);
-            parts.push(placed(new THREE.CylinderGeometry(0.42, 0.42, 0.22, 8).rotateX(Math.PI / 2), 0x222226, wx, 0.42, wz, yaw));
-        }
-        for(let i = 0; i < 3; i++) {
-            const [ox, oz] = at((i - 1) * 0.9, (rand() - 0.5) * 0.6);
-            parts.push(placed(new THREE.DodecahedronGeometry(0.6 + rand() * 0.25, 0), 0x5a5750, ox, 1.7, oz, rand() * 3, 0.9 + rand() * 0.3));
+        if(cartGeom) {
+            const g = cartGeom.clone();
+            g.scale(2.0, 1.5, 2.0);
+            g.rotateY(yaw);
+            g.translate(x, 0, z);
+            parts.push(g);
+        } else {
+            const at = (lx, lz) => [x + Math.cos(angle) * lx - Math.sin(angle) * lz, z + Math.sin(angle) * lx + Math.cos(angle) * lz];
+            parts.push(boxAt(3.2, 1.0, 1.9, IRON, x, 0.95, z, yaw));
+            parts.push(boxAt(3.5, 0.2, 2.2, 0x4d4d56, x, 1.5, z, yaw)); // the rim
+            for(const lx of [-1.0, 1.0]) for(const lz of [-1.0, 1.0]) {
+                const [wx, wz] = at(lx, lz * 0.95);
+                parts.push(placed(new THREE.CylinderGeometry(0.42, 0.42, 0.22, 8).rotateX(Math.PI / 2), 0x222226, wx, 0.42, wz, yaw));
+            }
+            for(let i = 0; i < 3; i++) {
+                const [ox, oz] = at((i - 1) * 0.9, (rand() - 0.5) * 0.6);
+                parts.push(placed(new THREE.DodecahedronGeometry(0.6 + rand() * 0.25, 0), 0x5a5750, ox, 1.7, oz, rand() * 3, 0.9 + rand() * 0.3));
+            }
         }
     }
     return parts;
@@ -175,7 +272,27 @@ function cartParts(layout, rand) {
 
 // Rails: two bars on timber ties along each leg of the polyline.
 function railParts(layout) {
+    const railGeom = mineGeometryCache.get('rails');
     const parts = [];
+    if(railGeom) {
+        for(let i = 0; i < layout.rails.length - 1; i++) {
+            const [x1, z1] = layout.rails[i], [x2, z2] = layout.rails[i + 1];
+            const length = Math.hypot(x2 - x1, z2 - z1);
+            const angle = Math.atan2(z2 - z1, x2 - x1);
+            const yaw = -angle + Math.PI / 2;
+            const ux = Math.cos(angle), uz = Math.sin(angle);
+            const step = 2.0;
+            const count = Math.max(1, Math.round(length / step));
+            for(let s = 0; s < count; s++) {
+                const t = (s + 0.5) / count * length;
+                const g = railGeom.clone();
+                g.rotateY(yaw);
+                g.translate(x1 + ux * t, 0, z1 + uz * t);
+                parts.push(g);
+            }
+        }
+        return parts;
+    }
     for(let i = 0; i < layout.rails.length - 1; i++) {
         const [x1, z1] = layout.rails[i], [x2, z2] = layout.rails[i + 1];
         const length = Math.hypot(x2 - x1, z2 - z1);
@@ -262,6 +379,37 @@ function buildShaft(layout, glow) {
 
 // A treasure chest: a box with a lid that lifts when it is opened, brass bands, and a gold glow while it is shut.
 function buildChest(x, z, yaw) {
+    const gltf = loadedMineModel('chest');
+    if(gltf) {
+        const group = new THREE.Group();
+        group.position.set(x, 0, z);
+        group.rotation.y = yaw;
+        const clone = gltf.scene.clone(true);
+        const lidPivot = new THREE.Group();
+        lidPivot.position.set(0, 0.74, -0.74);
+        let glow = null;
+        const baseMeshes = [], lidMeshes = [];
+        clone.traverse(o => {
+            if(o.isMesh) {
+                o.castShadow = true;
+                if(o.name.includes('Treasure_Glow')) glow = o;
+                else if(o.name.includes('Lid')) lidMeshes.push(o);
+                else baseMeshes.push(o);
+            }
+        });
+        for(const m of baseMeshes) group.add(m);
+        for(const m of lidMeshes) {
+            m.position.y -= 0.74;
+            m.position.z += 0.74;
+            lidPivot.add(m);
+        }
+        if(!glow) {
+            glow = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 0.5), new THREE.MeshBasicMaterial({ color: 0xffd060 }));
+            glow.position.set(0, 1.9, 0);
+        }
+        group.add(lidPivot, glow);
+        return { group, lidPivot, glow, open: false };
+    }
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.rotation.y = yaw;
