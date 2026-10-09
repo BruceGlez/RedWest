@@ -73,6 +73,10 @@ The contract between them:
    value). A function agent that adds objects keeps them few and merged (`src/meshMerge.js`).
 5. **Never edit the other's file for a quick fix.** Leave a note in the PR description for the other agent instead.
 
+## Managing agent and coordinator guide
+
+For coordinating tasks across lanes, delegating work to agents, and choosing the right AI models to conserve rate limits and tokens, see [docs/lanes/coordinator.md](docs/lanes/coordinator.md).
+
 ## Commands
 
 ```
