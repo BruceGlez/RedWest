@@ -6,6 +6,8 @@
 - Playtest gate: 12 first-time players, 8 understand Heat, 6 replay
 - Real-phone frame and audio checks; known-issues list; release candidate
 - Keep `RELEASE_CHECKLIST.md`, CI and `AGENTS.md`/`lanes.json` current
+- Built 2026-10-09: coordinator and managing agent guide (`docs/lanes/coordinator.md`) detailing multi-lane task delegation and recommended AI model allocation to preserve token quotas
+
 
 ## Rules
 A red check on `main` is everyone's first priority. Never skip or quarantine a test to get green.
