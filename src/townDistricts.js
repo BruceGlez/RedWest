@@ -165,6 +165,7 @@ export function unlockedDistricts(stageStars = []) {
 
 // What a shut gate says.
 export function lockedHint(district) {
+    if(district.id === 'wash') return 'Whisper Wash is coming soon in the next update.';
     const outlaw = OUTLAWS[opensWith(district)];
     return `${district.name} is shut. Beat ${outlaw.name} to open it.`;
 }
@@ -188,7 +189,9 @@ export function doorLabel(id) {
     if(id.startsWith('enter-')) return getDistrict(id.slice(6))?.name ?? '';
     if(id.startsWith('gate-')) {
         const d = getDistrict(id.slice(5));
-        return d ? `${d.name}: SHUT` : '';
+        if(!d) return '';
+        if(d.id === 'wash') return 'WHISPER WASH: SHUT (COMING SOON)';
+        return `${d.name}: SHUT`;
     }
     return PLACE_LABELS[id] ?? '';
 }
