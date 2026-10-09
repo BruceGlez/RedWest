@@ -1,10 +1,69 @@
 import * as THREE from 'three';
+import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { mergeGeometries } from 'three/addons/utils/BufferGeometryUtils.js';
 import { obstacles } from './state.js';
 import { markObstacleGridDirty } from './physics.js';
 import { toonVertexColorMaterial } from './assets.js';
 import { KIT_CAPACITY, DEFAULT_ATMOSPHERE } from './atmosphere.js';
 import { windUniforms } from './wind.js';
+import { assetUrl, DEMO } from './demo.js';
+
+const propLoader = new GLTFLoader();
+const propGeometryCache = new Map();
+const propLoading = new Map();
+
+export const PROP_MODELS = {
+    rock: 'models/rock.glb',
+    tree: 'models/tree.glb',
+    crate: 'models/crate.glb',
+    cactus: 'models/cactus.glb',
+    barrel: 'models/barrel.glb',
+    fence: 'models/fence.glb'
+};
+
+function extractModelGeometry(name, gltf) {
+    const parts = [];
+    gltf.scene.updateMatrixWorld(true);
+    gltf.scene.traverse(o => {
+        if(o.isMesh) {
+            const geom = (o.geometry.index ? o.geometry.toNonIndexed() : o.geometry.clone());
+            geom.applyMatrix4(o.matrixWorld);
+            const color = o.material?.color ? o.material.color : new THREE.Color(0xffffff);
+            const count = geom.attributes.position.count;
+            const colors = new Float32Array(count * 3);
+            for(let i = 0; i < count; i++) color.toArray(colors, i * 3);
+            geom.setAttribute('color', new THREE.Float32BufferAttribute(colors, 3));
+            for(const key of Object.keys(geom.attributes)) {
+                if(!['position', 'normal', 'color'].includes(key)) geom.deleteAttribute(key);
+            }
+            parts.push(geom);
+        }
+    });
+    if(!parts.length) return null;
+    const mergedGeom = mergeGeometries(parts, false);
+    if(name === 'cactus' || name === 'tree') {
+        mergedGeom.setAttribute('sway', new THREE.Float32BufferAttribute(new Float32Array(mergedGeom.attributes.position.count).fill(1), 1));
+    }
+    return mergedGeom;
+}
+
+export function loadPropGeometry(name) {
+    if(DEMO) return Promise.resolve(null);
+    const file = PROP_MODELS[name];
+    if(!file) return Promise.resolve(null);
+    if(propGeometryCache.has(name)) return Promise.resolve(propGeometryCache.get(name));
+    if(propLoading.has(name)) return propLoading.get(name);
+    const p = propLoader.loadAsync(assetUrl(file)).then(gltf => {
+        const geom = extractModelGeometry(name, gltf);
+        if(geom) propGeometryCache.set(name, geom);
+        return geom;
+    }).catch(() => {
+        propLoading.delete(name);
+        return null;
+    });
+    propLoading.set(name, p);
+    return p;
+}
 
 // The arena's props (rocks, dead trees, crates, cacti, fences) are drawn as one InstancedMesh per kind:
 // five draw calls for about 125 props, where each used to be a mesh (or several) of its own. Each prop is
@@ -153,15 +212,31 @@ function kindFor(scene, name) {
     const capacity = KIT_CAPACITY[name];
     if(current?.scene !== scene) current = { scene, kinds: {} };
     if(current.kinds[name]) return current.kinds[name];
-    const mesh = new THREE.InstancedMesh(SHAPES[name].geometry(), material, capacity);
+    const initialGeom = propGeometryCache.get(name) ? propGeometryCache.get(name).clone() : SHAPES[name].geometry();
+    const mesh = new THREE.InstancedMesh(initialGeom, material, capacity);
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.frustumCulled = false; // instances come and go all over the 240-wide map
     mesh.userData.scenery = name;
     for(let i = 0; i < capacity; i++) { mesh.setMatrixAt(i, HIDDEN); mesh.setColorAt(i, scratch.color.set(0xffffff)); }
     scene.add(mesh);
-    return (current.kinds[name] = { mesh, free: Array.from({ length: capacity }, (_, i) => capacity - 1 - i) });
+    const entry = { mesh, free: Array.from({ length: capacity }, (_, i) => capacity - 1 - i) };
+    current.kinds[name] = entry;
+
+    if(!propGeometryCache.has(name) && PROP_MODELS[name]) {
+        loadPropGeometry(name).then(geom => {
+            if(!geom) return;
+            if(current?.kinds[name] === entry && entry.mesh) {
+                entry.mesh.geometry.dispose();
+                entry.mesh.geometry = geom.clone();
+                entry.mesh.instanceMatrix.needsUpdate = true;
+            }
+        });
+    }
+
+    return entry;
 }
+for(const kind of Object.keys(PROP_MODELS)) loadPropGeometry(kind);
 
 // Takes every prop out of the scene (a stage change builds a new map). Each marker frees its own instance.
 export function clearScenery(scene) {
