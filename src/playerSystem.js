@@ -17,6 +17,8 @@ import { createTurner, snapTurn, resetTurner } from './turning.js';
 import { getWeapon, defaultWeapon } from './weapons.js';
 import { loadCharacterModel, createCharacterInstance } from './characterModels.js';
 import { BASE_DASH_TIME, BASE_DASH_COOLDOWN } from './perks.js';
+import { peteWorldRun } from './modes/peteWorld.js';
+import { consumeAmmo } from './ammoEconomy.js';
 
 const QUICK_FIRE_WINDOW = 0.4; // seconds of game time a tap stays live, to wait out the gun's cooldown
 const SHOT_CONVERGE_DISTANCE = 30; // shots leave the gun and meet the aim line this far out: nearly parallel, never crooked
@@ -90,6 +92,12 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
 
     function shoot() {
         if(gameState.isGameOver || !gameState.isGameStarted) return;
+        if(peteWorldRun?.active && peteWorldRun.ammoState) {
+            if(!consumeAmmo(peteWorldRun.ammoState, 1)) {
+                playSound('click');
+                return;
+            }
+        }
         playerGroup.userData.isAiming = true;
         playerGroup.userData.aimTimer = 0.5;
         // Each gun has its own shot: 'gun-rifle' plays 'shot-rifle'.

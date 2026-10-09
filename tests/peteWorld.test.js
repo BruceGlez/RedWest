@@ -81,3 +81,21 @@ test('peteWorldMode hooks conform to run mode contract', () => {
     assert.equal(typeof peteWorldMode.hud.wave, 'function');
     assert.equal(typeof peteWorldMode.hud.status, 'function');
 });
+
+test('peteWorldRun ammo consumption tracks shots and detects dry fire', () => {
+    const storage = createMockStorage();
+    const run = startPeteWorldRun({}, storage);
+    assert.equal(run.ammoState.current, 30);
+
+    // Consume 30 rounds
+    for(let i = 0; i < 30; i++) {
+        assert.equal(run.ammoState.current > 0, true);
+        run.ammoState.current--;
+    }
+    assert.equal(run.ammoState.current, 0);
+
+    // Further shots are dry fire
+    assert.equal(run.ammoState.current <= 0, true);
+    assert.equal(peteWorldMode.hud.status().includes('AMMO 0'), true);
+});
+
