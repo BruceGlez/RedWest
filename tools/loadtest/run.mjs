@@ -2,7 +2,7 @@ import { spawn } from 'node:child_process';
 import { mkdtempSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, dirname } from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { fileURLToPath, pathToFileURL } from 'node:url';
 import { setTimeout as sleep } from 'node:timers/promises';
 import { createServer } from 'node:net';
 import { createStats, summarize, player, processUsage, cpuPercent, waitForHealth, sha256, tokenOf, idOf, OPERATIONS } from './lib.mjs';
@@ -52,7 +52,8 @@ if(storeKind !== 'json' && storeKind !== 'postgres') { console.error('--store mu
 if(storeKind === 'postgres' && !databaseUrl) { console.error('--store postgres needs --database-url (a database that holds no real players).'); process.exit(2); }
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
-const { createProfile, weekKey } = await import(join(root, 'src', 'profile.js'));
+const moduleUrl = (...parts) => pathToFileURL(join(root, ...parts)).href;
+const { createProfile, weekKey } = await import(moduleUrl('src', 'profile.js'));
 const dir = mkdtempSync(join(tmpdir(), 'rw-loadtest-'));
 let child = null, pgStore = null;
 
@@ -80,7 +81,7 @@ try {
     const env = { ...process.env, NODE_ENV: 'production', TRUST_PROXY: '1', ALLOWED_ORIGIN: '*' };
     delete env.DATABASE_URL; delete env.STORE;
     if(storeKind === 'postgres') {
-        const { createPgStore } = await import(join(root, 'server', 'pgStore.js'));
+        const { createPgStore } = await import(moduleUrl('server', 'pgStore.js'));
         pgStore = await createPgStore({ connectionString: databaseUrl, max: 4 });
         const { rows } = await pgStore.pool.query(`select count(*)::int as n from users where id not like 'lt\\_%'`);
         if(rows[0].n > 0) throw new Error(`Refusing to run: that database holds ${rows[0].n} players that are not load-test players. Use an empty throwaway database.`);
@@ -89,7 +90,7 @@ try {
         for(let i = 0; i < seedCount; i++) await pgStore.putUser(idOf(i), makeUser(i));
         env.STORE = 'postgres'; env.DATABASE_URL = databaseUrl;
     } else {
-        const { createFileStore } = await import(join(root, 'server', 'store.js'));
+        const { createFileStore } = await import(moduleUrl('server', 'store.js'));
         const file = join(dir, 'redwest.json');
         console.log(`Seeding ${seedCount} players into a temp JSON file...`);
         const store = createFileStore(file);

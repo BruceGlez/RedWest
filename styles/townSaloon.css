@@ -16,3 +16,19 @@
 .saloon-station { flex: 1; padding: 6px; text-align: center; background: #2a1d15; border: 1px solid #c8a050; border-radius: 8px; font-size: 13px; }
 .saloon-station.busy { background: #6b4a2b; color: #fff; }
 .saloon-result { margin-top: auto; }
+.saloon-kitchen-stage { position: relative; flex: 1; min-height: 180px; overflow: hidden; touch-action: none; }
+.saloon-kitchen-controls { position: absolute; inset: 0; pointer-events: none; }
+.saloon-kitchen-target { position: absolute; z-index: 2; min-width: 52px; min-height: 48px; padding: 5px 8px; transform: translate(-50%, -50%); border: 2px solid #e0b95f; border-radius: 10px; background: rgba(42, 29, 21, 0.9); color: #fff4d2; font: bold 11px/1.15 "Roboto Mono", monospace; pointer-events: auto; }
+.saloon-kitchen-target[data-state="ready"] { border-color: #9bd35a; box-shadow: 0 0 12px rgba(155, 211, 90, 0.8); }
+.saloon-kitchen-target.customer { max-width: 94px; border-color: #d9b881; background: rgba(72, 45, 29, 0.92); }
+.saloon-kitchen-target.customer[data-state="walking"], .saloon-kitchen-target.customer[data-state="deciding"] { opacity: 0.7; }
+.saloon-kitchen-hands { position: absolute; z-index: 2; left: 50%; bottom: 8px; min-height: 28px; padding: 6px 10px; transform: translateX(-50%); border: 1px solid #c8a050; border-radius: 8px; background: rgba(24, 16, 10, 0.88); color: #fff4d2; font-size: 12px; pointer-events: none; }
+.saloon-kitchen-help { margin: 5px 12px; font-size: 12px; text-align: center; }
+
+@media (max-width: 480px) {
+    .saloon-shift { gap: 5px; padding-right: max(6px, env(safe-area-inset-right)); padding-left: max(6px, env(safe-area-inset-left)); }
+    .saloon-shift .saloon-head { gap: 5px; font-size: 11px; }
+    .saloon-shift .saloon-head .shop-action { min-height: 44px; }
+    .saloon-kitchen-target { min-width: 48px; padding: 4px; font-size: 9px; }
+    .saloon-kitchen-help { margin: 2px 6px; font-size: 10px; }
+}

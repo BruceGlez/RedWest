@@ -23,7 +23,7 @@
 //   click(button)             true when a button on its card was its own (plant, sell, ...)
 //   resize(w, h)              optional
 //   sync()                    optional: draw the profile into the scene, every render
-//   prepare(), arrive(), entered()   optional hooks while going in: before the look changes, before the walk starts, once inside
+//   prepare(), arrive(), entered(), depart()   optional hooks while going in, and just before leaving
 const factories = [];
 
 export function registerPlace(create) {

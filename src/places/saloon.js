@@ -1,12 +1,12 @@
 // Copper Bit as a place you step into (PLACES.md, section 8): Dusty Pete's saloon. The rules are src/saloon.js, the map src/saloonLayout.js, the
 // 3D scene src/placeSaloon.js. The bar's card shows the nights, the menu and the paid shifts left, and starts a shift: the game is
-// src/saloonShift.js, its screen src/saloonShiftView.js, and the wallet's `saloon` settles it (src/saloon.js).
+// src/saloonFloor.js, its screen src/saloonKitchenView.js, and the wallet's `saloon` settles it (src/saloon.js).
 // Built once per town screen by src/places/index.js.
 import { createSaloonScene } from '../placeSaloon.js';
 import { DAY_SKY } from '../townLook.js';
 import { createTownWalk } from '../townWalk.js';
 import { farmOpen } from '../farm.js';
-import { openShift } from '../saloonShiftView.js';
+import { openKitchenShift } from '../saloonKitchenView.js';
 import { NIGHTS, PAID_SHIFTS_PER_DAY, saloonOpen, menu, nightsOpen, paidShiftsLeft } from '../saloon.js';
 import { SALOON_START, saloonLabel } from '../saloonLayout.js';
 import { getDistrict } from '../townDistricts.js';
@@ -18,7 +18,7 @@ const PETE = OUTLAWS.find(o => o.id === 'dusty-pete').name;
 export function createSaloonPlace(host) {
     let scene3d = null; // built the first time you go in
     let walk = null;
-    let shift = null; // the shift on screen, if any (src/saloonShiftView.js)
+    let shift = null; // the walking kitchen shift on screen, if any
 
     const card = (id, title, body) => `<div class="town-card" data-building="${id}"><div class="town-sign"><span>${title}</span></div>${body}</div>`;
     function barCard(profile) {
@@ -50,8 +50,8 @@ export function createSaloonPlace(host) {
         if(shift?.active || !host.profile() || !saloonOpen(host.profile())) return;
         host.closeCard();
         host.track('saloon_shift');
-        shift = openShift(host.screen, {
-            night, farm: farmOpen(host.profile()),
+        shift = openKitchenShift(host.screen, {
+            night, farm: farmOpen(host.profile()), upgrades: host.profile().town.saloon?.upgrades,
             finish: async summary => {
                 const response = await host.wallet.saloon(summary);
                 host.onProfile(response.profile);
@@ -83,6 +83,7 @@ export function createSaloonPlace(host) {
         },
         arrive() { walk.place(SALOON_START[0], SALOON_START[1]); },
         entered() { host.markVisited('copper'); },
+        depart() { shift?.close(); },
         resize: (w, h) => scene3d?.resize(w, h),
         card: saloonCard,
         // The START NIGHT buttons on the bar's card and the BUY buttons on the shelf's. Returns true when the click was the saloon's.

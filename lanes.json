@@ -251,6 +251,7 @@
     "tests/touchControls.test.js",
     "tests/mobile-smoke.mjs",
     "src/saloonShiftView.js",
+    "src/saloonKitchenView.js",
     "styles/townSaloon.css"
    ],
    "checks": [
