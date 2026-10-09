@@ -25,6 +25,9 @@ import {
 } from '../peteWorldMap.js';
 import { createPeteBossState, damagePeteBoss, updateBossPete } from '../bossPete.js';
 import { hasSeenComic, markComicSeen, renderComicIntroHtml } from '../comicIntro.js';
+import { createPeteWorldScene } from '../placePeteWorld.js';
+
+let peteScene = null;
 
 export const peteWorldRun = {
     active: false,
@@ -101,12 +104,21 @@ export const peteWorldMode = {
         status: () => {
             const ammo = peteWorldRun.ammoState ? peteWorldRun.ammoState.current : 0;
             const clues = peteWorldRun.collectedClues.length;
-            return `CLUES ${clues}/3 | AMMO ${ammo}`;
+            const prompt = peteWorldRun.prompt ? ` | [ ${peteWorldRun.prompt} ]` : '';
+            return `CLUES ${clues}/3 | AMMO ${ammo}${prompt}`;
         }
     },
 
     begin: (ctx, storage = globalThis.localStorage) => {
         startPeteWorldRun({}, storage);
+        if(ctx?.scene) {
+            if(!peteScene) {
+                peteScene = createPeteWorldScene();
+            }
+            if(!ctx.scene.children.includes(peteScene.group)) {
+                ctx.scene.add(peteScene.group);
+            }
+        }
         if(ctx?.playerSystem?.playerGroup) {
             ctx.playerSystem.playerGroup.position.set(peteWorldRun.startPosition.x, 0, peteWorldRun.startPosition.z);
         }
@@ -137,6 +149,7 @@ export const peteWorldMode = {
 
         // 1. Update current zone
         peteWorldRun.currentZone = zoneAt(playerPos.z);
+        let activePrompt = null;
 
         // 2. Check campfires (auto-save checkpoint on reach)
         for(const fire of peteWorldRun.campfires) {
@@ -150,13 +163,17 @@ export const peteWorldMode = {
                     openedCrates: peteWorldRun.crates.filter(c => c.opened).map(c => c.id),
                     activeCampfires: peteWorldRun.campfires.filter(c => c.active).map(c => c.id)
                 }, storage);
+                activePrompt = 'CAMPFIRE SAVED';
+            } else if(fire.active && isNearCampfire(fire, playerPos.x, playerPos.z, 2.0)) {
+                activePrompt = 'CAMPFIRE RESTED';
             }
         }
 
         // 3. Check crates looting
         for(const crate of peteWorldRun.crates) {
             if(!crate.opened && isNearCrate(crate, playerPos.x, playerPos.z)) {
-                lootCrate(crate, peteWorldRun.ammoState, playerStats);
+                const lootRes = lootCrate(crate, peteWorldRun.ammoState, playerStats);
+                activePrompt = lootRes.text || 'LOOTED CRATE';
             }
         }
 
@@ -164,12 +181,14 @@ export const peteWorldMode = {
         for(const clue of INVESTIGATION_CLUES) {
             if(!peteWorldRun.collectedClues.includes(clue.id) && isNearClue(clue, playerPos.x, playerPos.z)) {
                 peteWorldRun.collectedClues.push(clue.id);
+                activePrompt = `FOUND ${clue.name.toUpperCase()}`;
             }
         }
 
         // 5. Stronghold gate breach check
         if(!peteWorldRun.gateBreached && canBreachStronghold(peteWorldRun.collectedClues)) {
             peteWorldRun.gateBreached = true;
+            activePrompt = 'STRONGHOLD UNLOCKED';
         }
 
         // 6. Boss arena encounter trigger
@@ -185,14 +204,32 @@ export const peteWorldMode = {
             const bossPos = { x: 0, z: 100 };
             updateBossPete(peteWorldRun.bossState, bossPos, playerPos, dt);
         }
+
+        peteWorldRun.prompt = activePrompt;
+    },
+
+    updateScene: (ctx, timeInSeconds) => {
+        if(peteScene && peteWorldRun.active) {
+            peteScene.update(peteWorldRun, timeInSeconds);
+        }
     },
 
     afterOutlawDown: (ctx, storage = globalThis.localStorage) => {
+        if(peteScene) {
+            peteScene.group?.parent?.remove(peteScene.group);
+            peteScene.dispose?.();
+            peteScene = null;
+        }
         endPeteWorldRun(true, storage);
         ctx?.finishRun?.('outlaw-defeated');
     },
 
     reset: (storage = globalThis.localStorage) => {
+        if(peteScene) {
+            peteScene.group?.parent?.remove(peteScene.group);
+            peteScene.dispose?.();
+            peteScene = null;
+        }
         endPeteWorldRun(false, storage);
     }
 };
