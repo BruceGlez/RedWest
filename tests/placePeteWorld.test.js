@@ -144,3 +144,55 @@ test('scene instantiates smashable clay pots that shatter into shards and pop co
     assert.ok(pot.coinMesh.position.y > 0.4);
 });
 
+test('scene instantiates bandit camp life with sleeping guards, zzz glyphs, and expressive alerts', () => {
+    const scene = createPeteWorldScene();
+    assert.ok(scene.bandits.length > 0);
+
+    const sleeper = scene.bandits.find(b => b.role === 'sleeper');
+    assert.ok(sleeper);
+    assert.equal(sleeper.alertState, 'idle');
+    assert.equal(sleeper.zGlyphs[0].mesh.visible, true);
+    assert.equal(sleeper.exclMesh.visible, false);
+
+    // Player far away (idle)
+    scene.update({
+        campfires: [{ id: sleeper.campId, active: false }],
+        crates: [],
+        collectedClues: [],
+        playerPos: { x: sleeper.group.position.x + 30, z: sleeper.group.position.z + 30 }
+    }, 1.0);
+    assert.equal(sleeper.alertState, 'idle');
+
+    // Player in caution radius (suspicious with ?)
+    scene.update({
+        campfires: [{ id: sleeper.campId, active: false }],
+        crates: [],
+        collectedClues: [],
+        playerPos: { x: sleeper.group.position.x + 12, z: sleeper.group.position.z }
+    }, 1.2);
+    assert.equal(sleeper.alertState, 'suspicious');
+    assert.equal(sleeper.questMesh.visible, true);
+
+    // Player close (alerted with !)
+    scene.update({
+        campfires: [{ id: sleeper.campId, active: false }],
+        crates: [],
+        collectedClues: [],
+        playerPos: { x: sleeper.group.position.x + 4, z: sleeper.group.position.z }
+    }, 1.5);
+    assert.equal(sleeper.alertState, 'alerted');
+    assert.equal(sleeper.exclMesh.visible, true);
+    assert.equal(sleeper.zGlyphs[0].mesh.visible, false); // Stops sleeping
+
+    // Camp cleared when campfire activated
+    scene.update({
+        campfires: [{ id: sleeper.campId, active: true }],
+        crates: [],
+        collectedClues: [],
+        playerPos: { x: sleeper.group.position.x, z: sleeper.group.position.z }
+    }, 2.0);
+    assert.equal(sleeper.alertState, 'cleared');
+    assert.equal(sleeper.characterMesh.visible, false);
+});
+
+

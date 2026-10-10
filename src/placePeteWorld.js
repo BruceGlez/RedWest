@@ -570,6 +570,235 @@ function createSmashablePotMesh(id, x, z) {
     };
 }
 
+// Camp bandit sentries and sleepers (Mini Ninjas living camps)
+export const CAMP_BANDITS = [
+    // Camp Alpha (Mine Camp, Z = -30)
+    { id: 'alpha-sleeper', campId: 'camp-mine', x: -2.8, z: -32, role: 'sleeper', rotY: 0.3 },
+    { id: 'alpha-sentry', campId: 'camp-mine', x: 3.2, z: -28, role: 'sentry', rotY: -2.2 },
+
+    // Camp Bravo (Rail Spur, Z = 0)
+    { id: 'bravo-sleeper', campId: 'camp-spur', x: -3.5, z: -2, role: 'sleeper', rotY: 1.2 },
+    { id: 'bravo-sentry', campId: 'camp-spur', x: 2.8, z: 2, role: 'sentry', rotY: -1.6 },
+
+    // Camp Charlie (Sulfur Springs, Z = 35)
+    { id: 'charlie-sleeper', campId: 'camp-springs', x: -3.2, z: 34, role: 'sleeper', rotY: 0.8 },
+    { id: 'charlie-sentry', campId: 'camp-springs', x: 3.6, z: 37, role: 'sentry', rotY: -2.5 }
+];
+
+function getPlayerPos(sceneGroup, runState) {
+    if(runState?.playerPos) return runState.playerPos;
+    if(typeof window !== 'undefined' && window.__redWest?.playerGroup?.position) {
+        return window.__redWest.playerGroup.position;
+    }
+    const root = sceneGroup?.parent;
+    if(root?.children) {
+        const p = root.children.find(c => c.userData?.type === 'player' || c.userData?.aimTimer !== undefined);
+        if(p?.position) return p.position;
+    }
+    return null;
+}
+
+function createCampBandit(def) {
+    const group = new THREE.Group();
+    group.position.set(def.x, 0, def.z);
+    group.rotation.y = def.rotY;
+    group.name = `bandit-${def.id}`;
+
+    // Bandit Chibi Character Body
+    const bodyParts = [
+        box(0.3, 0.25, 0.45, COLORS.woodDark, -0.2, 0.12, 0.05),
+        box(0.3, 0.25, 0.45, COLORS.woodDark, 0.2, 0.12, 0.05),
+        box(0.55, 0.55, 0.45, COLORS.iron, 0, 0.42, 0),
+        box(0.72, 0.7, 0.5, COLORS.cliffBase, 0, 0.95, 0),
+        box(0.74, 0.16, 0.52, COLORS.flowerRed, 0, 1.32, 0),
+        dodecahedron(0.32, COLORS.paper, 0, 1.55, 0),
+        cylinder(0.75, 0.75, 0.08, 8, COLORS.woodDark, 0, 1.82, 0),
+        cylinder(0.42, 0.45, 0.38, 7, COLORS.woodDark, 0, 2.05, 0)
+    ];
+
+    if(def.role === 'sentry') {
+        bodyParts.push(cylinder(0.12, 0.12, 0.2, 5, COLORS.iron, 0.42, 1.05, 0.25));
+    }
+
+    const characterMesh = new THREE.Mesh(mergeGeometries(bodyParts, false), sharedVertexMaterial());
+    group.add(characterMesh);
+
+    // Floating Sleep "Z" Glyphs for Sleeper
+    const zGlyphs = [];
+    if(def.role === 'sleeper') {
+        for(let i = 0; i < 3; i++) {
+            const zParts = [
+                box(0.24, 0.06, 0.06, COLORS.paper, 0, 0.12, 0),
+                box(0.06, 0.28, 0.06, COLORS.paper, 0, 0, 0, 0, 0, Math.PI / 4),
+                box(0.24, 0.06, 0.06, COLORS.paper, 0, -0.12, 0)
+            ];
+            const zMesh = new THREE.Mesh(mergeGeometries(zParts, false), sharedVertexMaterial());
+            zMesh.visible = true;
+            group.add(zMesh);
+            zGlyphs.push({ mesh: zMesh, phase: i * 0.33 });
+        }
+    }
+
+    // Expressive Comic Speech Balloon (! and ?)
+    const balloonGroup = new THREE.Group();
+    balloonGroup.position.set(0, 2.65, 0);
+    balloonGroup.scale.set(0, 0, 0);
+    group.add(balloonGroup);
+
+    const circleGeom = cylinder(0.45, 0.45, 0.06, 12, 0xffffff, 0, 0, 0, Math.PI / 2, 0, 0);
+    const arrowGeom = paint(new THREE.ConeGeometry(0.14, 0.22, 4).translate(0, -0.42, 0), 0xffffff);
+    const bgMesh = new THREE.Mesh(mergeGeometries([circleGeom, arrowGeom], false), sharedVertexMaterial());
+    balloonGroup.add(bgMesh);
+
+    // Exclamation mark mesh (!)
+    const exclParts = [
+        box(0.12, 0.38, 0.08, COLORS.flowerRed, 0, 0.1, 0.04),
+        dodecahedron(0.09, COLORS.flowerRed, 0, -0.22, 0.04)
+    ];
+    const exclMesh = new THREE.Mesh(mergeGeometries(exclParts, false), sharedVertexMaterial());
+    exclMesh.visible = false;
+    balloonGroup.add(exclMesh);
+
+    // Question mark mesh (?)
+    const questParts = [
+        box(0.25, 0.08, 0.08, COLORS.flowerYellow, 0, 0.24, 0.04),
+        box(0.08, 0.18, 0.08, COLORS.flowerYellow, 0.1, 0.15, 0.04),
+        box(0.15, 0.08, 0.08, COLORS.flowerYellow, 0.02, 0.05, 0.04),
+        box(0.08, 0.14, 0.08, COLORS.flowerYellow, -0.02, -0.05, 0.04),
+        dodecahedron(0.08, COLORS.flowerYellow, -0.02, -0.22, 0.04)
+    ];
+    const questMesh = new THREE.Mesh(mergeGeometries(questParts, false), sharedVertexMaterial());
+    questMesh.visible = false;
+    balloonGroup.add(questMesh);
+
+    // Defeat / Poof Dust
+    const dustPuffs = [];
+    for(let d = 0; d < 4; d++) {
+        const dMesh = new THREE.Mesh(
+            new THREE.DodecahedronGeometry(0.35, 0),
+            new THREE.MeshBasicMaterial({ color: COLORS.smoke, transparent: true, opacity: 0.5, depthWrite: false })
+        );
+        dMesh.visible = false;
+        group.add(dMesh);
+        dustPuffs.push({ mesh: dMesh, vel: new THREE.Vector3(0, 0, 0), age: 0 });
+    }
+
+    let alertAnimTime = 0;
+
+    return {
+        id: def.id,
+        campId: def.campId,
+        role: def.role,
+        group,
+        characterMesh,
+        zGlyphs,
+        balloonGroup,
+        exclMesh,
+        questMesh,
+        alertState: 'idle',
+        targetScale: 0,
+        currentScale: 0,
+
+        update(time, dt = 0.016, playerPos = null, isCampActive = false) {
+            if(isCampActive) {
+                if(this.alertState !== 'cleared') {
+                    this.alertState = 'cleared';
+                    this.balloonGroup.visible = false;
+                    this.characterMesh.visible = false;
+                    for(const zg of this.zGlyphs) zg.mesh.visible = false;
+                    for(let i = 0; i < dustPuffs.length; i++) {
+                        const dp = dustPuffs[i];
+                        dp.mesh.visible = true;
+                        dp.age = 0;
+                        dp.mesh.position.set(0, 0.8, 0);
+                        const angle = (i / dustPuffs.length) * Math.PI * 2;
+                        dp.vel.set(Math.cos(angle) * 1.8, 1.0, Math.sin(angle) * 1.8);
+                    }
+                }
+                for(const dp of dustPuffs) {
+                    if(dp.age > 0.8) { dp.mesh.visible = false; continue; }
+                    dp.age += dt;
+                    dp.mesh.position.addScaledVector(dp.vel, dt);
+                    const prog = dp.age / 0.8;
+                    const sc = 0.3 + prog * 1.6;
+                    dp.mesh.scale.set(sc, sc, sc);
+                    dp.mesh.material.opacity = (1 - prog) * 0.5;
+                }
+                return;
+            }
+
+            if(playerPos) {
+                const dx = playerPos.x - def.x;
+                const dz = playerPos.z - def.z;
+                const dist = Math.hypot(dx, dz);
+
+                if(dist < 9.0) {
+                    if(this.alertState !== 'alerted') {
+                        this.alertState = 'alerted';
+                        alertAnimTime = 0;
+                        if(typeof window !== 'undefined') {
+                            import('./audio.js').then(m => m.playSound?.('enemy-shot')).catch(() => {});
+                        }
+                    }
+                } else if(dist < 15.0) {
+                    if(this.alertState !== 'suspicious' && this.alertState !== 'alerted') {
+                        this.alertState = 'suspicious';
+                        alertAnimTime = 0;
+                    }
+                } else {
+                    this.alertState = 'idle';
+                }
+            }
+
+            if(this.alertState === 'alerted') {
+                this.exclMesh.visible = true;
+                this.questMesh.visible = false;
+                alertAnimTime += dt;
+                const pop = Math.sin(Math.min(alertAnimTime * 8, Math.PI)) * 0.4;
+                this.targetScale = 1.0 + pop;
+            } else if(this.alertState === 'suspicious') {
+                this.exclMesh.visible = false;
+                this.questMesh.visible = true;
+                this.targetScale = 0.9;
+                if(playerPos) {
+                    const lookAngle = Math.atan2(playerPos.x - def.x, playerPos.z - def.z);
+                    group.rotation.y = THREE.MathUtils.lerp(group.rotation.y, lookAngle, dt * 5);
+                }
+            } else {
+                this.exclMesh.visible = false;
+                this.questMesh.visible = false;
+                this.targetScale = 0;
+                group.rotation.y = THREE.MathUtils.lerp(group.rotation.y, def.rotY, dt * 3);
+            }
+
+            this.currentScale = THREE.MathUtils.lerp(this.currentScale, this.targetScale, dt * 14);
+            this.balloonGroup.scale.set(this.currentScale, this.currentScale, this.currentScale);
+            this.balloonGroup.visible = this.currentScale > 0.05;
+
+            if(this.role === 'sleeper') {
+                const isSleeping = (this.alertState === 'idle');
+                this.characterMesh.position.y = isSleeping ? Math.sin(time * 2.2) * 0.03 : 0;
+                for(let i = 0; i < this.zGlyphs.length; i++) {
+                    const zg = this.zGlyphs[i];
+                    zg.mesh.visible = isSleeping;
+                    if(!isSleeping) continue;
+                    const cycle = ((time * 0.7 + zg.phase) % 1.0);
+                    const y = 1.6 + cycle * 1.5;
+                    const sway = Math.sin(cycle * Math.PI * 2) * 0.16;
+                    zg.mesh.position.set(sway, y, cycle * 0.2);
+                    const sc = 0.5 + cycle * 0.6;
+                    zg.mesh.scale.set(sc, sc, sc);
+                    zg.mesh.material.opacity = (1 - cycle) * 0.8;
+                }
+            } else if(this.role === 'sentry') {
+                if(this.alertState === 'idle') {
+                    group.rotation.y = def.rotY + Math.sin(time * 1.2) * 0.4;
+                }
+            }
+        }
+    };
+}
+
 // Builds one investigation clue prop
 function createClueMesh(clueDef) {
     const group = new THREE.Group();
@@ -875,6 +1104,13 @@ export function createPeteWorldScene() {
         return item;
     });
 
+    // 7. Build bandit camp sentries & sleeping guards (Mini Ninjas camp life)
+    const banditMeshes = CAMP_BANDITS.map(def => {
+        const item = createCampBandit(def);
+        group.add(item.group);
+        return item;
+    });
+
     return {
         group,
         campfires: campfireMeshes,
@@ -883,6 +1119,7 @@ export function createPeteWorldScene() {
         clues: clueMeshes,
         gate: landmarks,
         environment,
+        bandits: banditMeshes,
 
         update(runState, timeInSeconds) {
             if(!runState) return;
@@ -912,6 +1149,15 @@ export function createPeteWorldScene() {
             // Animate smashable pots
             for(const pot of potMeshes) {
                 pot.update(timeInSeconds);
+            }
+
+            // Animate bandit sentries & alert reactions
+            const playerPos = getPlayerPos(group, runState);
+            const dt = 0.016;
+            for(const bandit of banditMeshes) {
+                const campData = runState.campfires?.find(c => c.id === bandit.campId);
+                const isCampActive = campData?.active ?? false;
+                bandit.update(timeInSeconds, dt, playerPos, isCampActive);
             }
 
             // Sync clues
