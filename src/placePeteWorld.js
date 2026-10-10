@@ -26,7 +26,19 @@ const COLORS = {
     ledgerCover: 0x822e1b,
     flameBase: 0xf56218,
     flameTip: 0xffcc33,
-    emberGlow: 0xff5500
+    emberGlow: 0xff5500,
+    smoke: 0xecd9c6,
+    cliffDark: 0x88351c,
+    cliffBase: 0xa84c2a,
+    cliffLight: 0xc46236,
+    cliffRim: 0xd97846,
+    cactusGreen: 0x3e8646,
+    cactusHighlight: 0x549e5c,
+    flowerRed: 0xe63946,
+    flowerYellow: 0xffcc00,
+    scrubTan: 0xc8a256,
+    lanternBrass: 0xd4a03e,
+    lanternGlow: 0xffaa22
 };
 
 function paint(geometry, hex) {
@@ -51,8 +63,24 @@ function box(w, h, d, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     return paint(g, hex);
 }
 
-function cylinder(rt, rb, h, segs, hex, x = 0, y = 0, z = 0) {
+function cylinder(rt, rb, h, segs, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     const g = new THREE.CylinderGeometry(rt, rb, h, segs);
+    if(rx || ry || rz) {
+        g.rotateX(rx);
+        g.rotateY(ry);
+        g.rotateZ(rz);
+    }
+    g.translate(x, y, z);
+    return paint(g, hex);
+}
+
+function dodecahedron(radius, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+    const g = new THREE.DodecahedronGeometry(radius, 0);
+    if(rx || ry || rz) {
+        g.rotateX(rx);
+        g.rotateY(ry);
+        g.rotateZ(rz);
+    }
     g.translate(x, y, z);
     return paint(g, hex);
 }
@@ -74,7 +102,7 @@ function glowMaterial(hex = COLORS.emberGlow) {
     });
 }
 
-// Builds one campfire site (stone circle + logs + flame + glow halo)
+// Builds one campfire site (stone circle + logs + flame + glow halo + animated cartoon smoke puffs)
 function createCampfireMesh(id, x, z) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
@@ -118,22 +146,62 @@ function createCampfireMesh(id, x, z) {
     glowMesh.visible = false;
     group.add(glowMesh);
 
+    // Dynamic cartoon smoke puffs (Mini Ninjas style: puffy rising cloud spheres)
+    const smokePuffs = [];
+    const smokeCount = 5;
+    for(let i = 0; i < smokeCount; i++) {
+        const puffGeom = new THREE.DodecahedronGeometry(0.32, 0);
+        const puffMat = new THREE.MeshBasicMaterial({
+            color: COLORS.smoke,
+            transparent: true,
+            opacity: 0.35,
+            depthWrite: false
+        });
+        const puffMesh = new THREE.Mesh(puffGeom, puffMat);
+        puffMesh.visible = false;
+        group.add(puffMesh);
+        smokePuffs.push({
+            mesh: puffMesh,
+            speed: 0.75 + (i * 0.12),
+            offset: (i / smokeCount) * 3.0,
+            driftX: ((i % 2 === 0 ? 1 : -1) * (0.12 + i * 0.06))
+        });
+    }
+
     return {
         id,
         group,
         flameMesh,
         glowMesh,
+        smokePuffs,
         active: false,
         setActive(isActive) {
             this.active = !!isActive;
             this.flameMesh.visible = this.active;
             this.glowMesh.visible = this.active;
+            if(!this.active) {
+                for(const sp of this.smokePuffs) sp.mesh.visible = false;
+            }
         },
         update(time) {
             if(!this.active) return;
             const flicker = 0.85 + 0.25 * Math.sin(time * 9 + x * 2);
             this.flameMesh.scale.set(flicker, flicker * 1.1, flicker);
             this.glowMesh.material.opacity = 0.35 + 0.15 * Math.sin(time * 6 + z);
+
+            // Animate cartoon smoke puffs
+            for(let i = 0; i < this.smokePuffs.length; i++) {
+                const sp = this.smokePuffs[i];
+                sp.mesh.visible = true;
+                const cycle = ((time * sp.speed + sp.offset) % 3.0) / 3.0; // 0 to 1
+                const y = 0.6 + cycle * 3.6;
+                const spread = Math.sin(cycle * Math.PI) * 0.5;
+                const windDrift = cycle * 0.7; // drifts downwind
+                sp.mesh.position.set(sp.driftX * spread + windDrift, y, Math.cos(time * 2 + i) * 0.12);
+                const scale = 0.4 + cycle * 1.5;
+                sp.mesh.scale.set(scale, scale * 0.85, scale);
+                sp.mesh.material.opacity = Math.sin(cycle * Math.PI) * 0.36;
+            }
         }
     };
 }
@@ -229,7 +297,7 @@ function createClueMesh(clueDef) {
     };
 }
 
-// Builds canyon architectural accents: mine arches, rail spur segments, and stronghold gate
+// Builds canyon architectural accents: mine arches, rail spur segments, stronghold gate, and hanging lanterns
 function createCanyonLandmarks() {
     const group = new THREE.Group();
     group.name = 'pete-world-landmarks';
@@ -242,6 +310,33 @@ function createCanyonLandmarks() {
         archParts.push(box(0.6, 5.0, 0.6, COLORS.woodDark, -6.5, 2.5, az));
         archParts.push(box(0.6, 5.0, 0.6, COLORS.woodDark, 6.5, 2.5, az));
         archParts.push(box(14.0, 0.6, 0.8, COLORS.wood, 0, 4.8, az));
+    }
+
+    // Hanging swinging brass lanterns with glowing cores on mine arches
+    const lanternGroups = [];
+    for(const az of archZs) {
+        for(const lx of [-3.5, 3.5]) {
+            const lantern = new THREE.Group();
+            lantern.position.set(lx, 4.5, az);
+
+            const chain = box(0.06, 0.5, 0.06, COLORS.iron, 0, -0.25, 0);
+            const cage = cylinder(0.24, 0.28, 0.6, 5, COLORS.lanternBrass, 0, -0.75, 0);
+            const cap = paint(new THREE.ConeGeometry(0.32, 0.22, 5).translate(0, -0.4, 0), COLORS.lanternBrass);
+            const core = paint(new THREE.DodecahedronGeometry(0.16, 0).translate(0, -0.75, 0), COLORS.lanternGlow);
+            const lampMesh = new THREE.Mesh(mergeGeometries([chain, cage, cap, core], false), sharedVertexMaterial());
+            lantern.add(lampMesh);
+
+            const haloGeom = new THREE.PlaneGeometry(1.5, 1.5);
+            const haloMesh = new THREE.Mesh(haloGeom, glowMaterial(COLORS.lanternGlow));
+            haloMesh.position.set(0, -0.75, 0);
+            lantern.add(haloMesh);
+
+            group.add(lantern);
+            lanternGroups.push({
+                group: lantern,
+                phase: (az + lx) * 0.4
+            });
+        }
     }
 
     // Rail tracks in Zone B (Rail Spur, Z from -48 to -8)
@@ -294,6 +389,7 @@ function createCanyonLandmarks() {
         gateGroup,
         leftDoor,
         rightDoor,
+        lanterns: lanternGroups,
         setBreached(breached) {
             if(breached) {
                 leftDoor.position.x = -6.0;
@@ -306,7 +402,107 @@ function createCanyonLandmarks() {
                 leftDoor.rotation.y = 0;
                 rightDoor.rotation.y = 0;
             }
+        },
+        update(time) {
+            for(const item of lanternGroups) {
+                item.group.rotation.z = Math.sin(time * 2.2 + item.phase) * 0.12;
+                item.group.rotation.x = Math.cos(time * 1.6 + item.phase) * 0.08;
+            }
         }
+    };
+}
+
+// Builds stylized canyon cliffs, natural rock arches, blooming flora, and abandoned camp clutter
+function createCanyonEnvironment() {
+    const group = new THREE.Group();
+    group.name = 'pete-canyon-environment';
+
+    const cliffParts = [];
+
+    // Stepped, chunky terracotta cliff formations flanking the canyon corridor
+    const zSteps = [-96, -80, -64, -48, -32, -16, 0, 16, 32, 48, 64, 80, 96];
+
+    for(let i = 0; i < zSteps.length; i++) {
+        const cz = zSteps[i];
+        const seed = Math.sin(i * 1.7);
+        const seed2 = Math.cos(i * 2.3);
+
+        // West cliff formation (X ~ -16 to -22)
+        const wx = -17 - Math.abs(seed) * 3;
+        const wh = 6 + Math.abs(seed2) * 3.5;
+        cliffParts.push(box(9, wh, 14, COLORS.cliffBase, wx, wh / 2, cz));
+        cliffParts.push(box(6, wh * 0.4, 9, COLORS.cliffLight, wx - 1.5, wh + (wh * 0.2), cz + 1));
+        cliffParts.push(dodecahedron(3.2, COLORS.cliffDark, wx + 3.2, 2.5, cz - 3, 0.2, 0.4, 0.1));
+        cliffParts.push(box(7, 0.8, 12, COLORS.cliffRim, wx + 1, wh - 0.4, cz));
+
+        // East cliff formation (X ~ 16 to 22)
+        const ex = 17 + Math.abs(seed2) * 3;
+        const eh = 6 + Math.abs(seed) * 3.5;
+        cliffParts.push(box(9, eh, 14, COLORS.cliffBase, ex, eh / 2, cz));
+        cliffParts.push(box(6, eh * 0.4, 9, COLORS.cliffLight, ex + 1.5, eh + (eh * 0.2), cz - 1));
+        cliffParts.push(dodecahedron(3.2, COLORS.cliffDark, ex - 3.2, 2.5, cz + 3, -0.2, -0.3, 0.1));
+        cliffParts.push(box(7, 0.8, 12, COLORS.cliffRim, ex - 1, eh - 0.4, cz));
+    }
+
+    // High natural rock arch spanning over the canyon at Z = -48 (Zone A to B entrance)
+    cliffParts.push(box(38, 3.5, 6, COLORS.cliffBase, 0, 10.5, -48));
+    cliffParts.push(box(24, 2.0, 5, COLORS.cliffRim, 0, 12.0, -48));
+    cliffParts.push(dodecahedron(3.8, COLORS.cliffLight, -6, 12.5, -48));
+
+    // High natural rock arch spanning over the canyon at Z = 52 (Zone C to D entrance)
+    cliffParts.push(box(38, 3.5, 6, COLORS.cliffBase, 0, 11.5, 52));
+    cliffParts.push(box(22, 2.0, 5, COLORS.cliffRim, 0, 13.0, 52));
+    cliffParts.push(dodecahedron(3.8, COLORS.cliffLight, 5, 13.5, 52));
+
+    const cliffsMesh = new THREE.Mesh(mergeGeometries(cliffParts, false), sharedVertexMaterial());
+    group.add(cliffsMesh);
+
+    // Desert Flora & Camp Clutter (Flowering saguaro cacti, scrub, TNT crates)
+    const floraParts = [];
+
+    // Saguaro cacti along the canyon margins
+    const cactusZs = [-84, -60, -36, -12, 12, 36, 60, 84];
+    for(let j = 0; j < cactusZs.length; j++) {
+        const cz = cactusZs[j];
+        const side = (j % 2 === 0 ? 1 : -1);
+        const cx = side * (12.5 + ((j * 3) % 4) * 0.5);
+
+        // Main trunk
+        floraParts.push(cylinder(0.65, 0.75, 5.2, 6, COLORS.cactusGreen, cx, 2.6, cz));
+        // Left arm
+        floraParts.push(box(0.5, 0.5, 1.4, COLORS.cactusHighlight, cx - (side * 0.9), 3.2, cz));
+        floraParts.push(cylinder(0.4, 0.45, 2.2, 5, COLORS.cactusGreen, cx - (side * 1.5), 4.2, cz));
+        // Right arm
+        floraParts.push(box(0.5, 0.5, 1.4, COLORS.cactusHighlight, cx + (side * 0.9), 2.4, cz));
+        floraParts.push(cylinder(0.4, 0.45, 2.0, 5, COLORS.cactusGreen, cx + (side * 1.5), 3.3, cz));
+        // Blooming crown flower
+        floraParts.push(dodecahedron(0.45, COLORS.flowerRed, cx, 5.4, cz));
+        floraParts.push(cylinder(0.18, 0.18, 0.25, 5, COLORS.flowerYellow, cx, 5.65, cz));
+
+        // Dry scrub tufts
+        floraParts.push(dodecahedron(0.85, COLORS.scrubTan, cx + (side * 1.8), 0.4, cz + 1.2));
+        floraParts.push(dodecahedron(0.65, COLORS.scrubTan, cx - (side * 1.2), 0.35, cz - 1.4));
+    }
+
+    // Abandoned camp props (TNT dynamite crates, prospector water casks)
+    const campZs = [-32, 2, 38];
+    for(const campZ of campZs) {
+        // Red TNT crates
+        floraParts.push(box(1.2, 0.9, 1.0, COLORS.ledgerCover, -4.8, 0.45, campZ));
+        floraParts.push(box(1.25, 0.25, 1.05, COLORS.paper, -4.8, 0.45, campZ));
+        // Water casks
+        floraParts.push(cylinder(0.55, 0.6, 1.3, 7, COLORS.woodDark, 4.8, 0.65, campZ + 1.5));
+        floraParts.push(cylinder(0.58, 0.58, 0.15, 7, COLORS.iron, 4.8, 0.4, campZ + 1.5));
+        floraParts.push(cylinder(0.58, 0.58, 0.15, 7, COLORS.iron, 4.8, 0.9, campZ + 1.5));
+    }
+
+    const floraMesh = new THREE.Mesh(mergeGeometries(floraParts, false), sharedVertexMaterial());
+    group.add(floraMesh);
+
+    return {
+        group,
+        cliffsMesh,
+        floraMesh
     };
 }
 
@@ -340,12 +536,17 @@ export function createPeteWorldScene() {
     const landmarks = createCanyonLandmarks();
     group.add(landmarks.group);
 
+    // 5. Build canyon cliffs, rock arches, flora, and environment
+    const environment = createCanyonEnvironment();
+    group.add(environment.group);
+
     return {
         group,
         campfires: campfireMeshes,
         crates: crateMeshes,
         clues: clueMeshes,
         gate: landmarks,
+        environment,
 
         update(runState, timeInSeconds) {
             if(!runState) return;
@@ -385,6 +586,11 @@ export function createPeteWorldScene() {
             // Sync stronghold gate
             if(landmarks && landmarks.setBreached) {
                 landmarks.setBreached(!!runState.gateBreached);
+            }
+
+            // Animate dynamic landmarks (swinging lanterns)
+            if(landmarks && landmarks.update) {
+                landmarks.update(timeInSeconds);
             }
         },
 

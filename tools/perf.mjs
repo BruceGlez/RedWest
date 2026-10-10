@@ -78,9 +78,12 @@ try {
     await page.evaluate(async () => {
         S.playerStats.hp = 999;
         const { spawnEnemy } = await import('/src/enemySystem.js');
-        const p = S.enemies[0].parent.children.find(o => o.userData.type === 'player');
-        for(let i = 0; i < 14; i++) spawnEnemy(p.parent, p.position, 'bandit');
-        S.enemies.forEach((e, i) => e.position.set(p.position.x + Math.cos(i) * 12, 0, p.position.z + Math.sin(i) * 9));
+        const scene = window.__redWest?.scene || (S.enemies[0] ? S.enemies[0].parent : null);
+        const p = window.__redWest?.playerGroup || scene?.children.find(o => o.userData.type === 'player');
+        if(scene && p) {
+            for(let i = 0; i < 14; i++) spawnEnemy(scene, p.position, 'bandit');
+            S.enemies.forEach((e, i) => e.position.set(p.position.x + Math.cos(i) * 12, 0, p.position.z + Math.sin(i) * 9));
+        }
         S.gameState.isPaused = true;
     });
     await page.waitForTimeout(1500);
@@ -88,7 +91,7 @@ try {
     // --detail: what the fight draws, by kind of object (visible meshes in view, or never culled).
     if(process.argv.includes('--detail')) console.log(await page.evaluate(async () => {
         const THREE = await import('/node_modules/.vite/deps/three.js').catch(() => null);
-        const scene = S.enemies[0].parent;
+        const scene = window.__redWest?.scene || (S.enemies[0] ? S.enemies[0].parent : null);
         const camera = window.__redWestCamera;
         const frustum = new THREE.Frustum().setFromProjectionMatrix(new THREE.Matrix4().multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse));
         const counts = {};

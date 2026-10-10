@@ -39,19 +39,19 @@ export const DEFAULT_ATMOSPHERE = {
 };
 
 export const ATMOSPHERES = {
-    'dusty-pete': { // Copper Bit: harsh noon
-        mood: 'harsh noon',
-        sky: [0x4f9ee6, 0x9cc8ee, 0xf3dfb4, 0xf6e3b8],
-        fog: { color: 0xf2dcae, near: 50, far: 120 },
-        hemi: { sky: 0xfff6e0, ground: 0xffffff, intensity: 1.7 },
-        sun: { color: 0xfff0d2, intensity: 2.9, offset: [-12, 56, -8] },
+    'dusty-pete': { // Copper Bit: warm stylized canyon sunset
+        mood: 'golden canyon sunset',
+        sky: [0x3c84c4, 0xdf8450, 0xed6828, 0xf6b468],
+        fog: { color: 0xdf925c, near: 48, far: 118 },
+        hemi: { sky: 0xffe0be, ground: 0xc45c2c, intensity: 1.75 },
+        sun: { color: 0xffc872, intensity: 2.7, offset: [-28, 44, -18] },
         ground: 0xffffff, props: 0xffffff,
         horizon: { style: 'mesa', height: 0.9, strength: 0.35 },
         hero: { id: 'piano', at: [-30, 26, 0.4] },
-        terrain: { ...SAND, base: '#d9b27a', extra: 'ruts', extraColor: 'rgba(110, 70, 40, 0.28)', pebbles: 200 },
+        terrain: { ...SAND, base: '#cb7846', extra: 'ruts', extraColor: 'rgba(125, 58, 28, 0.32)', pebbles: 240 },
         kit: { rock: 30, tree: 8, crate: 22, cactus: 8, fence: 6, barrel: 22, tombstone: 0, haystack: 0, spire: 0, wall: 0 },
-        palette: { ...NO_TINT, crate: 0xe0b890 },
-        wind: 0.4, weeds: 2, motes: { color: 0xeed2a0, size: 0.4, opacity: 0.4, count: 70, speed: 1.5, fall: 0 }
+        palette: { ...NO_TINT, crate: 0xe29864, rock: [0xa65234, 0xc06846] },
+        wind: 0.45, weeds: 2, motes: { color: 0xffdc82, size: 0.45, opacity: 0.55, count: 85, speed: 1.8, fall: -0.1 }
     },
     'rattlesnake-rosa': { // Whisper Wash: moonlit blue night
         mood: 'moonlit night',
