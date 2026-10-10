@@ -1,14 +1,12 @@
 // Outlaw 1 (Dusty Pete) Open-World Bounty Pursuit Run Mode.
 // Replaces endless horde survival waves with an open-world exploration pursuit:
 // 4 distinct canyon zones, campfire checkpoints, supply crates with finite ammo,
-// 3 investigation clues to track Pete, and a 3-phase Magicka-style boss confrontation.
+// 3 investigation clues to track Pete, and the shared charge-and-punch boss confrontation.
 
 import { gameState, playerStats } from '../state.js';
-import { createAmmoState, consumeAmmo, lootCrate, isNearCrate } from '../ammoEconomy.js';
+import { createAmmoState, lootCrate, isNearCrate } from '../ammoEconomy.js';
 import {
-    saveCheckpoint,
     loadCheckpoint,
-    hasActiveCheckpoint,
     clearCheckpoint,
     activateCampfire,
     isNearCampfire
@@ -23,7 +21,10 @@ import {
     canBreachStronghold,
     isNearClue
 } from '../peteWorldMap.js';
-import { createPeteBossState, damagePeteBoss, updateBossPete } from '../bossPete.js';
+import { arena } from '../arena.js';
+import { mine } from '../mine.js';
+import { offerBounty, bankBounty } from '../bounty.js';
+import { getOutlaw } from '../outlaws.js';
 import { hasSeenComic, markComicSeen, renderComicIntroHtml } from '../comicIntro.js';
 import { createPeteWorldScene } from '../placePeteWorld.js';
 
@@ -38,7 +39,6 @@ export const peteWorldRun = {
     collectedClues: [],
     currentZone: PETE_WORLD_ZONES.mineCamp,
     lastCheckpointId: null,
-    bossState: null,
     bossSpawned: false,
     gateBreached: false,
     prompt: null
@@ -51,7 +51,6 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
     peteWorldRun.collectedClues = [];
     peteWorldRun.bossSpawned = false;
     peteWorldRun.gateBreached = false;
-    peteWorldRun.bossState = createPeteBossState(100);
     peteWorldRun.prompt = null;
 
     // Load saved checkpoint if one exists
@@ -78,6 +77,8 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
         peteWorldRun.startPosition = { x: 0, z: -75 };
     }
 
+    peteWorldRun.currentZone = zoneAt(peteWorldRun.startPosition.z);
+
     return peteWorldRun;
 }
 
@@ -94,11 +95,13 @@ export const peteWorldMode = {
 
     isActive: () => {
         if(typeof window !== 'undefined' && window.__rwSmokeTest) return false;
-        return peteWorldRun.active || (gameState?.outlawIndex === 0 && !gameState?.isTown && !gameState?.isArena);
+        if(arena.enabled || mine.enabled) return false;
+        return peteWorldRun.active || (!gameState.isGameStarted && gameState.outlawIndex === 0 && !gameState.pendingEvent);
     },
 
     practice: null,
     usesEvent: false,
+    runOutlaw: () => 0,
 
     hud: {
         waveLabel: 'ZONE',
@@ -113,6 +116,8 @@ export const peteWorldMode = {
     },
 
     begin: (ctx, storage = globalThis.localStorage) => {
+        // The canyon supplies its own layout; random road props must not obstruct its clues or arena.
+        ctx?.clearSceneCollections?.();
         startPeteWorldRun({}, storage);
         if(ctx?.scene) {
             if(!peteScene) {
@@ -164,8 +169,9 @@ export const peteWorldMode = {
                     ammoState: peteWorldRun.ammoState,
                     completedMissions: peteWorldRun.collectedClues,
                     openedCrates: peteWorldRun.crates.filter(c => c.opened).map(c => c.id),
-                    activeCampfires: peteWorldRun.campfires.filter(c => c.active).map(c => c.id)
+                    activeCampfires: [...peteWorldRun.campfires.filter(c => c.active).map(c => c.id), fire.id]
                 }, storage);
+                peteWorldRun.lastCheckpointId = fire.id;
                 activePrompt = 'CAMPFIRE SAVED';
             } else if(fire.active && isNearCampfire(fire, playerPos.x, playerPos.z, 2.0)) {
                 activePrompt = 'CAMPFIRE RESTED';
@@ -184,7 +190,7 @@ export const peteWorldMode = {
         for(const clue of INVESTIGATION_CLUES) {
             if(!peteWorldRun.collectedClues.includes(clue.id) && isNearClue(clue, playerPos.x, playerPos.z)) {
                 peteWorldRun.collectedClues.push(clue.id);
-                activePrompt = `FOUND ${clue.name.toUpperCase()}`;
+                activePrompt = `FOUND ${clue.title.toUpperCase()}`;
             }
         }
 
@@ -196,16 +202,10 @@ export const peteWorldMode = {
 
         // 6. Boss arena encounter trigger
         if(peteWorldRun.gateBreached && playerPos.z >= STRONGHOLD_GATE_Z && !peteWorldRun.bossSpawned) {
-            peteWorldRun.bossSpawned = true;
             if(ctx?.spawn) {
-                ctx.spawn('boss', 0, 100);
+                ctx.spawn('boss', { x: 0, z: 100 });
+                peteWorldRun.bossSpawned = true;
             }
-        }
-
-        // 7. Update boss if engaged
-        if(peteWorldRun.bossSpawned && peteWorldRun.bossState && !peteWorldRun.bossState.defeated) {
-            const bossPos = { x: 0, z: 100 };
-            updateBossPete(peteWorldRun.bossState, bossPos, playerPos, dt);
         }
 
         peteWorldRun.prompt = activePrompt;
@@ -218,16 +218,21 @@ export const peteWorldMode = {
     },
 
     afterOutlawDown: (ctx, storage = globalThis.localStorage) => {
+        if(!peteWorldRun.active || !peteWorldRun.bossSpawned || gameState.isGameOver) return;
+        // Settle through the shared bounty contract so progress, earnings and result text agree.
+        offerBounty(gameState.bounty, gameState.heat.level, getOutlaw(0).bounty);
+        gameState.score = bankBounty(gameState.bounty, gameState.score);
+        ctx.finishRun('banked');
         if(peteScene) {
             peteScene.group?.parent?.remove(peteScene.group);
             peteScene.dispose?.();
             peteScene = null;
         }
         endPeteWorldRun(true, storage);
-        ctx?.finishRun?.('outlaw-defeated');
     },
 
     reset: (storage = globalThis.localStorage) => {
+        if(typeof document !== 'undefined') document.getElementById('comic-intro-modal')?.remove();
         if(peteScene) {
             peteScene.group?.parent?.remove(peteScene.group);
             peteScene.dispose?.();
