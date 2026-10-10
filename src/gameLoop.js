@@ -77,7 +77,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
     };
 
     // What a run mode (src/modes/registry.js) may use of this loop. Function declarations below are hoisted, so this can sit up here.
-    const modeCtx = { scene, camera, playerSystem, ui, cameraOffset, spawn, finishRun, beginWave, updateWaveFlow, openBountyChoice, ask, economy };
+    const modeCtx = { scene, camera, playerSystem, ui, cameraOffset, spawn, finishRun, beginWave, updateWaveFlow, openBountyChoice, ask, economy, clearSceneCollections };
 
     // Spawn and record first sightings for the Bounty Book (with a NEW ENEMY card in play).
     function spawn(type, at = null) { // `at`: a place to put it (the mine fills each chamber with its own), else the mode's usual way
@@ -562,6 +562,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
             return;
         }
         if(!gameState.isGameStarted) {
+            gameState.outlawIndex = gameState.pendingEvent?.outlaw ?? progress.selected;
             // The desert behind the start screen wears the look of the outlaw the player is about to face.
             const mode = activeMode();
             setAtmosphere(scene, mode.atmosphereId(mode.previewOutlaw(progress)));
@@ -579,7 +580,6 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
                 track('run_start');
                 gameState.isGameStarted = true;
                 // A Most Wanted event run (picked in Frontier Town) fights that week's outlaw with its twist.
-                const mode = activeMode();
                 const event = mode.usesEvent ? gameState.pendingEvent : null;
                 gameState.pendingEvent = null;
                 gameState.event = event || null;
