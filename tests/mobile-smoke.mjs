@@ -14,6 +14,9 @@ try {
     browser = await chromium.launch({ executablePath: findChrome(), headless: true, args: ['--enable-webgl', '--use-gl=angle', '--use-angle=swiftshader', '--no-proxy-server'] });
     const context = await browser.newContext({ viewport: { width: 844, height: 390 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     await context.addInitScript(answeredPrivacy);
+    // This suite verifies legacy arena touch controls. The first outlaw now defaults
+    // to a separate open-world mode, which has no guaranteed initial enemy.
+    await context.addInitScript(() => { window.__rwSmokeTest = true; });
     const page = await context.newPage();
     page.setDefaultTimeout(15000);
     const errors = [];
@@ -163,6 +166,7 @@ try {
     await context.close();
     const upright = await browser.newContext({ viewport: { width: 390, height: 844 }, hasTouch: true, isMobile: true, deviceScaleFactor: 2 });
     await upright.addInitScript(answeredPrivacy);
+    await upright.addInitScript(() => { window.__rwSmokeTest = true; });
     const tall = await upright.newPage();
     tall.setDefaultTimeout(15000);
     const tallErrors = [];
