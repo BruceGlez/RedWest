@@ -206,7 +206,7 @@ function createCampfireMesh(id, x, z) {
     };
 }
 
-// Builds one loot crate (wooden chest with hinged lid)
+// Builds one loot crate (wooden chest with hinged lid + dynamic splinter burst & loot pop)
 function createCrateMesh(id, x, z) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
@@ -230,14 +230,342 @@ function createCrateMesh(id, x, z) {
     lidGroup.add(lidMesh);
     group.add(lidGroup);
 
+    // Dynamic Splinter Shards Group (Mini Ninjas tactile splinters)
+    const splintersGroup = new THREE.Group();
+    splintersGroup.position.set(0, 0.6, 0);
+    group.add(splintersGroup);
+
+    const splinterShards = [];
+    const splinterCount = 8;
+    for(let i = 0; i < splinterCount; i++) {
+        const isIron = (i >= 6);
+        const geom = isIron 
+            ? box(0.12, 0.35, 0.08, COLORS.iron)
+            : box(0.2, 0.45, 0.1, (i % 2 === 0 ? COLORS.wood : COLORS.woodDark));
+        const mesh = new THREE.Mesh(geom, sharedVertexMaterial());
+        mesh.visible = false;
+        splintersGroup.add(mesh);
+        splinterShards.push({
+            mesh,
+            pos: new THREE.Vector3(0, 0, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            rotVel: new THREE.Vector3(0, 0, 0),
+            active: false
+        });
+    }
+
+    // Cartoon Dust Puffs Group
+    const dustPuffs = [];
+    const dustCount = 4;
+    for(let i = 0; i < dustCount; i++) {
+        const puffGeom = new THREE.DodecahedronGeometry(0.35, 0);
+        const puffMat = new THREE.MeshBasicMaterial({
+            color: COLORS.smoke,
+            transparent: true,
+            opacity: 0.45,
+            depthWrite: false
+        });
+        const puffMesh = new THREE.Mesh(puffGeom, puffMat);
+        puffMesh.visible = false;
+        group.add(puffMesh);
+        dustPuffs.push({
+            mesh: puffMesh,
+            pos: new THREE.Vector3(0, 0, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            age: 0
+        });
+    }
+
+    // Pop-up Loot Reward Icon (spinning brass bullet / golden coin)
+    const lootIconGroup = new THREE.Group();
+    lootIconGroup.position.set(0, 0.6, 0);
+    lootIconGroup.visible = false;
+    const coinGeom = cylinder(0.26, 0.26, 0.08, 8, COLORS.goldKey, 0, 0, 0, Math.PI / 2, 0, 0);
+    const bulletGeom = cylinder(0.1, 0.1, 0.32, 6, COLORS.lanternBrass, 0, 0.2, 0);
+    const lootMesh = new THREE.Mesh(mergeGeometries([coinGeom, bulletGeom], false), sharedVertexMaterial());
+    lootIconGroup.add(lootMesh);
+
+    const haloGeom = new THREE.PlaneGeometry(1.6, 1.6);
+    const haloMesh = new THREE.Mesh(haloGeom, glowMaterial(COLORS.goldKey));
+    lootIconGroup.add(haloMesh);
+    group.add(lootIconGroup);
+
+    let lastTime = 0;
+
     return {
         id,
         group,
         lidGroup,
+        splinterShards,
+        dustPuffs,
+        lootIconGroup,
         opened: false,
+        shattered: false,
+        shatterAge: 0,
+
         setOpened(isOpened) {
-            this.opened = !!isOpened;
-            this.lidGroup.rotation.x = this.opened ? -Math.PI * 0.45 : 0;
+            const willOpen = !!isOpened;
+            if(willOpen && !this.opened) {
+                this.opened = true;
+                this.lidGroup.rotation.x = -Math.PI * 0.45;
+                this.triggerSplinterBurst();
+            } else if(!willOpen && this.opened) {
+                this.opened = false;
+                this.lidGroup.rotation.x = 0;
+            }
+        },
+
+        triggerSplinterBurst() {
+            this.shattered = true;
+            this.shatterAge = 0;
+            if(typeof window !== 'undefined') {
+                import('./audio.js').then(m => {
+                    m.playSound?.('break');
+                    m.playSound?.('coin');
+                }).catch(() => {});
+            }
+
+            for(let i = 0; i < splinterShards.length; i++) {
+                const s = splinterShards[i];
+                s.active = true;
+                s.mesh.visible = true;
+                s.pos.set((Math.random() - 0.5) * 0.6, 0.2 + Math.random() * 0.4, (Math.random() - 0.5) * 0.6);
+                s.mesh.position.copy(s.pos);
+                s.vel.set((Math.random() - 0.5) * 5.5, 3.5 + Math.random() * 3.5, (Math.random() - 0.5) * 5.5);
+                s.rotVel.set((Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12, (Math.random() - 0.5) * 12);
+            }
+
+            for(let i = 0; i < dustPuffs.length; i++) {
+                const p = dustPuffs[i];
+                p.mesh.visible = true;
+                p.age = 0;
+                p.mesh.position.set(0, 0.4, 0);
+                p.mesh.scale.set(0.3, 0.3, 0.3);
+                p.mesh.material.opacity = 0.45;
+                const angle = (i / dustPuffs.length) * Math.PI * 2;
+                p.vel.set(Math.cos(angle) * 1.6, 0.8, Math.sin(angle) * 1.6);
+            }
+
+            lootIconGroup.visible = true;
+            lootIconGroup.position.set(0, 0.6, 0);
+            lootIconGroup.scale.set(0.8, 0.8, 0.8);
+        },
+
+        update(time) {
+            const dt = lastTime > 0 ? Math.min(time - lastTime, 0.1) : 0.016;
+            lastTime = time;
+
+            if(!this.shattered) return;
+            this.shatterAge += dt;
+
+            for(const s of splinterShards) {
+                if(!s.active) continue;
+                s.vel.y -= 14 * dt;
+                s.pos.x += s.vel.x * dt;
+                s.pos.y += s.vel.y * dt;
+                s.pos.z += s.vel.z * dt;
+
+                if(s.pos.y <= -0.55) {
+                    s.pos.y = -0.55;
+                    s.vel.y = -s.vel.y * 0.35;
+                    s.vel.x *= 0.6;
+                    s.vel.z *= 0.6;
+                    if(Math.abs(s.vel.y) < 0.2) s.vel.set(0, 0, 0);
+                }
+
+                s.mesh.position.copy(s.pos);
+                s.mesh.rotation.x += s.rotVel.x * dt;
+                s.mesh.rotation.y += s.rotVel.y * dt;
+                s.mesh.rotation.z += s.rotVel.z * dt;
+            }
+
+            for(const p of dustPuffs) {
+                if(p.age > 0.8) {
+                    p.mesh.visible = false;
+                    continue;
+                }
+                p.age += dt;
+                p.mesh.position.addScaledVector(p.vel, dt);
+                const progress = p.age / 0.8;
+                const scale = 0.3 + progress * 1.6;
+                p.mesh.scale.set(scale, scale, scale);
+                p.mesh.material.opacity = (1 - progress) * 0.45;
+            }
+
+            if(this.shatterAge < 1.4) {
+                const arc = Math.min(this.shatterAge / 0.7, 1.0);
+                lootIconGroup.position.y = 0.6 + Math.sin(arc * Math.PI * 0.5) * 2.2;
+                lootIconGroup.rotation.y += dt * 8;
+                if(this.shatterAge > 0.9) {
+                    const fade = (1.4 - this.shatterAge) / 0.5;
+                    lootIconGroup.scale.setScalar(Math.max(fade * 0.8, 0.01));
+                }
+            } else {
+                lootIconGroup.visible = false;
+            }
+        }
+    };
+}
+
+// Smashable clay pottery scattered across canyon camps
+export const WORLD_POTS = [
+    { id: 'pot-a1', x: -3.5, z: -34 },
+    { id: 'pot-a2', x: 4.2, z: -30 },
+    { id: 'pot-b1', x: -4.0, z: -2 },
+    { id: 'pot-b2', x: 3.8, z: 4 },
+    { id: 'pot-c1', x: -3.6, z: 36 },
+    { id: 'pot-c2', x: 4.5, z: 40 }
+];
+
+function createSmashablePotMesh(id, x, z) {
+    const group = new THREE.Group();
+    group.position.set(x, 0, z);
+    group.name = `smashable-pot-${id}`;
+
+    // Terracotta ceramic jar
+    const potParts = [
+        cylinder(0.38, 0.44, 0.65, 8, COLORS.cliffRim, 0, 0.32, 0),
+        cylinder(0.24, 0.38, 0.25, 8, COLORS.cliffBase, 0, 0.72, 0),
+        cylinder(0.28, 0.26, 0.12, 8, COLORS.cliffDark, 0, 0.88, 0),
+        cylinder(0.18, 0.2, 0.12, 7, COLORS.wood, 0, 0.98, 0)
+    ];
+    const potMesh = new THREE.Mesh(mergeGeometries(potParts, false), sharedVertexMaterial());
+    group.add(potMesh);
+
+    // 6 Ceramic Pottery Shards
+    const potShards = [];
+    for(let i = 0; i < 6; i++) {
+        const shardGeom = box(0.18, 0.25, 0.08, (i % 2 === 0 ? COLORS.cliffRim : COLORS.cliffDark));
+        const sMesh = new THREE.Mesh(shardGeom, sharedVertexMaterial());
+        sMesh.visible = false;
+        group.add(sMesh);
+        potShards.push({
+            mesh: sMesh,
+            pos: new THREE.Vector3(0, 0, 0),
+            vel: new THREE.Vector3(0, 0, 0),
+            rotVel: new THREE.Vector3(0, 0, 0),
+            active: false
+        });
+    }
+
+    // Clay Dust Puffs
+    const dustPuffs = [];
+    for(let i = 0; i < 3; i++) {
+        const puffGeom = new THREE.DodecahedronGeometry(0.28, 0);
+        const puffMat = new THREE.MeshBasicMaterial({
+            color: COLORS.smoke,
+            transparent: true,
+            opacity: 0.45,
+            depthWrite: false
+        });
+        const pMesh = new THREE.Mesh(puffGeom, puffMat);
+        pMesh.visible = false;
+        group.add(pMesh);
+        dustPuffs.push({ mesh: pMesh, vel: new THREE.Vector3(0, 0, 0), age: 0 });
+    }
+
+    // Mini Loot Coin
+    const coinGeom = cylinder(0.2, 0.2, 0.06, 8, COLORS.goldKey, 0, 0, 0, Math.PI / 2, 0, 0);
+    const coinMesh = new THREE.Mesh(coinGeom, sharedVertexMaterial());
+    coinMesh.visible = false;
+    group.add(coinMesh);
+
+    let lastTime = 0;
+
+    return {
+        id,
+        group,
+        potMesh,
+        shards: potShards,
+        dustPuffs,
+        coinMesh,
+        smashed: false,
+        shatterAge: 0,
+
+        shatter() {
+            if(this.smashed) return;
+            this.smashed = true;
+            this.shatterAge = 0;
+            this.potMesh.visible = false;
+
+            if(typeof window !== 'undefined') {
+                import('./audio.js').then(m => {
+                    m.playSound?.('break');
+                    m.playSound?.('coin');
+                }).catch(() => {});
+            }
+
+            for(let i = 0; i < potShards.length; i++) {
+                const s = potShards[i];
+                s.active = true;
+                s.mesh.visible = true;
+                s.pos.set(0, 0.4, 0);
+                s.mesh.position.copy(s.pos);
+                s.vel.set((Math.random() - 0.5) * 5.0, 3.0 + Math.random() * 3.0, (Math.random() - 0.5) * 5.0);
+                s.rotVel.set((Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14, (Math.random() - 0.5) * 14);
+            }
+
+            for(let i = 0; i < dustPuffs.length; i++) {
+                const p = dustPuffs[i];
+                p.mesh.visible = true;
+                p.age = 0;
+                p.mesh.position.set(0, 0.4, 0);
+                p.mesh.scale.set(0.3, 0.3, 0.3);
+                const angle = (i / dustPuffs.length) * Math.PI * 2;
+                p.vel.set(Math.cos(angle) * 1.5, 0.6, Math.sin(angle) * 1.5);
+            }
+
+            coinMesh.visible = true;
+            coinMesh.position.set(0, 0.4, 0);
+        },
+
+        update(time) {
+            const dt = lastTime > 0 ? Math.min(time - lastTime, 0.1) : 0.016;
+            lastTime = time;
+
+            if(!this.smashed) return;
+            this.shatterAge += dt;
+
+            for(const s of potShards) {
+                if(!s.active) continue;
+                s.vel.y -= 14 * dt;
+                s.pos.addScaledVector(s.vel, dt);
+                if(s.pos.y <= 0) {
+                    s.pos.y = 0;
+                    s.vel.y = -s.vel.y * 0.3;
+                    s.vel.x *= 0.6;
+                    s.vel.z *= 0.6;
+                }
+                s.mesh.position.copy(s.pos);
+                s.mesh.rotation.x += s.rotVel.x * dt;
+                s.mesh.rotation.y += s.rotVel.y * dt;
+                s.mesh.rotation.z += s.rotVel.z * dt;
+            }
+
+            for(const p of dustPuffs) {
+                if(p.age > 0.7) {
+                    p.mesh.visible = false;
+                    continue;
+                }
+                p.age += dt;
+                p.mesh.position.addScaledVector(p.vel, dt);
+                const progress = p.age / 0.7;
+                const scale = 0.3 + progress * 1.4;
+                p.mesh.scale.set(scale, scale, scale);
+                p.mesh.material.opacity = (1 - progress) * 0.45;
+            }
+
+            if(this.shatterAge < 1.2) {
+                const arc = Math.min(this.shatterAge / 0.6, 1.0);
+                coinMesh.position.y = 0.4 + Math.sin(arc * Math.PI * 0.5) * 1.8;
+                coinMesh.rotation.y += dt * 8;
+                if(this.shatterAge > 0.8) {
+                    const fade = (1.2 - this.shatterAge) / 0.4;
+                    coinMesh.scale.setScalar(Math.max(fade, 0.01));
+                }
+            } else {
+                coinMesh.visible = false;
+            }
         }
     };
 }
@@ -540,10 +868,18 @@ export function createPeteWorldScene() {
     const environment = createCanyonEnvironment();
     group.add(environment.group);
 
+    // 6. Build smashable clay pots (Mini Ninjas breakable pottery)
+    const potMeshes = WORLD_POTS.map(p => {
+        const item = createSmashablePotMesh(p.id, p.x, p.z);
+        group.add(item.group);
+        return item;
+    });
+
     return {
         group,
         campfires: campfireMeshes,
         crates: crateMeshes,
+        pots: potMeshes,
         clues: clueMeshes,
         gate: landmarks,
         environment,
@@ -562,14 +898,20 @@ export function createPeteWorldScene() {
                 }
             }
 
-            // Sync crates
+            // Sync crates and animate splinter burst
             if(Array.isArray(runState.crates)) {
                 for(const crateMesh of crateMeshes) {
                     const data = runState.crates.find(c => c.id === crateMesh.id);
                     if(data && data.opened !== crateMesh.opened) {
                         crateMesh.setOpened(data.opened);
                     }
+                    crateMesh.update(timeInSeconds);
                 }
+            }
+
+            // Animate smashable pots
+            for(const pot of potMeshes) {
+                pot.update(timeInSeconds);
             }
 
             // Sync clues

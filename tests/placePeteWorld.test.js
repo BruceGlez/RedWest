@@ -100,3 +100,47 @@ test('scene instantiates canyon cliffs, flora environment, smoke puffs, and swin
     const updatedRot = scene.gate.lanterns[0].group.rotation.z;
     assert.notEqual(initialRot, updatedRot);
 });
+
+test('crate opening triggers tactile splinter burst, cartoon dust, and pop-up loot icon', () => {
+    const scene = createPeteWorldScene();
+    const crate = scene.crates[0];
+    assert.equal(crate.shattered, false);
+    assert.equal(crate.lootIconGroup.visible, false);
+
+    // Open crate
+    crate.setOpened(true);
+    assert.equal(crate.opened, true);
+    assert.equal(crate.shattered, true);
+    assert.ok(crate.splinterShards.length >= 8);
+    assert.equal(crate.splinterShards[0].mesh.visible, true);
+    assert.equal(crate.dustPuffs[0].mesh.visible, true);
+    assert.equal(crate.lootIconGroup.visible, true);
+
+    // Advance time to verify physics animation
+    crate.update(0.1);
+    assert.ok(crate.splinterShards[0].pos.y !== 0);
+    assert.ok(crate.lootIconGroup.position.y > 0.6);
+});
+
+test('scene instantiates smashable clay pots that shatter into shards and pop coins', () => {
+    const scene = createPeteWorldScene();
+    assert.ok(scene.pots.length > 0);
+    const pot = scene.pots[0];
+    assert.equal(pot.smashed, false);
+    assert.equal(pot.potMesh.visible, true);
+    assert.equal(pot.coinMesh.visible, false);
+
+    // Shatter the pot
+    pot.shatter();
+    assert.equal(pot.smashed, true);
+    assert.equal(pot.potMesh.visible, false);
+    assert.equal(pot.shards[0].mesh.visible, true);
+    assert.equal(pot.dustPuffs[0].mesh.visible, true);
+    assert.equal(pot.coinMesh.visible, true);
+
+    // Advance physics
+    pot.update(0.1);
+    assert.ok(pot.shards[0].pos.y !== 0);
+    assert.ok(pot.coinMesh.position.y > 0.4);
+});
+
