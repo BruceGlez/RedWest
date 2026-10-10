@@ -70,3 +70,33 @@ test('scene dispose runs safely without errors', () => {
     const scene = createPeteWorldScene();
     assert.doesNotThrow(() => scene.dispose());
 });
+
+test('scene instantiates canyon cliffs, flora environment, smoke puffs, and swinging lanterns', () => {
+    const scene = createPeteWorldScene();
+    assert.ok(scene.environment);
+    assert.ok(scene.environment.cliffsMesh);
+    assert.ok(scene.environment.floraMesh);
+
+    // Check campfire smoke puffs
+    const fireMesh = scene.campfires[0];
+    assert.ok(fireMesh.smokePuffs.length > 0);
+    assert.equal(fireMesh.smokePuffs[0].mesh.visible, false);
+
+    // Lit campfire updates smoke puffs
+    scene.update({
+        campfires: [{ id: fireMesh.id, active: true }],
+        crates: [],
+        collectedClues: [],
+        gateBreached: false
+    }, 1.5);
+
+    assert.equal(fireMesh.smokePuffs[0].mesh.visible, true);
+    assert.ok(fireMesh.smokePuffs[0].mesh.position.y > 0.5);
+
+    // Check swinging lanterns
+    assert.ok(scene.gate.lanterns.length > 0);
+    const initialRot = scene.gate.lanterns[0].group.rotation.z;
+    scene.update({ campfires: [], crates: [], collectedClues: [], gateBreached: false }, 3.5);
+    const updatedRot = scene.gate.lanterns[0].group.rotation.z;
+    assert.notEqual(initialRot, updatedRot);
+});

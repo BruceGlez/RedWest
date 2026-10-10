@@ -69,4 +69,6 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 
 ## Open-World Bounty Pursuit (Dusty Pete MVP)
 - `src/placePeteWorld.js`: 3D landmark builder for Copper Bit canyon (campfires with glow, supply crates with animated lids, 3 investigation clue props, canyon mine arches and rail spur, stronghold barricade gate).
+- Stylized canyon atmosphere and environment: warm golden canyon sunset (`src/atmosphere.js`), stepped terracotta rock bluffs and natural rock arches, blooming saguaro flora, swinging mine arch brass lanterns, and cartoon puffy campfire smoke with ember motes (`src/placePeteWorld.js`).
+
 
