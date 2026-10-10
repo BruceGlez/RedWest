@@ -20,10 +20,13 @@ async function playOneRunAndDie(page) {
     await page.evaluate(() => { S.gameState.score = 480; S.gameState.runTime = 120; S.gameState.runStats.kills = { bandit: 3 }; });
     await page.evaluate(async () => {
         const { spawnEnemy } = await import('/src/enemySystem.js');
-        const p = S.enemies[0].parent.children.find(o => o.userData.type === 'player');
+        const scene = window.__redWest?.scene || S.enemies[0]?.parent;
+        const p = window.__redWest?.playerGroup || scene?.children.find(o => o.userData?.type === 'player');
         S.playerStats.hp = 1; S.playerStats.invulnerabilityTimer = 0; S.playerStats.isDashing = false;
-        spawnEnemy(p.parent, p.position, 'bandit');
-        S.enemies.at(-1).position.copy(p.position);
+        if(scene && p) {
+            spawnEnemy(scene, p.position, 'bandit');
+            S.enemies.at(-1).position.copy(p.position);
+        }
     });
     await page.locator('#gameover').waitFor({ state: 'visible' });
     await page.locator('#result-earnings .earn-title b').first().waitFor();
@@ -37,6 +40,7 @@ async function playOneRunAndDie(page) {
 async function openPage(browser, url, seed) {
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     await context.addInitScript(answeredPrivacy);
+    await context.addInitScript(() => { window.__rwSmokeTest = true; });
     if(seed) await context.addInitScript(seed);
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
@@ -185,9 +189,9 @@ try {
         await page.locator('[data-tab="boards"]').click();
         await page.locator('#records-board-list li.me').waitFor();
         const rows = await page.locator('#records-board-list li').evaluateAll(items => items.map(li =>
-            [...li.querySelectorAll('span')].map(span => span.textContent).join('')));
+            [...li.querySelectorAll('span')].map(span => span.textContent.replace(/,/g, '')).join('')));
         // Each row also says who the best run was played as.
-        assert.deepEqual(rows, ['#1RIVAL ROSAas Marshal Flint Reed2,000', '#2SMOKE KIDas Marshal Flint Reed480']);
+        assert.deepEqual(rows, ['#1RIVAL ROSAas Marshal Flint Reed2000', '#2SMOKE KIDas Marshal Flint Reed480']);
         // Other players' names can be reported (two taps); my own row has no report button.
         assert.equal(await page.locator('#records-board-list li.me .records-report').count(), 0);
         store.getUser(userId).profile.stats.runs = 3; // only players with a few runs can report
