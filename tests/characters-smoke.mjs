@@ -17,6 +17,7 @@ try {
     });
     const context = await browser.newContext({ viewport: { width: 1280, height: 720 } });
     await context.addInitScript(answeredPrivacy);
+    await context.addInitScript(() => { window.__rwSmokeTest = true; });
     // Iron Jack (stage 5) and Silas Vane (stage 7) three-starred; Rosa (stage 2) only beaten.
     await context.addInitScript(() => localStorage.setItem('redWestProgress.v1', JSON.stringify({ selected: 0, stars: [1, 1, 1, 1, 7, 1, 7, 0], best: [0, 0, 0, 0, 0, 0, 0, 0] })));
     const page = await context.newPage();
