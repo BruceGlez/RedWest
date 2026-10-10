@@ -15,6 +15,13 @@ import {
     endPeteWorldRun,
     peteWorldMode
 } from '../src/modes/peteWorld.js';
+import { gameState, playerStats, resetGameState, resetPlayerStats } from '../src/state.js';
+import { activeMode, registerMode, clearModes } from '../src/modes/registry.js';
+import { arenaMode } from '../src/modes/arena.js';
+import { arena } from '../src/arena.js';
+import { mine } from '../src/mine.js';
+import { createProgress, recordRun, STAR_DEFEATED } from '../src/progress.js';
+import { loadCheckpoint } from '../src/checkpoints.js';
 
 function createMockStorage() {
     const store = new Map();
@@ -114,6 +121,105 @@ test('peteWorldMode formats interactive HUD prompt and manages scene lifecycle',
 
     peteWorldMode.reset(storage);
     assert.equal(peteWorldRun.active, false);
+});
+
+test('Pete mode respects arena, mine, events and the selected outlaw, and stays active during its run', () => {
+    const storage = createMockStorage();
+    resetGameState();
+    peteWorldMode.reset(storage);
+    registerMode(arenaMode);
+    registerMode({ id: 'mine', isActive: () => mine.enabled });
+    registerMode(peteWorldMode);
+    assert.equal(activeMode().id, 'pete-world');
+    arena.enabled = true;
+    assert.equal(activeMode().id, 'arena');
+    arena.enabled = false;
+    mine.enabled = true;
+    assert.equal(activeMode().id, 'mine');
+    mine.enabled = false;
+    gameState.pendingEvent = { outlaw: 0 };
+    assert.equal(activeMode().id, 'road');
+    gameState.pendingEvent = null;
+    gameState.outlawIndex = 1;
+    assert.equal(activeMode().id, 'road');
+    startPeteWorldRun({}, storage);
+    gameState.isGameStarted = true;
+    assert.equal(activeMode().id, 'pete-world');
+    assert.equal(peteWorldMode.runOutlaw(), 0);
+    peteWorldMode.reset(storage);
+    resetGameState();
+    clearModes();
+});
+
+test('actual clue pickups unlock one correctly positioned boss and settlement awards progress once', () => {
+    const storage = createMockStorage();
+    resetGameState();
+    startPeteWorldRun({}, storage);
+    const position = { x: 0, z: 100 };
+    const calls = [];
+    const progress = createProgress();
+    const ctx = {
+        playerSystem: { playerGroup: { position } },
+        spawn: (...args) => calls.push(args),
+        finishRun: result => {
+            calls.push(['finish', result]);
+            gameState.isGameOver = true;
+            recordRun(progress, 0, gameState.bounty, gameState.score);
+        }
+    };
+    peteWorldMode.update(ctx, 0.1, storage);
+    assert.deepEqual(calls, [], 'entry without clues cannot spawn the boss');
+    for(const clue of INVESTIGATION_CLUES) {
+        Object.assign(position, clue);
+        peteWorldMode.update(ctx, 0.1, storage);
+    }
+    assert.equal(peteWorldRun.collectedClues.length, 3);
+    assert.equal(peteWorldRun.gateBreached, true);
+    assert.ok(peteWorldRun.prompt.includes('STRONGHOLD UNLOCKED'));
+    Object.assign(position, { x: 0, z: 74 });
+    peteWorldMode.update(ctx, 0.1, storage);
+    peteWorldMode.update(ctx, 0.1, storage);
+    assert.deepEqual(calls, [['boss', { x: 0, z: 100 }]]);
+    storage.setItem('redWestCheckpoint.v1', '{}');
+    peteWorldMode.afterOutlawDown(ctx, storage);
+    const score = gameState.score;
+    peteWorldMode.afterOutlawDown(ctx, storage);
+    assert.deepEqual(calls.at(-1), ['finish', 'banked']);
+    assert.equal(calls.length, 2, 'duplicate defeat callback cannot settle twice');
+    assert.equal(gameState.bounty.status, 'banked');
+    assert.equal(gameState.score, score);
+    assert.equal(score, 50);
+    assert.ok(progress.stars[0] & STAR_DEFEATED);
+    assert.equal(progress.selected, 1);
+    assert.equal(storage.getItem('redWestCheckpoint.v1'), null);
+    assert.equal(peteWorldRun.active, false);
+    resetGameState();
+});
+
+test('campfire saves clues, HP, ammo and its own activation; failure preserves the retry state', () => {
+    const storage = createMockStorage();
+    resetPlayerStats();
+    startPeteWorldRun({}, storage);
+    peteWorldRun.collectedClues = ['clue-manifest'];
+    peteWorldRun.ammoState.current = 17;
+    playerStats.hp = 3;
+    const position = { x: -5, z: -20 };
+    peteWorldMode.update({ playerSystem: { playerGroup: { position } } }, 0.1, storage);
+    const saved = loadCheckpoint(storage);
+    assert.equal(saved.lastCheckpointId, 'camp-depot');
+    assert.equal(peteWorldRun.lastCheckpointId, 'camp-depot');
+    assert.ok(saved.activeCampfires.includes('camp-depot'));
+    assert.deepEqual(saved.stats, { hp: 3, ammo: 17 });
+    peteWorldMode.reset(storage);
+    resetPlayerStats();
+    startPeteWorldRun({}, storage);
+    assert.deepEqual(peteWorldRun.startPosition, position);
+    assert.equal(playerStats.hp, 3);
+    assert.equal(peteWorldRun.ammoState.current, 17);
+    assert.deepEqual(peteWorldRun.collectedClues, ['clue-manifest']);
+    assert.equal(peteWorldRun.campfires.find(f => f.id === 'camp-depot').active, true);
+    peteWorldMode.reset(storage);
+    resetPlayerStats();
 });
 
 

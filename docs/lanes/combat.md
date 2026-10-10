@@ -48,3 +48,11 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 - `npm test`
 - `npm run test:enemies`
 - `npm run test:bosses`
+
+## Dusty Pete finishable pursuit (2026-10-10)
+- The minimal canyon run uses the shared 22-HP charge-and-punch Pete. The standalone three-phase `bossPete.js` remains a future combat slice; the mode no longer ticks a second, disconnected HP state.
+- Arena, mine and weekly event runs retain their own modes. The shared loop resolves the menu selection before choosing a mode and lends `clearSceneCollections` so the canyon starts without random road obstacles.
+- Actual clue pickups unlock one boss at `{ x: 0, z: 100 }`. The shared defeat callback banks Pete's bounty once, records the defeat star/unlock, displays BOUNTY CLAIMED and clears the checkpoint.
+- Death preserves the last campfire's HP, ammo, clues, crate and fire state; RETURN TO TOWN followed by another pursuit resumes it. Victory/restart remove the canyon scene; reset also removes an unfinished comic.
+- Regression coverage: `tests/peteWorld.test.js` checks selection, pickups, spawn arguments, settlement and saved fire state. `tests/boss-smoke.mjs` adds a default-mode browser pursuit using real firing input, bullet damage, death/retry and victory/exit, without `__rwSmokeTest`.
+- Follow-up: physical canyon/gate collision, zone encounters, a paused comic and three-phase boss integration remain outside this milestone.
