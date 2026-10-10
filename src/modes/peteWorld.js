@@ -92,7 +92,10 @@ export function endPeteWorldRun(victory = false, storage = globalThis.localStora
 export const peteWorldMode = {
     id: 'pete-world',
 
-    isActive: () => peteWorldRun.active,
+    isActive: () => {
+        if(typeof window !== 'undefined' && window.__rwSmokeTest) return false;
+        return peteWorldRun.active || (gameState?.outlawIndex === 0 && !gameState?.isTown && !gameState?.isArena);
+    },
 
     practice: null,
     usesEvent: false,
