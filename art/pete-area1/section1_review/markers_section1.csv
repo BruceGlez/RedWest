@@ -1,0 +1,42 @@
+rw_id,rw_type,game_x,game_z,rw_radius,rw_note,object
+I03,breakable,-149.8,-194.0,1.8,"Clay pot cluster (3 pots, layout a1-pot-1). pot_whole / pot_shards.",marker_breakable_a1-pot-1
+I03b,breakable,-130.5,-208.0,1.2,Layout pot a1-pot-2.,marker_breakable_a1-pot-2
+I14_1,breakable,-115.3,-238.2,1.8,Breakable fence section: fence_whole / fence_broken.,marker_breakable_sr1
+I14_2,breakable,-92.2,-235.2,1.8,Breakable fence section: fence_whole / fence_broken.,marker_breakable_sr2
+I14_3,breakable,-73.5,-231.8,1.8,Breakable fence section: fence_whole / fence_broken.,marker_breakable_sr3
+I23,breakable,-78.8,-207.6,1.4,Barrel that splinters: barrel_whole / barrel_broken.,marker_breakable_I23
+I01,campfire,-173.2,-191.6,3.0,"Trailhead campfire, the first checkpoint (layout a1-trail). Keep 3 m clear.",marker_campfire_a1-trail
+X01,crossover,-143.9,-182.0,4.0,south berm opening at 45 m: plank ramp,marker_crossover_s01
+X02,crossover,-45.7,-169.3,4.0,south berm opening at 150 m: plank ramp (I19),marker_crossover_s02
+X03,crossover,29.7,-155.7,12.0,south berm opening at 225 m: open fight plaza,marker_crossover_s03
+X04,crossover,55.7,-153.1,3.0,south berm opening at 250 m: culvert (H09),marker_crossover_s04
+X05,crossover,138.4,-162.5,4.0,south berm opening at 335 m: creek ford,marker_crossover_s05
+X06,crossover,-87.8,-215.2,5.0,north berm opening at 100 m: gap in berm,marker_crossover_n06
+X07,crossover,-5.8,-199.1,11.0,north berm opening at 183 m: claims yard opening,marker_crossover_n07
+X08,crossover,44.0,-191.8,11.0,north berm opening at 235 m: ore-bin yard opening (I17 gate),marker_crossover_n08
+X09,crossover,102.2,-194.0,4.0,north berm opening at 300 m: cart shed track,marker_crossover_n09
+X10,crossover,182.4,-181.7,7.0,north berm opening at 368 m: Smuggler's Stash path,marker_crossover_n10
+X11,crossover,-116.9,-219.2,2.0,north berm opening at 72 m: foot path to shack 1,marker_crossover_n11
+X12,crossover,-98.0,-216.9,2.0,"north berm opening at 90 m: foot path to shack 2 (H03, I15)",marker_crossover_n12
+X13,crossover,-79.7,-213.8,2.0,north berm opening at 108 m: foot path to shack 3,marker_crossover_n13
+X14,crossover,-62.1,-210.6,2.0,north berm opening at 126 m: foot path to shack 4,marker_crossover_n14
+I15,door,-97.5,-227.0,2.2,Shack 2 door (opens inward): dim 5 x 4 m room with one loot crate. Door pivot at the hinge. Also a hiding place.,marker_door_I15
+a1-sleeper-1,guard,-171.2,-204.1,8.0,Layout guard anchor (a sleeper by the trail fire). Marker only; the game spawns the bandit.,marker_guard_sleeper-1
+H01,hide,-162.1,-212.1,2.8,Waist-high dry-grass patch (5 x 4 m) with a trampled dip. Hides a crouching marshal.,marker_hide_H01
+H02,hide,-151.5,-185.5,2.5,Tipped handcart against the south berm: a pocket behind it. Entrance on the road side.,marker_hide_H02
+H03,hide,-96.5,-226.4,2.6,Raised porch with an open lattice front and a dark crawlspace. Entrance on the road side.,marker_hide_H03
+H04,hide,-75.7,-180.1,2.6,"Barrel U-shape with a tarp roof, opening to the road.",marker_hide_H04
+H05,hide,-51.1,-219.9,3.2,Laundry-line maze: hanging grey sheets forming a cloth corridor.,marker_hide_H05
+I08,loot,-124.1,-209.8,1.5,Layout crate a1-crate-1 (ammo). crate_body / lid pivot at the back edge.,marker_loot_a1-crate-1
+I02,lore,-178.3,-209.4,2.5,"Trailhead notice board: nailed papers, pictograms only; the story banner can appear here.",marker_lore_I02
+I24,lore,-92.2,-188.8,1.5,A child's wooden pull toy left in the road (a story beat).,marker_lore_I24
+TH_GATE,lore,-193.0,-194.5,6.0,"Trailhead gate: pick-and-rail pictogram signboard, Company emblem, lantern. Section 1 starts here.",marker_lore_gate
+END,note,186.0,-105.5,12.0,Section 1 ends at 420 m; this rock plug closes the valley until Section 2 is built (remove it then).,marker_section_end_plug
+START,note,-219.6,-190.4,12.0,West rock plug behind the trailhead gate.,marker_section_start_plug
+SLOT_S1,slot,-115.8,-232.2,4.5,"Shack S1 goes here (S1-3), door faces the road",marker_slot_shack_S1
+SLOT_S2,slot,-96.0,-229.7,4.5,"Shack S2 goes here (S1-3), door faces the road",marker_slot_shack_S2
+SLOT_S3,slot,-77.5,-226.6,4.5,"Shack S3 goes here (S1-3), door faces the road",marker_slot_shack_S3
+SLOT_S4,slot,-59.8,-223.4,4.5,"Shack S4 goes here (S1-3), door faces the road",marker_slot_shack_S4
+SLOT_S5,slot,-102.5,-246.8,4.5,"Shack S5 goes here (S1-3), door faces the road",marker_slot_shack_S5
+SLOT_S6,slot,-65.6,-240.7,4.5,"Shack S6 goes here (S1-3), door faces the road",marker_slot_shack_S6
+START,start,-174.2,-197.5,3.0,Player start (layout).,marker_start_start

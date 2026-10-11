@@ -1039,7 +1039,7 @@ def build_decals():
         rr = rng.uniform(0.5, 1.4)
         pts = [(c0.x + rr * (1 + 0.3 * N1(k * 1.3, d, 0.2)) * math.cos(k * math.tau / 11) * 1.4, c0.y + rr * (1 + 0.3 * N1(k * 1.3, d, 0.7)) * math.sin(k * math.tau / 11)) for k in range(11)]
         add_poly(V, F, pts, 0.057)
-        COL.append(shade(mixc(PAL["cool_mid"], PAL["mud"], 0.4), 0.9))
+        COL.append(shade(mixc(mixc(PAL["cool_light"], PAL["sand_ground"], 0.35), PAL["mud"], 0.25), 0.92))
     out["decal_puddles_s1"] = (V, F, COL)
     # pebble scatter (small low prisms in clusters)
     V, F, COL = [], [], []
@@ -1095,3 +1095,1080 @@ def run_s1_2(render=False):
         render_to(gc, "s1-2_game_camera_d110", (1920, 1080))
         render_to(bpy.data.objects["ReviewTopCamera"], "s1-2_top_down", (1920, 1080))
     return stats
+
+# ================================================================ step S1-3: the Trailhead (0 to 60 m) and Shack Row (60 to 140 m)
+# A small procedural modeller (Bld) builds each kit piece once; the scene then places linked instances of it.
+# Local frame of every prop: +x along the road, +y north (away from the road), -y is the front, +z up.
+from mathutils import Matrix
+
+WOOD = hexc("#6e4a2c"); WOOD_D = hexc("#48301c"); IRON = hexc("#36383d"); BRASS = hexc("#d4a03e"); GLOW = hexc("#ffaa22")
+FLAME_B = hexc("#f56218"); FLAME_T = hexc("#ffcc33"); CAC = hexc("#3e8646"); CAC_H = hexc("#549e5c")
+CO_RED = hexc("#b33a2a"); CO_TEAL = hexc("#2f6f73"); FL_RED = hexc("#e63946"); FL_YEL = hexc("#ffcc00")
+CREAM = mixc(PAPER, PAL["scrub"], 0.35); GREY_WOOD = mixc(WOOD, PAL["stone"], 0.45); DARK_IN = hexc("#241812")
+LDIR = Vector((-0.8, -0.35))
+
+def _l3(A, B, t):
+    return (A[0] + (B[0] - A[0]) * t, A[1] + (B[1] - A[1]) * t, A[2] + (B[2] - A[2]) * t)
+
+class Bld:
+    def __init__(s, seed=1):
+        s.V, s.F, s.C = [], [], []
+        s.r = random.Random(seed)
+
+    def face(s, pts, col):
+        b = len(s.V)
+        s.V.extend([tuple(p) for p in pts])
+        s.F.append(tuple(range(b, b + len(pts))))
+        s.C.append(col)
+
+    def face_out(s, pts, col, out):
+        P = [Vector(p) for p in pts]
+        n = (P[1] - P[0]).cross(P[2] - P[1])
+        if n.dot(Vector(out)) < 0:
+            pts = list(reversed(pts))
+        s.face(pts, col)
+
+    def card(s, pts, col):
+        s.face(pts, col)
+        s.face(list(reversed(pts)), col)
+
+    def box(s, cx, cy, z0, w, d, h, col, rot=0.0, top=1.0, planks=0.0, shear=(0.0, 0.0), var=0.05):
+        ca, sa = math.cos(rot), math.sin(rot)
+        T = lambda x, y, z: (cx + x * ca - y * sa, cy + x * sa + y * ca, z)
+        hw, hd = w / 2, d / 2
+        bot = [(-hw, -hd), (hw, -hd), (hw, hd), (-hw, hd)]
+        P0 = [T(x, y, z0) for x, y in bot]
+        P1 = [T(x * top + shear[0] * h, y * top + shear[1] * h, z0 + h) for x, y in bot]
+        for k in range(4):
+            k1 = (k + 1) % 4
+            ex, ey = bot[k1][0] - bot[k][0], bot[k1][1] - bot[k][1]
+            ln = math.hypot(ex, ey)
+            nx, ny = ey / ln, -ex / ln
+            wx, wy = nx * ca - ny * sa, nx * sa + ny * ca
+            lit = 0.72 + 0.28 * max(0.0, min(1.0, (wx * LDIR.x + wy * LDIR.y) * 0.7 + 0.5))
+            segs = max(1, int(round(ln / planks))) if planks > 0 else 1
+            for q in range(segs):
+                t0, t1 = q / segs, (q + 1) / segs
+                a0, a1 = _l3(P0[k], P0[k1], t0), _l3(P0[k], P0[k1], t1)
+                b0, b1 = _l3(P1[k], P1[k1], t0), _l3(P1[k], P1[k1], t1)
+                s.face((a0, a1, b1, b0), shade(col, lit * (1 + s.r.uniform(-var, var) * (1.8 if planks > 0 else 1))))
+        s.face(P1, shade(col, 1.06 * (1 + s.r.uniform(-var, var))))
+
+    def _frame(s, a, b):
+        ax = (Vector(b) - Vector(a)).normalized()
+        ref = Vector((0, 0, 1)) if abs(ax.z) < 0.95 else Vector((1, 0, 0))
+        e1 = ax.cross(ref).normalized()
+        e2 = ax.cross(e1)
+        return ax, e1, e2
+
+    def beam(s, a, b, w, d, col, caps=True):
+        a, b = Vector(a), Vector(b)
+        ax, e1, e2 = s._frame(a, b)
+        ring = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+        A = [a + e1 * (x * w / 2) + e2 * (y * d / 2) for x, y in ring]
+        B = [b + e1 * (x * w / 2) + e2 * (y * d / 2) for x, y in ring]
+        for k in range(4):
+            k1 = (k + 1) % 4
+            nrm = (A[k1] - A[k]).cross(B[k] - A[k]).normalized()
+            lit = 0.72 + 0.28 * max(0.0, min(1.0, (nrm.x * LDIR.x + nrm.y * LDIR.y) * 0.7 + 0.5))
+            s.face((A[k], A[k1], B[k1], B[k]), shade(col, lit * (1 + s.r.uniform(-0.05, 0.05))))
+        if caps:
+            s.face(B, shade(col, 1.0))
+            s.face(list(reversed(A)), shade(col, 0.8))
+
+    def tube(s, a, b, r0, r1, n, col, caps=(True, True), sq=(1.0, 1.0), var=0.04):
+        a, b = Vector(a), Vector(b)
+        ax, e1, e2 = s._frame(a, b)
+        A, B = [], []
+        for k in range(n):
+            th = math.tau * k / n
+            v = e1 * (math.cos(th) * sq[0]) + e2 * (math.sin(th) * sq[1])
+            A.append(a + v * r0)
+            B.append(b + v * r1)
+        for k in range(n):
+            k1 = (k + 1) % n
+            nrm = (A[k1] - A[k]).cross(B[k] - A[k]).normalized()
+            lit = 0.72 + 0.28 * max(0.0, min(1.0, (nrm.x * LDIR.x + nrm.y * LDIR.y) * 0.7 + 0.5))
+            s.face((A[k], A[k1], B[k1], B[k]), shade(col, lit * (1 + s.r.uniform(-var, var))))
+        if caps[1]:
+            s.face(B, shade(col, 1.05))
+        if caps[0]:
+            s.face(list(reversed(A)), shade(col, 0.8))
+
+    def cyl(s, cx, cy, z0, r0, r1, h, n, col, rot=0.0, sq=(1.0, 1.0), caps=(False, True)):
+        s.tube((cx, cy, z0), (cx, cy, z0 + h), r0, r1, n, col, caps=caps, sq=sq)
+
+    def slab(s, p0, p1, p2, p3, thick, col, up=True, var=0.04):
+        P = [Vector(p) for p in (p0, p1, p2, p3)]
+        n = (P[1] - P[0]).cross(P[3] - P[0]).normalized()
+        if up and n.z < 0:
+            P = [P[0], P[3], P[2], P[1]]
+            n = -n
+        Q = [p - n * thick for p in P]
+        lit = 0.72 + 0.28 * max(0.0, min(1.0, (n.x * LDIR.x + n.y * LDIR.y) * 0.7 + 0.5))
+        s.face(P, shade(col, (0.78 + 0.3 * max(0.0, n.z)) * (1 + s.r.uniform(-var, var))))
+        s.face(list(reversed(Q)), shade(col, 0.55))
+        for k in range(4):
+            k1 = (k + 1) % 4
+            s.face((P[k], Q[k], Q[k1], P[k1]), shade(col, 0.7 * lit))
+
+    def rock(s, cx, cy, z0, r, h, col, n=7, sq=(1.0, 1.0), var=0.1):
+        base = len(s.V)
+        rings = [(z0, r), (z0 + h * 0.55, r * 0.92), (z0 + h, r * 0.55)]
+        jr = [1 + s.r.uniform(-0.2, 0.2) for _ in range(n)]
+        for (z, rr) in rings:
+            for k in range(n):
+                a = math.tau * k / n
+                s.V.append((cx + rr * jr[k] * math.cos(a) * sq[0], cy + rr * jr[k] * math.sin(a) * sq[1], z + s.r.uniform(-0.04, 0.04) * h))
+        for ri in range(2):
+            for k in range(n):
+                k1 = (k + 1) % n
+                f = (base + ri * n + k, base + ri * n + k1, base + (ri + 1) * n + k1, base + (ri + 1) * n + k)
+                s.F.append(f)
+                s.C.append(shade(col, (0.8 + 0.1 * ri + 0.18 * (k % 2)) * (1 + s.r.uniform(-var, var))))
+        s.F.append(tuple(base + 2 * n + k for k in range(n)))
+        s.C.append(shade(col, 1.05))
+
+    def apply(s, M, start=0):
+        for i in range(start, len(s.V)):
+            v = M @ Vector(s.V[i])
+            s.V[i] = (v.x, v.y, v.z)
+
+    def ground(s, start=0):
+        zmin = min(v[2] for v in s.V[start:])
+        for i in range(start, len(s.V)):
+            s.V[i] = (s.V[i][0], s.V[i][1], s.V[i][2] - zmin)
+
+    def tris(s):
+        return sum(len(f) - 2 for f in s.F)
+
+    def finish(s, name, collection=None, smooth=False, glow=False, hide=False):
+        me = bpy.data.meshes.new(name)
+        me.from_pydata(s.V, [], s.F)
+        me.update()
+        attr = me.color_attributes.new("Col", "FLOAT_COLOR", "CORNER")
+        flat = []
+        for p in me.polygons:
+            c = s.C[p.index]
+            for _ in p.loop_indices:
+                flat.extend(c)
+        attr.data.foreach_set("color", flat)
+        if smooth:
+            me.shade_smooth()
+        else:
+            try:
+                me.shade_flat()
+            except Exception:
+                pass
+        me.materials.append(get_glow_material() if glow else get_material())
+        ob = bpy.data.objects.new(name, me)
+        (collection or coll("50_props")).objects.link(ob)
+        ob["rw_gen"] = "s1_3"
+        if hide:
+            ob.hide_render = True
+            ob.hide_viewport = True
+        return ob
+
+def get_glow_material():
+    m = bpy.data.materials.get("M_cloth_glow")
+    if m is None:
+        m = bpy.data.materials.new("M_cloth_glow")
+    m.use_nodes = True
+    nt = m.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputMaterial")
+    em = nt.nodes.new("ShaderNodeEmission")
+    vc = nt.nodes.new("ShaderNodeVertexColor")
+    vc.layer_name = "Col"
+    nt.links.new(vc.outputs["Color"], em.inputs["Color"])
+    nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
+    em.inputs["Strength"].default_value = 2.5
+    return m
+
+# ---------------------------------------------------------------- the kit (each builder returns a template object)
+KITS = {}
+KIT_TRIS = {}
+
+def kit(name, b, **kw):
+    ob = b.finish("kit_" + name, coll("50_props"), hide=True, **kw)
+    KITS[name] = ob
+    KIT_TRIS[name] = b.tris()
+    return ob
+
+def build_kits():
+    KITS.clear(); KIT_TRIS.clear()
+    r = random.Random(3)
+    # --- crate (named nodes: crate_body and lid, the lid pivots at its back edge)
+    b = Bld(1)
+    b.box(0, 0, 0, 1.0, 1.0, 0.92, WOOD, planks=0.34)
+    for z in (0.14, 0.7):
+        b.box(0, 0, z, 1.04, 1.04, 0.07, IRON)
+    for x in (-0.4, 0.4):
+        b.box(x, 0, 0, 0.07, 1.04, 0.92, IRON)
+    kit("crate_body", b)
+    b = Bld(2)
+    b.box(0, -0.52, 0, 1.04, 1.04, 0.09, mixc(WOOD, WOOD_D, 0.25), planks=0.35)
+    b.box(0, -0.52, 0.09, 0.3, 0.3, 0.02, CO_RED)      # a made-up Company stamp, no text
+    kit("crate_lid", b)
+    # --- clay pot and its shards (named nodes pot_whole and pot_shards)
+    b = Bld(4)
+    prof = [(0.0, 0.26), (0.18, 0.40), (0.42, 0.46), (0.66, 0.38), (0.80, 0.27), (0.88, 0.31), (0.92, 0.27)]
+    clay = PAL["cliff_light"]
+    for i in range(len(prof) - 1):
+        (z0, r0), (z1, r1) = prof[i], prof[i + 1]
+        b.tube((0, 0, z0), (0, 0, z1), r0, r1, 9, mixc(clay, PAL["cliff_base"], 0.3 + 0.1 * (i % 3)), caps=(False, False))
+    b.face([(0.27 * math.cos(math.tau * k / 9), 0.27 * math.sin(math.tau * k / 9), 0.92) for k in range(9)], shade(PAL["cliff_dark"], 0.5))
+    kit("pot_whole", b, smooth=True)
+    b = Bld(5)
+    for k in range(6):
+        a = math.tau * k / 6 + r.uniform(-0.3, 0.3)
+        c = Vector((0.38 * math.cos(a), 0.38 * math.sin(a), 0.0))
+        pts = [(c.x + 0.16 * math.cos(a + t), c.y + 0.16 * math.sin(a + t), 0.0) for t in (0.2, 2.3, 4.4)]
+        b.slab(pts[0], pts[1], pts[2], pts[2], 0.03, clay) if False else b.face([(p[0], p[1], 0.06 + 0.04 * (k % 2)) for p in pts], shade(clay, 0.9 + 0.1 * (k % 2)))
+        b.face([(p[0], p[1], 0.0) for p in reversed(pts)], shade(PAL["cliff_dark"], 0.7))
+    kit("pot_shards", b)
+    # --- barrel (whole, broken)
+    b = Bld(6)
+    prof = [(0.0, 0.31), (0.28, 0.37), (0.55, 0.40), (0.82, 0.37), (1.0, 0.31)]
+    for i in range(4):
+        b.tube((0, 0, prof[i][0]), (0, 0, prof[i + 1][0]), prof[i][1], prof[i + 1][1], 10, mixc(WOOD, WOOD_D, 0.15 * (i % 2)), caps=(False, False))
+    b.face([(0.3 * math.cos(math.tau * k / 10), 0.3 * math.sin(math.tau * k / 10), 1.0) for k in range(10)], shade(WOOD_D, 1.0))
+    for z, rr in ((0.2, 0.355), (0.8, 0.375)):
+        b.tube((0, 0, z - 0.03), (0, 0, z + 0.03), rr + 0.01, rr + 0.01, 10, IRON, caps=(False, False))
+    kit("barrel_whole", b, smooth=True)
+    b = Bld(7)
+    for k in range(8):
+        a = math.tau * k / 8
+        ca, sa = math.cos(a), math.sin(a)
+        b.beam((0.18 * ca, 0.18 * sa, 0.03), (0.52 * ca, 0.52 * sa, 0.62 - 0.1 * (k % 3)), 0.17, 0.04, WOOD if k % 2 else WOOD_D)
+    b.tube((0, 0, 0.02), (0, 0, 0.06), 0.4, 0.4, 10, IRON, caps=(False, False))
+    kit("barrel_broken", b)
+    # --- small things
+    b = Bld(8)
+    b.cyl(0, 0, 0, 0.05, 0.06, 0.1, 6, IRON)
+    kit("tin_cup", b)
+    b = Bld(9)
+    b.tube((0, 0, 0.0), (0, 0, 0.16), 0.09, 0.07, 8, IRON)
+    b.tube((0.07, 0, 0.1), (0.2, 0, 0.17), 0.015, 0.012, 5, IRON)
+    b.tube((-0.09, 0, 0.12), (-0.15, 0, 0.06), 0.012, 0.012, 5, IRON)
+    kit("coffee_pot", b)
+    b = Bld(10)
+    b.tube((-0.5, 0, 0.17), (0.5, 0, 0.17), 0.17, 0.17, 8, mixc(CO_TEAL, CREAM, 0.3))
+    b.box(0, 0.0, 0.0, 1.0, 0.7, 0.03, mixc(CO_TEAL, CREAM, 0.1))
+    b.tube((-0.2, 0, 0.34), (0.2, 0, 0.34), 0.03, 0.03, 5, WOOD_D)
+    kit("bedroll", b)
+    b = Bld(11)
+    b.tube((-0.8, 0, 0.2), (0.8, 0, 0.2), 0.2, 0.19, 8, GREY_WOOD)
+    kit("log_seat", b)
+    # --- lantern: frame and glow are separate (named nodes lantern and glow)
+    b = Bld(12)
+    b.box(0, 0, 0, 0.3, 0.3, 0.05, BRASS)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            b.beam((sx * 0.12, sy * 0.12, 0.05), (sx * 0.12, sy * 0.12, 0.42), 0.03, 0.03, BRASS)
+    b.box(0, 0, 0.42, 0.34, 0.34, 0.05, BRASS, top=0.5)
+    b.tube((0, 0, 0.5), (0, 0, 0.62), 0.07, 0.01, 5, BRASS)
+    kit("lantern_frame", b)
+    b = Bld(13)
+    b.box(0, 0, 0.07, 0.2, 0.2, 0.33, GLOW)
+    kit("lantern_glow", b, glow=True)
+    # --- campfire: stones, logs, glow disc, flame (named nodes campfire_stones, campfire_logs, fire_glow, fire_flame)
+    b = Bld(14)
+    for k in range(13):
+        a = math.tau * k / 13
+        b.rock(0.78 * math.cos(a), 0.78 * math.sin(a), 0, r.uniform(0.17, 0.24), r.uniform(0.18, 0.3), PAL["stone"], n=6)
+    kit("campfire_stones", b)
+    b = Bld(15)
+    for k in range(4):
+        a = math.tau * k / 4 + 0.4
+        b.tube((0.5 * math.cos(a), 0.5 * math.sin(a), 0.1), (-0.05 * math.cos(a), -0.05 * math.sin(a), 0.32), 0.09, 0.08, 6, WOOD_D)
+    kit("campfire_logs", b)
+    b = Bld(16)
+    b.face([(0.62 * math.cos(math.tau * k / 12), 0.62 * math.sin(math.tau * k / 12), 0.03) for k in range(12)], shade(GLOW, 0.8))
+    kit("fire_glow", b, glow=True)
+    b = Bld(17)
+    for i, (rr, hh, c) in enumerate(((0.34, 0.55, FLAME_B), (0.24, 0.8, mixc(FLAME_B, FLAME_T, 0.5)), (0.14, 1.0, FLAME_T))):
+        b.tube((0, 0, 0.18), (0.04 * i, 0.03 * i, 0.18 + hh), rr, 0.01, 6, c, caps=(False, False))
+    kit("fire_flame", b, glow=True)
+    # --- plants
+    b = Bld(18)
+    for k in range(3):
+        a = k * math.pi / 3
+        ca, sa = math.cos(a), math.sin(a)
+        for sgn in (1, -1):
+            h = r.uniform(0.55, 0.85)
+            b.card([(-sgn * 0.07 * ca, -sgn * 0.07 * sa, 0), (sgn * 0.07 * ca, sgn * 0.07 * sa, 0), (sgn * 0.01 * ca + 0.05 * sa, sgn * 0.01 * sa, h), (-sgn * 0.01 * ca, -sgn * 0.01 * sa, h * 0.95)], shade(PAL["scrub"], r.uniform(0.85, 1.1)))
+    kit("tuft_dry", b)
+    b = Bld(19)
+    for k in range(5):
+        a = k * math.pi / 2.5
+        h = r.uniform(0.35, 0.55)
+        ca, sa = math.cos(a), math.sin(a)
+        b.card([(-0.07 * ca, -0.07 * sa, 0), (0.07 * ca, 0.07 * sa, 0), (0.02 * ca, 0.02 * sa, h)], mixc(PAL["scrub"], CAC, 0.35 + 0.1 * (k % 3)))
+    kit("tuft_green", b)
+    for nm, col in (("red", FL_RED), ("yellow", FL_YEL)):
+        b = Bld(20 if nm == "red" else 21)
+        for k in range(8):
+            x, y = r.uniform(-0.6, 0.6), r.uniform(-0.6, 0.6)
+            h = r.uniform(0.3, 0.55)
+            a = r.uniform(0, math.pi)
+            ca, sa = math.cos(a), math.sin(a)
+            b.card([(x - 0.03 * ca, y - 0.03 * sa, 0), (x + 0.03 * ca, y + 0.03 * sa, 0), (x, y, h)], mixc(CAC, PAL["scrub"], 0.3))
+            b.cyl(x, y, h, 0.09, 0.05, 0.07, 5, col)
+        for k in range(3):
+            a = k * 2.1
+            b.card([(-0.3 * math.cos(a), -0.3 * math.sin(a), 0), (0.3 * math.cos(a), 0.3 * math.sin(a), 0), (0, 0, 0.22)], CAC)
+        kit("flowers_" + nm, b)
+    for v in range(3):
+        b = Bld(30 + v)
+        h = (3.6, 4.6, 3.0)[v]
+        b.tube((0, 0, 0), (0, 0, h), 0.34, 0.27, 8, CAC, caps=(False, False))
+        b.tube((0, 0, h), (0, 0, h + 0.3), 0.27, 0.05, 8, CAC_H, caps=(False, False))
+        arms = [(1.5, 1, 0.9), (2.0, -1, 0.7)][: (1, 2, 0)[v]]
+        for (z, sgn, up) in arms:
+            b.tube((0.2 * sgn, 0, z), (0.95 * sgn, 0, z), 0.18, 0.16, 6, CAC, caps=(False, False))
+            b.tube((0.95 * sgn, 0, z), (0.95 * sgn, 0, z + up + 0.6), 0.16, 0.15, 6, CAC, caps=(False, False))
+            b.tube((0.95 * sgn, 0, z + up + 0.6), (0.95 * sgn, 0, z + up + 0.85), 0.15, 0.03, 6, CAC_H, caps=(False, False))
+        if v == 2:
+            b.cyl(0, 0, h + 0.28, 0.14, 0.08, 0.14, 5, FL_RED)
+        for k in range(8):
+            a = math.tau * k / 8
+            b.beam((0.3 * math.cos(a), 0.3 * math.sin(a), 0.2), (0.3 * math.cos(a), 0.3 * math.sin(a), h - 0.1), 0.025, 0.02, CAC_H)
+        kit("saguaro_" + "abc"[v], b, smooth=False)
+    b = Bld(34)
+    b.cyl(0, 0, 0, 0.45, 0.34, 0.55, 8, CAC)
+    b.cyl(0, 0, 0.5, 0.34, 0.06, 0.12, 8, CAC_H)
+    b.cyl(0, 0, 0.58, 0.12, 0.08, 0.1, 5, FL_YEL)
+    kit("barrel_cactus", b)
+    b = Bld(35)
+    for (x, y, z, s, rot) in ((0, 0, 0, 1.0, 0.2), (0.35, 0.1, 0.45, 0.8, 0.9), (-0.3, 0.05, 0.4, 0.75, -0.7)):
+        b.tube((x, y, z + 0.2 * s), (x, y + 0.05, z + 0.2 * s + 0.05), 0.4 * s, 0.38 * s, 7, CAC, sq=(1.0, 0.18))
+    b.cyl(0.35, 0.1, 0.9, 0.07, 0.05, 0.08, 5, FL_RED)
+    kit("prickly_pear", b)
+    b = Bld(36)
+    for k in range(6):
+        a = math.tau * k / 6
+        b.tube((0.14 * math.cos(a), 0.14 * math.sin(a), 0.02), (0.55 * math.cos(a), 0.55 * math.sin(a), 0.34 + 0.12 * (k % 2)), 0.1, 0.01, 5, mixc(PAL["scrub"], CAC, 0.55))
+    kit("sage", b)
+    b = Bld(37)
+    col = mixc(PAPER, PAL["stone"], 0.45)
+    b.tube((0, 0, 0), (0.1, 0.05, 2.6), 0.22, 0.14, 6, col, caps=(False, False))
+    b.tube((0.1, 0.05, 2.6), (0.5, 0.1, 3.5), 0.14, 0.08, 6, col)
+    b.tube((0.05, 0.03, 1.6), (-1.2, 0.3, 2.7), 0.1, 0.05, 5, col)
+    b.tube((0.1, 0.05, 2.2), (1.3, -0.3, 3.0), 0.09, 0.04, 5, col)
+    b.tube((-0.7, 0.2, 2.2), (-1.0, 0.8, 3.1), 0.05, 0.02, 4, col)
+    kit("dead_tree", b)
+    for v in range(4):
+        b = Bld(40 + v)
+        rr = (0.9, 1.3, 1.7, 1.1)[v]
+        b.rock(0, 0, 0, rr, rr * (0.8 + 0.2 * (v % 2)), mixc(PAL["stone"], PAL["cliff_base"], 0.25 * v), n=7, sq=(1.1, 0.9))
+        if v == 1:
+            b.rock(1.1, 0.5, 0, 0.6, 0.55, PAL["stone"], n=6)
+        kit("boulder_" + "abcd"[v], b)
+    # --- fences
+    b = Bld(50)
+    for x in (-1.5, 1.5):
+        b.box(x, 0, 0, 0.12, 0.12, 1.15, GREY_WOOD)
+    for z in (0.35, 0.75):
+        b.box(0, 0.06, z, 3.0, 0.05, 0.09, GREY_WOOD)
+    for i in range(6):
+        b.box(-1.25 + i * 0.5, 0, 0, 0.11, 0.04, 1.0, mixc(GREY_WOOD, PAPER, 0.15 * (i % 2)), top=0.35)
+    kit("fence_whole", b)
+    b = Bld(51)
+    b.box(-1.5, 0, 0, 0.12, 0.12, 1.15, GREY_WOOD)
+    b.box(1.5, 0, 0, 0.12, 0.12, 1.15, GREY_WOOD, shear=(0.12, 0))
+    b.beam((-1.5, 0.06, 0.35), (0.2, 0.06, 0.4), 0.05, 0.09, GREY_WOOD)
+    b.beam((0.4, 0.06, 0.16), (1.5, 0.06, 0.8), 0.05, 0.09, GREY_WOOD)
+    for i in (0, 1, 2, 5):
+        b.box(-1.25 + i * 0.5, 0, 0, 0.11, 0.04, 1.0 - 0.3 * (i == 2), mixc(GREY_WOOD, PAPER, 0.15 * (i % 2)), top=0.35, shear=(0.12 * (i == 5), 0))
+    b.beam((0.1, -0.2, 0.05), (0.9, 0.2, 0.08), 0.11, 0.04, GREY_WOOD)
+    kit("fence_broken", b)
+    # --- wheelbarrow, tub, outhouse, well, handcart, toy
+    b = Bld(55)
+    b.box(0, 0, 0.35, 1.0, 0.6, 0.3, WOOD, top=1.3, planks=0.3)
+    b.tube((0.62, -0.06, 0.28), (0.62, 0.06, 0.28), 0.28, 0.28, 8, IRON)
+    b.beam((-0.4, -0.24, 0.45), (-1.0, -0.3, 0.7), 0.05, 0.05, WOOD_D)
+    b.beam((-0.4, 0.24, 0.45), (-1.0, 0.3, 0.7), 0.05, 0.05, WOOD_D)
+    for sy in (-1, 1):
+        b.beam((-0.35, sy * 0.24, 0.35), (-0.4, sy * 0.24, 0.0), 0.05, 0.05, WOOD_D)
+    kit("wheelbarrow", b)
+    b = Bld(56)
+    b.cyl(0, 0, 0, 0.42, 0.52, 0.4, 10, mixc(IRON, WOOD, 0.4))
+    b.tube((0.5, 0, 0.3), (0.62, 0, 0.3), 0.04, 0.04, 5, IRON)
+    kit("washtub", b)
+    b = Bld(57)
+    b.box(0, 0, 0, 1.5, 1.5, 2.3, GREY_WOOD, planks=0.3, shear=(0.1, 0.0))
+    b.box(0, -0.78, 0.1, 0.8, 0.05, 1.9, WOOD_D, shear=(0.1, 0))
+    b.slab((-0.95, -0.95, 2.45), (0.95, -0.95, 2.45), (0.95, 0.95, 2.75), (-0.95, 0.95, 2.75), 0.1, hexc("#8c3f26"))
+    kit("outhouse", b)
+    b = Bld(58)
+    for k in range(10):
+        a = math.tau * k / 10
+        b.rock(0.95 * math.cos(a), 0.95 * math.sin(a), 0, 0.3, 0.55, PAL["stone"], n=5)
+    b.box(-0.95, 0, 0.3, 0.14, 0.14, 2.2, WOOD_D, shear=(0.1, 0))
+    b.box(0.95, 0, 0.3, 0.14, 0.14, 2.2, WOOD_D, shear=(-0.05, 0))
+    b.beam((-0.9, 0, 2.5), (0.95, 0, 2.5), 0.12, 0.12, WOOD)
+    b.slab((-1.2, -0.7, 2.5), (1.2, -0.7, 2.5), (1.2, 0, 3.1), (-1.2, 0, 3.1), 0.06, hexc("#8c3f26"))
+    b.slab((1.2, 0.7, 2.5), (-1.2, 0.7, 2.5), (-1.2, 0, 3.1), (1.2, 0, 3.1), 0.06, hexc("#8c3f26"))
+    b.tube((0.1, 0, 2.5), (0.1, 0, 1.4), 0.015, 0.015, 4, hexc("#c8a256"))
+    b.cyl(0.1, 0, 1.0, 0.16, 0.2, 0.4, 7, WOOD)
+    kit("well", b)
+    # handcart (tipped on its side, spilling) built upright then rotated about its base
+    b = Bld(59)
+    s0 = len(b.V)
+    b.box(0, 0, 0.45, 1.5, 0.9, 0.5, mixc(WOOD, GREY_WOOD, 0.35), top=1.15, planks=0.3)
+    for sy in (-1, 1):
+        b.tube((0, sy * 0.52, 0.35), (0, sy * 0.6, 0.35), 0.37, 0.37, 10, IRON)
+    b.beam((0.7, -0.3, 0.55), (2.1, -0.35, 0.9), 0.06, 0.06, WOOD_D)
+    b.beam((0.7, 0.3, 0.55), (2.1, 0.35, 0.9), 0.06, 0.06, WOOD_D)
+    b.apply(Matrix.Rotation(math.radians(78), 4, "X"), s0)
+    b.apply(Matrix.Rotation(math.radians(-18), 4, "Z"), s0)
+    b.ground(s0)
+    kit("handcart_tipped", b)
+    b = Bld(60)
+    for k in range(14):
+        b.rock(r.uniform(-1.1, 1.1), r.uniform(-0.8, 0.8), 0, r.uniform(0.1, 0.22), r.uniform(0.1, 0.2), mixc(PAL["stone"], CAC, 0.3 * (k % 3 == 0)), n=5)
+    kit("ore_spill", b)
+    b = Bld(61)       # a child's wooden pull toy on wheels (a toy, not an animal model)
+    b.box(0, 0, 0.14, 0.34, 0.14, 0.14, mixc(CREAM, WOOD, 0.4))
+    b.box(0.2, 0, 0.26, 0.1, 0.1, 0.18, WOOD)
+    b.box(0.26, 0, 0.42, 0.14, 0.1, 0.1, WOOD, top=0.7)
+    for (x, y) in ((-0.1, -0.09), (-0.1, 0.09), (0.12, -0.09), (0.12, 0.09)):
+        b.tube((x, y - 0.015, 0.07), (x, y + 0.015, 0.07), 0.07, 0.07, 8, CO_RED)
+    kit("toy_pull", b)
+    # --- hitching rail, notice board, telegraph pole, gate
+    b = Bld(62)
+    for x in (-1.4, 1.4):
+        b.box(x, 0, 0, 0.18, 0.18, 1.3, WOOD_D)
+    b.beam((-1.5, 0, 1.0), (1.5, 0, 1.0), 0.14, 0.14, WOOD)
+    b.beam((-1.4, 0, 0.5), (1.4, 0, 0.55), 0.08, 0.08, WOOD)
+    kit("hitching_rail", b)
+    b = Bld(63)
+    for x in (-0.95, 0.95):
+        b.box(x, 0, 0, 0.14, 0.14, 2.3, WOOD_D)
+    b.box(0, 0, 0.9, 2.0, 0.08, 1.3, mixc(WOOD, WOOD_D, 0.2), planks=0.5)
+    b.slab((-1.15, -0.15, 2.25), (1.15, -0.15, 2.25), (1.15, 0.3, 2.45), (-1.15, 0.3, 2.45), 0.07, hexc("#8c3f26"))
+    for k in range(16):
+        x, z = -0.8 + 0.4 * (k % 5) + r.uniform(-0.05, 0.05), 1.05 + 0.4 * (k // 5) + r.uniform(-0.04, 0.04)
+        rot = r.uniform(-0.2, 0.2)
+        c = mixc(PAPER, PAL["scrub"], r.uniform(0.0, 0.5))
+        ca, sa = math.cos(rot), math.sin(rot)
+        w, h = 0.27, 0.34
+        b.face([(x + (-w / 2) * ca + (-h / 2) * -sa * 0, -0.06, z - h / 2), (x + w / 2, -0.06, z - h / 2), (x + w / 2, -0.06, z + h / 2), (x - w / 2, -0.06, z + h / 2)], c)
+        if k % 4 == 0:
+            b.face([(x - 0.06, -0.062, z + 0.02), (x + 0.06, -0.062, z + 0.02), (x + 0.06, -0.062, z + 0.1), (x - 0.06, -0.062, z + 0.1)], CO_RED)
+    kit("notice_board", b)
+    b = Bld(64)
+    b.tube((0, 0, 0), (0, 0, 7.0), 0.16, 0.11, 7, GREY_WOOD, caps=(False, True))
+    b.beam((-0.95, 0, 6.35), (0.95, 0, 6.35), 0.12, 0.14, GREY_WOOD)
+    b.beam((-0.5, 0, 5.5), (-0.1, 0, 6.2), 0.07, 0.07, GREY_WOOD)
+    b.beam((0.5, 0, 5.5), (0.1, 0, 6.2), 0.07, 0.07, GREY_WOOD)
+    for x in (-0.85, -0.3, 0.3, 0.85):
+        b.cyl(x, 0, 6.4, 0.05, 0.04, 0.16, 5, CO_TEAL)
+    kit("telegraph_pole", b)
+    build_gate()
+
+def build_gate():
+    b = Bld(70)
+    for sx in (-1, 1):
+        x = sx * 4.6
+        b.box(x, 0, 0, 0.5, 0.5, 5.4, WOOD_D, planks=0.25)
+        b.box(x, 0, 5.4, 0.7, 0.7, 0.16, WOOD)
+        b.beam((x, 0, 3.4), (x - sx * 1.4, 0, 5.2), 0.2, 0.2, WOOD)
+        b.rock(x, 0, 0, 0.55, 0.5, PAL["stone"], n=6)
+    b.beam((-5.2, 0, 5.2), (5.2, 0, 5.2), 0.5, 0.5, WOOD)
+    b.beam((-4.6, 0, 4.2), (4.6, 0, 4.2), 0.26, 0.26, WOOD_D)
+    b.beam((-5.0, 0, 5.62), (5.0, 0, 5.62), 0.34, 0.34, GREY_WOOD)
+    # signboard hung from the beam on two chains: a pick and a rail pictogram (no text)
+    for x in (-1.2, 1.2):
+        b.beam((x, 0, 4.2), (x, 0, 3.5), 0.03, 0.03, IRON)
+    b.box(0, -0.05, 2.6, 2.8, 0.14, 1.0, mixc(WOOD, WOOD_D, 0.4), planks=0.4)
+    b.beam((-0.55, -0.14, 2.75), (0.4, -0.14, 3.4), 0.1, 0.03, PAPER)
+    b.beam((0.4, -0.14, 3.4), (0.7, -0.14, 3.1), 0.2, 0.03, IRON)
+    b.beam((-0.9, -0.14, 2.9), (0.9, -0.14, 2.9), 0.07, 0.03, CREAM)
+    for x in (-0.7, -0.2, 0.3, 0.8):
+        b.beam((x, -0.14, 2.8), (x, -0.14, 3.0), 0.06, 0.03, WOOD_D)
+    # a made-up rail-and-rising-sun emblem plate
+    b.box(3.3, -0.1, 4.45, 0.9, 0.08, 0.6, CO_RED)
+    b.face([(3.3 + 0.28 * math.cos(math.pi * k / 6), -0.15, 4.5 + 0.28 * math.sin(math.pi * k / 6)) for k in range(7)], FLAME_T)
+    b.beam((2.95, -0.16, 4.5), (3.65, -0.16, 4.5), 0.7, 0.02, IRON) if False else b.beam((2.95, -0.16, 4.52), (3.65, -0.16, 4.52), 0.05, 0.02, IRON)
+    # lantern on a hook (named group lantern, parts lantern_frame and glow come from the kit)
+    b.beam((-4.2, 0, 5.0), (-4.2, -0.5, 5.0), 0.06, 0.06, IRON)
+    kit("gate_trailhead", b)
+
+# ---------------------------------------------------------------- shacks (six distinct builds)
+ROOF_RUST = hexc("#8c3f26"); ROOF_TEAL = mixc(CO_TEAL, PAPER, 0.12); ROOF_CREAM = mixc(CREAM, PAL["scrub"], 0.25); ROOF_CHAR = mixc(IRON, WOOD_D, 0.3)
+
+def roof_gable(b, w, d, z, pitch, col, ov=0.55, patches=()):
+    X, Y = w / 2 + ov, d / 2 + ov
+    zr = z + pitch * (Y / (d / 2))
+    b.slab((-X, -Y, z - 0.1), (X, -Y, z - 0.1), (X, 0, zr), (-X, 0, zr), 0.12, col)
+    b.slab((X, Y, z - 0.1), (-X, Y, z - 0.1), (-X, 0, zr), (X, 0, zr), 0.12, col)
+    for sx in (-1, 1):
+        b.face_out([(sx * w / 2, -d / 2, z), (sx * w / 2, d / 2, z), (sx * w / 2, 0, z + pitch * 0.95)], shade(GREY_WOOD, 0.9), (sx, 0, 0))
+    for (px, side, pc) in patches:
+        yy = -1 if side == "f" else 1
+        t0, t1 = 0.25, 0.7
+        zz = lambda t: z - 0.1 + (zr - z + 0.1) * t
+        b.slab((px - 0.9, yy * Y * (1 - t0), zz(t0) + 0.02), (px + 0.9, yy * Y * (1 - t0), zz(t0) + 0.02), (px + 0.9, yy * Y * (1 - t1), zz(t1) + 0.02), (px - 0.9, yy * Y * (1 - t1), zz(t1) + 0.02), 0.02, pc)
+
+def door_window(b, w, d, z0, dx, col_door=WOOD_D, win_x=None):
+    b.box(dx, -d / 2 - 0.04, z0, 1.0, 0.08, 2.05, col_door, planks=0.25)
+    b.box(dx, -d / 2 - 0.06, z0 + 2.02, 1.3, 0.1, 0.12, WOOD)
+    for sx in (-1, 1):
+        b.box(dx + sx * 0.6, -d / 2 - 0.06, z0, 0.1, 0.1, 2.1, WOOD)
+    if win_x is not None:
+        b.box(win_x, -d / 2 - 0.03, z0 + 1.0, 0.9, 0.06, 0.8, DARK_IN)
+        for sx in (-1, 1):
+            b.box(win_x + sx * 0.55, -d / 2 - 0.07, z0 + 1.0, 0.4, 0.05, 0.8, mixc(CO_TEAL, WOOD_D, 0.4), planks=0.2)
+
+def porch(b, w, d, z0, h, depth=1.7, raised=0.0, sag=0.0, col=ROOF_RUST):
+    zd = z0 + raised
+    b.box(0, -d / 2 - depth / 2, z0, w + 0.2, depth, 0.28 + raised, mixc(WOOD, GREY_WOOD, 0.4), planks=0.35)
+    for px, ps in ((-w / 2 + 0.25, 0.0), (0.0, 0.0), (w / 2 - 0.25, sag)):
+        b.box(px, -d / 2 - depth + 0.2, zd + 0.28, 0.14, 0.14, 2.35 - ps, WOOD_D)
+    zt = zd + 0.28 + 2.35
+    b.slab((-w / 2 - 0.2, -d / 2 + 0.05, zt + 0.3), (w / 2 + 0.2, -d / 2 + 0.05, zt + 0.3), (w / 2 + 0.2, -d / 2 - depth - 0.1, zt - 0.12 - sag), (-w / 2 - 0.2, -d / 2 - depth - 0.1, zt - 0.1), 0.1, col)
+    if raised > 0:
+        b.box(0, -d / 2 - depth / 2, z0, w + 0.1, depth - 0.15, raised, DARK_IN)       # the dark crawlspace behind the lattice
+        for i in range(int((w + 0.2) / 0.45) + 1):
+            x = -w / 2 - 0.1 + i * 0.45
+            b.beam((x, -d / 2 - depth - 0.02, z0), (x + 0.4, -d / 2 - depth - 0.02, z0 + raised), 0.04, 0.03, GREY_WOOD)
+            b.beam((x + 0.4, -d / 2 - depth - 0.02, z0), (x, -d / 2 - depth - 0.02, z0 + raised), 0.04, 0.03, GREY_WOOD)
+        b.box(0.5, -d / 2 - depth - 0.35, z0, 1.6, 0.5, raised * 0.5, WOOD)        # step
+    else:
+        b.box(0.0, -d / 2 - depth - 0.35, z0, 1.2, 0.5, 0.14, WOOD)
+
+def shack_spec(sid):
+    return dict(
+        S1=dict(w=6.0, d=5.0, h=2.9, wall=GREY_WOOD, roof=ROOF_RUST, kind="gable", pitch=1.35, porch=dict(sag=0.14), patches=((-1.2, "f", ROOF_TEAL), (1.5, "b", ROOF_CREAM)), chimney=(1.6, 0.8)),
+        S2=dict(w=6.2, d=5.2, h=3.0, wall=mixc(WOOD, GREY_WOOD, 0.6), roof=ROOF_TEAL, kind="gable", pitch=1.3, porch=dict(raised=0.7, sag=0.1), open_door=True, patches=((1.0, "f", ROOF_CREAM),), chimney=(-1.8, 1.0)),
+        S3=dict(w=9.0, d=4.5, h=2.8, wall=mixc(GREY_WOOD, PAL["stone"], 0.3), roof=ROOF_CHAR, kind="gable", pitch=1.1, porch=dict(), patches=((-2.5, "f", ROOF_RUST),), chimney=(3.0, 0.5), two_doors=True),
+        S4=dict(w=6.0, d=4.2, h=2.6, wall=WOOD, roof=ROOF_CREAM, kind="lean", pitch=1.2, porch=None, patches=()),
+        S5=dict(w=5.0, d=5.0, h=3.2, wall=mixc(CO_TEAL, GREY_WOOD, 0.55), roof=ROOF_RUST, kind="flat", pitch=0.0, porch=None, patches=(), falsefront=True),
+        S6=dict(w=5.0, d=4.2, h=2.6, wall=mixc(WOOD_D, GREY_WOOD, 0.5), roof=ROOF_CREAM, kind="gable", pitch=1.15, porch=dict(sag=0.2), patches=((0.5, "f", ROOF_RUST), (-1.4, "b", ROOF_TEAL)), chimney=(-1.2, -0.6), lean=2.6),
+    )[sid]
+
+def build_shack(sid, seed):
+    sp = shack_spec(sid)
+    b = Bld(seed)
+    w, d, h = sp["w"], sp["d"], sp["h"]
+    wc = sp["wall"]
+    z0 = 0.18 + (sp["porch"] or {}).get("raised", 0.0)
+    b.box(0, 0, 0, w + 0.3, d + 0.3, z0, PAL["stone"])
+    door_part = None
+    if sp.get("open_door"):
+        t = 0.2
+        b.box(0, d / 2 - t / 2, z0, w, t, h, wc, planks=0.5)
+        b.box(-w / 2 + t / 2, 0, z0, t, d, h, wc, planks=0.5)
+        b.box(w / 2 - t / 2, 0, z0, t, d, h, wc, planks=0.5)
+        dx, dw = -w * 0.18, 1.1
+        lw, rw = (dx - dw / 2) + w / 2, w / 2 - (dx + dw / 2)
+        b.box(-w / 2 + lw / 2, -d / 2 + t / 2, z0, lw, t, h, wc, planks=0.5)
+        b.box(w / 2 - rw / 2, -d / 2 + t / 2, z0, rw, t, h, wc, planks=0.5)
+        b.box(dx, -d / 2 + t / 2, z0 + 2.1, dw, t, h - 2.1, wc)
+        b.box(0, 0, z0, w - 2 * t, d - 2 * t, 0.05, hexc("#33241a"))
+        b.box(0, 0, z0 + h - 0.1, w - 2 * t, d - 2 * t, 0.1, WOOD_D)
+        b.box(w / 2 - 0.9, -0.2, z0, 1.2, 0.9, 0.55, WOOD_D)              # a cot
+        b.box(w * 0.18, -d / 2 - 0.04, z0 + 1.0, 0.9, 0.06, 0.8, DARK_IN)
+        b.box(dx, -d / 2 - 0.06, z0 + 2.1, 1.3, 0.1, 0.12, WOOD)
+        for sx in (-1, 1):
+            b.box(dx + sx * 0.62, -d / 2 - 0.06, z0, 0.1, 0.1, 2.1, WOOD)
+        bd = Bld(seed + 100)
+        bd.box(dw / 2, 0, 0, dw, 0.08, 2.05, WOOD_D, planks=0.25)       # the door, hinge at x = 0
+        door_part = (bd, (dx - dw / 2, -d / 2 - 0.02, z0))
+    else:
+        b.box(0, 0, z0, w, d, h, wc, planks=0.5)
+        if sp.get("two_doors"):
+            door_window(b, w, d, z0, -w * 0.3, win_x=-w * 0.05)
+            door_window(b, w, d, z0, w * 0.3, win_x=w * 0.05)
+        else:
+            door_window(b, w, d, z0, -w * 0.17, win_x=w * 0.25)
+        b.box(w / 2 + 0.02, 0, z0 + 1.1, 0.05, 0.8, 0.7, DARK_IN)
+    zr = z0 + h
+    if sp["kind"] == "gable":
+        roof_gable(b, w, d, zr, sp["pitch"], sp["roof"], patches=sp["patches"])
+    elif sp["kind"] == "lean":
+        X, Y = w / 2 + 0.5, d / 2 + 0.5
+        b.slab((-X, -Y, zr - 0.2), (X, -Y, zr - 0.2), (X, Y, zr + sp["pitch"]), (-X, Y, zr + sp["pitch"]), 0.12, sp["roof"])
+        for sx in (-1, 1):
+            b.face_out([(sx * w / 2, -d / 2, zr), (sx * w / 2, d / 2, zr), (sx * w / 2, d / 2, zr + sp["pitch"] - 0.05)], shade(wc, 0.9), (sx, 0, 0))
+        b.slab((-X + 0.3, -Y + 0.4, zr - 0.18), (-X + 1.9, -Y + 0.4, zr - 0.18), (-X + 1.9, -Y + 2.0, zr + 0.2), (-X + 0.3, -Y + 2.0, zr + 0.2), 0.02, ROOF_TEAL)
+    else:
+        b.slab((-w / 2 - 0.2, -d / 2 - 0.2, zr), (w / 2 + 0.2, -d / 2 - 0.2, zr), (w / 2 + 0.2, d / 2 + 0.2, zr + 0.1), (-w / 2 - 0.2, d / 2 + 0.2, zr + 0.1), 0.15, sp["roof"])
+        if sp.get("falsefront"):
+            b.box(0, -d / 2 - 0.12, zr, w + 0.3, 0.2, 1.5, mixc(wc, WOOD, 0.3), planks=0.5)
+            b.box(0, -d / 2 - 0.24, zr + 1.4, w * 0.5, 0.14, 0.35, CREAM)
+            door_window(b, w, d, z0, -w * 0.15, win_x=w * 0.28)
+    if sp.get("porch") is not None:
+        porch(b, w, d, 0.0, h, depth=1.7, col=sp["roof"], **sp["porch"])
+    if sp.get("chimney"):
+        cx, cy = sp["chimney"]
+        b.box(cx, cy, zr + 0.4, 0.7, 0.7, 1.6, mixc(PAL["stone"], PAL["cliff_base"], 0.3), top=0.85)
+        b.box(cx, cy, zr + 2.0, 0.85, 0.85, 0.1, PAL["stone"])
+    if sp.get("lean"):
+        b.apply(Matrix.Rotation(math.radians(sp["lean"]), 4, "Y"))
+    ob = kit("shack_" + sid, b)
+    if door_part:
+        bd, loc = door_part
+        KITS["door_" + sid] = bd.finish("kit_door_" + sid, coll("50_props"), hide=True)
+        KIT_TRIS["door_" + sid] = bd.tris()
+        KITS["door_" + sid]["hinge"] = tuple(loc)
+    return ob
+
+# ---------------------------------------------------------------- placement
+S13 = dict(count_prop=0, count_foliage=0, tris=[], markers=[], hides=0, inter=0)
+
+def frame(d, u, x=0.0, y=0.0):
+    """World point and heading for road-local coordinates: d along, u north of the centre line, then x along / y north of that."""
+    t = tang_at(d)
+    n = Vector((-t.y, t.x))
+    P = centre(d) + n * u + t * x + n * y
+    return Vector((P.x, P.y, 0.0)), math.atan2(t.y, t.x)
+
+def new_empty(name, pos, rotz=0.0, parent=None, size=0.35):
+    e = bpy.data.objects.new(name, None)
+    e.empty_display_type = "PLAIN_AXES"
+    e.empty_display_size = size
+    e.location = pos
+    e.rotation_euler = (0, 0, rotz)
+    (coll("50_props")).objects.link(e)
+    e["rw_gen"] = "s1_3"
+    if parent is not None:
+        e.parent = parent
+    return e
+
+def inst(kit_name, name, pos, rotz=0.0, scale=1.0, parent=None, cat="prop", d=None, hide=False, rot=None, count=True):
+    ob = bpy.data.objects.new(name, KITS[kit_name].data)
+    ob.location = pos
+    ob.rotation_euler = rot if rot is not None else (0, 0, rotz)
+    ob.scale = (scale, scale, scale) if not isinstance(scale, tuple) else scale
+    (coll("60_foliage") if cat == "foliage" else coll("50_props")).objects.link(ob)
+    ob["rw_gen"] = "s1_3"
+    ob["rw_cat"] = cat
+    if d is not None:
+        ob["rw_d"] = d
+    if parent is not None:
+        ob.parent = parent
+    if hide:
+        ob.hide_render = True
+        ob.hide_viewport = True
+    if count and parent is None:
+        S13["count_foliage" if cat == "foliage" else "count_prop"] += 1
+    if count:
+        S13["tris"].append((d if d is not None else (parent["rw_d"] if parent is not None and "rw_d" in parent.keys() else 0), KIT_TRIS.get(kit_name, 0)))
+    return ob
+
+def marker(name, pos, rw_type, rw_id, radius, note):
+    m = add_marker("marker_%s_%s" % (rw_type, name), (pos.x, pos.y, 0.3), rw_type, rw_id, radius, note, 0.9)
+    m["rw_gen"] = "s1_3"
+    S13["markers"].append((rw_id, rw_type, round(pos.x, 1), round(-pos.y, 1), radius, note))
+    if rw_type == "hide":
+        S13["hides"] += 1
+    elif rw_type in ("breakable", "loot", "door", "lever", "climb", "lore", "vantage", "campfire", "hazard"):
+        S13["inter"] += 1
+    return m
+
+def remove_old_trailhead():
+    victims = [o for o in bpy.data.objects if not o.get("rw_gen") and o.users_scene and bpy.data.scenes["PeteArea1"] in o.users_scene
+               and o.parent is None and o.location.x < -100 and o.type in ("MESH", "EMPTY")]
+    for o in victims:
+        for ch in list(o.children_recursive):
+            me = ch.data if ch.type == "MESH" else None
+            bpy.data.objects.remove(ch, do_unlink=True)
+            if me is not None and me.users == 0:
+                bpy.data.meshes.remove(me)
+        me = o.data if o.type == "MESH" else None
+        bpy.data.objects.remove(o, do_unlink=True)
+        if me is not None and me.users == 0:
+            bpy.data.meshes.remove(me)
+    return len(victims)
+
+def make_group(name, pos, rotz, d):
+    g = new_empty(name, pos, rotz)
+    g["rw_d"] = d
+    return g
+
+def crate_group(name, pos, rotz, d, open_=False):
+    g = make_group("prop_crate_" + name, pos, rotz, d)
+    inst("crate_body", "crate_body", Vector((0, 0, 0)), parent=g, d=d)
+    lid = inst("crate_lid", "lid", Vector((0, 0.52, 0.92)), parent=g, d=d)
+    if open_:
+        lid.rotation_euler = (math.radians(-105), 0, 0)
+    S13["count_prop"] += 1
+    return g
+
+def pot_group(name, pos, rotz, d):
+    g = make_group("prop_pot_" + name, pos, rotz, d)
+    inst("pot_whole", "pot_whole", Vector((0, 0, 0)), parent=g, d=d)
+    inst("pot_shards", "pot_shards", Vector((0, 0, 0)), parent=g, d=d, hide=True)
+    S13["count_prop"] += 1
+    return g
+
+def barrel_group(name, pos, rotz, d):
+    g = make_group("prop_barrel_" + name, pos, rotz, d)
+    inst("barrel_whole", "barrel_whole", Vector((0, 0, 0)), parent=g, d=d)
+    inst("barrel_broken", "barrel_broken", Vector((0, 0, 0)), parent=g, d=d, hide=True)
+    S13["count_prop"] += 1
+    return g
+
+def lantern_group(name, pos, d, rotz=0.0):
+    g = make_group("lantern_" + name, pos, rotz, d)
+    g.name = "lantern" if "lantern" not in bpy.data.objects else "lantern_" + name
+    inst("lantern_frame", "lantern_frame", Vector((0, 0, 0)), parent=g, d=d)
+    inst("lantern_glow", "glow", Vector((0, 0, 0)), parent=g, d=d)
+    S13["count_prop"] += 1
+    return g
+
+def fence_break_group(name, pos, rotz, d):
+    g = make_group("prop_fence_" + name, pos, rotz, d)
+    inst("fence_whole", "fence_whole", Vector((0, 0, 0)), parent=g, d=d)
+    inst("fence_broken", "fence_broken", Vector((0, 0, 0)), parent=g, d=d, hide=True)
+    S13["count_prop"] += 1
+    return g
+
+def build_lamp_post():
+    b = Bld(80)
+    b.tube((0, 0, 0), (0, 0, 3.0), 0.1, 0.07, 6, WOOD_D)
+    b.beam((0, 0, 2.9), (0.6, 0, 2.9), 0.07, 0.07, WOOD_D)
+    b.beam((0.1, 0, 2.5), (0.5, 0, 2.85), 0.05, 0.05, WOOD_D)
+    kit("lamp_post", b)
+
+def wire_mesh(poles):
+    b = Bld(81)
+    for a, c in zip(poles, poles[1:]):
+        for dz in (-0.85, -0.3, 0.3, 0.85):
+            A, C = a.copy(), c.copy()
+            for (p, off) in ((A, a), (C, c)):
+                pass
+            n = 16
+            for k in range(n):
+                t0, t1 = k / n, (k + 1) / n
+                sag = lambda t: 0.9 * (1 - (2 * t - 1) ** 2)
+                p0 = Vector((A.x + (C.x - A.x) * t0, A.y + (C.y - A.y) * t0, 6.45 - sag(t0)))
+                p1 = Vector((A.x + (C.x - A.x) * t1, A.y + (C.y - A.y) * t1, 6.45 - sag(t1)))
+                tt = (C - A).normalized()
+                nn = Vector((-tt.y, tt.x, 0))
+                off = nn * (dz * 0.9)
+                b.beam(p0 + off, p1 + off, 0.03, 0.03, IRON, caps=False)
+    ob = b.finish("telegraph_wire_s1", coll("50_props"))
+    return ob
+
+def scatter_ok(d, u):
+    """Keep the centre line and 8 m either side free of standing props."""
+    return abs(u) > 9.0
+
+def build_laundry(d, u, seed):
+    """H05: two hanging lines of grey sheets forming a small cloth corridor."""
+    rng = random.Random(seed)
+    b = Bld(seed)
+    cols = [mixc(PAPER, PAL["stone"], 0.55), mixc(PAPER, PAL["stone"], 0.7), mixc(CREAM, PAL["stone"], 0.4), mixc(CO_TEAL, PAL["stone"], 0.6)]
+    for yy in (-1.15, 1.15):
+        for x in (-4.4, 4.4):
+            b.tube((x, yy, 0), (x + 0.05, yy, 2.6), 0.07, 0.05, 5, WOOD_D)
+        for k in range(18):
+            t0, t1 = k / 18, (k + 1) / 18
+            p = lambda t: Vector((-4.4 + 8.8 * t, yy, 2.5 - 0.28 * (1 - (2 * t - 1) ** 2)))
+            b.beam(p(t0), p(t1), 0.025, 0.025, WOOD_D, caps=False)
+        for i in range(6):
+            x0 = -3.6 + i * 1.4 + rng.uniform(-0.1, 0.1)
+            wdt = 1.05
+            tt = lambda x: (x + 4.4) / 8.8
+            top = lambda x: 2.5 - 0.28 * (1 - (2 * tt(x) - 1) ** 2)
+            hang = rng.uniform(1.4, 1.75)
+            c = cols[(i + (yy > 0)) % 4]
+            for q in range(3):
+                xa, xb = x0 + wdt * q / 3, x0 + wdt * (q + 1) / 3
+                wa, wb = 0.07 * math.sin(xa * 3.1 + yy), 0.07 * math.sin(xb * 3.1 + yy)
+                b.card([(xa, yy + wa, top(xa) - hang - 0.02 * q), (xb, yy + wb, top(xb) - hang - 0.02 * (q + 1)), (xb, yy + wb, top(xb)), (xa, yy + wa, top(xa))], shade(c, 0.92 + 0.05 * q))
+    pos, ang = frame(d, u)
+    ob = b.finish("prop_laundry_lines_%d" % d, coll("50_props"))
+    ob.location = pos
+    ob.rotation_euler = (0, 0, ang)
+    ob["rw_gen"] = "s1_3"; ob["rw_d"] = d; ob["rw_cat"] = "prop"
+    S13["count_prop"] += 1
+    S13["tris"].append((d, b.tris()))
+    return ob
+
+def build_dry_garden():
+    b = Bld(82)
+    soil = mixc(PAL["mud"], PAL["cliff_dark"], 0.3)
+    b.box(0, 0, 0, 3.0, 1.8, 0.04, soil)
+    for sx in (-1, 1):
+        b.beam((sx * 1.5, -0.9, 0.0), (sx * 1.5, 0.9, 0.0), 0.08, 0.2, GREY_WOOD)
+    for sy in (-1, 1):
+        b.beam((-1.5, sy * 0.9, 0.0), (1.5, sy * 0.9, 0.0), 0.08, 0.2, GREY_WOOD)
+    r = random.Random(83)
+    for row in range(4):
+        for i in range(7):
+            x, y = -1.2 + i * 0.4 + r.uniform(-0.05, 0.05), -0.6 + row * 0.4
+            h = r.uniform(0.2, 0.55)
+            for a in (0.0, math.pi / 2):
+                ca, sa = math.cos(a), math.sin(a)
+                b.card([(x - 0.05 * ca, y - 0.05 * sa, 0.04), (x + 0.05 * ca, y + 0.05 * sa, 0.04), (x + 0.02 * ca, y + 0.02 * sa, h)], mixc(PAL["scrub"], WOOD, r.uniform(0.2, 0.6)))
+    kit("dry_garden", b)
+
+def build_stack_lumber():
+    b = Bld(84)
+    r = random.Random(85)
+    for row in range(4):
+        for i in range(3 - row // 2):
+            b.box(0, -0.2 + i * 0.22 - row * 0.02, row * 0.1, 2.4 - 0.1 * row, 0.2, 0.1, mixc(WOOD, GREY_WOOD, r.uniform(0.0, 0.6)))
+    kit("lumber_stack", b)
+
+def place_shack_yard(sid, d, u, pos, ang):
+    """Yard dressing in the shack's own frame (x along the road, y north, front is -y)."""
+    sp = shack_spec(sid)
+    w, dp = sp["w"], sp["d"]
+    cs, sn = math.cos(ang), math.sin(ang)
+    P = lambda x, y, z=0.0: Vector((pos.x + x * cs - y * sn, pos.y + x * sn + y * cs, z))
+    rot = lambda a=0.0: ang + a
+    inst("shack_" + sid, "prop_shack_" + sid, P(0, 0), ang + (0.03 if sid in ("S3", "S5") else -0.03 * (sid == "S1")), d=d)
+    return P, rot
+
+def run_s1_3_place():
+    S13.update(count_prop=0, count_foliage=0, tris=[], markers=[], hides=0, inter=0)
+    rng = random.Random(404)
+    removed = remove_old_trailhead()
+    build_kits(); build_lamp_post(); build_dry_garden(); build_stack_lumber()
+    for i, sid in enumerate(("S1", "S2", "S3", "S4", "S5", "S6")):
+        build_shack(sid, 200 + i)
+
+    # ---------------- the Trailhead (0 to 60 m)
+    gp, ga = frame(-3, 0)
+    g = make_group("prop_gate_trailhead", gp, ga + math.pi / 2, -3)
+    inst("gate_trailhead", "gate_frame", Vector((0, 0, 0)), parent=g, d=-3)
+    S13["count_prop"] += 1
+    lg = lantern_group("gate", Vector((-4.2, -0.5, 4.38)), -3)
+    lg.parent = g
+    S13["count_prop"] -= 1
+    marker("gate", gp, "lore", "TH_GATE", 6, "Trailhead gate: pick-and-rail pictogram signboard, Company emblem, lantern. Section 1 starts here.")
+
+    camp = Vector((_L["campfires"][0]["x"], -_L["campfires"][0]["z"], 0.0))
+    dc, uc = world_to_du(Vector((camp.x, camp.y)))
+    fire = make_group("prop_campfire_a1-trail", camp, 0.0, dc)
+    for nm, kn in (("campfire_stones", "campfire_stones"), ("campfire_logs", "campfire_logs"), ("fire_glow", "fire_glow"), ("fire_flame", "fire_flame")):
+        inst(kn, nm, Vector((0, 0, 0)), parent=fire, d=dc)
+    S13["count_prop"] += 1
+    marker("a1-trail", camp, "campfire", "I01", 3.0, "Trailhead campfire, the first checkpoint (layout a1-trail). Keep 3 m clear.")
+    _, a0 = frame(dc, uc)
+    CP = lambda x, y, z=0.0: Vector((camp.x + x * math.cos(a0) - y * math.sin(a0), camp.y + x * math.sin(a0) + y * math.cos(a0), z))
+    for (x, y, rr) in ((-2.4, -1.3, 0.5), (0.5, -2.8, 1.6), (2.6, -1.0, 2.6)):
+        inst("log_seat", "prop_log_seat", CP(x, y), a0 + rr, d=dc)
+    inst("bedroll", "prop_bedroll", CP(-1.7, -2.3), a0 + 0.4, d=dc)
+    inst("coffee_pot", "prop_coffee_pot", CP(0.95, 0.4, 0.2), a0, d=dc)
+    for k, (x, y) in enumerate(((1.35, -0.15), (1.6, 0.25), (1.25, 0.75))):
+        inst("tin_cup", "prop_tin_cup", CP(x, y), a0, d=dc)
+    for k, (x, y) in enumerate(((-3.5, 1.6), (-2.9, 2.4))):
+        barrel_group("th%d" % k, CP(x, y), a0 + k, dc)
+    crate_group("th_camp", CP(3.2, 1.8), a0 + 0.3, dc)
+    inst("crate_body", "prop_crate_stack", CP(3.3, 1.7, 0.92), a0 + 0.9, d=dc)
+    marker("sleeper-1", Vector((_L["guardAnchors"][0]["x"], -_L["guardAnchors"][0]["z"], 0)), "guard", "a1-sleeper-1", 8, "Layout guard anchor (a sleeper by the trail fire). Marker only; the game spawns the bandit.")
+    marker("start", Vector((_L["start"]["x"], -_L["start"]["z"], 0)), "start", "START", 3, "Player start (layout).")
+    hp, ha = frame(22, -10.0)
+    inst("hitching_rail", "prop_hitching_rail", hp, ha, d=22)
+    cp, ca = frame(36, -15.6)
+    inst("handcart_tipped", "prop_handcart_tipped", cp, ca + 0.35, scale=1.5, d=36)
+    inst("ore_spill", "prop_ore_spill", frame(36, -13.2, 0.8, 0.0)[0], ca, d=36)
+    marker("H02", frame(36, -15.2, 1.0)[0], "hide", "H02", 2.5, "Tipped handcart against the south berm: a pocket behind it. Entrance on the road side.")
+    nb, na = frame(14, 12.4)
+    inst("notice_board", "prop_notice_board", nb, na, d=14)
+    marker("I02", nb, "lore", "I02", 2.5, "Trailhead notice board: nailed papers, pictograms only; the story banner can appear here.")
+    # H01 tall dry-grass patch with a trampled dip
+    h1, _ = frame(30, 12.5)
+    for k in range(46):
+        x, y = rng.uniform(-2.5, 2.5), rng.uniform(-2.0, 2.0)
+        if x * x / 1.6 + y * y / 1.0 < 0.5:
+            continue
+        pp, aa = frame(30, 12.5, x, y)
+        inst("tuft_dry", "foliage_tall_grass", pp, rng.uniform(0, 6.28), rng.uniform(1.3, 1.9), cat="foliage", d=30)
+    marker("H01", h1, "hide", "H01", 2.8, "Waist-high dry-grass patch (5 x 4 m) with a trampled dip. Hides a crouching marshal.")
+    # telegraph poles with sagging wire (they start at 52 m)
+    poles = []
+    for dd in (52, 80, 108, 136):
+        pp, aa = frame(dd, -12.6)
+        inst("telegraph_pole", "prop_telegraph_pole", pp, aa + math.pi / 2, d=dd)
+        poles.append(Vector((pp.x, pp.y, 0)))
+    wire_mesh(poles)
+    S13["count_prop"] += 1
+    # pots and the layout crate
+    for k, (pid, dxy) in enumerate((("a1-pot-1", _L["pots"][0]), ("a1-pot-2", _L["pots"][1]))):
+        pp = Vector((dxy["x"], -dxy["z"], 0))
+        dd, uu = world_to_du(Vector((pp.x, pp.y)))
+        pot_group(pid, pp, rng.uniform(0, 6), dd)
+        if k == 0:
+            for (x, y) in ((0.8, 0.5), (-0.6, 0.7)):
+                pot_group("th_extra%d" % int(x * 10), Vector((pp.x + x, pp.y + y, 0)), rng.uniform(0, 6), dd)
+            marker(pid, pp, "breakable", "I03", 1.8, "Clay pot cluster (3 pots, layout %s). pot_whole / pot_shards." % pid)
+        else:
+            marker(pid, pp, "breakable", "I03b", 1.2, "Layout pot %s." % pid)
+    cx, cy = _L["crates"][0]["x"], -_L["crates"][0]["z"]
+    cd, _ = world_to_du(Vector((cx, cy)))
+    crate_group("a1-crate-1", Vector((cx, cy, 0)), 0.3, cd)
+    marker("a1-crate-1", Vector((cx, cy, 0)), "loot", "I08", 1.5, "Layout crate a1-crate-1 (ammo). crate_body / lid pivot at the back edge.")
+
+    # ---------------- Shack Row (60 to 140 m)
+    slot_pos = {}
+    for (sid, d, u) in SHACK_SLOTS:
+        pos, ang = frame(d, u)
+        slot_pos[sid] = (pos, ang, d, u)
+        for m in [o for o in bpy.data.objects if o.name == "marker_slot_shack_%s" % sid]:
+            pass
+    placements = {}
+    for sid in ("S1", "S2", "S3", "S4", "S5", "S6"):
+        pos, ang, d, u = slot_pos[sid]
+        sp = shack_spec(sid)
+        w, dp = sp["w"], sp["d"]
+        s_obj = inst("shack_" + sid, "prop_shack_" + sid, pos + Vector((0, 0, 0)), ang + (-0.04 if sid in ("S1", "S4") else 0.035 * (sid == "S6")), d=d)
+        P = lambda x, y, z=0.0, pos=pos, ang=ang: Vector((pos.x + x * math.cos(ang) - y * math.sin(ang), pos.y + x * math.sin(ang) + y * math.cos(ang), z))
+        placements[sid] = P
+    # S2: the open door, a dim room with a loot crate (I15, also a hiding place)
+    P2, ang2 = placements["S2"], slot_pos["S2"][1]
+    hinge = KITS["door_S2"]["hinge"]
+    door = inst("door_S2", "door", P2(hinge[0], hinge[1], hinge[2]), ang2 - math.radians(105), d=90)
+    crate_group("shack2_loot", P2(1.6, 1.4, 0.93), ang2 + 0.4, 90)
+    lantern_group("shack2", P2(-1.8, 1.4, 1.9), 90)
+    marker("I15", P2(-1.1, -2.9), "door", "I15", 2.2, "Shack 2 door (opens inward): dim 5 x 4 m room with one loot crate. Door pivot at the hinge. Also a hiding place.")
+    marker("H03", P2(0, -3.4), "hide", "H03", 2.6, "Raised porch with an open lattice front and a dark crawlspace. Entrance on the road side.")
+    # yards
+    items = {
+        "S1": [("dry_garden", 6.8, -0.5, 0.2), ("wheelbarrow", -4.6, -1.8, 0.6), ("washtub", 4.4, -4.0, 0), ("sage", -5.2, 2.5, 0), ("fence", -6.5, 1.0, math.pi / 2), ("fence", 6.5, 3.6, math.pi / 2), ("fence_break", 0, 6.0, 0)],
+        "S2": [("barrel", -4.2, 1.8, 0), ("barrel", -4.9, 2.6, 0), ("crate", 4.4, -1.2, 0.3), ("lumber_stack", 5.1, 1.8, 0.1), ("fence", 7.0, 0.0, math.pi / 2), ("fence", -7.0, -0.5, math.pi / 2), ("fence_break", 3.0, 6.0, 0), ("sage", 4.7, 4.5, 0)],
+        "S3": [("dry_garden", -7.0, -1.0, 0), ("washtub", 5.8, -3.6, 0), ("wheelbarrow", 6.4, 2.0, 2.5), ("outhouse", 9.5, 4.0, 0.15), ("fence", -7.6, 3.0, math.pi / 2), ("fence", 0, 5.8, 0), ("fence_break", 3.0, 5.8, 0), ("barrel", 7.5, -2.6, 0)],
+        "S4": [("well", 7.3, 2.2, 0), ("dry_garden", -5.8, 0.0, -0.1), ("crate", -4.2, -3.0, 0.5), ("barrel", 4.2, -2.6, 0), ("fence", -3.0, 5.0, 0), ("fence", 0, 5.0, 0), ("sage", 4.4, 5.0, 0)],
+        "S5": [("barrel", -3.6, -1.8, 0), ("crate", 3.4, -2.0, 0.2), ("lumber_stack", 4.2, 1.6, 0.3), ("sage", -4.2, 2.6, 0)],
+        "S6": [("barrel", 3.6, -1.5, 0), ("washtub", -3.9, -2.8, 0), ("sage", 4.3, 2.6, 0), ("fence", 0, 4.6, 0)],
+    }
+    nfence = 0
+    for sid, lst in items.items():
+        P = placements[sid]
+        _, ang, d, u = slot_pos[sid]
+        for (kind, x, y, r_) in lst:
+            pp = P(x, y)
+            if kind == "fence":
+                inst("fence_whole", "prop_fence", pp, ang + r_, d=d)
+            elif kind == "fence_break":
+                nfence += 1
+                fence_break_group("sr%d" % nfence, pp, ang + r_, d)
+                marker("sr%d" % nfence, pp, "breakable", "I14_%d" % nfence, 1.8, "Breakable fence section: fence_whole / fence_broken.")
+            elif kind == "barrel":
+                barrel_group("%s_%d" % (sid, int(x * 10)), pp, rng.uniform(0, 6), d)
+            elif kind == "crate":
+                crate_group("%s_%d" % (sid, int(x * 10)), pp, ang + r_, d)
+            else:
+                cat = "foliage" if kind in ("sage",) else "prop"
+                inst({"dry_garden": "dry_garden", "wheelbarrow": "wheelbarrow", "washtub": "washtub", "sage": "sage", "outhouse": "outhouse", "well": "well", "lumber_stack": "lumber_stack"}[kind], "prop_" + kind, pp, ang + r_, cat=cat, d=d)
+    # hanging lanterns on porches and lamp posts along the walkway
+    for sid in ("S1", "S6"):
+        P = placements[sid]
+        sp = shack_spec(sid)
+        lantern_group("porch_" + sid, P(-sp["w"] / 2 + 0.25, -sp["d"] / 2 - 1.5, 1.8), slot_pos[sid][2])
+    for dd in (68, 100, 132):
+        pp, aa = frame(dd, 22.2)
+        inst("lamp_post", "prop_lamp_post", pp, aa, d=dd)
+        lantern_group("post_%d" % dd, Vector((pp.x - math.sin(aa) * 0 + math.cos(aa) * 0.6, pp.y + math.sin(aa) * 0.6, 2.3)), dd)
+    # I23 barrel (explodes), I24 toy, H04 barrel alcove, H05 laundry maze, walkway
+    bp, ba = frame(110, 12.0)
+    barrel_group("I23", bp, 0.4, 110)
+    marker("I23", bp, "breakable", "I23", 1.4, "Barrel that splinters: barrel_whole / barrel_broken.")
+    tp, ta = frame(100, -8.8)
+    inst("toy_pull", "prop_toy_pull", tp, ta + 0.6, d=100)
+    marker("I24", tp, "lore", "I24", 1.5, "A child's wooden pull toy left in the road (a story beat).")
+    for k, (x, y) in enumerate(((-1.55, -16.2), (-0.5, -16.3), (0.55, -16.2), (1.6, -16.3), (-2.0, -15.2), (-2.1, -14.2), (2.0, -15.1), (2.05, -14.1))):
+        pp, aa = frame(118, 0, x, y)
+        barrel_group("H04_%d" % k, pp, rng.uniform(0, 6), 118)
+    tarp = Bld(86)
+    tarp.slab((-2.4, -16.9, 2.15), (2.4, -16.9, 2.15), (2.4, -13.4, 1.65), (-2.4, -13.4, 1.65), 0.04, mixc(CO_TEAL, PAPER, 0.15))
+    to = tarp.finish("prop_tarp_roof_H04", coll("50_props"))
+    to.location, to.rotation_euler = frame(118, 0)[0], (0, 0, frame(118, 0)[1])
+    to["rw_gen"] = "s1_3"; to["rw_d"] = 118; to["rw_cat"] = "prop"
+    S13["count_prop"] += 1; S13["tris"].append((118, tarp.tris()))
+    marker("H04", frame(118, -14.5)[0], "hide", "H04", 2.6, "Barrel U-shape with a tarp roof, opening to the road.")
+    build_laundry(135, 29.0, 90)
+    marker("H05", frame(135, 29.0)[0], "hide", "H05", 3.2, "Laundry-line maze: hanging grey sheets forming a cloth corridor.")
+    build_walkway_marker = None
+
+    # ---------------- plants and scatter (Trailhead flowers, grass tufts, cacti, rocks)
+    for k in range(16):
+        d = rng.uniform(-22, 58)
+        u = rng.choice([-1, 1]) * rng.uniform(9, 30)
+        pp, aa = frame(d, u)
+        inst("flowers_" + rng.choice(("red", "yellow")), "foliage_flowers", pp, rng.uniform(0, 6), rng.uniform(0.9, 1.4), cat="foliage", d=d)
+    for (d, u, v) in ((-12, 24, "a"), (40, -27, "b"), (55, 23, "c"), (-4, -26, "a"), (126, -26, "b")):
+        pp, aa = frame(d, u)
+        inst("saguaro_" + v, "foliage_saguaro", pp, rng.uniform(0, 6), rng.uniform(0.9, 1.2), cat="foliage", d=d)
+    for k in range(10):
+        d = rng.uniform(-20, 140)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 42)
+        if scatter_ok(d, u):
+            pp, aa = frame(d, u)
+            inst(rng.choice(("barrel_cactus", "prickly_pear")), "foliage_cactus", pp, rng.uniform(0, 6), rng.uniform(0.8, 1.2), cat="foliage", d=d)
+    for (d, u) in ((-6, 30), (138, 46)):
+        pp, aa = frame(d, u)
+        inst("dead_tree", "foliage_dead_tree", pp, rng.uniform(0, 6), 1.0, cat="foliage", d=d)
+    for k in range(70):
+        d = rng.uniform(-22, 142)
+        u = rng.choice([-1, 1]) * rng.uniform(9.5, 40)
+        pp, aa = frame(d, u)
+        inst(rng.choice(("tuft_dry", "tuft_green", "tuft_dry")), "foliage_tuft", pp, rng.uniform(0, 6), rng.uniform(0.9, 1.5), cat="foliage", d=d)
+    for k in range(16):
+        d = rng.uniform(-22, 142)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 44)
+        pp, aa = frame(d, u)
+        inst("sage", "foliage_sage", pp, rng.uniform(0, 6), rng.uniform(0.8, 1.3), cat="foliage", d=d)
+    for k in range(22):
+        d = rng.uniform(-24, 144)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 48)
+        pp, aa = frame(d, u)
+        inst("boulder_" + rng.choice("abcd"), "prop_boulder", pp, rng.uniform(0, 6), rng.uniform(0.7, 1.2), d=d)
+    return removed
+
+def run_s1_3(render=False):
+    run_s1_2(render=False)
+    clear_generated("s1_3")
+    removed = run_s1_3_place()
+    tri_by_chunk = {}
+    for ck, (a, b) in CHUNKS.items():
+        tri_by_chunk[ck] = sum(t for (d, t) in S13["tris"] if a <= d <= b)
+    shack_tris = {k: v for k, v in KIT_TRIS.items() if k.startswith("shack_") or k.startswith("gate")}
+    stats = dict(removed_old=removed, props=S13["count_prop"], foliage=S13["count_foliage"], hiding_places=S13["hides"], interactables=S13["inter"],
+                 s1_3_tris_by_chunk_instanced=tri_by_chunk, kit_tris=shack_tris)
+    print(json.dumps(stats, indent=1))
+    for m in S13["markers"]:
+        print("MARKER", m)
+    if render:
+        s13_renders()
+    return stats
+
+def aerial(name, d, u, off, h, lens=35, res=(1920, 1080)):
+    """A review camera hovering over road-local (d, u), offset (x, y) metres and h up, looking down at it."""
+    c = get_cam("ReviewCloseCamera")
+    c.data.type = "PERSP"; c.data.sensor_fit = "AUTO"; c.data.lens = lens; c.data.clip_end = 3000
+    p2 = du_w(d, u)
+    tgt = Vector((p2.x, p2.y, 0.0)); pos = Vector((p2.x + off[0], p2.y + off[1], h))
+    c.location = pos
+    c.rotation_euler = (tgt - pos).to_track_quat("-Z", "Y").to_euler()
+    return render_to(c, name, res)
+
+def s13_renders():
+    cc, cp = get_cam("ChaseCamera"), get_cam("ChaseCameraPhone")
+    for d in (28, 50, 72, 100, 125):
+        place_chase_camera(cc, d)
+        render_to(cc, "s1-3_chase_d%03d" % d, (1920, 1080))
+    place_chase_camera(cc, 96, u=22)
+    render_to(cc, "s1-3_chase_walkway_d096", (1920, 1080))
+    place_chase_camera(cp, 110, phone=True)
+    render_to(cp, "s1-3_chase_phone_d110", (1080, 1920))
+    aerial("s1-3_closeup_trailhead_camp", 14, 0, (-6, -34), 26)
+    aerial("s1-3_closeup_trailhead_east", 38, -6, (-8, -36), 26)
+    aerial("s1-3_closeup_shack_row_west", 84, 28, (-14, -44), 26)
+    aerial("s1-3_closeup_shack_row_east", 118, 28, (-14, -44), 26)
+    aerial("s1-3_closeup_H04_barrel_alcove", 118, -12, (-6, -28), 20)
+    aerial("s1-3_closeup_H05_laundry", 135, 28, (-8, -34), 22)
+    aerial("s1-3_closeup_gate", -3, 0, (14, -24), 14)
+    aerial("s1-3_closeup_H02_cart", 36, -14, (-6, -26), 16)
+    aerial("s1-3_closeup_S2_door_porch", 90, 28, (-3, -16), 11)
+    gc = bpy.data.objects["GameCamera"]
+    place_game_camera(gc, 90)
+    render_to(gc, "s1-3_game_camera_d090", (1920, 1080))
+    render_to(bpy.data.objects["ReviewTopCamera"], "s1-3_top_down", (1920, 1080))
