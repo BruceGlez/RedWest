@@ -56,3 +56,5 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 - Death preserves the last campfire's HP, ammo, clues, crate and fire state; RETURN TO TOWN followed by another pursuit resumes it. Victory/restart remove the canyon scene; reset also removes an unfinished comic.
 - Regression coverage: `tests/peteWorld.test.js` checks selection, pickups, spawn arguments, settlement and saved fire state. `tests/boss-smoke.mjs` adds a default-mode browser pursuit using real firing input, bullet damage, death/retry and victory/exit, without `__rwSmokeTest`.
 - Follow-up: physical canyon/gate collision, zone encounters, a paused comic and three-phase boss integration remain outside this milestone.
+
+- Pete's canyon now has real guards: `ENCOUNTERS` in `src/peteWorldMap.js` wake as the marshal walks up (once each, none respawn, skipped when resuming past them). Each zone shows a story banner on first entry, clues show their text, and the HUD says what to find next. Canyon walls moved out to x=±44 so the valley reads as open country.

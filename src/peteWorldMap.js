@@ -63,12 +63,68 @@ export const WORLD_CRATES = [
     createLootCrate('crate-c4', 12, 50, { type: 'ammo', amount: 20 })
 ];
 
-export const ENCOUNTER_SPAWNS = [
-    { id: 'patrol-1', type: 'bandit', x: -8, z: -35, zone: 'railSpur' },
-    { id: 'patrol-2', type: 'bandit', x: 10, z: -25, zone: 'railSpur' },
-    { id: 'patrol-3', type: 'rusher', x: -5, z: -10, zone: 'railSpur' },
-    { id: 'scout-mini', type: 'brawler', x: 0, z: 38, zone: 'sunkenSaloon', isMiniBoss: true }
+// Guard groups. Each wakes when the marshal walks within `radius` of it, then chases; nobody respawns, so the canyon is
+// cleared as you push on. Offsets are from the group's centre. `line` is the words on the banner when they spot you.
+export const ENCOUNTERS = [
+    {
+        id: 'mine-guards', zone: 'mineCamp', x: 6, z: -45, radius: 28,
+        line: 'Company guards at the old mine!',
+        enemies: [{ type: 'bandit', dx: -6, dz: 0 }, { type: 'bandit', dx: 6, dz: 4 }, { type: 'wolf', dx: 0, dz: -6 }]
+    },
+    {
+        id: 'depot-patrol', zone: 'railSpur', x: -4, z: -28, radius: 22,
+        line: 'A patrol on the rail spur.',
+        enemies: [{ type: 'bandit', dx: -8, dz: 0 }, { type: 'bandit', dx: 8, dz: 2 }, { type: 'gunslinger', dx: 0, dz: 8 }]
+    },
+    {
+        id: 'depot-yard', zone: 'railSpur', x: 6, z: -4, radius: 30,
+        line: 'Enforcers guard the depot yard.',
+        enemies: [{ type: 'knifer', dx: -7, dz: 0 }, { type: 'knifer', dx: 7, dz: 0 }, { type: 'rifleman', dx: 0, dz: 10 }]
+    },
+    {
+        id: 'saloon-lookouts', zone: 'sunkenSaloon', x: 0, z: 36, radius: 30,
+        line: "Pete's lookouts, and a big one.",
+        enemies: [{ type: 'bandit', dx: -9, dz: 0 }, { type: 'bandit', dx: 9, dz: 0 }, { type: 'gunslinger', dx: 0, dz: 6 }, { type: 'brute', dx: 0, dz: -6 }]
+    },
+    {
+        id: 'gate-guards', zone: 'stronghold', x: 0, z: 84, radius: 30,
+        line: "Pete's gate crew.",
+        enemies: [{ type: 'bandit', dx: -10, dz: 0 }, { type: 'bandit', dx: 10, dz: 0 }, { type: 'knifer', dx: -4, dz: 6 }, { type: 'knifer', dx: 4, dz: 6 }]
+    }
 ];
+
+// Flat list of every guard's start point (kept for the map tests and for tools that want to draw them).
+export const ENCOUNTER_SPAWNS = ENCOUNTERS.flatMap(group =>
+    group.enemies.map((enemy, i) => ({ id: `${group.id}-${i + 1}`, type: enemy.type, x: group.x + enemy.dx, z: group.z + enemy.dz, zone: group.zone, group: group.id }))
+);
+
+// What the marshal reads on the banner on first reaching each zone. Serious voice (STORY_BIBLE.md): loss is told, never shown.
+export const ZONE_STORY = {
+    mineCamp: {
+        title: 'COPPER BIT',
+        line: 'The miners are gone and the mine is Company property now. Somebody here saw where Pete went.'
+    },
+    railSpur: {
+        title: 'THE RAIL SPUR',
+        line: 'Company freight sits where the miners\' carts used to roll. Pete\'s claim ledger rode through here.'
+    },
+    sunkenSaloon: {
+        title: 'THE TIN CUP',
+        line: 'The Tin Cup\'s piano still stands in the street. Pete\'s lookouts hold the key to his gate.'
+    },
+    stronghold: {
+        title: "PETE'S STRONGHOLD",
+        line: 'Pete kept every receipt. Now he has to answer for them.'
+    }
+};
+
+// The one thing to do next, for the HUD.
+export function objectiveFor(collectedClueIds = [], bossSpawned = false) {
+    if(bossSpawned) return 'DEFEAT DUSTY PETE';
+    const next = INVESTIGATION_CLUES.find(clue => !collectedClueIds.includes(clue.id));
+    if(!next) return 'BREAK INTO THE STRONGHOLD';
+    return `FIND: ${next.title.toUpperCase()}`;
+}
 
 export const STRONGHOLD_GATE_Z = 74;
 

@@ -16,7 +16,10 @@ import {
     INVESTIGATION_CLUES,
     WORLD_CAMPFIRES,
     WORLD_CRATES,
+    ENCOUNTERS,
+    ZONE_STORY,
     STRONGHOLD_GATE_Z,
+    objectiveFor,
     zoneAt,
     canBreachStronghold,
     isNearClue
@@ -41,6 +44,8 @@ export const peteWorldRun = {
     lastCheckpointId: null,
     bossSpawned: false,
     gateBreached: false,
+    triggeredEncounters: [],
+    announcedZones: [],
     prompt: null
 };
 
@@ -51,6 +56,8 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
     peteWorldRun.collectedClues = [];
     peteWorldRun.bossSpawned = false;
     peteWorldRun.gateBreached = false;
+    peteWorldRun.triggeredEncounters = [];
+    peteWorldRun.announcedZones = [];
     peteWorldRun.prompt = null;
 
     // Load saved checkpoint if one exists
@@ -78,8 +85,33 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
     }
 
     peteWorldRun.currentZone = zoneAt(peteWorldRun.startPosition.z);
+    // A run resumed from a campfire does not send back the guards already left behind it.
+    for(const group of ENCOUNTERS) {
+        if(group.z < peteWorldRun.startPosition.z - 10) peteWorldRun.triggeredEncounters.push(group.id);
+    }
 
     return peteWorldRun;
+}
+
+// The banner a zone gets the first time the marshal reaches it.
+function announceZone(ctx, zone) {
+    if(!zone || peteWorldRun.announcedZones.includes(zone.id)) return;
+    peteWorldRun.announcedZones.push(zone.id);
+    const story = ZONE_STORY[zone.id];
+    if(story) ctx?.ui?.showWaveBanner?.(`${story.title}: ${story.line}`, 4200);
+}
+
+// Wake each guard group the marshal walks up to. Returns the banner line of a group that woke this frame, or null.
+function wakeEncounters(ctx, playerPos) {
+    let line = null;
+    for(const group of ENCOUNTERS) {
+        if(peteWorldRun.triggeredEncounters.includes(group.id)) continue;
+        if(Math.hypot(group.x - playerPos.x, group.z - playerPos.z) > group.radius) continue;
+        peteWorldRun.triggeredEncounters.push(group.id);
+        for(const enemy of group.enemies) ctx?.spawn?.(enemy.type, { x: group.x + enemy.dx, z: group.z + enemy.dz });
+        line = group.line;
+    }
+    return line;
 }
 
 export function endPeteWorldRun(victory = false, storage = globalThis.localStorage) {
@@ -111,7 +143,8 @@ export const peteWorldMode = {
             const ammo = peteWorldRun.ammoState ? peteWorldRun.ammoState.current : 0;
             const clues = peteWorldRun.collectedClues.length;
             const prompt = peteWorldRun.prompt ? ` | [ ${peteWorldRun.prompt} ]` : '';
-            return `CLUES ${clues}/3 | AMMO ${ammo}${prompt}`;
+            const goal = peteWorldRun.prompt ? '' : ` | ${objectiveFor(peteWorldRun.collectedClues, peteWorldRun.bossSpawned)}`;
+            return `CLUES ${clues}/3 | AMMO ${ammo}${prompt}${goal}`;
         }
     },
 
@@ -130,6 +163,7 @@ export const peteWorldMode = {
         if(ctx?.playerSystem?.playerGroup) {
             ctx.playerSystem.playerGroup.position.set(peteWorldRun.startPosition.x, 0, peteWorldRun.startPosition.z);
         }
+        announceZone(ctx, peteWorldRun.currentZone);
         // Show prologue comic if not seen yet
         if(!hasSeenComic('dusty-pete', storage) && typeof document !== 'undefined') {
             const existing = document.getElementById('comic-intro-modal');
@@ -155,8 +189,9 @@ export const peteWorldMode = {
         if(!peteWorldRun.active) return;
         const playerPos = ctx?.playerSystem?.playerGroup?.position || { x: 0, z: 0 };
 
-        // 1. Update current zone
+        // 1. Update current zone, and tell its story the first time
         peteWorldRun.currentZone = zoneAt(playerPos.z);
+        announceZone(ctx, peteWorldRun.currentZone);
         let activePrompt = null;
 
         // 2. Check campfires (auto-save checkpoint on reach)
@@ -191,13 +226,22 @@ export const peteWorldMode = {
             if(!peteWorldRun.collectedClues.includes(clue.id) && isNearClue(clue, playerPos.x, playerPos.z)) {
                 peteWorldRun.collectedClues.push(clue.id);
                 activePrompt = `FOUND ${clue.title.toUpperCase()}`;
+                ctx?.ui?.showWaveBanner?.(`${clue.title}: ${clue.detail}`, 5200);
             }
+        }
+
+        // 4b. Guards wake as the marshal nears them
+        const alarm = wakeEncounters(ctx, playerPos);
+        if(alarm) {
+            activePrompt = alarm.toUpperCase();
+            ctx?.ui?.showWaveBanner?.(alarm, 2200);
         }
 
         // 5. Stronghold gate breach check
         if(!peteWorldRun.gateBreached && canBreachStronghold(peteWorldRun.collectedClues)) {
             peteWorldRun.gateBreached = true;
             activePrompt = 'STRONGHOLD UNLOCKED';
+            ctx?.ui?.showWaveBanner?.('You have the receipt, the ledger and the key. The stronghold gate is open.', 4200);
         }
 
         // 6. Boss arena encounter trigger

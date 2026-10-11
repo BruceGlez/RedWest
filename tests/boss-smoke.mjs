@@ -91,9 +91,9 @@ async function checkPetePursuit(browser, url) {
             await page.waitForFunction(count => P.peteWorldRun.collectedClues.length === count, index + 1);
         }
         await page.evaluate(() => { window.__redWest.playerGroup.position.set(0, 0, 74); });
-        await page.waitForFunction(() => P.peteWorldRun.bossSpawned && S.enemies.length === 1);
+        await page.waitForFunction(() => P.peteWorldRun.bossSpawned && S.enemies.some(e => e.userData.type === 'boss'));
         const spawned = await page.evaluate(() => {
-            const e = S.enemies[0];
+            const e = S.enemies.find(enemy => enemy.userData.type === 'boss');
             // Pause after the spawn frame to inspect the contract before Pete moves.
             S.gameState.isPaused = true;
             return { type: e.userData.type, hp: e.userData.hp, style: e.userData.bossStyle, x: e.position.x, z: e.position.z };
@@ -104,7 +104,7 @@ async function checkPetePursuit(browser, url) {
         assert.ok(Math.hypot(spawned.x, spawned.z - 100) < 2, `Pete spawns at the stronghold: ${JSON.stringify(spawned)}`);
         await page.evaluate(async () => {
             const { spawnBullet } = await import('/src/bulletSystem.js');
-            window.__pete = S.enemies[0];
+            window.__pete = S.enemies.find(enemy => enemy.userData.type === 'boss');
             const at = window.__pete.position.clone().setY(2);
             spawnBullet(window.__redWest.scene, 'player', at, at.clone().set(0, 0, 0));
             S.gameState.isPaused = false;

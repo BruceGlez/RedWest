@@ -7,7 +7,10 @@ import {
     WORLD_CRATES,
     zoneAt,
     canBreachStronghold,
-    isNearClue
+    isNearClue,
+    ENCOUNTERS,
+    ZONE_STORY,
+    objectiveFor
 } from '../src/peteWorldMap.js';
 import {
     peteWorldRun,
@@ -168,7 +171,7 @@ test('actual clue pickups unlock one correctly positioned boss and settlement aw
         }
     };
     peteWorldMode.update(ctx, 0.1, storage);
-    assert.deepEqual(calls, [], 'entry without clues cannot spawn the boss');
+    assert.deepEqual(calls.filter(([type]) => type === 'boss'), [], 'entry without clues cannot spawn the boss');
     for(const clue of INVESTIGATION_CLUES) {
         Object.assign(position, clue);
         peteWorldMode.update(ctx, 0.1, storage);
@@ -179,13 +182,13 @@ test('actual clue pickups unlock one correctly positioned boss and settlement aw
     Object.assign(position, { x: 0, z: 74 });
     peteWorldMode.update(ctx, 0.1, storage);
     peteWorldMode.update(ctx, 0.1, storage);
-    assert.deepEqual(calls, [['boss', { x: 0, z: 100 }]]);
+    assert.deepEqual(calls.filter(([type]) => type === 'boss'), [['boss', { x: 0, z: 100 }]]);
     storage.setItem('redWestCheckpoint.v1', '{}');
     peteWorldMode.afterOutlawDown(ctx, storage);
     const score = gameState.score;
     peteWorldMode.afterOutlawDown(ctx, storage);
     assert.deepEqual(calls.at(-1), ['finish', 'banked']);
-    assert.equal(calls.length, 2, 'duplicate defeat callback cannot settle twice');
+    assert.equal(calls.filter(([type]) => type === 'finish').length, 1, 'duplicate defeat callback cannot settle twice');
     assert.equal(gameState.bounty.status, 'banked');
     assert.equal(gameState.score, score);
     assert.equal(score, 50);
@@ -223,3 +226,55 @@ test('campfire saves clues, HP, ammo and its own activation; failure preserves t
 });
 
 
+
+test('every zone has guards and a story line, and every guard is a real enemy type', async () => {
+    const { ENEMY_TYPES } = await import('../src/enemyTypes.js');
+    for(const zone of Object.keys(PETE_WORLD_ZONES)) {
+        assert.ok(ZONE_STORY[zone]?.line, `${zone} has a story line`);
+        assert.ok(ENCOUNTERS.some(group => group.zone === zone), `${zone} has guards`);
+    }
+    for(const group of ENCOUNTERS) {
+        for(const enemy of group.enemies) assert.ok(ENEMY_TYPES[enemy.type], `${group.id}: ${enemy.type} exists`);
+    }
+});
+
+test('guards wake once as the marshal walks up, and the objective points at the next clue', () => {
+    const storage = createMockStorage();
+    resetGameState();
+    startPeteWorldRun({}, storage);
+    const position = { x: 0, z: -75 };
+    const spawned = [];
+    const banners = [];
+    const ctx = {
+        playerSystem: { playerGroup: { position } },
+        spawn: (type, at) => spawned.push([type, at]),
+        ui: { showWaveBanner: text => banners.push(text) }
+    };
+    peteWorldMode.update(ctx, 0.1, storage);
+    assert.equal(spawned.length, 0, 'the start is quiet');
+    assert.ok(banners.some(text => text.includes('COPPER BIT')), 'the first zone tells its story');
+    assert.equal(objectiveFor([], false), "FIND: MINERS' PAYROLL MANIFEST");
+    Object.assign(position, { x: 6, z: -50 });
+    peteWorldMode.update(ctx, 0.1, storage);
+    const first = ENCOUNTERS[0];
+    assert.equal(spawned.length, first.enemies.length);
+    peteWorldMode.update(ctx, 0.1, storage);
+    assert.equal(spawned.length, first.enemies.length, 'a group wakes only once');
+    assert.ok(peteWorldMode.hud.status().includes('FIND:'));
+    peteWorldMode.reset(storage);
+    resetGameState();
+});
+
+test('resuming at a campfire does not send back the guards left behind it', () => {
+    const storage = createMockStorage();
+    resetGameState();
+    startPeteWorldRun({}, storage);
+    peteWorldRun.startPosition = { x: 0, z: 25 };
+    peteWorldMode.reset(storage);
+    storage.setItem('redWestCheckpoint.v1', JSON.stringify({ version: 1, outlawId: 'dusty-pete', lastCheckpointId: 'camp-saloon', position: { x: 0, z: 25 }, stats: { hp: 5, ammo: 20 } }));
+    startPeteWorldRun({}, storage);
+    assert.ok(peteWorldRun.triggeredEncounters.includes('mine-guards'));
+    assert.ok(!peteWorldRun.triggeredEncounters.includes('gate-guards'));
+    peteWorldMode.reset(storage);
+    resetGameState();
+});

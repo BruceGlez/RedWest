@@ -15,6 +15,9 @@ import {
     STRONGHOLD_GATE_Z
 } from './peteWorldMap.js';
 
+// How far from the centre line the canyon walls stand. The trail, crates, clues and camps all sit inside it.
+const CANYON_WALL_X = 44;
+
 const COLORS = {
     wood: 0x6e4a2c,
     woodDark: 0x48301c,
@@ -984,32 +987,22 @@ function createCanyonEnvironment() {
         const seed = Math.sin(i * 1.7);
         const seed2 = Math.cos(i * 2.3);
 
-        // West cliff formation (X ~ -16 to -22)
-        const wx = -17 - Math.abs(seed) * 3;
+        // West cliff formation (well back from the trail, so the valley reads as open country)
+        const wx = -CANYON_WALL_X - Math.abs(seed) * 6;
         const wh = 6 + Math.abs(seed2) * 3.5;
         cliffParts.push(box(9, wh, 14, COLORS.cliffBase, wx, wh / 2, cz));
         cliffParts.push(box(6, wh * 0.4, 9, COLORS.cliffLight, wx - 1.5, wh + (wh * 0.2), cz + 1));
         cliffParts.push(dodecahedron(3.2, COLORS.cliffDark, wx + 3.2, 2.5, cz - 3, 0.2, 0.4, 0.1));
         cliffParts.push(box(7, 0.8, 12, COLORS.cliffRim, wx + 1, wh - 0.4, cz));
 
-        // East cliff formation (X ~ 16 to 22)
-        const ex = 17 + Math.abs(seed2) * 3;
+        // East cliff formation
+        const ex = CANYON_WALL_X + Math.abs(seed2) * 6;
         const eh = 6 + Math.abs(seed) * 3.5;
         cliffParts.push(box(9, eh, 14, COLORS.cliffBase, ex, eh / 2, cz));
         cliffParts.push(box(6, eh * 0.4, 9, COLORS.cliffLight, ex + 1.5, eh + (eh * 0.2), cz - 1));
         cliffParts.push(dodecahedron(3.2, COLORS.cliffDark, ex - 3.2, 2.5, cz + 3, -0.2, -0.3, 0.1));
         cliffParts.push(box(7, 0.8, 12, COLORS.cliffRim, ex - 1, eh - 0.4, cz));
     }
-
-    // High natural rock arch spanning over the canyon at Z = -48 (Zone A to B entrance)
-    cliffParts.push(box(38, 3.5, 6, COLORS.cliffBase, 0, 10.5, -48));
-    cliffParts.push(box(24, 2.0, 5, COLORS.cliffRim, 0, 12.0, -48));
-    cliffParts.push(dodecahedron(3.8, COLORS.cliffLight, -6, 12.5, -48));
-
-    // High natural rock arch spanning over the canyon at Z = 52 (Zone C to D entrance)
-    cliffParts.push(box(38, 3.5, 6, COLORS.cliffBase, 0, 11.5, 52));
-    cliffParts.push(box(22, 2.0, 5, COLORS.cliffRim, 0, 13.0, 52));
-    cliffParts.push(dodecahedron(3.8, COLORS.cliffLight, 5, 13.5, 52));
 
     const cliffsMesh = new THREE.Mesh(mergeGeometries(cliffParts, false), sharedVertexMaterial());
     group.add(cliffsMesh);
