@@ -761,3 +761,21 @@ def run_s1_1(render=False):
 
 if "RUN_STEPS" in globals():
     pass
+
+# ---------------------------------------------------------------- chase camera (proposal: a more 3D follow camera)
+CHASE = dict(back=9.0, up=5.2, ahead=9.0, look_z=1.4, vfov=58.0)          # landscape
+CHASE_PHONE = dict(back=11.0, up=6.5, ahead=10.0, look_z=1.4, vfov=58.0)  # portrait
+
+def place_chase_camera(cam, d, u=0.0, phone=False, cfg=None):
+    """Behind and above the marshal on the road, looking down the road ahead (the camera follows the heading)."""
+    c = cfg or (CHASE_PHONE if phone else CHASE)
+    P0 = centre(d)
+    T = (centre(d + 1.0) - centre(d - 1.0)).normalized()
+    Nv = Vector((-T.y, T.x))
+    P = P0 + Nv * u
+    pos = Vector((P.x - T.x * c["back"], P.y - T.y * c["back"], c["up"]))
+    tgt = Vector((P.x + T.x * c["ahead"], P.y + T.y * c["ahead"], c["look_z"]))
+    cam.location = pos
+    cam.rotation_euler = (tgt - pos).to_track_quat("-Z", "Y").to_euler()
+    cam.data.type = "PERSP"
+    vfov_camera(cam, c["vfov"])
