@@ -4236,7 +4236,27 @@ BLOCK_TOKENS = ("prop_shack_", "prop_headframe", "prop_ore_bin", "prop_tent_", "
                 "prop_notice_board", "prop_eviction_board", "prop_hanging_sign", "prop_cable_spool", "prop_lumber_stack", "prop_dynamite_crate", "foliage_saguaro",
                 "foliage_dead_tree", "foliage_mesquite", "foliage_rock_cluster", "prop_wheelbarrow", "prop_yard", "prop_log_seat", "prop_dry_garden", "fence_whole",
                 "prop_waterwheel_gully", "prop_cave_mouth", "prop_adit_mouth", "prop_map_rock", "prop_gate_I17", "gate_posts", "prop_mossy_stone", "foliage_cactus", "foliage_scrub")
-SKIP_TOKENS = ("sluice_walk", "culvert", "ladder", "ditch_ramp", "walkway", "laundry", "tarp_roof", "lantern", "wire", "aqueduct", "flume_bridge", "tuft", "flowers", "decal", "prop_dry_garden", "foliage_scrub")
+SKIP_TOKENS = ("prop_lookout", "sluice_walk", "culvert", "ladder", "ditch_ramp", "walkway", "laundry", "tarp_roof", "lantern", "wire", "aqueduct", "flume_bridge", "tuft", "flowers", "decal", "prop_dry_garden", "foliage_scrub")
+
+def _custom_rects(ob):
+    """Footprints for buildings that need rooms or open fronts, as local rectangles (cx, cy, halfX, halfY)."""
+    n = ob.name
+    if n.startswith("prop_shack_"):
+        sid = n.replace("prop_shack_", "")[:2]
+        sp = shack_spec(sid)
+        w, d = sp["w"], sp["d"]
+        if sp.get("open_door"):                      # S2: four walls and a doorway, so the dim room can be entered
+            t, dx, dw = 0.2, -w * 0.18, 1.1
+            lw, rw = (dx - dw / 2) + w / 2, w / 2 - (dx + dw / 2)
+            return [(0, d / 2 - t / 2, w / 2, t / 2), (-w / 2 + t / 2, 0, t / 2, d / 2), (w / 2 - t / 2, 0, t / 2, d / 2),
+                    (-w / 2 + lw / 2, -d / 2 + t / 2, lw / 2, t / 2), (w / 2 - rw / 2, -d / 2 + t / 2, rw / 2, t / 2)]
+        return [(0, 0, w / 2 + 0.15, d / 2 + 0.15)]
+    if n.startswith("shed_body"):                    # three sides, open front
+        w, d = 5.2, 4.2
+        return [(0, d / 2 - 0.1, w / 2, 0.1), (-(w / 2 - 0.1), 0, 0.1, d / 2), (w / 2 - 0.1, 0, 0.1, d / 2)]
+    if n.startswith("prop_headframe_tower"):
+        return [(0, 0, 3.2, 3.2), (0, 5.2, 2.0, 1.6), (0, -7.0, 1.3, 1.3)]
+    return None
 
 def collision_boxes():
     out = []
@@ -4249,6 +4269,13 @@ def collision_boxes():
         if not any(t in n for t in BLOCK_TOKENS) or any(t in n for t in SKIP_TOKENS):
             continue
         M = ob.matrix_world
+        rects = _custom_rects(ob)
+        if rects is not None:
+            th0 = M.to_euler().z
+            for (lx, ly, hx0, hy0) in rects:
+                w0 = M @ Vector((lx, ly, 0.0))
+                out.append([round(w0.x * WORLD_SCALE, 2), round(w0.y * WORLD_SCALE, 2), round(hx0 * WORLD_SCALE, 2), round(hy0 * WORLD_SCALE, 2), round(th0, 3)])
+            continue
         cs = [M @ Vector(c) for c in ob.bound_box]
         zmin, zmax = min(c.z for c in cs), max(c.z for c in cs)
         if zmax - zmin < 0.3 or zmin > 4.0:
