@@ -121,6 +121,8 @@ function scaledEncounter(g) {
 
 // ---- the area itself
 // `sceneFactory` (optional) returns { buildEnvironment, buildLandmarks } for one mount of the scene (src/placePeteSection1.js).
+import { ODELL, objectiveFor, BEAT_LINES } from './section1/story.js';
+
 export function createSection1Area({ collision, markers = [], sceneFactory = null } = {}) {
     if(!collision) throw new Error('createSection1Area needs the collision JSON');
     const byId = Object.fromEntries(markers.map(m => [m.id, m]));
@@ -150,7 +152,8 @@ export function createSection1Area({ collision, markers = [], sceneFactory = nul
         encounters,
         places: SECTION1_PLACES,
         story: SECTION1_STORY,
-        markers,
+        markers: [...markers, { id: ODELL.id, type: 'npc', x: ODELL.at.x, z: ODELL.at.z, radius: 9, note: 'Miner Odell, the witness by the Trailhead fire' }],
+        npcs: [{ id: ODELL.id, x: ODELL.at.x, z: ODELL.at.z, face: ODELL.at.face, model: 'models/ezra-stone.glb' }],
         zoneAt(x, z) {
             let best = null, bestScore = Infinity;
             for(const place of SECTION1_PLACES) {
@@ -168,15 +171,15 @@ export function createSection1Area({ collision, markers = [], sceneFactory = nul
             requires: [],
             clears: ['a1-flume-ambush'],           // the way on opens once this guard group has been woken and beaten
             locked: 'The bridge is held. Clear the Company men first.',
-            opened: 'The Flume Bridge is yours. The road goes on.',
+            opened: BEAT_LINES.bridge,
             next: 1
         },
-        objective: () => 'FOLLOW THE CLAIMS ROAD',
+        objective: (_clues, _boss, run) => objectiveFor(run),
         isGateOpen: run => !!run.exitOpen,
         enterBanner: 'THE CLAIMS ROAD: THE TRAILHEAD',
         sceneParts() {
             if(!sceneFactory) return null;
-            const parts = sceneFactory({ markers });
+            const parts = sceneFactory({ markers, npcs: this.npcs });
             return {
                 campfires, crates, pots, bandits, clues: [],
                 itemScale: S,                 // crates, pots and campfires are drawn in the art's scale

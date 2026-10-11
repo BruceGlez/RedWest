@@ -300,7 +300,7 @@ export const peteWorldMode = {
             const ammo = peteWorldRun.ammoState ? peteWorldRun.ammoState.current : 0;
             const clues = peteWorldRun.collectedClues.length;
             const prompt = peteWorldRun.prompt ? ` | [ ${peteWorldRun.prompt} ]` : '';
-            const goal = peteWorldRun.prompt ? '' : ` | ${peteWorldRun.area.objective(peteWorldRun.collectedClues, peteWorldRun.bossSpawned)}`;
+            const goal = peteWorldRun.prompt ? '' : ` | ${peteWorldRun.area.objective(peteWorldRun.collectedClues, peteWorldRun.bossSpawned, peteWorldRun)}`;
             const found = peteWorldRun.s1?.summary() ? ` | ${peteWorldRun.s1.summary()}` : '';
             return peteWorldRun.area.isSection ? `AMMO ${ammo}${found}${prompt}${goal}` : `CLUES ${clues}/3 | AMMO ${ammo}${prompt}${goal}`;
         }
@@ -372,6 +372,7 @@ export const peteWorldMode = {
             if(!crate.opened && isNearCrate(crate, playerPos.x, playerPos.z)) {
                 const lootRes = lootCrate(crate, peteWorldRun.ammoState, playerStats);
                 activePrompt = lootRes.text || 'LOOTED CRATE';
+                if(crate.id.startsWith('a1-secret')) peteWorldRun.s1?.grant('whiskey', 1, text => ctx?.ui?.showWaveBanner?.(text, 2600));   // the Smuggler's Stash holds whiskey
             }
         }
 
@@ -392,7 +393,8 @@ export const peteWorldMode = {
             const r = peteWorldRun.s1.step({
                 x: playerPos.x, z: playerPos.z, dt, pressed, dialogue,
                 fired: !!(keys.mouse || keys.space || touch.firing),
-                banner: text => ctx?.ui?.showWaveBanner?.(text, 2600)
+                banner: text => ctx?.ui?.showWaveBanner?.(text, 2600),
+                heal: n => { if(playerStats) playerStats.hp = Math.min(playerStats.maxHp, playerStats.hp + n); }
             });
             if(playerStats) playerStats.speedMult = r.speedMult;
             // breakables, found elements and what they do to the enemies
@@ -428,6 +430,9 @@ export const peteWorldMode = {
             if(camera.clock - (peteWorldRun.encounterWokeAt[id] ?? camera.clock) < 1.5) continue;
             if(!enemies.some(e => Math.hypot(e.position.x - group.x, e.position.z - group.z) < group.radius * 1.6)) peteWorldRun.clearedEncounters.push(id);
         }
+
+        // 4d. Section 1: the Claims are held, so Odell has a word (story beat B4)
+        if(peteWorldRun.s1 && peteWorldRun.clearedEncounters.includes('a1-claims-guards')) peteWorldRun.s1.beat('claims', text => ctx?.ui?.showWaveBanner?.(text, 4200));
 
         // 5. The gate at the end of the area opens for its clue, and stepping through it starts the next area
         if(area.exit) {

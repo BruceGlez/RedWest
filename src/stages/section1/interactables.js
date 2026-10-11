@@ -1,9 +1,9 @@
 // What the marshal can use in Section 1 (docs/design/pete-section1-gameplay.md, section 4): the art's markers (pete_section1_markers.json) become
 // interactables with a kind, a place, a reach and a prompt. Pure data and rules; src/stages/section1/runtime.js runs them each frame.
 
-export const KIND_BY_TYPE = { hide: 'hide', door: 'door', lever: 'lever', lore: 'lore', climb: 'climb', vantage: 'vantage' };
+export const KIND_BY_TYPE = { npc: 'npc', hide: 'hide', door: 'door', lever: 'lever', lore: 'lore', climb: 'climb', vantage: 'vantage' };
 // When several are in reach, the first kind in this list wins (a door beside a hiding place opens the door).
-const PRIORITY = ['door', 'lever', 'stack', 'climb', 'lore', 'vantage', 'hide'];
+const PRIORITY = ['npc', 'door', 'lever', 'stack', 'climb', 'lore', 'vantage', 'hide'];
 export const MIN_REACH = 6;           // units: even a small marker can be used from a step away
 
 export function buildInteractables(markers = []) {
@@ -33,6 +33,7 @@ export function promptFor(item, state) {
     case 'lever': return state?.leverPulled ? 'LEVER PULLED' : 'E: PULL LEVER';
     case 'hide': return state?.hiding?.hidden && state.hiding.hideId === item.id ? 'HIDDEN (E: STEP OUT)' : 'E: HIDE';
     case 'stack': return state?.stackTaken ? null : 'E: TAKE DYNAMITE';
+    case 'npc': return state?.beats?.witness ? 'E: TALK TO ODELL' : 'E: TALK';
     case 'lore': return 'E: LOOK';
     case 'climb': return 'E: CLIMB';
     case 'vantage': return 'E: LOOK OUT';

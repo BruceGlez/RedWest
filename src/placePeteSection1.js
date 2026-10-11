@@ -42,6 +42,7 @@ function nodeKey(node) { return `${plain(node.name)}@${node.position.x.toFixed(1
 // Doors swing open and the yard gate lifts as the run's state says (runState.s1.state: src/stages/section1/runtime.js). Each moving node answers
 // to the nearest door or lever marker, found once.
 const OPEN_ANGLE = 1.6;
+const NPC_HEIGHT = 5.4;   // a little shorter than the marshal (6) so a hat does not tower over him
 function nearestMarker(list, node) {
     let best = null, bestD = Infinity;
     for(const m of list) { const d = Math.hypot(m.x - node.position.x, m.z - node.position.z); if(d < bestD) { bestD = d; best = m; } }
@@ -82,7 +83,7 @@ function syncMoving(registry, s1, markers) {
     }
 }
 
-export function createSection1Parts({ markers = [], loader = new GLTFLoader(), url = assetUrl, files = SECTION1_CHUNK_FILES, far = SECTION1_FAR_FILE } = {}) {
+export function createSection1Parts({ markers = [], npcs = [], loader = new GLTFLoader(), url = assetUrl, files = SECTION1_CHUNK_FILES, far = SECTION1_FAR_FILE } = {}) {
     const environment = new THREE.Group();
     environment.name = 'pete-section1-environment';
     const landmarks = new THREE.Group();
@@ -138,7 +139,21 @@ export function createSection1Parts({ markers = [], loader = new GLTFLoader(), u
         registry,
         ready,
         buildEnvironment: () => ({ group: environment }),
-        buildLandmarks: () => ({
+        buildLandmarks: () => {
+            // The people who stand in the area (Miner Odell): a placeholder model, as tall as the marshal (6 units), turned to face their fire.
+            for(const npc of npcs) {
+                loader.load(url(npc.model), gltf => {
+                    if(disposed) return;
+                    const box = new THREE.Box3().setFromObject(gltf.scene);
+                    const height = box.max.y - box.min.y || 1;
+                    gltf.scene.scale.setScalar(NPC_HEIGHT / height);
+                    gltf.scene.position.set(npc.x, -box.min.y * (NPC_HEIGHT / height), npc.z);
+                    gltf.scene.rotation.y = npc.face ?? 0;
+                    gltf.scene.name = `npc_${npc.id}`;
+                    landmarks.add(gltf.scene);
+                }, undefined, error => console.warn('Section 1 NPC failed', npc.id, error));
+            }
+            return {
             group: landmarks,
             setBreached() {},
             update(t, runState = null) {
@@ -146,7 +161,8 @@ export function createSection1Parts({ markers = [], loader = new GLTFLoader(), u
                 for(const { node, seed } of registry.lanterns) node.rotation.z = Math.sin(t * 1.7 + seed) * 0.07;
                 registry.flames.forEach((f, i) => f.scale.set(1, 0.85 + 0.25 * Math.sin(t * 9 + i), 1));
             }
-        }),
+            };
+        },
         dispose() {
             disposed = true;
             environment.traverse(o => { o.geometry?.dispose?.(); o.material?.dispose?.(); });

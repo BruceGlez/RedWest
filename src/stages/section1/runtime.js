@@ -5,13 +5,14 @@
 import { HIDE, createHidingState, stepHiding, speedScale, resetHiding } from './hiding.js';
 import { createBreakables, shoot, blastAt, step as stepBreakables, takeStack } from './breakables.js';
 import { createElements, resetElements, give, cycle, throwSelected, step as stepElements, slowAt, comboHint, summary, addPuddle } from './elements.js';
+import { ODELL, BEAT_LINES } from './story.js';
 import { buildInteractables, nearestInteractable, promptFor, LORE } from './interactables.js';
 
 export function createSection1Runtime(markers = []) {
     const interactables = buildInteractables(markers);
     const breakables = createBreakables(markers);
     const elements = createElements();
-    const state = { doors: {}, leverPulled: false, hiding: createHidingState(), seen: {}, near: null, prompt: null, broken: {}, stackTaken: false };
+    const state = { doors: {}, leverPulled: false, hiding: createHidingState(), seen: {}, near: null, prompt: null, broken: {}, stackTaken: false, beats: {} };
 
     function reset() {
         state.doors = {};
@@ -22,13 +23,14 @@ export function createSection1Runtime(markers = []) {
         state.prompt = null;
         state.broken = {};
         state.stackTaken = false;
+        state.beats = {};
         breakables.items = createBreakables(markers).items;
         breakables.pending = [];
         resetElements(elements);
     }
 
     // Returns { prompt, speedMult, revealed, said } for this frame. `pressed`: E (or ACT) this frame. `fired`: he is shooting.
-    function step({ x, z, dt, pressed = false, fired = false, dialogue = null, banner = null }) {
+    function step({ x, z, dt, pressed = false, fired = false, dialogue = null, banner = null, heal = null }) {
         // A dialogue that is open takes the press (it goes to the next line) and nothing else happens.
         if(dialogue?.isOpen()) {
             if(pressed) dialogue.advance();
@@ -44,7 +46,7 @@ export function createSection1Runtime(markers = []) {
         const useHide = !!hideHere && (!near || near.kind === 'hide' || state.hiding.hidden);
         let said = null;
         if(pressed && near && near.kind !== 'hide' && !state.hiding.hidden) {
-            said = use(near, dialogue, banner);
+            said = use(near, dialogue, banner, heal);
         }
         stepHiding(state.hiding, dt, { here: hideHere, pressed: pressed && useHide, fired });
         const shown = state.hiding.hidden ? hideHere : near;
@@ -52,11 +54,28 @@ export function createSection1Runtime(markers = []) {
         return { prompt: state.prompt, speedMult: speedScale(state.hiding), revealed: state.hiding.reason === 'fired', said };
     }
 
-    function use(item, dialogue, banner) {
+    // A story beat happens once: the banner line shows and the beat is remembered (state.beats). Returns true the first time.
+    function beat(name, banner) {
+        if(state.beats[name]) return false;
+        state.beats[name] = true;
+        if(BEAT_LINES[name]) banner?.(BEAT_LINES[name]);
+        return true;
+    }
+
+    function use(item, dialogue, banner, heal) {
         switch(item.kind) {
+        case 'npc': {
+            const first = !state.beats.witness;
+            dialogue?.open({
+                speaker: ODELL.speaker, lines: first ? ODELL.first : ODELL.again, closeAt: { x: item.x, z: item.z, r: item.r + 8 }, id: item.id,
+                onDone: () => { if(first) { state.beats.witness = true; heal?.(ODELL.healAmount); } }
+            });
+            return 'npc';
+        }
         case 'door': {
             const d = state.doors[item.id] ?? (state.doors[item.id] = { open: false });
             d.open = !d.open;
+            if(d.open && item.id === 'I15') beat('ledger', banner);       // the shack's claim ledger page
             return d.open ? 'door-open' : 'door-close';
         }
         case 'lever':
@@ -114,5 +133,12 @@ export function createSection1Runtime(markers = []) {
         return events;
     }
 
-    return { interactables, state, step, tick, reset, breakables, elements, slowAt: (x, z) => slowAt(elements, x, z), summary: () => summary(elements), HIDE };
+    // Something found in the world goes in the pack (the Stash crates hold Whiskey). Returns how many fitted.
+    function grant(type, n, banner) {
+        const got = give(elements, type, n);
+        if(got) { const hint = comboHint(elements); banner?.(hint ?? `${type.toUpperCase()} x${elements.slots[type]}. F throws it, V swaps.`); }
+        return got;
+    }
+
+    return { interactables, state, step, tick, reset, beat, grant, breakables, elements, slowAt: (x, z) => slowAt(elements, x, z), summary: () => summary(elements), HIDE };
 }

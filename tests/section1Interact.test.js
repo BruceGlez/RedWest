@@ -312,3 +312,48 @@ test('chase camera: Z and X swing it, a drag lifts it within limits, sideways wa
     cc.stepChase(c, 0.1, { dragY: -100000 });
     assert.equal(c.height, CHASE.HEIGHT_MIN);
 });
+
+import { ODELL, BEAT_LINES, objectiveFor } from '../src/stages/section1/story.js';
+
+test('story: every line fits the dialogue box', () => {
+    for(const line of [...ODELL.first, ...ODELL.again, ...Object.values(BEAT_LINES)]) assert.ok(line.length <= 200, line);
+});
+
+test('story: Odell tells his tale once, heals one hit point when it is heard, and later repeats a short line', () => {
+    const rt = createSection1Runtime([{ id: 'ODELL', type: 'npc', x: 0, z: 0, radius: 9 }]);
+    const dlg = createDialogue();
+    let healed = 0;
+    const press = () => rt.step({ x: 0, z: 0, dt: 0.1, pressed: true, dialogue: dlg, heal: n => { healed += n; } });
+    assert.equal(rt.step({ x: 0, z: 0, dt: 0.1 }).prompt, 'E: TALK');
+    press();
+    assert.equal(dlg.isOpen(), true);
+    assert.equal(rt.state.beats.witness, undefined, 'nothing yet: the tale is not heard');
+    press(); press();
+    assert.equal(dlg.isOpen(), true, 'three boxes, so one is still up');
+    press();
+    assert.equal(dlg.isOpen(), false);
+    assert.equal(rt.state.beats.witness, true);
+    assert.equal(healed, 1);
+    press();
+    assert.equal(dlg.current().count, 1, 'the second time: one short line');
+    dlg.skip();
+    assert.equal(healed, 1);
+});
+
+test('story: opening the shack door finds the claim ledger page once; the objective follows the beats', () => {
+    const rt = createSection1Runtime([{ id: 'I15', type: 'door', x: 0, z: 0, radius: 6 }]);
+    const lines = [];
+    const press = () => rt.step({ x: 0, z: 0, dt: 0.1, pressed: true, banner: t => lines.push(t) });
+    press(); press(); press();
+    assert.equal(lines.filter(l => l.includes('LEDGER')).length, 1);
+    const run = { s1: rt, exitOpen: true, clearedEncounters: [], currentZone: null };   // the exit starts open; it counts once the ambush is beaten
+    assert.equal(objectiveFor(run), 'FOLLOW THE CLAIMS ROAD');
+    rt.state.beats.witness = true;
+    assert.equal(objectiveFor(run), "FIND THE FOREMAN'S PAYROLL BOOK");
+    rt.state.beats.claims = true;
+    assert.equal(objectiveFor(run), 'HEAD FOR THE FLUME');
+    run.currentZone = { id: 'flume' };
+    assert.equal(objectiveFor(run), 'CROSS THE FLUME BRIDGE');
+    run.clearedEncounters.push('a1-flume-ambush');
+    assert.equal(objectiveFor(run), 'FOLLOW THE ROAD TO THE HAIRPIN');
+});
