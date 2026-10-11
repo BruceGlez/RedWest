@@ -120,7 +120,8 @@ function scaledEncounter(g) {
 }
 
 // ---- the area itself
-export function createSection1Area({ collision, markers = [], scene = null } = {}) {
+// `sceneFactory` (optional) returns { buildEnvironment, buildLandmarks } for one mount of the scene (src/placePeteSection1.js).
+export function createSection1Area({ collision, markers = [], sceneFactory = null } = {}) {
     if(!collision) throw new Error('createSection1Area needs the collision JSON');
     const byId = Object.fromEntries(markers.map(m => [m.id, m]));
     const trail = AREA1_CAMPFIRES.find(c => c.id === 'a1-trail');
@@ -164,19 +165,24 @@ export function createSection1Area({ collision, markers = [], scene = null } = {
         exit: {
             x: end.x, z: end.z, tx: end.tx, tz: end.tz, r: 18,
             requires: [],
+            clears: ['a1-flume-ambush'],           // the way on opens once this guard group has been woken and beaten
             locked: 'The bridge is held. Clear the Company men first.',
             opened: 'The Flume Bridge is yours. The road goes on.',
             next: 1
         },
         objective: () => 'FOLLOW THE CLAIMS ROAD',
         isGateOpen: run => !!run.exitOpen,
+        enterBanner: 'THE CLAIMS ROAD: THE TRAILHEAD',
         sceneParts() {
-            return scene ? {
+            if(!sceneFactory) return null;
+            const parts = sceneFactory();
+            return {
                 campfires, crates, pots, bandits, clues: [],
-                buildEnvironment: scene.buildEnvironment,
-                buildLandmarks: scene.buildLandmarks,
+                itemScale: S,                 // crates, pots and campfires are drawn in the art's scale
+                buildEnvironment: parts.buildEnvironment,
+                buildLandmarks: parts.buildLandmarks,
                 isGateOpen: run => !!run.exitOpen
-            } : null;
+            };
         }
     };
 }

@@ -20,6 +20,7 @@ import {
     AREA1_SECRET_CRATES, AREA1_POTS, AREA1_BANDITS, AREA1_ENCOUNTERS, AREA1_EXIT, createAreaWalk
 } from './peteArea1.js';
 import { createAreaEnvironment, createAreaGate } from '../placePeteArea.js';
+import { pointAlong } from './roadMask.js';
 
 function nearestSample(road, x, z) {
     let best = null, bestD = Infinity;
@@ -98,5 +99,48 @@ const area2 = {
     sceneParts: () => null
 };
 
-export const PETE_AREAS = [area1, area2];
+// The chapter's areas, in play order. With Section 1 installed (src/stages/section1Preload.js) the list is
+//   0 Section 1 (Trailhead to the Flume Bridge, the new art at game scale), 1 the old road from the bridge on, 2 Pete's Canyon;
+// otherwise it is the original two. An area's `index` is its place in this list, and a saved run also names its area (`areaId`).
+const LEGACY_AREAS = [area1, area2];
+export const PETE_AREAS = [...LEGACY_AREAS];
+
+// The old road, picked up where Section 1 ends (the bridge): the same data from the flume's progress on, entered through a loading
+// screen, so the whole area stays playable until the later sections replace it.
+function roadAfterSection1() {
+    const bridgeEnd = pointAlong(AREA1_ROAD, 0.33, 0);
+    return {
+        ...area1,
+        index: 1,
+        id: 'claims-road-2',
+        name: 'The Claims Road',
+        start: { x: bridgeEnd.x, z: bridgeEnd.z },
+        enterBanner: 'THE ROAD GOES ON: THE HAIRPIN AHEAD',
+        encounters: area1.encounters.filter(group => group.progress > 0.33),
+        campfires: area1.campfires.filter(fire => fire.id !== 'a1-trail'),
+        crates: area1.crates.filter(crate => nearestSample(AREA1_ROAD, crate.x, crate.z).d / AREA1_ROAD.length > 0.33),
+        pots: area1.pots.filter(pot => nearestSample(AREA1_ROAD, pot.x, pot.z).d / AREA1_ROAD.length > 0.33),
+        bandits: area1.bandits.filter(guard => guard.id !== 'a1-sleeper-1'),
+        exit: { ...area1.exit, next: 2 }
+    };
+}
+
+export function installSection1(section1) {
+    PETE_AREAS.splice(0, PETE_AREAS.length, { ...section1, index: 0 }, roadAfterSection1(), { ...area2, index: 2 });
+}
+export function uninstallSection1() { PETE_AREAS.splice(0, PETE_AREAS.length, ...LEGACY_AREAS); }
+export const section1Installed = () => PETE_AREAS[0]?.isSection === true;
+
+// Where a saved run goes: by area name when it has one, else by the old index (a save from before Section 1 existed means the original
+// first or second area, which are now Section 1 and the canyon).
+export function areaIndexForSave(saved) {
+    if(saved?.areaId) {
+        const i = PETE_AREAS.findIndex(a => a.id === saved.areaId);
+        if(i >= 0) return i;
+    }
+    if(!Number.isInteger(saved?.areaIndex)) return -1;
+    if(section1Installed()) return saved.areaIndex === 0 ? 0 : saved.areaIndex === 1 ? 2 : -1;
+    return PETE_AREAS[saved.areaIndex] ? saved.areaIndex : -1;
+}
+
 export { PETE_WORLD_ZONES };

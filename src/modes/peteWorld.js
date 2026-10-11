@@ -4,6 +4,7 @@
 // ammo, and a forced checkpoint on entering each area (no going back). docs/design/stage-world-framework.md.
 
 import { gameState, playerStats } from '../state.js';
+import { enemies } from '../state.js';
 import { createAmmoState, lootCrate, isNearCrate } from '../ammoEconomy.js';
 import {
     loadCheckpoint,
@@ -17,7 +18,8 @@ import {
     canBreachStronghold,
     isNearClue
 } from '../peteWorldMap.js';
-import { PETE_AREAS } from '../stages/pete.js';
+import { PETE_AREAS, areaIndexForSave } from '../stages/pete.js';
+import { preloadSection1 } from '../stages/section1Preload.js';
 import { setWalkMask } from '../physics.js';
 import { setGroundSize } from '../groundSize.js';
 import { arena } from '../arena.js';
@@ -39,6 +41,7 @@ export const peteWorldRun = {
     crates: [],
     collectedClues: [],
     areaIndex: 0,
+    areaId: null,
     area: PETE_AREAS[0],
     walk: null,
     exitOpen: false,
@@ -48,6 +51,8 @@ export const peteWorldRun = {
     bossSpawned: false,
     gateBreached: false,
     triggeredEncounters: [],
+    clearedEncounters: [],       // guard groups that were woken and beaten (an area's exit may need them: exit.clears)
+    encounterWokeAt: {},
     announcedZones: [],
     prompt: null
 };
@@ -55,11 +60,13 @@ export const peteWorldRun = {
 export function startPeteWorldRun(options = {}, storage = globalThis.localStorage) {
     // A saved run resumes in the area it was saved in. Saves from before the areas existed have no area, so they start fresh.
     const saved = loadCheckpoint(storage);
-    const resumes = !!saved && saved.outlawId === 'dusty-pete' && Number.isInteger(saved.areaIndex) && !!PETE_AREAS[saved.areaIndex];
-    const area = PETE_AREAS[resumes ? saved.areaIndex : 0];
+    const savedIndex = saved && saved.outlawId === 'dusty-pete' ? areaIndexForSave(saved) : -1;
+    const resumes = savedIndex >= 0;
+    const area = PETE_AREAS[resumes ? savedIndex : 0];
 
     peteWorldRun.active = true;
     peteWorldRun.areaIndex = area.index;
+    peteWorldRun.areaId = area.id;
     peteWorldRun.area = area;
     peteWorldRun.walk = area.createWalk();
     peteWorldRun.campfires = area.campfires.map(c => ({ ...c }));
@@ -70,6 +77,8 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
     peteWorldRun.exitOpen = false;
     peteWorldRun.exitWarnedAt = -99;
     peteWorldRun.triggeredEncounters = [];
+    peteWorldRun.clearedEncounters = [];
+    peteWorldRun.encounterWokeAt = {};
     peteWorldRun.announcedZones = [];
     peteWorldRun.prompt = null;
 
@@ -102,7 +111,7 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
     // A run resumed part-way does not send back the guards already left behind.
     const here = area.progressAt(peteWorldRun.startPosition.x, peteWorldRun.startPosition.z);
     for(const group of area.encounters) {
-        if(group.progress < here - area.progressMargin) peteWorldRun.triggeredEncounters.push(group.id);
+        if(group.progress < here - area.progressMargin) { peteWorldRun.triggeredEncounters.push(group.id); peteWorldRun.clearedEncounters.push(group.id); }
     }
 
     return peteWorldRun;
@@ -125,6 +134,7 @@ function wakeEncounters(ctx, playerPos) {
         if(peteWorldRun.triggeredEncounters.includes(group.id)) continue;
         if(Math.hypot(group.x - playerPos.x, group.z - playerPos.z) > group.radius) continue;
         peteWorldRun.triggeredEncounters.push(group.id);
+        peteWorldRun.encounterWokeAt[group.id] = camera.clock;
         for(const enemy of group.enemies) ctx?.spawn?.(enemy.type, { x: group.x + enemy.dx, z: group.z + enemy.dz });
         line = group.line;
     }
@@ -170,7 +180,8 @@ function saveAreaStart(storage) {
         completedMissions: peteWorldRun.collectedClues,
         openedCrates: [],
         activeCampfires: [],
-        areaIndex: peteWorldRun.areaIndex
+        areaIndex: peteWorldRun.areaIndex,
+        areaId: peteWorldRun.areaId
     }, storage);
     peteWorldRun.lastCheckpointId = `${peteWorldRun.area.id}-start`;
 }
@@ -186,6 +197,7 @@ function enterArea(ctx, index, storage) {
     const area = PETE_AREAS[index];
     if(!area) return;
     peteWorldRun.areaIndex = area.index;
+    peteWorldRun.areaId = area.id;
     peteWorldRun.area = area;
     peteWorldRun.walk = area.createWalk();
     peteWorldRun.campfires = area.campfires.map(c => ({ ...c }));
@@ -199,7 +211,7 @@ function enterArea(ctx, index, storage) {
     mountScene(ctx);
     placeMarshal(ctx, area.start);
     saveAreaStart(storage);
-    ctx?.ui?.showWaveBanner?.(`AREA ${area.index + 1}: ${area.name.toUpperCase()}`, 3600);
+    ctx?.ui?.showWaveBanner?.(area.enterBanner ?? `AREA ${area.index + 1}: ${area.name.toUpperCase()}`, 3600);
     if(peteWorldRun.currentZone) peteWorldRun.announcedZones.push(peteWorldRun.currentZone.id);
     camera.revealUntil = camera.clock + 2.6;
 }
@@ -235,7 +247,7 @@ export const peteWorldMode = {
             const clues = peteWorldRun.collectedClues.length;
             const prompt = peteWorldRun.prompt ? ` | [ ${peteWorldRun.prompt} ]` : '';
             const goal = peteWorldRun.prompt ? '' : ` | ${peteWorldRun.area.objective(peteWorldRun.collectedClues, peteWorldRun.bossSpawned)}`;
-            return `CLUES ${clues}/3 | AMMO ${ammo}${prompt}${goal}`;
+            return peteWorldRun.area.isSection ? `AMMO ${ammo}${prompt}${goal}` : `CLUES ${clues}/3 | AMMO ${ammo}${prompt}${goal}`;
         }
     },
 
@@ -290,7 +302,8 @@ export const peteWorldMode = {
                     completedMissions: peteWorldRun.collectedClues,
                     openedCrates: peteWorldRun.crates.filter(c => c.opened).map(c => c.id),
                     activeCampfires: [...peteWorldRun.campfires.filter(c => c.active).map(c => c.id), fire.id],
-                    areaIndex: peteWorldRun.areaIndex
+                    areaIndex: peteWorldRun.areaIndex,
+                    areaId: peteWorldRun.areaId
                 }, storage);
                 peteWorldRun.lastCheckpointId = fire.id;
                 activePrompt = 'CAMPFIRE SAVED';
@@ -323,10 +336,18 @@ export const peteWorldMode = {
             ctx?.ui?.showWaveBanner?.(alarm, 2200);
         }
 
+        // 4c. A guard group counts as beaten once it has been woken for a moment and nobody of it is left standing around its place
+        for(const id of area.exit?.clears ?? []) {
+            const group = area.encounters.find(g => g.id === id);
+            if(!group || peteWorldRun.clearedEncounters.includes(id) || !peteWorldRun.triggeredEncounters.includes(id)) continue;
+            if(camera.clock - (peteWorldRun.encounterWokeAt[id] ?? camera.clock) < 1.5) continue;
+            if(!enemies.some(e => Math.hypot(e.position.x - group.x, e.position.z - group.z) < group.radius * 1.6)) peteWorldRun.clearedEncounters.push(id);
+        }
+
         // 5. The gate at the end of the area opens for its clue, and stepping through it starts the next area
         if(area.exit) {
             const exit = area.exit;
-            const open = exit.requires.every(id => peteWorldRun.collectedClues.includes(id));
+            const open = exit.requires.every(id => peteWorldRun.collectedClues.includes(id)) && (exit.clears ?? []).every(id => peteWorldRun.clearedEncounters.includes(id));
             if(open && !peteWorldRun.exitOpen) {
                 peteWorldRun.exitOpen = true;
                 activePrompt = 'GATE UNLOCKED';
@@ -405,3 +426,6 @@ export const peteWorldMode = {
         endPeteWorldRun(false, storage);
     }
 };
+
+// Section 1 is behind a switch while it is finished (src/stages/section1Preload.js): this starts fetching its data at start-up when it is on.
+preloadSection1();

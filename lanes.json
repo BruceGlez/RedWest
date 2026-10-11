@@ -218,7 +218,8 @@
     "src/stages/**",
     "src/groundSize.js",
     "tests/peteArea1.test.js",
-    "tests/peteSection1.test.js"
+    "tests/peteSection1.test.js",
+    "tests/peteSection1Run.test.js"
    ],
    "checks": [
     "npm test",
