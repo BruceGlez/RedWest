@@ -2172,3 +2172,611 @@ def s13_renders():
     place_game_camera(gc, 90)
     render_to(gc, "s1-3_game_camera_d090", (1920, 1080))
     render_to(bpy.data.objects["ReviewTopCamera"], "s1-3_top_down", (1920, 1080))
+
+# ================================================================ step S1-4: the Sluice Field (140 to 215 m) and the Headframe (215 to 275 m)
+RUST = mixc(hexc("#8c3f26"), IRON, 0.3)
+TAIL = mixc(mixc(PAL["stone"], PAL["scrub"], 0.3), PAL["cliff_base"], 0.18)
+CLAIMS_C = Vector((_L["encounters"][0]["x"], -_L["encounters"][0]["z"]))
+FIGHT_R = 26.0
+
+def in_fight(p, pad=2.0):
+    return (Vector((p.x, p.y)) - CLAIMS_C).length < FIGHT_R + pad
+
+def trestle(b, x, y, w, h, col=GREY_WOOD):
+    for sy in (-1, 1):
+        b.beam((x, y + sy * w / 2, 0), (x + 0.0, y + sy * (w / 2 - 0.1), h), 0.12, 0.12, col)
+    b.beam((x, y - w / 2 + 0.05, h * 0.45), (x, y + w / 2 - 0.05, h * 0.75), 0.07, 0.07, col)
+    b.beam((x, y + w / 2 - 0.05, h * 0.45), (x, y - w / 2 + 0.05, h * 0.75), 0.07, 0.07, col)
+
+def sluice(b, v, L=5.6, W=0.9):
+    hh = 0.95
+    s0 = len(b.V)
+    for x in (-L / 2 + 0.3, 0.0, L / 2 - 0.3):
+        trestle(b, x, 0, W + 0.3, hh)
+    b.box(0, 0, hh, L, W, 0.07, GREY_WOOD, planks=0.5)
+    for sy in (-1, 1):
+        if v == 1 and sy == 1:
+            b.box(-L / 4, sy * (W / 2), hh, L / 2, 0.06, 0.5, GREY_WOOD, planks=0.6)       # one side board missing on the right half
+        else:
+            b.box(0, sy * (W / 2), hh, L, 0.06, 0.5, mixc(GREY_WOOD, WOOD, 0.3), planks=0.6)
+    b.box(-L / 2, 0, hh, 0.06, W, 0.5, GREY_WOOD)
+    for i in range(9):
+        b.box(-L / 2 + 0.5 + i * 0.52, 0, hh + 0.07, 0.05, W - 0.12, 0.1, WOOD_D)
+    b.beam((-L / 2 - 0.2, 0, hh + 0.3), (-L / 2 - 0.9, 0, hh + 0.9), 0.5, 0.05, RUST)       # feed hopper lip
+    b.apply(Matrix.Rotation(math.radians(-5 if v != 2 else -22), 4, "Y"), s0)
+    if v == 2:                                                                               # collapsed on one end
+        b.apply(Matrix.Translation((0, 0, -0.35)), s0)
+    b.ground(s0)
+
+def build_kits_s14():
+    r = random.Random(140)
+    for v in range(3):
+        b = Bld(300 + v)
+        sluice(b, v)
+        kit("sluice_" + "abc"[v], b)
+    # walkable sluice trough (H06): a long covered flume you can walk through, open at both ends
+    b = Bld(310)
+    L, W, H = 9.0, 2.4, 2.5
+    for sy in (-1, 1):
+        b.box(0, sy * (W / 2), 0, L, 0.14, H, mixc(GREY_WOOD, WOOD, 0.25), planks=0.45)
+    for k in range(7):
+        x = -L / 2 + 0.6 + k * (L - 1.2) / 6
+        if k in (2, 5):
+            continue                                                                        # gaps in the roof let light in
+        b.box(x, 0, H, 0.55, W + 0.5, 0.1, WOOD_D)
+    for x in (-L / 2 + 0.3, 0, L / 2 - 0.3):
+        for sy in (-1, 1):
+            b.beam((x, sy * (W / 2 + 0.2), 0), (x, sy * (W / 2 + 0.2), H + 0.1), 0.2, 0.2, WOOD_D)
+        b.beam((x, -W / 2 - 0.2, H - 0.1), (x, W / 2 + 0.2, H - 0.1), 0.18, 0.18, WOOD_D)
+    b.box(0, 0, 0.02, L - 0.2, W - 0.3, 0.03, DARK_IN)
+    for i in range(8):
+        b.box(-L / 2 + 1 + i, 0, 0.05, 0.06, W - 0.4, 0.07, WOOD_D)
+    kit("sluice_walk", b)
+    # tailings heaps (three)
+    for v in range(3):
+        b = Bld(320 + v)
+        R = (3.2, 2.6, 3.8)[v]
+        b.rock(0, 0, 0, R, R * 0.45, TAIL, n=9, sq=(1.15, 1.0))
+        b.rock(0.2 * R, 0.1 * R, R * 0.3, R * 0.62, R * 0.32, mixc(TAIL, PAL["cliff_dark"], 0.3), n=8)
+        for _ in range(6):
+            a = r.uniform(0, math.tau)
+            b.rock(R * 0.95 * math.cos(a), R * 0.8 * math.sin(a), 0, r.uniform(0.25, 0.5), r.uniform(0.2, 0.4), mixc(TAIL, PAL["stone"], 0.4), n=5)
+        kit("tailings_" + "abc"[v], b)
+    # ore bin: timber hopper on legs with a chute
+    b = Bld(330)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            b.beam((sx * 1.3, sy * 1.3, 0), (sx * 1.3, sy * 1.3, 2.0), 0.28, 0.28, WOOD_D)
+    for z in (0.7, 1.3):
+        for (a, c) in (((-1.3, -1.3), (1.3, -1.3)), ((1.3, -1.3), (1.3, 1.3)), ((1.3, 1.3), (-1.3, 1.3)), ((-1.3, 1.3), (-1.3, -1.3))):
+            b.beam((a[0], a[1], z), (c[0], c[1], z), 0.12, 0.12, WOOD)
+    b.box(0, 0, 1.9, 1.0, 1.0, 1.2, mixc(WOOD, GREY_WOOD, 0.4), top=3.0, planks=0.5)
+    b.box(0, 0, 3.1, 3.0, 3.0, 0.9, mixc(WOOD, GREY_WOOD, 0.4), planks=0.5)
+    b.face([(-1.4, -1.4, 4.02), (1.4, -1.4, 4.02), (1.4, 1.4, 4.02), (-1.4, 1.4, 4.02)], mixc(PAL["scrub"], TAIL, 0.5))
+    for z in (3.3, 3.8):
+        b.box(0, 0, z, 3.1, 3.1, 0.07, IRON)
+    b.beam((0, -0.4, 1.9), (0, -1.4, 0.9), 0.5, 0.06, RUST)
+    kit("ore_bin", b)
+    # washing station: a short trough, a table and buckets
+    b = Bld(340)
+    sluice(b, 0, L=3.2, W=0.8)
+    b.box(2.6, 0.6, 0.7, 2.0, 0.8, 0.07, WOOD)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            b.box(2.6 + sx * 0.9, 0.6 + sy * 0.3, 0, 0.1, 0.1, 0.7, WOOD_D)
+    for (x, y) in ((2.2, 0.55), (3.0, 0.7)):
+        b.cyl(x, y, 0.77, 0.18, 0.22, 0.28, 8, mixc(IRON, WOOD, 0.4))
+    kit("wash_station", b)
+    b = Bld(341)
+    b.cyl(0, 0, 0, 0.18, 0.22, 0.3, 8, mixc(IRON, WOOD, 0.4))
+    kit("bucket", b)
+    # Company tents (three distinct): ridge tent, wall tent, lean-to
+    b = Bld(350)
+    w, d, h = 4.0, 4.6, 2.7
+    # ridge along y: two slopes in x
+    for sx in (-1, 1):
+        for j in range(6):
+            y0, y1 = -d / 2 + j * d / 6, -d / 2 + (j + 1) * d / 6
+            c = CO_RED if j % 3 == 1 else CREAM
+            pts = [(sx * w / 2, y0, 0.05), (0, y0, h), (0, y1, h), (sx * w / 2, y1, 0.05)]
+            b.face_out(pts, shade(c, 0.95 + 0.05 * (j % 2)), (sx, 0, 1))
+    b.face([(-w / 2, -d / 2, 0.05), (w / 2, -d / 2, 0.05), (0, -d / 2, h)], DARK_IN)
+    b.face_out([(-w / 2, d / 2, 0.05), (w / 2, d / 2, 0.05), (0, d / 2, h)], shade(CREAM, 0.85), (0, 1, 0))
+    b.beam((0, -d / 2 - 0.5, h + 0.05), (0, d / 2 + 0.5, h + 0.05), 0.1, 0.1, WOOD_D)
+    for sx in (-1, 1):
+        b.beam((sx * w / 2, -d / 2, 0.8), (sx * (w / 2 + 1.5), -d / 2 - 1.0, 0.0), 0.03, 0.03, WOOD)
+        b.beam((sx * w / 2, d / 2, 0.8), (sx * (w / 2 + 1.5), d / 2 + 1.0, 0.0), 0.03, 0.03, WOOD)
+    kit("tent_a", b)
+    b = Bld(351)
+    w, d, wh, h = 4.4, 5.0, 1.3, 2.7
+    b.box(0, 0, 0, w, d, wh, mixc(CO_TEAL, CREAM, 0.55), planks=1.1)
+    for sx in (-1, 1):
+        pts = [(sx * w / 2, -d / 2, wh), (0, -d / 2, h), (0, d / 2, h), (sx * w / 2, d / 2, wh)]
+        b.face_out(pts, mixc(CO_TEAL, CREAM, 0.35), (sx, 0, 1))
+    b.face_out([(-w / 2, -d / 2, wh), (w / 2, -d / 2, wh), (0, -d / 2, h)], mixc(CO_TEAL, CREAM, 0.45), (0, -1, 0))
+    b.face_out([(-w / 2, d / 2, wh), (w / 2, d / 2, wh), (0, d / 2, h)], mixc(CO_TEAL, CREAM, 0.45), (0, 1, 0))
+    b.box(0, -d / 2 - 0.02, 0, 1.0, 0.04, 1.2, DARK_IN)
+    b.box(0, 0, h, 0.12, d + 0.8, 0.12, WOOD_D)
+    kit("tent_b", b)
+    b = Bld(352)
+    w, d = 4.2, 3.6
+    b.face_out([(-w / 2, d / 2, 0.0), (w / 2, d / 2, 0.0), (w / 2, d / 2, 2.4), (-w / 2, d / 2, 2.4)], mixc(CO_RED, CREAM, 0.55), (0, 1, 0))
+    b.face_out([(-w / 2, d / 2, 2.4), (w / 2, d / 2, 2.4), (w / 2, -d / 2, 0.9), (-w / 2, -d / 2, 0.9)], mixc(CO_RED, CREAM, 0.7), (0, 0, 1))
+    for sx in (-1, 1):
+        b.face_out([(sx * w / 2, d / 2, 0.0), (sx * w / 2, d / 2, 2.4), (sx * w / 2, -d / 2, 0.9), (sx * w / 2, -d / 2, 0.0)], mixc(CO_RED, CREAM, 0.6), (sx, 0, 0))
+    for sx in (-1, 1):
+        b.beam((sx * w / 2, -d / 2, 0), (sx * w / 2, -d / 2, 0.95), 0.1, 0.1, WOOD_D)
+    b.box(0, 0.9, 0, 2.0, 1.0, 0.18, WOOD_D)
+    kit("tent_c", b)
+    # plank ramp over a shallow ditch (I19): a dark channel, timber edges and a deck at 0.05 m
+    b = Bld(360)
+    b.face([(-3.4, -1.3, 0.035), (3.4, -1.3, 0.035), (3.4, 1.3, 0.035), (-3.4, 1.3, 0.035)], mixc(PAL["cool_dark"], PAL["mud"], 0.5))
+    for sy in (-1, 1):
+        b.beam((-3.4, sy * 1.35, 0.06), (3.4, sy * 1.35, 0.06), 0.16, 0.2, GREY_WOOD)
+    for i in range(9):
+        b.box(-1.1 + i * 0.275, 0, 0.0, 0.25, 4.6, 0.05, mixc(WOOD, GREY_WOOD, 0.1 * (i % 4)))
+    for (x, y) in ((-1.2, -2.0), (1.2, -2.0), (-1.2, 2.0), (1.2, 2.0)):
+        b.beam((x, y, 0.05), (x, y, 1.0), 0.1, 0.1, WOOD_D)
+    for sy in (-2.0, 2.0):
+        b.beam((-1.2, sy, 0.95), (1.2, sy, 0.9), 0.04, 0.04, CREAM)
+    kit("ditch_ramp", b)
+    # dynamite crate: red, with a pictogram of a stick (no text)
+    b = Bld(370)
+    b.box(0, 0, 0, 1.0, 1.0, 0.8, CO_RED, planks=0.34)
+    b.box(0, 0, 0, 1.04, 1.04, 0.06, IRON)
+    b.box(0, 0, 0.7, 1.04, 1.04, 0.06, IRON)
+    b.face([(-0.06, -0.52, 0.2), (0.06, -0.52, 0.2), (0.06, -0.52, 0.6), (-0.06, -0.52, 0.6)], PAPER)
+    b.face([(0.0, -0.521, 0.6), (0.02, -0.521, 0.6), (0.1, -0.521, 0.72), (0.08, -0.521, 0.72)], IRON)
+    kit("dynamite_crate", b)
+    # hanging sign with a pick pictogram, cable spool, rail-tie pile, stump with a pick
+    b = Bld(371)
+    b.box(0, 0, 0, 0.18, 0.18, 3.0, WOOD_D)
+    b.beam((0, 0, 2.8), (1.6, 0, 2.8), 0.12, 0.12, WOOD_D)
+    b.box(1.2, 0, 1.7, 1.3, 0.08, 0.9, mixc(WOOD, WOOD_D, 0.3), planks=0.4)
+    for x in (0.8, 1.6):
+        b.beam((x, 0, 2.8), (x, 0, 2.6), 0.03, 0.03, IRON)
+    b.beam((0.8, -0.06, 1.55), (1.5, -0.06, 2.1), 0.08, 0.03, PAPER)
+    b.beam((1.2, -0.06, 2.15), (1.6, -0.06, 1.95), 0.3, 0.03, IRON)
+    kit("hanging_sign", b)
+    b = Bld(372)
+    b.tube((0, -0.35, 0.6), (0, 0.35, 0.6), 0.6, 0.6, 12, WOOD)
+    b.tube((0, -0.45, 0.6), (0, -0.35, 0.6), 0.65, 0.65, 12, GREY_WOOD)
+    b.tube((0, 0.35, 0.6), (0, 0.45, 0.6), 0.65, 0.65, 12, GREY_WOOD)
+    b.tube((0, -0.5, 0.6), (0, 0.5, 0.6), 0.12, 0.12, 6, IRON)
+    kit("cable_spool", b)
+    b = Bld(373)
+    for row in range(3):
+        for i in range(4 - row):
+            b.box(-0.9 + i * 0.6 + row * 0.3, 0, row * 0.16, 0.2, 1.5, 0.15, WOOD_D)
+    kit("tie_pile", b)
+    b = Bld(374)
+    b.cyl(0, 0, 0, 0.34, 0.3, 0.55, 8, GREY_WOOD)
+    b.beam((0.1, 0, 0.55), (0.9, 0, 1.1), 0.07, 0.07, WOOD)
+    b.beam((0.7, 0, 1.2), (1.1, 0, 1.0), 0.28, 0.05, IRON)
+    kit("stump_pick", b)
+    # ladder (named node ladder), lever and gate pieces (named nodes lever_arm, gate_leaf)
+    b = Bld(380)
+    s0 = len(b.V)
+    for sx in (-0.35, 0.35):
+        b.beam((sx, 0, 0), (sx, 0, 4.6), 0.1, 0.07, WOOD_D)
+    for k in range(13):
+        b.beam((-0.35, 0, 0.3 + k * 0.33), (0.35, 0, 0.3 + k * 0.33), 0.07, 0.07, WOOD)
+    b.apply(Matrix.Rotation(math.radians(-12), 4, "X"), s0)
+    kit("ladder", b)
+    b = Bld(381)
+    for x in (0.0, 4.0):
+        b.box(x, 0, 0, 0.32, 0.32, 2.5, WOOD_D)
+    b.beam((-0.1, 0, 2.4), (4.1, 0, 2.4), 0.2, 0.2, WOOD)
+    kit("gate_posts", b)
+    b = Bld(382)
+    b.box(1.8, 0, 0.3, 3.5, 0.1, 1.7, GREY_WOOD, planks=0.4)
+    b.beam((0.05, 0, 0.35), (3.5, 0, 1.95), 0.12, 0.06, WOOD_D)
+    b.beam((0.05, 0, 0.35), (0.05, 0, 2.0), 0.1, 0.1, IRON)
+    kit("gate_leaf", b)
+    b = Bld(383)
+    b.box(0, 0, 0, 0.5, 0.4, 0.6, PAL["stone"])
+    b.box(0, 0, 0.6, 0.3, 0.2, 0.5, IRON)
+    kit("lever_base", b)
+    b = Bld(384)
+    b.beam((0, 0, 0), (0, 0, 1.2), 0.08, 0.08, RUST)
+    b.cyl(0, 0, 1.2, 0.07, 0.07, 0.2, 6, CO_RED)
+    kit("lever_arm", b)
+    build_headframe()
+    build_adit()
+    build_cart_boiler()
+
+def build_headframe():
+    b = Bld(400)
+    H, base, top = 13.6, 2.6, 0.7
+    legs = [(-1, -1), (1, -1), (1, 1), (-1, 1)]
+    for (sx, sy) in legs:
+        b.beam((sx * base, sy * base, 0), (sx * top, sy * top, H), 0.44, 0.44, WOOD_D)
+    levels = (0.0, 3.4, 6.9, 10.2, H)
+    half = lambda z: base + (top - base) * z / H
+    for z in levels[1:-1]:
+        k = half(z)
+        cs = [(-k, -k), (k, -k), (k, k), (-k, k)]
+        for i in range(4):
+            a, c = cs[i], cs[(i + 1) % 4]
+            b.beam((a[0], a[1], z), (c[0], c[1], z), 0.24, 0.24, WOOD)
+    for z0, z1 in zip(levels[:-1], levels[1:]):
+        k0, k1 = half(z0), half(z1)
+        for sy in (-1, 1):
+            b.beam((-k0, sy * k0, z0), (k1, sy * k1, z1), 0.14, 0.14, GREY_WOOD)
+            b.beam((k0, sy * k0, z0), (-k1, sy * k1, z1), 0.14, 0.14, GREY_WOOD)
+        for sx in (-1, 1):
+            b.beam((sx * k0, -k0, z0), (sx * k1, k1, z1), 0.12, 0.12, GREY_WOOD)
+    b.box(0, 0, H, 2.6, 2.6, 0.22, WOOD)
+    # sheave wheel on its axle with spokes (the wheel turns about x)
+    zc = H + 1.45
+    b.tube((-0.45, 0, zc), (0.45, 0, zc), 1.55, 1.55, 14, RUST)
+    b.tube((-0.35, 0, zc), (0.35, 0, zc), 1.28, 1.28, 14, mixc(RUST, IRON, 0.5), caps=(False, False))
+    for k in range(8):
+        a = math.tau * k / 8
+        b.beam((0, 0.1 * math.cos(a), zc + 0.1 * math.sin(a)), (0, 1.45 * math.cos(a), zc + 1.45 * math.sin(a)), 0.1, 0.1, IRON)
+    b.tube((-1.1, 0, zc), (1.1, 0, zc), 0.12, 0.12, 6, IRON)
+    for sx in (-1, 1):
+        b.beam((sx * 0.9, -0.9, H + 0.2), (sx * 0.9, 0, zc), 0.18, 0.18, WOOD_D)
+        b.beam((sx * 0.9, 0.9, H + 0.2), (sx * 0.9, 0, zc), 0.18, 0.18, WOOD_D)
+    # hoist rope down to the shaft collar in front, and a guy to the hoist house behind
+    b.tube((0, -1.5, zc - 0.5), (0, -6.8, 0.9), 0.06, 0.06, 5, IRON)
+    b.tube((0, 1.5, zc - 0.5), (0, 5.2, 2.4), 0.06, 0.06, 5, IRON)
+    b.box(0, -7.0, 0, 2.6, 2.6, 0.45, WOOD_D)
+    b.box(0, -7.0, 0.45, 1.8, 1.8, 0.04, DARK_IN)
+    for sx in (-1, 1):
+        b.box(sx * 1.2, -7.0, 0.45, 0.14, 2.6, 0.6, WOOD)
+    b.box(0, 5.2, 0, 4.0, 3.2, 2.6, mixc(WOOD, GREY_WOOD, 0.5), planks=0.5)
+    b.slab((-2.4, 3.3, 2.5), (2.4, 3.3, 2.5), (2.4, 7.1, 3.2), (-2.4, 7.1, 3.2), 0.12, ROOF_RUST)
+    b.box(1.0, 3.58, 0, 0.9, 0.06, 1.9, DARK_IN)
+    kit("headframe_tower", b)
+
+def build_adit():
+    b = Bld(410)
+    W = 5.2
+    b.box(0, 0.7, 0.0, W - 0.4, 2.2, 3.4, DARK_IN)                                  # the dark mouth behind the boards
+    for sx in (-1, 1):
+        b.box(sx * W / 2, 0, 0, 0.5, 0.5, 3.9, WOOD_D)
+    b.box(0, 0, 3.7, W + 0.8, 0.5, 0.5, WOOD)
+    for k, z in enumerate((0.2, 0.75, 1.3, 1.85, 2.4, 2.95)):
+        b.box(0.1 * (k % 2) - 0.05, -0.28, z, W - 0.2 - 0.3 * (k % 3), 0.07, 0.42, mixc(GREY_WOOD, WOOD, 0.4 * (k % 2)), rot=0.0, shear=(0, 0))
+    b.beam((-W / 2 + 0.2, -0.34, 0.2), (W / 2 - 0.2, -0.34, 3.2), 0.4, 0.06, GREY_WOOD)
+    b.beam((W / 2 - 0.2, -0.34, 0.2), (-W / 2 + 0.2, -0.34, 3.2), 0.4, 0.06, GREY_WOOD)
+    b.box(0, -0.3, 4.15, 1.5, 0.08, 0.95, CO_RED)                                      # Company plate: rising sun over a rail
+    b.face([(0.45 * math.cos(math.pi * k / 6), -0.36, 4.3 + 0.45 * math.sin(math.pi * k / 6)) for k in range(7)], FLAME_T)
+    b.beam((-0.6, -0.37, 4.28), (0.6, -0.37, 4.28), 0.07, 0.02, IRON)
+    kit("adit_mouth", b)
+
+def build_cart_boiler():
+    b = Bld(420)
+    b.box(0, 0, 0.45, 1.7, 1.0, 0.65, RUST, top=1.2)
+    for sy in (-1, 1):
+        b.beam((-0.85, sy * 0.52, 1.1), (0.85, sy * 0.58, 1.1), 0.08, 0.08, IRON)
+    for (x, y) in ((-0.55, -0.55), (0.55, -0.55), (-0.55, 0.55), (0.55, 0.55)):
+        b.tube((x, y - 0.04, 0.25), (x, y + 0.04, 0.25), 0.25, 0.25, 8, IRON)
+    b.rock(0, 0, 1.0, 0.55, 0.3, mixc(PAL["scrub"], TAIL, 0.4), n=6, sq=(1.3, 0.9))
+    kit("ore_cart", b)
+    b = Bld(421)
+    s0 = len(b.V)
+    b.box(0, 0, 0.45, 1.7, 1.0, 0.65, RUST, top=1.2)
+    for (x, y) in ((-0.55, -0.55), (0.55, -0.55), (-0.55, 0.55), (0.55, 0.55)):
+        b.tube((x, y - 0.04, 0.25), (x, y + 0.04, 0.25), 0.25, 0.25, 8, IRON)
+    b.apply(Matrix.Rotation(math.radians(100), 4, "X"), s0)
+    b.apply(Matrix.Rotation(math.radians(20), 4, "Z"), s0)
+    b.ground(s0)
+    kit("ore_cart_tipped", b)
+    b = Bld(422)
+    for x in (-1.2, 1.2):
+        b.box(x, 0, 0, 0.7, 1.7, 0.6, PAL["stone"])
+    b.tube((-1.9, 0, 1.7), (1.9, 0, 1.7), 0.95, 0.95, 12, RUST)
+    for x in (-1.3, 0, 1.3):
+        b.tube((x - 0.05, 0, 1.7), (x + 0.05, 0, 1.7), 1.0, 1.0, 12, IRON, caps=(False, False))
+    b.tube((1.9, 0, 1.7), (2.15, 0, 1.7), 0.7, 0.55, 12, RUST)
+    b.box(2.05, 0, 1.2, 0.08, 0.7, 0.7, IRON)
+    b.tube((-1.4, 0, 2.5), (-1.4, 0, 7.4), 0.36, 0.26, 8, RUST)
+    b.tube((-1.4, 0, 7.4), (-1.4, 0, 7.8), 0.3, 0.3, 8, IRON, caps=(False, False))
+    b.tube((0.6, 0, 2.6), (0.6, 0, 3.7), 0.1, 0.1, 6, IRON)
+    b.tube((0.6, 0, 3.7), (1.3, 0, 3.7), 0.1, 0.1, 6, IRON)
+    kit("boiler", b)
+    b = Bld(423)
+    for k in range(6):
+        a = math.tau * k / 6
+        b.box(0.35 * math.cos(a), 0.35 * math.sin(a), 0.0, 0.5, 0.5, 0.5 + 0.08 * (k % 3), mixc(PAPER, PAL["stone"], 0.25 + 0.05 * (k % 3)), rot=a)
+    b.box(0, 0, 0.45, 0.6, 0.6, 0.3, mixc(PAPER, PAL["stone"], 0.2))
+    kit("steam_puff", b)
+
+def track_mesh(name, pts, gauge=1.0):
+    b = Bld(430)
+    pl = [Vector(p) for p in pts]
+    res = [pl[0]]
+    for a, c in zip(pl, pl[1:]):
+        n = max(1, int((c - a).length / 0.9))
+        for k in range(1, n + 1):
+            res.append(a + (c - a) * (k / n))
+    for i, p in enumerate(res):
+        q = res[min(i + 1, len(res) - 1)] - res[max(i - 1, 0)]
+        t = q.normalized() if q.length > 1e-6 else Vector((1, 0, 0))
+        n_ = Vector((-t.y, t.x, 0))
+        b.box(p.x, p.y, 0.0, 0.2, 1.6, 0.1, mixc(WOOD_D, WOOD, 0.3 * (i % 3)), rot=math.atan2(t.y, t.x))
+    for sgn in (-1, 1):
+        for i in range(0, len(res) - 2, 2):
+            a = res[i]; c = res[min(i + 2, len(res) - 1)]
+            ta = (c - a).normalized()
+            na = Vector((-ta.y, ta.x, 0))
+            b.beam(a + na * (sgn * gauge / 2) + Vector((0, 0, 0.1)), c + na * (sgn * gauge / 2) + Vector((0, 0, 0.1)), 0.07, 0.12, RUST)
+    ob = b.finish(name, coll("50_props"))
+    ob["rw_d"] = 250; ob["rw_cat"] = "prop"
+    S13["count_prop"] += 1
+    S13["tris"].append((250, b.tris()))
+    return ob
+
+def lantern_string(d, u0, u1, zline, seed):
+    """I20: a string of lanterns hung across the road; lanterns are real lantern groups."""
+    b = Bld(seed)
+    A, C = frame(d, u0)[0], frame(d, u1)[0]
+    for P in (A, C):
+        b.tube((P.x, P.y, 0), (P.x, P.y, zline + 0.4), 0.14, 0.1, 6, WOOD_D)
+    n = 22
+    pts = []
+    for k in range(n + 1):
+        t = k / n
+        p = A + (C - A) * t
+        pts.append(Vector((p.x, p.y, zline - 1.3 * (1 - (2 * t - 1) ** 2))))
+    for p0, p1 in zip(pts, pts[1:]):
+        b.beam(p0, p1, 0.04, 0.04, WOOD_D, caps=False)
+    ob = b.finish("prop_lantern_string_%d" % d, coll("50_props"))
+    ob["rw_d"] = d; ob["rw_cat"] = "prop"
+    S13["count_prop"] += 1; S13["tris"].append((d, b.tris()))
+    g = make_group("prop_lantern_string_I20", Vector((0, 0, 0)), 0.0, d)
+    ob.parent = g
+    for k, t in enumerate((0.14, 0.32, 0.5, 0.68, 0.86)):
+        p = A + (C - A) * t
+        zz = zline - 1.3 * (1 - (2 * t - 1) ** 2) - 0.75
+        lg = lantern_group("string%d" % k, Vector((p.x, p.y, zz)), d)
+        lg.parent = g
+        lg.matrix_parent_inverse = g.matrix_world.inverted()
+    return g
+
+def mud_channels():
+    V, F, COL = [], [], []
+    chans = [[(148, 33), (156, 36), (166, 34), (176, 37), (186, 35)], [(152, -29), (160, -32), (171, -29), (183, -33), (196, -30)],
+             [(200, 36), (208, 33), (214, 36)], [(256, 44), (262, 41), (270, 44)]]
+    for pts in chans:
+        wp = [Vector((frame(d, u)[0].x, frame(d, u)[0].y)) for d, u in pts]
+        strip_mesh(V, F, COL, wp, 1.9, 0.052, 0.046, lambda e, i: shade(mixc(PAL["mud"], PAL["cliff_dark"], 0.55 - 0.2 * e), 0.9), step=1.4, meander=0.6, seed=len(F), ncross=5)
+        c = wp[-1]
+        add_poly(V, F, [(c.x + 2.2 * math.cos(k * math.tau / 10) * 1.3, c.y + 2.2 * math.sin(k * math.tau / 10)) for k in range(10)], 0.054)
+        COL.append(shade(mixc(PAL["cool_light"], PAL["mud"], 0.4), 0.9))
+    return flat_obj("decal_mud_channels_s1", V, F, COL, coll("30_road"), tag="s1_3")
+
+def s14_place():
+    rng = random.Random(1404)
+    build_kits_s14()
+    ok = lambda d, u: not in_fight(frame(d, u)[0])
+    def P(d, u, x=0.0, y=0.0):
+        return frame(d, u, x, y)
+    # ---- Sluice Field (140 to 215 m)
+    # I19 plank ramp over a shallow ditch, with the ditch drawn as a dark channel
+    p, a = P(150, -19.5)
+    inst("ditch_ramp", "prop_ditch_ramp", p, a + math.pi / 2, d=150)
+    marker("I19", p, "climb", "I19", 3.0, "Plank ramp over a shallow drainage ditch (flat for the game, deck top 0.05 m): a crossover to the south lane.")
+    # H06 walkable sluice trough
+    p, a = P(165, -12.8)
+    inst("sluice_walk", "prop_sluice_walk", p, a, d=165)
+    marker("H06", p, "hide", "H06", 3.5, "Walkable wooden sluice trough, open at both ends, shaded inside.")
+    for k, (d, u, v) in enumerate(((146, 34, "a"), (154, 42, "b"), (183, 33, "c"), (192, 45, "a"), (200, 36, "b"), (150, -31, "b"), (158, -38, "c"), (176, -30, "a"), (186, -37, "b"), (196, -31, "c"))):
+        p, a = P(d, u)
+        inst("sluice_" + v, "prop_sluice_box", p, a + rng.uniform(-0.5, 0.5) + (math.pi / 2 if k % 3 == 0 else 0), d=d)
+    for (d, u, v) in ((184, -16, "a"), (200, 30, "b")):
+        pass
+    # H07 tailings crescent with a sheltered hollow
+    cc = P(190, 30)[0]
+    for k in range(5):
+        ang = math.radians(25 + k * 32.5)
+        d_off, u_off = 5.0 * math.cos(ang), 5.0 * math.sin(ang) * 0.9
+        p, a = P(190, 30, d_off, u_off)
+        inst("tailings_" + "abc"[k % 3], "prop_tailings", p, rng.uniform(0, 6), rng.uniform(0.95, 1.2), d=190)
+    marker("H07", cc, "hide", "H07", 3.0, "Crescent of tailings heaps with a sheltered dip, open to the road side.")
+    for (d, u, v) in ((158, 28, "b"), (170, 46, "a"), (204, 28, "c"), (176, -36, "c"), (206, -28, "a"), (262, 36, "b"), (276, 40, "a")):
+        p, a = P(d, u)
+        if ok(d, u):
+            inst("tailings_" + v, "prop_tailings", p, rng.uniform(0, 6), rng.uniform(0.8, 1.3), d=d)
+    # Company camp: three canvas tents, crates, barrels, a stump with a pick
+    for (d, u, k, rot) in ((163, 40, "tent_a", 0.1), (172, 36, "tent_b", -0.15), (180, 41, "tent_c", 0.3)):
+        p, a = P(d, u)
+        inst(k, "prop_" + k, p, a + rot, d=d)
+    for (d, u, rot) in ((167, 33, 0.2), (176, 32, 0.4), (168, 45, 0.1)):
+        p, a = P(d, u)
+        barrel_group("camp_%d" % d, p, rot, d)
+    for (d, u) in ((168, 30), (170, 30.8), (169, 30.4)):
+        pass
+    cx, cy = _L["crates"][1]["x"], -_L["crates"][1]["z"]
+    cd, cu = world_to_du(Vector((cx, cy)))
+    crate_group("a1-crate-2", Vector((cx, cy, 0)), 0.4, cd)
+    crate_group("camp_pile1", Vector((cx + 1.1, cy + 0.3, 0)), 0.8, cd)
+    inst("crate_body", "prop_crate_stack", Vector((cx + 0.2, cy + 0.2, 0.92)), 0.2, d=cd)
+    marker("a1-crate-2", Vector((cx, cy, 0)), "loot", "I09", 1.5, "Layout crate a1-crate-2 (ammo).")
+    for k, (d, u) in enumerate(((176, 28), (161, 31))):
+        p, a = P(d, u)
+        crate_group("camp_%d" % k, p, a + 0.3 * k, d)
+    p, a = P(174, 43)
+    inst("stump_pick", "prop_stump_pick", p, a, d=174)
+    p, a = P(168, 38)
+    inst("bucket", "prop_bucket", p, a, d=168)
+    # lantern string over the field (I20), eviction boards at the Claims entrance
+    lantern_string(175, -12.8, 12.8, 4.9, 440)
+    marker("I20", P(175, 0)[0], "hazard", "I20", 4.0, "Swinging lantern string over the road (decor with light): lantern groups with glow.")
+    for (d, u, rot) in ((146, 12.0, 0.0), (157, -12.0, math.pi)):
+        p, a = P(d, u)
+        inst("notice_board", "prop_eviction_board", p, a + rot, d=d)
+    # washing station and a few loose tools
+    p, a = P(262, -32)
+    inst("wash_station", "prop_wash_station", p, a, d=262)
+    barrel_group("wash1", P(262, -32, 5.2, 0.8)[0], 0.2, 262)
+    barrel_group("wash2", P(262, -32, 6.0, 1.4)[0], 1.2, 262)
+    # ---- the Headframe (215 to 275 m)
+    B248 = B_of(248)
+    p, a = P(248, B248 - 7.5)
+    inst("headframe_tower", "prop_headframe_tower", p, a, d=248)
+    marker("headframe", p, "landmark", "LM_HEADFRAME", 7.0, "Landmark: 14 m timber A-frame headframe with hoist wheel, against the north cliffs.")
+    B262 = B_of(262)
+    p, a = P(262, B262 + 0.6)
+    inst("adit_mouth", "prop_adit_mouth", p, a, d=262)
+    marker("adit", p, "landmark", "ADIT", 4.0, "Boarded adit (mine tunnel mouth) with the made-up Company rail-and-rising-sun plate.")
+    track = [frame(262, B262 - 1.0)[0], frame(262, 36)[0], frame(255, 32)[0], frame(244, 31)[0], frame(232, 32)[0], frame(226, 34)[0]]
+    track_mesh("rail_track_s1", track)
+    p, a = P(252, 31.2)
+    inst("ore_cart", "prop_ore_cart", p, a + 0.15, d=252)
+    p, a = P(236, 34.4)
+    inst("ore_cart_tipped", "prop_ore_cart_tipped", p, a + 0.8, d=236)
+    inst("ore_spill", "prop_ore_spill", P(236, 35.8, 0.8, 0)[0], a, d=236)
+    # ore bins: a pair with a narrow slot (H08), plus two more in the yard
+    for k, (d, u) in enumerate(((223.3, 43), (228.7, 43), (266, 45), (274, 47))):
+        p, a = P(d, u)
+        inst("ore_bin", "prop_ore_bin", p, a + (0.05 if k > 1 else 0), d=d)
+    marker("H08", P(226, 43)[0], "hide", "H08", 2.0, "Narrow slot between two big ore bins (1.6 m wide).")
+    # I18 ladder to the lowest terrace
+    B205 = B_of(205)
+    p, a = P(205, B205 + 1.1)
+    inst("ladder", "ladder", p, a, d=205)
+    marker("I18", p, "climb", "I18", 2.0, "Ladder to the lowest terrace (top at the terrace platform).")
+    # I17 lever and yard gate in the berm opening
+    p, a = P(242, 22)
+    g = make_group("prop_gate_I17", p, a, 242)
+    inst("gate_posts", "gate_posts", Vector((-2.0, 0, 0)), parent=g, d=242)
+    inst("gate_leaf", "gate_leaf", Vector((-2.0 + 0.05, 0, 0)), parent=g, d=242)
+    inst("lever_base", "lever_base", Vector((-3.4, -1.0, 0)), parent=g, d=242)
+    inst("lever_arm", "lever_arm", Vector((-3.4, -1.0, 1.1)), parent=g, d=242)
+    S13["count_prop"] += 1
+    marker("I17", p, "lever", "I17", 3.0, "Lever (lever_arm rotates 60 degrees) opens gate_leaf: a shortcut from the north lane to the ore-bin yard.")
+    # I26 second campfire, dynamite, lumber, spools, rail ties, hanging sign
+    cp, ca = P(250, 12.5)
+    fire = make_group("prop_campfire_I26", cp, 0.0, 250)
+    for nm in ("campfire_stones", "campfire_logs", "fire_glow", "fire_flame"):
+        inst(nm, nm, Vector((0, 0, 0)), parent=fire, d=250)
+    S13["count_prop"] += 1
+    inst("log_seat", "prop_log_seat", P(250, 12.5, -2.3, -1.0)[0], ca + 0.4, d=250)
+    inst("log_seat", "prop_log_seat", P(250, 12.5, 1.5, 2.6)[0], ca + 1.8, d=250)
+    marker("I26", cp, "campfire", "I26", 3.0, "Second campfire at the Headframe: checkpoint for Section 1's far half.")
+    for k, (d, u) in enumerate(((268, 41), (270.2, 41.5), (269.1, 40.4))):
+        p, a = P(d, u)
+        inst("dynamite_crate", "prop_dynamite_crate", p, a + 0.1 * k, d=d)
+    inst("dynamite_crate", "prop_dynamite_crate", P(269.2, 40.6)[0] + Vector((0, 0, 0.8)), a + 0.5, d=269)
+    marker("dynamite", P(269, 41)[0], "hazard", "DYNAMITE", 3.0, "Red dynamite crates (stick pictogram): visual hazard marker; the game decides behaviour.")
+    for (d, u, rot) in ((258, 46, 0.1), (244, 48, 0.0), (276, 33, 0.2)):
+        p, a = P(d, u)
+        inst("lumber_stack", "prop_lumber_stack", p, a + rot, d=d)
+    for (d, u) in ((252, 44), (236, 46)):
+        p, a = P(d, u)
+        inst("cable_spool", "prop_cable_spool", p, a, d=d)
+    p, a = P(240, 39)
+    inst("tie_pile", "prop_tie_pile", p, a, d=240)
+    p, a = P(246, 17.5)
+    inst("hanging_sign", "prop_hanging_sign", p, a, d=246)
+    barrel_group("I23b", P(256, 12.0)[0], 0.7, 256)
+    marker("I23b", P(256, 12.0)[0], "breakable", "I23b", 1.4, "Second barrel that splinters (255 m).")
+    # rusted boiler with steam
+    p, a = P(274, 31)
+    inst("boiler", "prop_boiler", p, a, d=274)
+    for k, (z, s) in enumerate(((3.9, 0.6), (4.9, 0.9), (6.2, 1.3))):
+        pp = Vector((p.x + math.cos(a) * 1.3 * 1.0 - math.sin(a) * 0.0 + 0.2 * k, p.y + math.sin(a) * 1.3, z))
+        inst("steam_puff", "prop_steam_puff", pp, k * 0.7, s, d=274)
+    # pots and the layout crate-3 and extra yard dressing
+    for k, (pid, dxy) in enumerate((("a1-pot-3", _L["pots"][2]), ("a1-pot-4", _L["pots"][3]))):
+        pp = Vector((dxy["x"], -dxy["z"], 0))
+        dd, uu = world_to_du(Vector((pp.x, pp.y)))
+        pot_group(pid, pp, rng.uniform(0, 6), dd)
+        for (x, y) in ((0.8, 0.4), (-0.5, 0.8)):
+            pot_group(pid + "_x%d" % int(x * 10), Vector((pp.x + x, pp.y + y, 0)), rng.uniform(0, 6), dd)
+        marker(pid, pp, "breakable", "I04" if k == 0 else "I05", 1.8, "Clay pot cluster (layout %s)." % pid)
+    cx, cy = _L["crates"][2]["x"], -_L["crates"][2]["z"]
+    cd, cu = world_to_du(Vector((cx, cy)))
+    crate_group("a1-crate-3", Vector((cx, cy, 0)), 0.3, cd)
+    marker("a1-crate-3", Vector((cx, cy, 0)), "loot", "I10", 1.5, "Layout crate a1-crate-3 (health).")
+    # the Claims guard group: markers only (the game spawns bandits and the wolf)
+    marker("claims-guards", Vector((CLAIMS_C.x, CLAIMS_C.y, 0)), "encounter", "a1-claims-guards", FIGHT_R, "Fight circle (26 m radius, kept clear of tall props). Wake radius 34. Layout encounter.")
+    for k, sp_ in enumerate(_L["encounters"][0]["spawnPoints"]):
+        marker("claims-spawn%d" % k, Vector((sp_["x"], -sp_["z"], 0)), "spawn", "a1-claims-spawn-%s%d" % (sp_["type"], k), 1.5, "Layout spawn point (%s). Marker only." % sp_["type"])
+    # telegraph poles continue, with their own wire
+    poles = [frame(136, -12.6)[0]]
+    for dd in (164, 192, 220, 248, 276):
+        pp, aa = frame(dd, -12.6)
+        inst("telegraph_pole", "prop_telegraph_pole", pp, aa + math.pi / 2, d=dd)
+        poles.append(Vector((pp.x, pp.y, 0)))
+    wire_mesh(poles)
+    mud_channels()
+    # lamp posts and stray props
+    for dd in (156, 188, 232, 262):
+        pp, aa = frame(dd, 22.2 if dd < 215 else 30.0)
+        if ok(dd, 22.2):
+            inst("lamp_post", "prop_lamp_post", pp, aa, d=dd)
+            lantern_group("post_%d" % dd, Vector((pp.x + math.cos(aa) * 0.6, pp.y + math.sin(aa) * 0.6, 2.3)), dd)
+    for k in range(10):
+        d = rng.uniform(142, 276)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 40)
+        p, a = P(d, u)
+        if ok(d, u):
+            inst(rng.choice(("wheelbarrow", "washtub", "bucket", "stump_pick")), "prop_yard", p, rng.uniform(0, 6), d=d)
+    # plants and rocks over 140 to 275 m
+    for k in range(70):
+        d = rng.uniform(140, 276)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 44)
+        p, a = P(d, u)
+        if ok(d, u):
+            inst(rng.choice(("tuft_dry", "tuft_dry", "tuft_green")), "foliage_tuft", p, rng.uniform(0, 6), rng.uniform(0.9, 1.5), cat="foliage", d=d)
+    for k in range(18):
+        d = rng.uniform(140, 276)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 46)
+        p, a = P(d, u)
+        if ok(d, u):
+            inst(rng.choice(("sage", "barrel_cactus", "prickly_pear")), "foliage_scrub", p, rng.uniform(0, 6), rng.uniform(0.8, 1.3), cat="foliage", d=d)
+    for (d, u, v) in ((160, -34, "b"), (214, 36, "c"), (270, -30, "a"), (186, 52, "a")):
+        p, a = P(d, u)
+        inst("saguaro_" + v, "foliage_saguaro", p, rng.uniform(0, 6), rng.uniform(0.9, 1.2), cat="foliage", d=d)
+    for (d, u) in ((232, 52), (192, -40)):
+        p, a = P(d, u)
+        inst("dead_tree", "foliage_dead_tree", p, rng.uniform(0, 6), 1.0, cat="foliage", d=d)
+    for k in range(26):
+        d = rng.uniform(140, 276)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 50)
+        p, a = P(d, u)
+        if ok(d, u):
+            inst("boulder_" + rng.choice("abcd"), "prop_boulder", p, rng.uniform(0, 6), rng.uniform(0.7, 1.2), d=d)
+
+def run_s1_4(render=False):
+    run_s1_2(render=False)
+    clear_generated("s1_3")
+    removed = run_s1_3_place()
+    s14_place()
+    ranges = {"a": (-35, 105), "b": (85, 210), "c": (190, 315), "d": (295, 447)}
+    tri_by_chunk = {ck: sum(t for (d, t) in S13["tris"] if a <= d <= b) for ck, (a, b) in ranges.items()}
+    kt = {k: v for k, v in KIT_TRIS.items() if k in ("headframe_tower", "adit_mouth", "ore_bin", "sluice_walk", "tent_a", "tent_b", "tent_c", "boiler", "sluice_a", "tailings_a")}
+    stats = dict(props=S13["count_prop"], foliage=S13["count_foliage"], hiding_places=S13["hides"], interactables=S13["inter"], tris_by_chunk_instanced=tri_by_chunk, kit_tris=kt)
+    print(json.dumps(stats, indent=1))
+    for m in S13["markers"]:
+        if m[0] in ("H06", "H07", "H08", "I17", "I18", "I19", "I20", "I26", "I09", "I10", "I04", "I05", "I23b", "a1-claims-guards", "LM_HEADFRAME", "ADIT", "DYNAMITE"):
+            print("MARKER", m)
+    if render:
+        s14_renders()
+    return stats
+
+def s14_renders():
+    cc, cp = get_cam("ChaseCamera"), get_cam("ChaseCameraPhone")
+    for d in (150, 175, 205, 232, 258):
+        place_chase_camera(cc, d)
+        render_to(cc, "s1-4_chase_d%03d" % d, (1920, 1080))
+    place_chase_camera(cc, 236, u=20)
+    render_to(cc, "s1-4_chase_yard_gate_d236", (1920, 1080))
+    place_chase_camera(cp, 245, phone=True)
+    render_to(cp, "s1-4_chase_phone_d245", (1080, 1920))
+    aerial("s1-4_aerial_sluice_field_west", 160, 33, (-14, -50), 30)
+    aerial("s1-4_aerial_sluice_field_east", 190, 30, (-14, -46), 28)
+    aerial("s1-4_aerial_south_lane_H06", 168, -22, (-10, -36), 24)
+    aerial("s1-4_aerial_headframe", 250, 44, (-16, -44), 30)
+    aerial("s1-4_aerial_headframe_close", 248, 52, (-10, -26), 18)
+    aerial("s1-4_aerial_ore_yard_H08", 232, 40, (-12, -34), 24)
+    aerial("s1-4_aerial_boiler_adit", 268, 40, (-16, -40), 26)
+    aerial("s1-4_aerial_I20_lantern_string", 175, 0, (-6, -30), 20)
+    gc = bpy.data.objects["GameCamera"]
+    place_game_camera(gc, 235)
+    render_to(gc, "s1-4_game_camera_d235", (1920, 1080))
+    render_to(bpy.data.objects["ReviewTopCamera"], "s1-4_top_down", (1920, 1080))
