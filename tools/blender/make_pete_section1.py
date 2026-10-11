@@ -2647,10 +2647,10 @@ def s14_place():
     inst("ore_cart_tipped", "prop_ore_cart_tipped", p, a + 0.8, d=236)
     inst("ore_spill", "prop_ore_spill", P(236, 35.8, 0.8, 0)[0], a, d=236)
     # ore bins: a pair with a narrow slot (H08), plus two more in the yard
-    for k, (d, u) in enumerate(((223.3, 43), (228.7, 43), (266, 45), (274, 47))):
+    for k, (d, u) in enumerate(((223.3, B_of(223.3) - 6.0), (228.7, B_of(228.7) - 6.0), (266, B_of(266) - 6.0), (274, B_of(274) - 6.0))):
         p, a = P(d, u)
         inst("ore_bin", "prop_ore_bin", p, a + (0.05 if k > 1 else 0), d=d)
-    marker("H08", P(226, 43)[0], "hide", "H08", 2.0, "Narrow slot between two big ore bins (1.6 m wide).")
+    marker("H08", P(226, B_of(226) - 6.0)[0], "hide", "H08", 2.0, "Narrow slot between two big ore bins (1.6 m wide).")
     # I18 ladder to the lowest terrace
     B205 = B_of(205)
     p, a = P(205, B205 + 1.1)
@@ -3088,7 +3088,7 @@ def s15_place():
     inst("shed_body", "shed_body", Vector((0, 0, 0)), parent=g, d=300)
     inst("shed_door_l", "door_l", Vector((-2.7, -2.1, 0)), rotz=math.radians(-70), parent=g, d=300)
     inst("shed_door_r", "door_r", Vector((2.7, -2.1, 0)), rotz=math.radians(70), parent=g, d=300)
-    inst("ore_cart", "prop_ore_cart", P(300, 30, -0.4, 0.6)[0], a + 0.3, d=300)
+    inst("ore_cart", "prop_ore_cart", P(300, 30, -1.5, 1.2)[0], a + 0.3, d=300)
     S13["count_prop"] += 1
     marker("H11", p, "hide", "H11", 3.0, "Three-sided cart shed with a sagging roof (open front).")
     marker("I16", P(300, 30, 0, -2.2)[0], "door", "I16", 3.0, "Shed double doors: door_l and door_r pivot at their hinges.")
@@ -3096,7 +3096,7 @@ def s15_place():
     c1 = P(330, -13)[0]
     for k in range(9):
         ang = math.radians(k * 40 + 10)
-        pp, aa = P(330, -13, 2.3 * math.cos(ang), 2.3 * math.sin(ang) * -1)
+        pp, aa = P(330, -13, 3.2 * math.cos(ang), 3.2 * math.sin(ang) * -1)
         inst("mesquite_bush", "foliage_mesquite", pp, rng.uniform(0, 6), rng.uniform(0.9, 1.3), cat="foliage", d=330)
     inst("mesquite_tree", "foliage_mesquite_tree", P(330, -13, -3.8, -2.5)[0], 0.5, 1.2, cat="foliage", d=330)
     marker("H12", c1, "hide", "H12", 2.4, "Dense mesquite thicket with a hollow inside.")
@@ -3160,7 +3160,7 @@ def s15_place():
     zc = terrain_z(G, *world_to_du(Vector((cm.x, cm.y)))) - 0.1
     inst("cave_mouth", "prop_cave_mouth", Vector((cm.x, cm.y, max(0.0, zc))), face_dir(-toN.x, -toN.y), d=wd)
     marker("cave", Vector((cm.x, cm.y, 0)), "lore", "B17", 4.0, "Cave mouth carved into the cliff behind the Stash clearing (dark, with a hanging lantern hook).")
-    lad = C + Vector((-0.62, 0.78)) * 14.0
+    lad = C + Vector((-0.62, 0.78)) * 12.4
     ld, lu = world_to_du(Vector((lad.x, lad.y)))
     inst("rope_ladder", "prop_rope_ladder", Vector((lad.x, lad.y, max(0.0, terrain_z(G, ld, lu)))), face_dir(0.62, -0.78), d=wd)
     marker("rope-ladder", Vector((lad.x, lad.y, 0)), "climb", "I22_ladder", 2.0, "Rope ladder up to a rim ledge above the Stash.")
@@ -4236,7 +4236,7 @@ BLOCK_TOKENS = ("prop_shack_", "prop_headframe", "prop_ore_bin", "prop_tent_", "
                 "prop_notice_board", "prop_eviction_board", "prop_hanging_sign", "prop_cable_spool", "prop_lumber_stack", "prop_dynamite_crate", "foliage_saguaro",
                 "foliage_dead_tree", "foliage_mesquite", "foliage_rock_cluster", "prop_wheelbarrow", "prop_yard", "prop_log_seat", "prop_dry_garden", "fence_whole",
                 "prop_waterwheel_gully", "prop_cave_mouth", "prop_adit_mouth", "prop_map_rock", "prop_gate_I17", "gate_posts", "prop_mossy_stone", "foliage_cactus", "foliage_scrub")
-SKIP_TOKENS = ("prop_lookout", "sluice_walk", "culvert", "ladder", "ditch_ramp", "walkway", "laundry", "tarp_roof", "lantern", "wire", "aqueduct", "flume_bridge", "tuft", "flowers", "decal", "prop_dry_garden", "foliage_scrub")
+SKIP_TOKENS = ("gate_posts", "prop_gate_I17", "prop_lookout", "sluice_walk", "culvert", "ladder", "ditch_ramp", "walkway", "laundry", "tarp_roof", "lantern", "wire", "aqueduct", "flume_bridge", "tuft", "flowers", "decal", "prop_dry_garden", "foliage_scrub")
 
 def _custom_rects(ob):
     """Footprints for buildings that need rooms or open fronts, as local rectangles (cx, cy, halfX, halfY)."""
@@ -4290,6 +4290,12 @@ def collision_boxes():
         cx = c0.x + mx * math.cos(th) - my * math.sin(th)
         cy = c0.y + mx * math.sin(th) + my * math.cos(th)
         hx, hy = (lx1 - lx0) / 2, (ly1 - ly0) / 2
+        if "prop_tailings" in n:
+            hx, hy = hx * 0.65, hy * 0.65
+        elif "boulder" in n or "stash_screen" in n or "rock_cluster" in n or "mossy_stone" in n:
+            hx, hy = hx * 0.75, hy * 0.75
+        elif n.startswith("foliage_"):
+            hx, hy = hx * 0.7, hy * 0.7
         if hx > 25 or hy > 25 or max(hx, hy) < 0.6:
             continue                                          # small things (crates, pots, barrels, poles) do not block; the game handles them
         out.append([round(cx * WORLD_SCALE, 2), round(cy * WORLD_SCALE, 2), round(max(hx, 0.15) * WORLD_SCALE, 2), round(max(hy, 0.15) * WORLD_SCALE, 2), round(th, 3)])
@@ -4319,13 +4325,26 @@ def export_collision():
                 if 375.5 <= d <= 415.5:
                     t = tang_at(d)
                     u = (Vector((px, py)) - centre(d)).dot(Vector((-t.y, t.x)))
-                    if abs(u) <= 5.2:
+                    if abs(u) <= 5.45:
                         blocked = False                      # the bridge deck
             if blocked:
                 k = iy * nx + ix
                 bits[k >> 3] |= 1 << (k & 7)
             else:
                 free += 1
+    # the timber ledge under the bridge (H13) and its stair are walkable although the gully around them is not
+    ledge = bpy.data.objects.get("prop_timber_ledge_H13")
+    if ledge is not None:
+        M = ledge.matrix_world
+        cs = [M @ Vector(c) for c in ledge.bound_box]
+        lx0, lx1 = min(c.x for c in cs) - 0.4, max(c.x for c in cs) + 0.4
+        ly0, ly1 = min(c.y for c in cs) - 0.4, max(c.y for c in cs) + 0.4
+        for iy in range(max(0, int(ly0 - y0)), min(ny, int(ly1 - y0) + 1)):
+            for ix in range(max(0, int(lx0 - x0)), min(nx, int(lx1 - x0) + 1)):
+                k = iy * nx + ix
+                if bits[k >> 3] & (1 << (k & 7)):
+                    bits[k >> 3] &= ~(1 << (k & 7))
+                    free += 1
     boxes = collision_boxes()
     path = os.path.join(OUT_DIR, "pete_section1_collision.json")
     json.dump(dict(note="Game units, already multiplied by WORLD_SCALE. Blender XY (x east, y = -game z). Grid cell = cell units, row-major from (x0, y0); bit set = blocked (terrain above 0.45 m, the gully, outside the valley). boxes: [cx, cy, halfX, halfY, yaw] in the same XY.",

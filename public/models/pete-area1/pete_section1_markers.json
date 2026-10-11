@@ -125,8 +125,8 @@
   {
    "id": "I22_ladder",
    "type": "climb",
-   "x": 586.32,
-   "z": -615.09,
+   "x": 589.3,
+   "z": -611.35,
    "radius": 6.0,
    "note": "Rope ladder up to a rim ledge above the Stash."
   },
@@ -357,8 +357,8 @@
   {
    "id": "H08",
    "type": "hide",
-   "x": 115.01,
-   "z": -652.72,
+   "x": 112.31,
+   "z": -630.64,
    "radius": 6.0,
    "note": "Narrow slot between two big ore bins (1.6 m wide)."
   },
