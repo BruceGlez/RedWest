@@ -4263,8 +4263,8 @@ def collision_boxes():
         cx = c0.x + mx * math.cos(th) - my * math.sin(th)
         cy = c0.y + mx * math.sin(th) + my * math.cos(th)
         hx, hy = (lx1 - lx0) / 2, (ly1 - ly0) / 2
-        if hx > 25 or hy > 25:
-            continue
+        if hx > 25 or hy > 25 or max(hx, hy) < 0.6:
+            continue                                          # small things (crates, pots, barrels, poles) do not block; the game handles them
         out.append([round(cx * WORLD_SCALE, 2), round(cy * WORLD_SCALE, 2), round(max(hx, 0.15) * WORLD_SCALE, 2), round(max(hy, 0.15) * WORLD_SCALE, 2), round(th, 3)])
     return out
 
