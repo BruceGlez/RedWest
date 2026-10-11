@@ -27,6 +27,25 @@ const BASE = '/models/pete-area1/';
 const scene = new THREE.Scene();
 const FOG = new THREE.Color('#df925c');
 scene.background = FOG;
+// gradient sky dome with the game's Pete sky colours: horizon haze, orange, then blue overhead
+const sky = new THREE.Mesh(new THREE.SphereGeometry(700, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `varying vec3 vP;
+    void main(){
+      float h = normalize(vP).y;
+      vec3 c0 = vec3(0.965, 0.706, 0.408);   // #f6b468 horizon
+      vec3 c1 = vec3(0.929, 0.408, 0.157);   // #ed6828
+      vec3 c2 = vec3(0.875, 0.518, 0.314);   // #df8450
+      vec3 c3 = vec3(0.235, 0.518, 0.769);   // #3c84c4 overhead
+      vec3 c = mix(c0, c1, smoothstep(0.0, 0.08, h));
+      c = mix(c, c2, smoothstep(0.08, 0.25, h));
+      c = mix(c, c3, smoothstep(0.25, 0.7, h));
+      gl_FragColor = vec4(c, 1.0);
+    }`
+}));
+sky.renderOrder = -1;
+scene.add(sky);
 scene.fog = new THREE.Fog(FOG, 48, 118);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
@@ -45,12 +64,7 @@ const load = (f) => new Promise((res, rej) => loader.load(BASE + f, (g) => res(g
 
 // ---- the player (a simple stand-in) and its controls
 const player = new THREE.Group();
-const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.4, 10), new THREE.MeshLambertMaterial({ color: '#b33a2a' }));
-body.position.y = 0.7; player.add(body);
-const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.12, 12), new THREE.MeshLambertMaterial({ color: '#48301c' }));
-hat.position.y = 1.9; player.add(hat);
-const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshLambertMaterial({ color: '#e0a263' }));
-head.position.y = 1.55; player.add(head);
+let mixer = null, actions = {}, current = null;
 scene.add(player);
 
 let yaw = 0, mode = 'chase', speed = 0;
@@ -62,6 +76,23 @@ pad.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 
 pad.addEventListener('pointerup', () => { padVec = { x: 0, y: 0 }; });
 
 function teleport(x, z, face) { player.position.set(x, 0, z); if (face !== undefined) yaw = face; }
+
+// ---- the marshal (the game's own model, skinned, with idle and run clips)
+loader.load('/models/marshal.glb', (g) => {
+  const m = g.scene;
+  m.traverse((n) => { if (n.isMesh) { n.frustumCulled = false; if (n.material) n.material.fog = true; } });
+  player.add(m);
+  mixer = new THREE.AnimationMixer(m);
+  for (const c of g.animations) actions[c.name] = mixer.clipAction(c);
+  current = actions.idle; if (current) current.play();
+});
+function play(name) {
+  const next = actions[name];
+  if (!next || next === current) return;
+  next.reset().play();
+  if (current) current.crossFadeTo(next, 0.2, false);
+  current = next;
+}
 
 // ---- load the section
 const hud = document.getElementById('hud'), bar = document.getElementById('bar');
@@ -100,7 +131,9 @@ function animate() {
   const hx = Math.cos(yaw), hz = Math.sin(yaw);
   player.position.x += hx * sp * dt;
   player.position.z += hz * sp * dt;
-  player.rotation.y = -yaw;
+  player.rotation.y = Math.atan2(hx, hz);                      // the marshal model faces +z
+  if (mixer) { mixer.update(dt); play(Math.abs(fwd) > 0.05 ? 'run' : 'idle'); }
+  sky.position.copy(cam.position);
   const p = player.position;
   if (mode === 'chase') {
     cam.position.set(p.x - hx * 9, 5.2, p.z - hz * 9);
