@@ -4218,3 +4218,81 @@ def s17_renders():
         render_to(cc, "chase_camera_d%03d" % d, (1920, 1080), subdir="s1-7_final")
     render_to(bpy.data.objects["ReviewTopCamera"], "top_down", (1920, 1080), subdir="s1-7_final")
     render_to(bpy.data.objects["ReviewObliqueCamera"], "oblique", (1920, 1080), subdir="s1-7_final")
+
+# ================================================================ collision for the test viewer
+import base64
+
+BLOCK_TOKENS = ("prop_shack_", "prop_headframe", "prop_ore_bin", "prop_tent_", "prop_sluice_box", "prop_lookout", "prop_boiler", "prop_wash_station", "prop_well",
+                "prop_outhouse", "shed_body", "prop_boulder", "prop_tailings", "prop_cutbank", "prop_stash_screen", "prop_telegraph_pole", "prop_lamp_post",
+                "prop_ore_cart", "prop_waterwheel_dry", "prop_dress_", "prop_fence", "prop_crate_stack", "crate_body", "barrel_whole", "pot_whole", "prop_hitching_rail",
+                "prop_notice_board", "prop_eviction_board", "prop_hanging_sign", "prop_cable_spool", "prop_lumber_stack", "prop_dynamite_crate", "foliage_saguaro",
+                "foliage_dead_tree", "foliage_mesquite", "foliage_rock_cluster", "prop_wheelbarrow", "prop_yard", "prop_log_seat", "prop_dry_garden", "fence_whole",
+                "prop_waterwheel_gully", "prop_cave_mouth", "prop_adit_mouth", "prop_map_rock", "prop_gate_I17", "gate_posts", "prop_mossy_stone", "foliage_cactus", "foliage_scrub")
+SKIP_TOKENS = ("sluice_walk", "culvert", "ladder", "ditch_ramp", "walkway", "laundry", "tarp_roof", "lantern", "wire", "aqueduct", "flume_bridge", "tuft", "flowers", "decal", "prop_dry_garden", "foliage_scrub")
+
+def collision_boxes():
+    out = []
+    for ob in scn().objects:
+        if ob.type != "MESH" or not ob.get("rw_gen") or ob.hide_viewport or ob.hide_render:
+            continue
+        n = ob.name
+        if n.startswith("kit_") and "_inst" not in n:
+            continue
+        if not any(t in n for t in BLOCK_TOKENS) or any(t in n for t in SKIP_TOKENS):
+            continue
+        M = ob.matrix_world
+        cs = [M @ Vector(c) for c in ob.bound_box]
+        zmin, zmax = min(c.z for c in cs), max(c.z for c in cs)
+        if zmax - zmin < 0.3 or zmin > 4.0:
+            continue
+        th = M.to_euler().z
+        c0 = sum((Vector((c.x, c.y)) for c in cs), Vector((0, 0))) / len(cs)
+        ca, sa = math.cos(-th), math.sin(-th)
+        loc = [((c.x - c0.x) * ca - (c.y - c0.y) * sa, (c.x - c0.x) * sa + (c.y - c0.y) * ca) for c in cs]
+        lx0, lx1 = min(l[0] for l in loc), max(l[0] for l in loc)
+        ly0, ly1 = min(l[1] for l in loc), max(l[1] for l in loc)
+        mx, my = (lx0 + lx1) / 2, (ly0 + ly1) / 2
+        cx = c0.x + mx * math.cos(th) - my * math.sin(th)
+        cy = c0.y + mx * math.sin(th) + my * math.cos(th)
+        hx, hy = (lx1 - lx0) / 2, (ly1 - ly0) / 2
+        if hx > 25 or hy > 25:
+            continue
+        out.append([round(cx, 2), round(cy, 2), round(max(hx, 0.15), 2), round(max(hy, 0.15), 2), round(th, 3)])
+    return out
+
+def export_collision():
+    build_dtab()
+    bpy.context.view_layer.update()
+    terr = bpy.data.objects["terrain_section1"]
+    ws = [(terr, terr.matrix_world)]
+    for o in scn().objects:
+        if o.type == "MESH" and o.get("rw_gen") == "s1_1" and (o.name.startswith("kit_cliff_inst") or o.name.startswith("mesa_")):
+            ws.append((o, o.matrix_world))
+    bvh = bvh_from(ws)
+    x0, y0, nx, ny = -245, 55, 535, 285
+    bits = bytearray((nx * ny + 7) // 8)
+    free = 0
+    for iy in range(ny):
+        for ix in range(nx):
+            px, py = x0 + ix + 0.5, y0 + iy + 0.5
+            hit = bvh.ray_cast((px, py, 90.0), (0, 0, -1), 200.0)
+            blocked = True
+            if hit[0] is not None:
+                z = hit[0].z
+                blocked = z > 0.45 or z < -0.45
+                d = d_of(px, py)
+                if 375.5 <= d <= 415.5:
+                    t = tang_at(d)
+                    u = (Vector((px, py)) - centre(d)).dot(Vector((-t.y, t.x)))
+                    if abs(u) <= 5.2:
+                        blocked = False                      # the bridge deck
+            if blocked:
+                k = iy * nx + ix
+                bits[k >> 3] |= 1 << (k & 7)
+            else:
+                free += 1
+    boxes = collision_boxes()
+    path = os.path.join(OUT_DIR, "pete_section1_collision.json")
+    json.dump(dict(note="Blender XY (x east, y = -game z). cell 1 m; bits row-major, bit set = blocked (terrain above 0.45 m, the gully, outside the valley). boxes: [cx, cy, halfX, halfY, yaw].",
+                   cell=1, x0=x0, y0=y0, nx=nx, ny=ny, bits=base64.b64encode(bytes(bits)).decode(), boxes=boxes), open(path, "w"), separators=(",", ":"))
+    return dict(free_cells=free, boxes=len(boxes), bytes=os.path.getsize(path))
