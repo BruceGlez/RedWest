@@ -22,6 +22,7 @@ async function checkPetePursuit(browser, url) {
             window.P = await import('/src/modes/peteWorld.js');
             window.M = await import('/src/modes/index.js');
             window.W = await import('/src/peteWorldMap.js');
+            window.G = await import('/src/stages/pete.js');
         });
         await page.waitForFunction(() => window.__redWest && S.gameState.loading === false && !S.gameState.startBlocked);
         await page.locator('#play-btn').click({ force: true }); // animated PLAY never becomes geometrically stable
@@ -50,15 +51,17 @@ async function checkPetePursuit(browser, url) {
             window.__redWest.playerGroup.position.set(c.x, 0, c.z);
         });
         await page.waitForFunction(() => P.peteWorldRun.collectedClues.length === 1);
-        await page.evaluate(() => {
+        const hairpin = await page.evaluate(() => { const f = G.PETE_AREAS[0].campfires.find(c => c.id === 'a1-hairpin'); return { x: f.x, z: f.z }; });
+        await page.evaluate(at => {
             S.playerStats.hp = 3;
             P.peteWorldRun.ammoState.current = 17;
-            window.__redWest.playerGroup.position.set(-5, 0, -20);
-        });
-        await page.waitForFunction(() => P.peteWorldRun.lastCheckpointId === 'camp-depot');
+            window.__redWest.playerGroup.position.set(at.x, 0, at.z);
+        }, hairpin);
+        await page.waitForFunction(() => P.peteWorldRun.lastCheckpointId === 'a1-hairpin');
         const checkpoint = await page.evaluate(() => JSON.parse(localStorage.getItem('redWestCheckpoint.v1')));
         assert.deepEqual(checkpoint.stats, { hp: 3, ammo: 17 });
-        assert.ok(checkpoint.activeCampfires.includes('camp-depot'));
+        assert.ok(checkpoint.activeCampfires.includes('a1-hairpin'));
+        assert.equal(checkpoint.areaIndex, 0);
 
         // A real enemy bullet causes failure; returning and starting again restores the checkpoint.
         await page.evaluate(async () => {
@@ -80,9 +83,17 @@ async function checkPetePursuit(browser, url) {
             clues: P.peteWorldRun.collectedClues,
             x: window.__redWest.playerGroup.position.x, z: window.__redWest.playerGroup.position.z
         }));
-        assert.deepEqual(restored, { hp: 3, ammo: 17, clues: ['clue-manifest'], x: -5, z: -20 });
+        assert.equal(restored.hp, 3);
+        assert.equal(restored.ammo, 17);
+        assert.deepEqual(restored.clues, ['clue-manifest']);
+        assert.ok(Math.hypot(restored.x - hairpin.x, restored.z - hairpin.z) < 0.5, 'resumes at the hairpin campfire');
         console.log('Pete pursuit: death and checkpoint retry checked.');
 
+        // The manifest opens Area 1's gate; stepping through starts Area 2 with its own forced checkpoint.
+        await page.evaluate(() => { const e = G.PETE_AREAS[0].exit; window.__redWest.playerGroup.position.set(e.x, 0, e.z); });
+        await page.waitForFunction(() => P.peteWorldRun.areaIndex === 1);
+        assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem('redWestCheckpoint.v1')).areaIndex), 1);
+        console.log('Pete pursuit: through the Area 1 gate.');
         for(let index = 1; index < 3; index++) {
             await page.evaluate(index => {
                 const c = W.INVESTIGATION_CLUES[index];

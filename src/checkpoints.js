@@ -52,6 +52,7 @@ export function saveCheckpoint(runState, storage = globalThis.localStorage) {
             version: 1,
             outlawId: runState.outlawId || 'dusty-pete',
             lastCheckpointId: runState.lastCheckpointId || null,
+            areaIndex: runState.areaIndex ?? 0, // which big area of the stage the marshal is in (src/stages/)
             position: {
                 x: runState.playerPos ? runState.playerPos.x : (runState.lastCampfire?.x || 0),
                 z: runState.playerPos ? runState.playerPos.z : (runState.lastCampfire?.z || 0)

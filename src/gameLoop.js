@@ -672,11 +672,16 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         ui.updateDashBar(dashPct);
 
         const playerPos = playerSystem.playerGroup.position;
-        camera.position.lerp(playerPos.clone().add(cameraOffset()), 5 * realDt);
+        // A mode may steer the camera (src/modes/registry.js, cameraBias): stand further back and look ahead down the road.
+        const bias = mode.cameraBias?.(playerPos, realDt);
+        const camOffset = cameraOffset().clone();
+        if(bias?.scale) camOffset.multiplyScalar(bias.scale);
+        const lookX = bias?.lookX ?? 0, lookZ = bias?.lookZ ?? 0;
+        camera.position.lerp(playerPos.clone().add(camOffset).add(new THREE.Vector3(lookX, 0, lookZ)), 5 * realDt);
         const shake = shakeOffset(realDt, time);
         camera.position.x += shake.x;
         camera.position.z += shake.z;
-        camera.lookAt(playerPos.x + shake.x * 0.5, playerPos.y, playerPos.z + shake.z * 0.5);
+        camera.lookAt(playerPos.x + lookX + shake.x * 0.5, playerPos.y, playerPos.z + lookZ + shake.z * 0.5);
         updateFeedback(realDt, camera, enemies, playerPos);
         updateSun(playerPos);
         updateAmbience(realDt, timeInSeconds, playerPos);

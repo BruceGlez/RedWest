@@ -81,7 +81,12 @@ export function stepAround(x, z, mx, mz, radius, side) {
     return null;
 }
 
+// A big stage's walkable ground (src/stages/roadMask.js): outside it is rock, for everyone and every bullet. null = no limit.
+let walkMask = null;
+export function setWalkMask(isWalkable) { walkMask = typeof isWalkable === 'function' ? isWalkable : null; }
+
 export function checkCollision(x, z, radius) {
+    if(walkMask && !walkMask(x, z)) return true;
     // In the mine the rock is blocked everywhere, not only along the wall ring, so nobody can stand, spawn or land in it.
     const cave = activeFloor();
     if(cave && !isOpen(cave, x, z)) return true;

@@ -14,13 +14,13 @@ test('createPeteWorldScene instantiates all canyon landmark groups and props', (
 
 test('scene update synchronizes campfire active state and flame visibility', () => {
     const scene = createPeteWorldScene();
-    const fireMesh = scene.campfires.find(f => f.id === 'camp-mine');
+    const fireMesh = scene.campfires.find(f => f.id === 'camp-depot');
     assert.equal(fireMesh.active, false);
     assert.equal(fireMesh.flameMesh.visible, false);
 
     // Update with lit campfire
     scene.update({
-        campfires: [{ id: 'camp-mine', active: true }],
+        campfires: [{ id: 'camp-depot', active: true }],
         crates: [],
         collectedClues: [],
         gateBreached: false
@@ -33,13 +33,13 @@ test('scene update synchronizes campfire active state and flame visibility', () 
 
 test('scene update synchronizes crate opened status with lid angle', () => {
     const scene = createPeteWorldScene();
-    const crateMesh = scene.crates.find(c => c.id === 'crate-a1');
+    const crateMesh = scene.crates.find(c => c.id === 'crate-b1');
     assert.equal(crateMesh.opened, false);
     assert.equal(crateMesh.lidGroup.rotation.x, 0);
 
     scene.update({
         campfires: [],
-        crates: [{ id: 'crate-a1', opened: true }],
+        crates: [{ id: 'crate-b1', opened: true }],
         collectedClues: [],
         gateBreached: false
     }, 1.0);

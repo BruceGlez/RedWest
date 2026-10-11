@@ -4,10 +4,11 @@
 
 import { createCampfire } from './checkpoints.js';
 import { createLootCrate } from './ammoEconomy.js';
+import { AREA1_CLUE_AT } from './stages/peteArea1.js';
 
 export const PETE_WORLD_ZONES = {
-    mineCamp: { id: 'mineCamp', name: 'Zone A: Abandoned Mine Camp', minZ: -95, maxZ: -40 },
-    railSpur: { id: 'railSpur', name: 'Zone B: Old Rail Spur & Depot', minZ: -40, maxZ: 10 },
+    // Area 1 (src/stages/peteArea1.js) replaced the old mine camp; this canyon is now Area 2 and starts at the rail spur.
+    railSpur: { id: 'railSpur', name: 'Zone B: Old Rail Spur & Depot', minZ: -48, maxZ: 10 },
     sunkenSaloon: { id: 'sunkenSaloon', name: 'Zone C: Sunken Saloon Ruins', minZ: 10, maxZ: 60 },
     stronghold: { id: 'stronghold', name: 'Zone D: Pete\'s Stronghold Arena', minZ: 60, maxZ: 125 }
 };
@@ -15,15 +16,17 @@ export const PETE_WORLD_ZONES = {
 export const INVESTIGATION_CLUES = [
     {
         id: 'clue-manifest',
-        zone: 'mineCamp',
+        zone: 'miners',
+        area: 0, // found in Area 1; the others are in Area 2
         title: "Miners' Payroll Manifest",
         detail: "Found inside the foreman's cabin. Proves the miners were owed $450 before Pete stole the cashbox.",
-        x: 8,
-        z: -50
+        x: AREA1_CLUE_AT.x,
+        z: AREA1_CLUE_AT.z
     },
     {
         id: 'clue-ledger',
         zone: 'railSpur',
+        area: 1,
         title: "Pete's Stolen Claim Ledger",
         detail: "Tucked inside an abandoned handcar. Contains the $50 payment receipt from Meridian Land & Rail.",
         x: -12,
@@ -32,6 +35,7 @@ export const INVESTIGATION_CLUES = [
     {
         id: 'clue-key',
         zone: 'sunkenSaloon',
+        area: 1,
         title: "Stronghold Gate Key",
         detail: "Carried by Pete's lookout behind the broken piano bar. Unlocks the palisade gate to the stronghold.",
         x: 0,
@@ -40,17 +44,12 @@ export const INVESTIGATION_CLUES = [
 ];
 
 export const WORLD_CAMPFIRES = [
-    createCampfire('camp-mine', 'Mine Entrance Campfire', 'mineCamp', 0, -75),
     createCampfire('camp-depot', 'Rail Depot Campfire', 'railSpur', -5, -20),
     createCampfire('camp-saloon', 'Sunken Saloon Campfire', 'sunkenSaloon', 0, 25),
     createCampfire('camp-stronghold', 'Stronghold Gate Campfire', 'stronghold', 0, 68)
 ];
 
 export const WORLD_CRATES = [
-    // Zone A
-    createLootCrate('crate-a1', -10, -65, { type: 'ammo', amount: 20 }),
-    createLootCrate('crate-a2', 12, -55, { type: 'health', amount: 1 }),
-    createLootCrate('crate-a3', -6, -45, { type: 'ammo', amount: 15 }),
     // Zone B
     createLootCrate('crate-b1', -15, -30, { type: 'ammo', amount: 20 }),
     createLootCrate('crate-b2', 18, -25, { type: 'health', amount: 1 }),
@@ -66,11 +65,6 @@ export const WORLD_CRATES = [
 // Guard groups. Each wakes when the marshal walks within `radius` of it, then chases; nobody respawns, so the canyon is
 // cleared as you push on. Offsets are from the group's centre. `line` is the words on the banner when they spot you.
 export const ENCOUNTERS = [
-    {
-        id: 'mine-guards', zone: 'mineCamp', x: 6, z: -45, radius: 28,
-        line: 'Company guards at the old mine!',
-        enemies: [{ type: 'bandit', dx: -6, dz: 0 }, { type: 'bandit', dx: 6, dz: 4 }, { type: 'wolf', dx: 0, dz: -6 }]
-    },
     {
         id: 'depot-patrol', zone: 'railSpur', x: -4, z: -28, radius: 22,
         line: 'A patrol on the rail spur.',
@@ -100,10 +94,6 @@ export const ENCOUNTER_SPAWNS = ENCOUNTERS.flatMap(group =>
 
 // What the marshal reads on the banner on first reaching each zone. Serious voice (STORY_BIBLE.md): loss is told, never shown.
 export const ZONE_STORY = {
-    mineCamp: {
-        title: 'COPPER BIT',
-        line: 'The miners are gone and the mine is Company property now. Somebody here saw where Pete went.'
-    },
     railSpur: {
         title: 'THE RAIL SPUR',
         line: 'Company freight sits where the miners\' carts used to roll. Pete\'s claim ledger rode through here.'
@@ -133,7 +123,7 @@ export function zoneAt(z) {
     for(const zone of Object.values(PETE_WORLD_ZONES)) {
         if(z >= zone.minZ && z < zone.maxZ) return zone;
     }
-    return PETE_WORLD_ZONES.mineCamp;
+    return PETE_WORLD_ZONES.railSpur;
 }
 
 // Check if player has found all required investigation clues to breach the stronghold.

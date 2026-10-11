@@ -25,6 +25,7 @@ import { arena } from '../src/arena.js';
 import { mine } from '../src/mine.js';
 import { createProgress, recordRun, STAR_DEFEATED } from '../src/progress.js';
 import { loadCheckpoint } from '../src/checkpoints.js';
+import { PETE_AREAS } from '../src/stages/pete.js';
 
 function createMockStorage() {
     const store = new Map();
@@ -37,7 +38,7 @@ function createMockStorage() {
 }
 
 test('zoneAt maps Z coordinates to corresponding open-world canyon zones', () => {
-    assert.equal(zoneAt(-80).id, 'mineCamp');
+    assert.equal(zoneAt(-80).id, 'railSpur', 'the old mine camp is Area 1 now; the canyon starts at the rail spur');
     assert.equal(zoneAt(-15).id, 'railSpur');
     assert.equal(zoneAt(30).id, 'sunkenSaloon');
     assert.equal(zoneAt(90).id, 'stronghold');
@@ -56,8 +57,9 @@ test('startPeteWorldRun initializes new open-world run with default ammo and cam
     const run = startPeteWorldRun({}, storage);
     assert.equal(run.active, true);
     assert.equal(run.ammoState.current, 30);
-    assert.equal(run.campfires.length, WORLD_CAMPFIRES.length);
-    assert.equal(run.crates.length, WORLD_CRATES.length);
+    assert.equal(run.areaIndex, 0, 'a new run starts in Area 1');
+    assert.equal(run.campfires.length, PETE_AREAS[0].campfires.length);
+    assert.equal(run.crates.length, PETE_AREAS[0].crates.length);
     assert.equal(run.collectedClues.length, 0);
     assert.equal(run.gateBreached, false);
 });
@@ -67,22 +69,38 @@ test('startPeteWorldRun resumes from saved checkpoint state', () => {
     const mockSave = {
         version: 1,
         outlawId: 'dusty-pete',
-        lastCheckpointId: 'camp-depot',
-        position: { x: -5, z: -20 },
+        areaIndex: 0,
+        lastCheckpointId: 'a1-hairpin',
+        position: { x: PETE_AREAS[0].campfires[1].x, z: PETE_AREAS[0].campfires[1].z },
         stats: { hp: 4, ammo: 45 },
         completedMissions: ['clue-manifest'],
-        openedCrates: ['crate-a1', 'crate-a2'],
-        activeCampfires: ['camp-mine', 'camp-depot']
+        openedCrates: ['a1-crate-1', 'a1-crate-2'],
+        activeCampfires: ['a1-trail', 'a1-hairpin']
     };
     storage.setItem('redWestCheckpoint.v1', JSON.stringify(mockSave));
 
     const run = startPeteWorldRun({}, storage);
-    assert.equal(run.lastCheckpointId, 'camp-depot');
+    assert.equal(run.lastCheckpointId, 'a1-hairpin');
     assert.equal(run.ammoState.current, 45);
     assert.deepEqual(run.collectedClues, ['clue-manifest']);
-    assert.equal(run.crates.find(c => c.id === 'crate-a1').opened, true);
-    assert.equal(run.crates.find(c => c.id === 'crate-a3').opened, false);
-    assert.equal(run.campfires.find(c => c.id === 'camp-mine').active, true);
+    assert.equal(run.exitOpen, true, 'the manifest was already found, so the gate is open');
+    assert.equal(run.crates.find(c => c.id === 'a1-crate-1').opened, true);
+    assert.equal(run.crates.find(c => c.id === 'a1-crate-3').opened, false);
+    assert.equal(run.campfires.find(c => c.id === 'a1-trail').active, true);
+    peteWorldMode.reset(storage);
+});
+
+test('a save from before the areas existed starts a fresh run instead of dropping the marshal into rock', () => {
+    const storage = createMockStorage();
+    storage.setItem('redWestCheckpoint.v1', JSON.stringify({
+        version: 1, outlawId: 'dusty-pete', lastCheckpointId: 'camp-depot', position: { x: -5, z: -20 },
+        stats: { hp: 4, ammo: 45 }, completedMissions: ['clue-manifest'], openedCrates: [], activeCampfires: []
+    }));
+    const run = startPeteWorldRun({}, storage);
+    assert.equal(run.areaIndex, 0);
+    assert.deepEqual(run.collectedClues, []);
+    assert.deepEqual(run.startPosition, PETE_AREAS[0].start);
+    peteWorldMode.reset(storage);
 });
 
 test('peteWorldMode hooks conform to run mode contract', () => {
@@ -154,7 +172,7 @@ test('Pete mode respects arena, mine, events and the selected outlaw, and stays 
     clearModes();
 });
 
-test('actual clue pickups unlock one correctly positioned boss and settlement awards progress once', () => {
+test('actual clue pickups and the area gate lead to one correctly positioned boss; settlement awards progress once', () => {
     const storage = createMockStorage();
     resetGameState();
     startPeteWorldRun({}, storage);
@@ -170,9 +188,28 @@ test('actual clue pickups unlock one correctly positioned boss and settlement aw
             recordRun(progress, 0, gameState.bounty, gameState.score);
         }
     };
+    const bossCalls = () => calls.filter(([type]) => type === 'boss');
+    const area1 = PETE_AREAS[0];
     peteWorldMode.update(ctx, 0.1, storage);
-    assert.deepEqual(calls.filter(([type]) => type === 'boss'), [], 'entry without clues cannot spawn the boss');
-    for(const clue of INVESTIGATION_CLUES) {
+    assert.deepEqual(bossCalls(), [], 'entry without clues cannot spawn the boss');
+
+    // Area 1: the gate is chained until the payroll manifest is found.
+    Object.assign(position, { x: area1.exit.x, z: area1.exit.z });
+    peteWorldMode.update(ctx, 0.1, storage);
+    assert.equal(peteWorldRun.areaIndex, 0, 'a chained gate does not open');
+    assert.ok(peteWorldRun.prompt.includes('GATE LOCKED'));
+    Object.assign(position, area1.clues[0]);
+    peteWorldMode.update(ctx, 0.1, storage);
+    assert.deepEqual(peteWorldRun.collectedClues, ['clue-manifest']);
+    assert.equal(peteWorldRun.exitOpen, true);
+    Object.assign(position, { x: area1.exit.x, z: area1.exit.z });
+    peteWorldMode.update(ctx, 0.1, storage);
+    assert.equal(peteWorldRun.areaIndex, 1, 'through the gate and into Area 2');
+    assert.deepEqual({ x: position.x, z: position.z }, PETE_AREAS[1].start);
+    assert.equal(loadCheckpoint(storage).areaIndex, 1, 'a forced checkpoint saves the new area');
+
+    // Area 2: the ledger and the key, then the stronghold and Pete.
+    for(const clue of PETE_AREAS[1].clues) {
         Object.assign(position, clue);
         peteWorldMode.update(ctx, 0.1, storage);
     }
@@ -182,7 +219,7 @@ test('actual clue pickups unlock one correctly positioned boss and settlement aw
     Object.assign(position, { x: 0, z: 74 });
     peteWorldMode.update(ctx, 0.1, storage);
     peteWorldMode.update(ctx, 0.1, storage);
-    assert.deepEqual(calls.filter(([type]) => type === 'boss'), [['boss', { x: 0, z: 100 }]]);
+    assert.deepEqual(bossCalls(), [['boss', { x: 0, z: 100 }]]);
     storage.setItem('redWestCheckpoint.v1', '{}');
     peteWorldMode.afterOutlawDown(ctx, storage);
     const score = gameState.score;
@@ -206,12 +243,14 @@ test('campfire saves clues, HP, ammo and its own activation; failure preserves t
     peteWorldRun.collectedClues = ['clue-manifest'];
     peteWorldRun.ammoState.current = 17;
     playerStats.hp = 3;
-    const position = { x: -5, z: -20 };
+    const fire = PETE_AREAS[0].campfires.find(f => f.id === 'a1-hairpin');
+    const position = { x: fire.x, z: fire.z };
     peteWorldMode.update({ playerSystem: { playerGroup: { position } } }, 0.1, storage);
     const saved = loadCheckpoint(storage);
-    assert.equal(saved.lastCheckpointId, 'camp-depot');
-    assert.equal(peteWorldRun.lastCheckpointId, 'camp-depot');
-    assert.ok(saved.activeCampfires.includes('camp-depot'));
+    assert.equal(saved.lastCheckpointId, 'a1-hairpin');
+    assert.equal(saved.areaIndex, 0);
+    assert.equal(peteWorldRun.lastCheckpointId, 'a1-hairpin');
+    assert.ok(saved.activeCampfires.includes('a1-hairpin'));
     assert.deepEqual(saved.stats, { hp: 3, ammo: 17 });
     peteWorldMode.reset(storage);
     resetPlayerStats();
@@ -220,7 +259,7 @@ test('campfire saves clues, HP, ammo and its own activation; failure preserves t
     assert.equal(playerStats.hp, 3);
     assert.equal(peteWorldRun.ammoState.current, 17);
     assert.deepEqual(peteWorldRun.collectedClues, ['clue-manifest']);
-    assert.equal(peteWorldRun.campfires.find(f => f.id === 'camp-depot').active, true);
+    assert.equal(peteWorldRun.campfires.find(f => f.id === 'a1-hairpin').active, true);
     peteWorldMode.reset(storage);
     resetPlayerStats();
 });
@@ -236,13 +275,22 @@ test('every zone has guards and a story line, and every guard is a real enemy ty
     for(const group of ENCOUNTERS) {
         for(const enemy of group.enemies) assert.ok(ENEMY_TYPES[enemy.type], `${group.id}: ${enemy.type} exists`);
     }
+    const area1 = PETE_AREAS[0];
+    for(const place of area1.places) {
+        assert.ok(area1.story[place.id]?.line, `${place.id} has a story line`);
+        if(place.id !== 'trailhead') assert.ok(area1.encounters.some(group => group.zone === place.id), `${place.id} has guards`);
+    }
+    for(const group of area1.encounters) {
+        for(const enemy of group.enemies) assert.ok(ENEMY_TYPES[enemy.type], `${group.id}: ${enemy.type} exists`);
+    }
 });
 
 test('guards wake once as the marshal walks up, and the objective points at the next clue', () => {
     const storage = createMockStorage();
     resetGameState();
     startPeteWorldRun({}, storage);
-    const position = { x: 0, z: -75 };
+    const area1 = PETE_AREAS[0];
+    const position = { ...area1.start };
     const spawned = [];
     const banners = [];
     const ctx = {
@@ -252,11 +300,12 @@ test('guards wake once as the marshal walks up, and the objective points at the 
     };
     peteWorldMode.update(ctx, 0.1, storage);
     assert.equal(spawned.length, 0, 'the start is quiet');
-    assert.ok(banners.some(text => text.includes('COPPER BIT')), 'the first zone tells its story');
-    assert.equal(objectiveFor([], false), "FIND: MINERS' PAYROLL MANIFEST");
-    Object.assign(position, { x: 6, z: -50 });
+    assert.ok(banners.some(text => text.includes('THE TRAILHEAD')), 'the first place tells its story');
+    assert.equal(area1.objective([]), "FIND: MINERS' PAYROLL MANIFEST");
+    assert.equal(area1.objective(['clue-manifest']), 'REACH THE COMPANY GATE');
+    const first = area1.encounters[0];
+    Object.assign(position, { x: first.x, z: first.z });
     peteWorldMode.update(ctx, 0.1, storage);
-    const first = ENCOUNTERS[0];
     assert.equal(spawned.length, first.enemies.length);
     peteWorldMode.update(ctx, 0.1, storage);
     assert.equal(spawned.length, first.enemies.length, 'a group wakes only once');
@@ -265,16 +314,19 @@ test('guards wake once as the marshal walks up, and the objective points at the 
     resetGameState();
 });
 
-test('resuming at a campfire does not send back the guards left behind it', () => {
+test('resuming part-way does not send back the guards left behind', () => {
     const storage = createMockStorage();
     resetGameState();
+    storage.setItem('redWestCheckpoint.v1', JSON.stringify({ version: 1, areaIndex: 1, outlawId: 'dusty-pete', lastCheckpointId: 'camp-saloon', position: { x: 0, z: 25 }, stats: { hp: 5, ammo: 20 } }));
     startPeteWorldRun({}, storage);
-    peteWorldRun.startPosition = { x: 0, z: 25 };
-    peteWorldMode.reset(storage);
-    storage.setItem('redWestCheckpoint.v1', JSON.stringify({ version: 1, outlawId: 'dusty-pete', lastCheckpointId: 'camp-saloon', position: { x: 0, z: 25 }, stats: { hp: 5, ammo: 20 } }));
-    startPeteWorldRun({}, storage);
-    assert.ok(peteWorldRun.triggeredEncounters.includes('mine-guards'));
+    assert.equal(peteWorldRun.areaIndex, 1);
+    assert.ok(peteWorldRun.triggeredEncounters.includes('depot-patrol'));
     assert.ok(!peteWorldRun.triggeredEncounters.includes('gate-guards'));
+    peteWorldMode.reset(storage);
+    storage.setItem('redWestCheckpoint.v1', JSON.stringify({ version: 1, areaIndex: 0, outlawId: 'dusty-pete', lastCheckpointId: 'a1-miners', position: { x: PETE_AREAS[0].campfires[2].x, z: PETE_AREAS[0].campfires[2].z }, stats: { hp: 5, ammo: 20 } }));
+    startPeteWorldRun({}, storage);
+    assert.ok(peteWorldRun.triggeredEncounters.includes('a1-claims-guards'), 'Area 1 guards behind the camp stay cleared');
+    assert.ok(!peteWorldRun.triggeredEncounters.includes('a1-gate-guards'));
     peteWorldMode.reset(storage);
     resetGameState();
 });
