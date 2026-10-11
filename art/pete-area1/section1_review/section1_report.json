@@ -1,0 +1,383 @@
+{
+ "checks": {
+  "road_ribbon_max_z": 0.036,
+  "walkway_max_z": 0.05,
+  "bridge_deck_top_max_z": 0.05,
+  "decals_max_z": 0.203,
+  "west_plug_min_z": 8.7,
+  "east_plug_min_z": 10.8,
+  "north_edge_min_z": 24.0,
+  "south_edge_min_z": 4.7,
+  "south_wall_max_z_first_terrace_6m": 6.4,
+  "props_inside_8m_of_centre_line": [
+   [
+    "prop_log_seat",
+    14,
+    -7.3
+   ],
+   [
+    "prop_log_seat.002",
+    19,
+    -7.0
+   ],
+   [
+    "prop_crate_stack",
+    19,
+    -4.3
+   ],
+   [
+    "prop_tarp_roof_H04",
+    118,
+    0.0
+   ],
+   [
+    "prop_lamp_post.006",
+    372,
+    -6.3
+   ],
+   [
+    "prop_lamp_post.007",
+    373,
+    6.3
+   ],
+   [
+    "prop_lamp_post.008",
+    418,
+    -6.3
+   ],
+   [
+    "prop_lamp_post.009",
+    419,
+    6.3
+   ],
+   [
+    "prop_waterwheel_gully",
+    394,
+    7.0
+   ],
+   [
+    "prop_gully_stone",
+    386,
+    5.7
+   ],
+   [
+    "prop_gully_stone.004",
+    391,
+    -8.0
+   ],
+   [
+    "prop_gully_stone.005",
+    404,
+    -2.5
+   ],
+   [
+    "prop_gully_stone.006",
+    392,
+    5.3
+   ],
+   [
+    "prop_gully_stone.008",
+    389,
+    2.6
+   ],
+   [
+    "prop_gully_stone.011",
+    393,
+    7.4
+   ],
+   [
+    "prop_timber_ledge_H13",
+    382,
+    -6.0
+   ]
+  ],
+  "props_inside_claims_fight_circle": [],
+  "cliff_kit_variants": 24,
+  "cliff_kit_min_distance_same_variant_m": 66.8,
+  "darkest_linear_luminance": 0.0043,
+  "lightest_linear_luminance": 0.855,
+  "textures": 2
+ },
+ "chunks": {
+  "a": {
+   "range": [
+    -35,
+    105
+   ],
+   "static_tris": 36019,
+   "by_category": {
+    "terrain": 7806,
+    "cliff_kit": 3177,
+    "road_and_ground": 6248,
+    "props": 10248,
+    "foliage": 8540
+   },
+   "dynamic_roots": 8,
+   "dynamic_tris": 884,
+   "glb": {
+    "bytes": 1703024,
+    "nodes": 23,
+    "mesh_nodes": 16,
+    "meshes": 6,
+    "triangles_unique": 36331,
+    "triangles_rendered": 36903,
+    "materials": [
+     "M_rock",
+     "M_cloth_glow"
+    ]
+   }
+  },
+  "b": {
+   "range": [
+    85,
+    210
+   ],
+   "static_tris": 40147,
+   "by_category": {
+    "terrain": 6930,
+    "cliff_kit": 2914,
+    "road_and_ground": 8544,
+    "props": 16770,
+    "foliage": 4989
+   },
+   "dynamic_roots": 12,
+   "dynamic_tris": 2062,
+   "glb": {
+    "bytes": 1886796,
+    "nodes": 47,
+    "mesh_nodes": 32,
+    "meshes": 10,
+    "triangles_unique": 41073,
+    "triangles_rendered": 42209,
+    "materials": [
+     "M_rock",
+     "M_cloth_glow"
+    ]
+   }
+  },
+  "c": {
+   "range": [
+    190,
+    315
+   ],
+   "static_tris": 34926,
+   "by_category": {
+    "terrain": 6963,
+    "cliff_kit": 3071,
+    "road_and_ground": 5694,
+    "props": 14272,
+    "foliage": 4926
+   },
+   "dynamic_roots": 7,
+   "dynamic_tris": 1212,
+   "glb": {
+    "bytes": 1676192,
+    "nodes": 20,
+    "mesh_nodes": 16,
+    "meshes": 16,
+    "triangles_unique": 36138,
+    "triangles_rendered": 36138,
+    "materials": [
+     "M_rock",
+     "M_cloth_glow"
+    ]
+   }
+  },
+  "d": {
+   "range": [
+    295,
+    447
+   ],
+   "static_tris": 36609,
+   "by_category": {
+    "terrain": 8438,
+    "cliff_kit": 3279,
+    "road_and_ground": 3062,
+    "props": 15496,
+    "foliage": 6334
+   },
+   "dynamic_roots": 8,
+   "dynamic_tris": 734,
+   "glb": {
+    "bytes": 1737560,
+    "nodes": 19,
+    "mesh_nodes": 14,
+    "meshes": 6,
+    "triangles_unique": 36967,
+    "triangles_rendered": 37343,
+    "materials": [
+     "M_rock",
+     "M_cloth_glow"
+    ]
+   }
+  },
+  "far_ring": {
+   "static_tris": 1313,
+   "glb": {
+    "bytes": 49652,
+    "nodes": 1,
+    "mesh_nodes": 1,
+    "meshes": 1,
+    "triangles_unique": 1313,
+    "triangles_rendered": 1313,
+    "materials": [
+     "M_rock"
+    ]
+   }
+  }
+ },
+ "kits": {
+  "kit_crate.glb": {
+   "bytes": 9984,
+   "nodes": 3,
+   "mesh_nodes": 2,
+   "meshes": 2,
+   "triangles_unique": 102,
+   "triangles_rendered": 102,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_pot.glb": {
+   "bytes": 12152,
+   "nodes": 3,
+   "mesh_nodes": 2,
+   "meshes": 2,
+   "triangles_unique": 127,
+   "triangles_rendered": 127,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_campfire.glb": {
+   "bytes": 40412,
+   "nodes": 5,
+   "mesh_nodes": 4,
+   "meshes": 4,
+   "triangles_unique": 490,
+   "triangles_rendered": 490,
+   "materials": [
+    "M_rock",
+    "M_cloth_glow"
+   ]
+  },
+  "kit_lantern.glb": {
+   "bytes": 9600,
+   "nodes": 3,
+   "mesh_nodes": 2,
+   "meshes": 2,
+   "triangles_unique": 94,
+   "triangles_rendered": 94,
+   "materials": [
+    "M_cloth_glow",
+    "M_rock"
+   ]
+  },
+  "kit_barrel.glb": {
+   "bytes": 18880,
+   "nodes": 3,
+   "mesh_nodes": 2,
+   "meshes": 2,
+   "triangles_unique": 218,
+   "triangles_rendered": 218,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_fence_break.glb": {
+   "bytes": 17296,
+   "nodes": 3,
+   "mesh_nodes": 2,
+   "meshes": 2,
+   "triangles_unique": 196,
+   "triangles_rendered": 196,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_shed_doors.glb": {
+   "bytes": 8264,
+   "nodes": 3,
+   "mesh_nodes": 2,
+   "meshes": 2,
+   "triangles_unique": 84,
+   "triangles_rendered": 84,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_door.glb": {
+   "bytes": 2904,
+   "nodes": 2,
+   "mesh_nodes": 1,
+   "meshes": 1,
+   "triangles_unique": 22,
+   "triangles_rendered": 22,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_lever_gate.glb": {
+   "bytes": 14980,
+   "nodes": 5,
+   "mesh_nodes": 4,
+   "meshes": 4,
+   "triangles_unique": 146,
+   "triangles_rendered": 146,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_ladder.glb": {
+   "bytes": 15280,
+   "nodes": 2,
+   "mesh_nodes": 1,
+   "meshes": 1,
+   "triangles_unique": 180,
+   "triangles_rendered": 180,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_clue_manifest.glb": {
+   "bytes": 6232,
+   "nodes": 2,
+   "mesh_nodes": 1,
+   "meshes": 1,
+   "triangles_unique": 64,
+   "triangles_rendered": 64,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_clue_ledger.glb": {
+   "bytes": 3536,
+   "nodes": 2,
+   "mesh_nodes": 1,
+   "meshes": 1,
+   "triangles_unique": 30,
+   "triangles_rendered": 30,
+   "materials": [
+    "M_rock"
+   ]
+  },
+  "kit_clue_key.glb": {
+   "bytes": 6096,
+   "nodes": 2,
+   "mesh_nodes": 1,
+   "meshes": 1,
+   "triangles_unique": 68,
+   "triangles_rendered": 68,
+   "materials": [
+    "M_rock"
+   ]
+  }
+ },
+ "markers": 85,
+ "counts": {
+  "props": 487,
+  "foliage": 384,
+  "hides": 14,
+  "inter": 34
+ }
+}

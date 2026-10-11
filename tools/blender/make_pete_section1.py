@@ -442,6 +442,7 @@ def prism(V, F, cx, cy, z0, z1, r0, r1, n, rng, jit=0.14, rot=0.0, sq=(1.0, 1.0)
 
 def kit_variant(v, rng):
     V, F = [], []
+    v = v % 12                                       # 12 shapes, two seeds each
     if v == 0:      # terraced stack
         w, z = rng.uniform(4.0, 4.8), 0.0
         for t in range(4):
@@ -488,7 +489,7 @@ def kit_variant(v, rng):
         prism(V, F, -2.4, 2.4, 0, 3.0, 2.6, 1.8, 7, rng, sq=(0.9, 1.8))
     return V, F
 
-KIT_N = 12
+KIT_N = 24
 
 def kit_colors(zmax):
     def fn(pi, vi, nrm, co):
@@ -504,7 +505,7 @@ def build_kit_meshes():
         rng = random.Random(1000 + v)
         V, F = kit_variant(v, rng)
         zmax = max(p[2] for p in V)
-        name = "kit_cliff_%s" % "abcdefghijkl"[v]
+        name = "kit_cliff_%02d" % v
         ob = make_obj(name, V, F, kit_colors(zmax), coll("20_cliffs"), "s1_1")
         ob.hide_render = True            # the template is hidden; the instances are what renders
         ob.hide_viewport = True
@@ -657,10 +658,25 @@ def run_s1_1(render=False):
     order = list(range(KIT_N))
     rng.shuffle(order)
     inst = []
+    placed_pos = []
     for n, (d, kind, j, i, hlim, inset) in enumerate(placements):
         if D1 - 14 < d or d < D0 + 6:
             continue
-        v = order[n % KIT_N]
+        P = centre(d)
+        tang0 = (centre(d + 1) - centre(d - 1)).normalized()
+        n0 = Vector((-tang0.y, tang0.x))
+        wpos = Vector((X[i][j] + n0.x * inset * (1.0 if kind == "nw" else -1.0), Y[i][j] + n0.y * inset * (1.0 if kind == "nw" else -1.0)))
+        best_v, best_dist = None, -1.0
+        for cand in order:
+            dmin = min([(wpos - q).length for (q, vv) in placed_pos if vv == cand], default=1e9)
+            if dmin >= 40.0:
+                best_v, best_dist = cand, dmin
+                break
+            if dmin > best_dist:
+                best_v, best_dist = cand, dmin
+        v = best_v
+        placed_pos.append((wpos, v))
+        order.append(order.pop(order.index(v)))                      # rotate so the next pick starts elsewhere
         tmpl, zmax = kit[v]
         s = rng.uniform(0.8, 1.3)
         s = min(s, hlim / zmax)
@@ -954,7 +970,7 @@ def build_walkway():
         n_ = Vector((-t.y, t.x))
         L = wd * rng.uniform(0.97, 1.03)
         bw = 0.28
-        z = 0.07 + (0.015 if n % 17 == 0 else 0.0)           # a few lifted boards
+        z = 0.05                                             # boards stay within the 0.05 m walkable height
         c = shade(mixc(wood, dark, rng.uniform(0.0, 0.55)), rng.uniform(0.9, 1.08))
         shift = rng.uniform(-0.05, 0.05)
         a = P + n_ * (-L / 2 + shift)
@@ -980,7 +996,7 @@ def build_cobbles():
         ring = [(c0.x + (R + 0.6) * math.cos(a), c0.y + (R + 0.6) * math.sin(a)) for a in [k * math.tau / 24 for k in range(24)]]
         add_poly(V, F, ring, 0.04)
         COL.append(shade(mixc(PAL["mud"], PAL["cliff_dark"], 0.4), 0.8))      # dark under-layer: the gaps read as mortar
-        sp = 0.7
+        sp = 0.82
         q = int(R / sp) + 2
         for iy in range(-q, q + 1):
             for ix in range(-q, q + 1):
@@ -989,7 +1005,7 @@ def build_cobbles():
                 rr = math.hypot(x - c0.x, y - c0.y)
                 if rr > R * (1 + 0.1 * N1(x * 0.3, y * 0.3, 3.0)):
                     continue
-                r = rng.uniform(0.29, 0.34)
+                r = rng.uniform(0.33, 0.39)
                 rot = rng.uniform(0, math.pi)
                 hexp = [(x + r * math.cos(rot + k * math.pi / 3), y + r * math.sin(rot + k * math.pi / 3)) for k in range(6)]
                 add_poly(V, F, hexp, 0.055 + rng.uniform(0, 0.025))
@@ -1025,7 +1041,7 @@ def build_decals():
             p = a + hd * (k * 0.72) + nd * (0.17 if k % 2 else -0.17) + nd * 0.2 * N1(k * 0.3, 3.3, 0.1)
             ang = math.atan2(hd.y, hd.x) + rng.uniform(-0.12, 0.12)
             ca, sa = math.cos(ang), math.sin(ang)
-            for shape in (sole, heel):
+            for shape in (sole,):
                 add_poly(V, F, [(p.x + x * ca - y * sa, p.y + x * sa + y * ca) for (x, y) in shape], 0.06)
                 COL.append(shade(mixc(PAL["sand_road"], PAL["cliff_dark"], 0.4), 0.9))
             k += 1
@@ -1047,7 +1063,7 @@ def build_decals():
         d = rng.uniform(-22, 372)
         u = rng.choice([-1, 1]) * rng.uniform(6, 13) if rng.random() < 0.7 else rng.uniform(-34, 34)
         c0 = du_w(d, u)
-        for k in range(3):
+        for k in range(2):
             r = rng.uniform(0.07, 0.2)
             before = len(F)
             prism(V, F, c0.x + rng.uniform(-0.7, 0.7), c0.y + rng.uniform(-0.7, 0.7), 0.04, 0.04 + r * rng.uniform(0.5, 0.9), r, r * 0.6, 4, rng, jit=0.2, mid=False)
@@ -1277,12 +1293,15 @@ def get_glow_material():
     nt = m.node_tree
     nt.nodes.clear()
     out = nt.nodes.new("ShaderNodeOutputMaterial")
-    em = nt.nodes.new("ShaderNodeEmission")
+    bsdf = nt.nodes.new("ShaderNodeBsdfPrincipled")
     vc = nt.nodes.new("ShaderNodeVertexColor")
     vc.layer_name = "Col"
-    nt.links.new(vc.outputs["Color"], em.inputs["Color"])
-    nt.links.new(em.outputs["Emission"], out.inputs["Surface"])
-    em.inputs["Strength"].default_value = 2.5
+    nt.links.new(vc.outputs["Color"], bsdf.inputs["Base Color"])
+    nt.links.new(bsdf.outputs["BSDF"], out.inputs["Surface"])
+    bsdf.inputs["Roughness"].default_value = 0.9
+    bsdf.inputs["Metallic"].default_value = 0.0
+    bsdf.inputs["Emission Color"].default_value = (1.0, 0.55, 0.12, 1.0)      # constant, so glTF carries it as emissiveFactor
+    bsdf.inputs["Emission Strength"].default_value = 1.6
     return m
 
 # ---------------------------------------------------------------- the kit (each builder returns a template object)
@@ -1331,10 +1350,10 @@ def build_kits():
     b = Bld(6)
     prof = [(0.0, 0.31), (0.28, 0.37), (0.55, 0.40), (0.82, 0.37), (1.0, 0.31)]
     for i in range(4):
-        b.tube((0, 0, prof[i][0]), (0, 0, prof[i + 1][0]), prof[i][1], prof[i + 1][1], 10, mixc(WOOD, WOOD_D, 0.15 * (i % 2)), caps=(False, False))
-    b.face([(0.3 * math.cos(math.tau * k / 10), 0.3 * math.sin(math.tau * k / 10), 1.0) for k in range(10)], shade(WOOD_D, 1.0))
+        b.tube((0, 0, prof[i][0]), (0, 0, prof[i + 1][0]), prof[i][1], prof[i + 1][1], 8, mixc(WOOD, WOOD_D, 0.15 * (i % 2)), caps=(False, False))
+    b.face([(0.3 * math.cos(math.tau * k / 8), 0.3 * math.sin(math.tau * k / 8), 1.0) for k in range(8)], shade(WOOD_D, 1.0))
     for z, rr in ((0.2, 0.355), (0.8, 0.375)):
-        b.tube((0, 0, z - 0.03), (0, 0, z + 0.03), rr + 0.01, rr + 0.01, 10, IRON, caps=(False, False))
+        b.tube((0, 0, z - 0.03), (0, 0, z + 0.03), rr + 0.01, rr + 0.01, 8, IRON, caps=(False, False))
     kit("barrel_whole", b, smooth=True)
     b = Bld(7)
     for k in range(8):
@@ -1839,18 +1858,17 @@ def wire_mesh(poles):
     for a, c in zip(poles, poles[1:]):
         for dz in (-0.85, -0.3, 0.3, 0.85):
             A, C = a.copy(), c.copy()
-            for (p, off) in ((A, a), (C, c)):
-                pass
-            n = 16
+            n = 12
+            tt = (C - A).normalized()
+            nn = Vector((-tt.y, tt.x, 0))
+            off = nn * (dz * 0.9)
+            sag = lambda t: 0.9 * (1 - (2 * t - 1) ** 2)
             for k in range(n):
                 t0, t1 = k / n, (k + 1) / n
-                sag = lambda t: 0.9 * (1 - (2 * t - 1) ** 2)
-                p0 = Vector((A.x + (C.x - A.x) * t0, A.y + (C.y - A.y) * t0, 6.45 - sag(t0)))
-                p1 = Vector((A.x + (C.x - A.x) * t1, A.y + (C.y - A.y) * t1, 6.45 - sag(t1)))
-                tt = (C - A).normalized()
-                nn = Vector((-tt.y, tt.x, 0))
-                off = nn * (dz * 0.9)
-                b.beam(p0 + off, p1 + off, 0.03, 0.03, IRON, caps=False)
+                p0 = Vector((A.x + (C.x - A.x) * t0, A.y + (C.y - A.y) * t0, 6.45 - sag(t0))) + off
+                p1 = Vector((A.x + (C.x - A.x) * t1, A.y + (C.y - A.y) * t1, 6.45 - sag(t1))) + off
+                up = Vector((0, 0, 0.03))
+                b.card([p0 + up, p1 + up, p1 - up, p0 - up], IRON)
     ob = b.finish("telegraph_wire_s1", coll("50_props"))
     return ob
 
@@ -2186,7 +2204,6 @@ def trestle(b, x, y, w, h, col=GREY_WOOD):
     for sy in (-1, 1):
         b.beam((x, y + sy * w / 2, 0), (x + 0.0, y + sy * (w / 2 - 0.1), h), 0.12, 0.12, col)
     b.beam((x, y - w / 2 + 0.05, h * 0.45), (x, y + w / 2 - 0.05, h * 0.75), 0.07, 0.07, col)
-    b.beam((x, y + w / 2 - 0.05, h * 0.45), (x, y - w / 2 + 0.05, h * 0.75), 0.07, 0.07, col)
 
 def sluice(b, v, L=5.6, W=0.9):
     hh = 0.95
@@ -2200,8 +2217,8 @@ def sluice(b, v, L=5.6, W=0.9):
         else:
             b.box(0, sy * (W / 2), hh, L, 0.06, 0.5, mixc(GREY_WOOD, WOOD, 0.3), planks=0.6)
     b.box(-L / 2, 0, hh, 0.06, W, 0.5, GREY_WOOD)
-    for i in range(9):
-        b.box(-L / 2 + 0.5 + i * 0.52, 0, hh + 0.07, 0.05, W - 0.12, 0.1, WOOD_D)
+    for i in range(6):
+        b.box(-L / 2 + 0.6 + i * 0.9, 0, hh + 0.07, 0.05, W - 0.12, 0.1, WOOD_D)
     b.beam((-L / 2 - 0.2, 0, hh + 0.3), (-L / 2 - 0.9, 0, hh + 0.9), 0.5, 0.05, RUST)       # feed hopper lip
     b.apply(Matrix.Rotation(math.radians(-5 if v != 2 else -22), 4, "Y"), s0)
     if v == 2:                                                                               # collapsed on one end
@@ -2236,9 +2253,9 @@ def build_kits_s14():
     for v in range(3):
         b = Bld(320 + v)
         R = (3.2, 2.6, 3.8)[v]
-        b.rock(0, 0, 0, R, R * 0.45, TAIL, n=9, sq=(1.15, 1.0))
-        b.rock(0.2 * R, 0.1 * R, R * 0.3, R * 0.62, R * 0.32, mixc(TAIL, PAL["cliff_dark"], 0.3), n=8)
-        for _ in range(6):
+        b.rock(0, 0, 0, R, R * 0.45, TAIL, n=7, sq=(1.15, 1.0))
+        b.rock(0.2 * R, 0.1 * R, R * 0.3, R * 0.62, R * 0.32, mixc(TAIL, PAL["cliff_dark"], 0.3), n=6)
+        for _ in range(4):
             a = r.uniform(0, math.tau)
             b.rock(R * 0.95 * math.cos(a), R * 0.8 * math.sin(a), 0, r.uniform(0.25, 0.5), r.uniform(0.2, 0.4), mixc(TAIL, PAL["stone"], 0.4), n=5)
         kit("tailings_" + "abc"[v], b)
@@ -2698,7 +2715,7 @@ def s14_place():
         marker("claims-spawn%d" % k, Vector((sp_["x"], -sp_["z"], 0)), "spawn", "a1-claims-spawn-%s%d" % (sp_["type"], k), 1.5, "Layout spawn point (%s). Marker only." % sp_["type"])
     # telegraph poles continue, with their own wire
     poles = [frame(136, -12.6)[0]]
-    for dd in (164, 192, 220, 248, 276):
+    for dd in (164, 192, 248, 276):
         pp, aa = frame(dd, -12.6)
         inst("telegraph_pole", "prop_telegraph_pole", pp, aa + math.pi / 2, d=dd)
         poles.append(Vector((pp.x, pp.y, 0)))
@@ -2969,7 +2986,7 @@ def build_bridge(G):
         lift = 0.0
         tilt = 0.0
         if n % 29 == 0:
-            lift, tilt = 0.06, 0.10
+            lift, tilt = 0.0, 0.10                                # a few crooked planks; the deck top stays at +0.05
         b.box(P.x, P.y, -0.05 + lift, 0.30, 11.0 * rng.uniform(0.985, 1.0), 0.10, deck_col(), rot=ang + tilt, var=0.06)
     for u in (-4.2, 0.0, 4.2):
         for d in [d0 + 2.0 * k for k in range(int((d1 - d0) / 2.0))]:
@@ -2983,15 +3000,15 @@ def build_bridge(G):
         for (u0, u1) in ((-4.6, 0.0), (0.0, 4.6)):
             A, C = du_w(d, u0), du_w(d, u1)
             za, zc_ = terrain_z(G, d, u0), terrain_z(G, d, u1)
-            zl = max(za, zc_) + 3.3
+            zl = min(max(za, zc_) + 3.3, -1.1)                    # crossbars stay below the stringers
             b.beam((A.x, A.y, zl), (C.x, C.y, zl), 0.2, 0.2, WOOD)
             b.beam((A.x, A.y, -0.8), (C.x, C.y, zl - 0.2), 0.14, 0.14, GREY_WOOD)
             b.beam((C.x, C.y, -0.8), (A.x, A.y, zl - 0.2), 0.14, 0.14, GREY_WOOD)
     for dd in range(380, 411, 10):
         for u in (-4.6, 0.0, 4.6):
             A, C = du_w(dd, u), du_w(dd + 10, u)
-            za = min(terrain_z(G, dd, u), terrain_z(G, dd + 10, u)) + 1.2
-            b.beam((A.x, A.y, za + 1.5), (C.x, C.y, za + 1.5), 0.14, 0.14, GREY_WOOD)
+            za = min(min(terrain_z(G, dd, u), terrain_z(G, dd + 10, u)) + 2.7, -1.3)
+            b.beam((A.x, A.y, za), (C.x, C.y, za), 0.14, 0.14, GREY_WOOD)
     for side in (-1, 1):
         prev = None
         for k in range(int((d1 - d0) / 3.4) + 1):
@@ -3128,7 +3145,7 @@ def s15_place():
     inst("hanging_sign", "prop_hanging_sign", p, a, d=360)
     marker("I25", p, "lore", "I25", 2.0, "Flume bridge sign (pictogram: a bucket and a pick). The sign node is hanging_sign.")
     # ---------------- the Smuggler's Stash (path leaves just before the bridge)
-    s0, s1, s2 = STASH[0], STASH[1], STASH[2]
+    s0, s1, s2 = STASH[0], STASH[3], STASH[2]
     pdir = (s2 - s0).normalized()
     pn = Vector((-pdir.y, pdir.x))
     scr = [(s1 + pdir * 0.5 + pn * -2.9, 2.5), (s1 + pdir * 5.0 + pn * 3.2, 2.3), (s1 + pdir * 9.5 + pn * -2.8, 2.4), (s1 + pdir * 1.5 + pn * 5.2, 2.0), (s1 + pdir * 7.0 + pn * -5.0, 1.9)]
@@ -3294,11 +3311,11 @@ def build_kits_s16():
     agave_col = mixc(mixc(CAC, PAL["stone"], 0.35), CAC_H, 0.25)
     for v in range(2):
         b = Bld(700 + v)
-        for k in range(13):
-            a = math.tau * k / 13 + r.uniform(-0.1, 0.1)
+        for k in range(9):
+            a = math.tau * k / 9 + r.uniform(-0.1, 0.1)
             ln = r.uniform(0.75, 1.15)
             tilt = r.uniform(0.45, 0.8)
-            b.beam((0.05 * math.cos(a), 0.05 * math.sin(a), 0.05), (ln * math.cos(a) * tilt, ln * math.sin(a) * tilt, 0.05 + ln * (1 - tilt) * 0.9), 0.17, 0.05, shade(agave_col, r.uniform(0.85, 1.1)))
+            b.tube((0.05 * math.cos(a), 0.05 * math.sin(a), 0.05), (ln * math.cos(a) * tilt, ln * math.sin(a) * tilt, 0.05 + ln * (1 - tilt) * 0.9), 0.1, 0.02, 3, shade(agave_col, r.uniform(0.85, 1.1)))
         if v == 1:
             b.tube((0, 0, 0.2), (0.05, 0.03, 2.4), 0.05, 0.03, 5, mixc(PAL["scrub"], WOOD, 0.4))
             for k in range(6):
@@ -3587,6 +3604,13 @@ def bake_all_ao():
     for o in templ:
         b2 = bvh_from([(o, Matrix.Identity(4))], ground_z=0.0, ground_half=40.0)
         n += bake_ao(o, Matrix.Identity(4), b2, 2.4 if not o.name.startswith("kit_cliff") else 3.5, 0.45)
+    for me in bpy.data.meshes:                                   # the unbaked copy is only needed while baking; drop it so exports carry one COLOR_0
+        cb = me.color_attributes.get("Col_base")
+        if cb is not None:
+            me.color_attributes.remove(cb)
+        col = me.color_attributes.get("Col")
+        if col is not None:
+            me.color_attributes.active_color = col
     return n
 
 def run_s1_6(render=False):
@@ -3635,3 +3659,562 @@ def s16_renders():
     pos = Vector((30, 120, 55)); tgt = Vector((20, 330, 40))
     c.location = pos; c.rotation_euler = (tgt - pos).to_track_quat("-Z", "Y").to_euler()
     render_to(c, "s1-6_far_ring_north", (1920, 1080))
+
+# ================================================================ step S1-7: audit, merge into chunks, export
+import struct, re, shutil
+from mathutils.kdtree import KDTree
+
+OUT_DIR = os.path.join(REPO, "public", "models", "pete-area1")
+CHUNK_FILES = {"a": "chunk_section1_a.glb", "b": "chunk_section1_b.glb", "c": "chunk_section1_c.glb", "d": "chunk_section1_d.glb"}
+LAYOUT_PREFIXES = ("prop_crate_a1-", "prop_pot_a1-", "prop_campfire_a1-")
+DYN_ROOTS = ("prop_gate_I17", "prop_fence_", "prop_barrel_I23", "prop_campfire_I26", "prop_lantern_string_I20")
+DYN_LEAVES = ("door", "door_l", "door_r", "ladder")
+
+_DT = []
+_KD = None
+
+def build_dtab():
+    global _KD, _DT
+    pts = [(centre(float(d)), float(d)) for d in range(-45, 462)]
+    _DT = [d for (_, d) in pts]
+    _KD = KDTree(len(pts))
+    for i, (p, _) in enumerate(pts):
+        _KD.insert((p.x, p.y, 0.0), i)
+    _KD.balance()
+
+def d_of(x, y):
+    co, i, dist = _KD.find((x, y, 0.0))
+    return _DT[i]
+
+def base_name(ob):
+    return re.sub(r"\.\d{3}$", "", ob.name)
+
+def root_of(ob):
+    while ob.parent is not None:
+        ob = ob.parent
+    return ob
+
+def is_layout_group(e):
+    n = e.name
+    if not n.startswith(LAYOUT_PREFIXES):
+        return False
+    return "_x" not in n and "extra" not in n
+
+def _is_dyn_group(p):
+    return p.type == "EMPTY" and (p.name.startswith(DYN_ROOTS) or p.name == "lantern" or p.name.startswith("lantern_") or p.name.startswith("lantern."))
+
+def dynamic_root(ob):
+    """The top-level node of a dynamic part (animated by the game), or None if the object is static."""
+    p = ob
+    top = None
+    while p is not None:
+        if _is_dyn_group(p):
+            top = p
+        p = p.parent
+    if top is not None:
+        while top.parent is not None and _is_dyn_group(top.parent):
+            top = top.parent
+        return top
+    if ob.type == "MESH" and base_name(ob) in DYN_LEAVES:
+        return ob
+    return None
+
+def layout_child(ob):
+    p = ob.parent
+    while p is not None:
+        if p.type == "EMPTY" and is_layout_group(p):
+            return True
+        p = p.parent
+    return False
+
+def category(ob):
+    n = ob.name
+    if n.startswith("terrain_"):
+        return "terrain"
+    if n.startswith(("road_", "paths_", "walkway_", "cobbles_", "decal_", "rail_track", "telegraph_wire")):
+        return "road_and_ground"
+    if n.startswith("kit_cliff_inst") or n.startswith("mesa_"):
+        return "cliff_kit"
+    if n.startswith("foliage_"):
+        return "foliage"
+    return "props"
+
+def static_objects():
+    out, far = [], []
+    for ob in scn().objects:
+        if ob.type != "MESH" or not ob.get("rw_gen"):
+            continue
+        if ob.hide_viewport or ob.hide_render:
+            continue
+        if ob.name.startswith("kit_") and "_inst" not in ob.name:
+            continue
+        if ob.get("rw_cat") == "far" or ob.name.startswith(("far_", "terrain_far")):
+            far.append(ob)
+            continue
+        if dynamic_root(ob) is not None or layout_child(ob):
+            continue
+        out.append(ob)
+    return out, far
+
+def obj_d(ob):
+    if "rw_d" in ob.keys():
+        return float(ob["rw_d"])
+    w = ob.matrix_world.translation
+    return d_of(w.x, w.y)
+
+def world_geom(ob, poly_ok=None):
+    me = ob.data
+    M = ob.matrix_world
+    attr = me.color_attributes.get("Col")
+    V, F, C = [], [], []
+    remap = {}
+    for p in me.polygons:
+        if poly_ok is not None and not poly_ok(ob, p, M):
+            continue
+        face = []
+        for li, vi in zip(p.loop_indices, p.vertices):
+            w = M @ me.vertices[vi].co
+            V.append((w.x, w.y, w.z))
+            face.append(len(V) - 1)
+            c = attr.data[li].color if attr is not None else (0.5, 0.5, 0.5, 1.0)
+            C.append((c[0], c[1], c[2], 1.0))
+        F.append(tuple(face))
+    return V, F, C
+
+def build_chunk_geometry(ck, objs):
+    a, b = CHUNKS[ck]
+    Vt, Ft, Ct = [], [], []
+    br = {}
+    for ob in objs:
+        small = len(ob.data.polygons) < 1500 and max(ob.dimensions) < 40.0
+        if small:
+            d = obj_d(ob)
+            if not (a <= d <= b):
+                continue
+            V, F, C = world_geom(ob)
+        else:
+            def ok(ob_, p, M):
+                c = M @ p.center
+                return a <= d_of(c.x, c.y) <= b
+            V, F, C = world_geom(ob, ok)
+        if not F:
+            continue
+        base = len(Vt)
+        Vt.extend(V)
+        Ft.extend([tuple(i + base for i in f) for f in F])
+        Ct.extend(C)
+        cat = category(ob)
+        br[cat] = br.get(cat, 0) + sum(len(f) - 2 for f in F)
+    return Vt, Ft, Ct, br
+
+def merged_object(name, V, F, C, glow=False):
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(V, [], F)
+    me.update()
+    attr = me.color_attributes.new("Col", "FLOAT_COLOR", "CORNER")
+    flat = []
+    for p in me.polygons:
+        for li in p.loop_indices:
+            vi = me.loops[li].vertex_index
+            pass
+    # colours were gathered per face corner in face order, so they line up with the loops
+    cols = []
+    for c in C:
+        cols.extend(c)
+    attr.data.foreach_set("color", cols)
+    try:
+        me.shade_flat()
+    except Exception:
+        pass
+    me.materials.append(get_glow_material() if glow else get_material())
+    ob = bpy.data.objects.new(name, me)
+    coll("90_export").objects.link(ob)
+    return ob
+
+def clone_tree(root, parent=None, world=True):
+    """A temporary copy of a dynamic node tree (shares mesh data) for export."""
+    if root.type == "EMPTY":
+        n = bpy.data.objects.new(base_name(root), None)
+        n.empty_display_type = "PLAIN_AXES"
+    else:
+        n = bpy.data.objects.new(base_name(root), root.data)
+    coll("90_export").objects.link(n)
+    if parent is None:
+        n.matrix_world = root.matrix_world.copy()
+    else:
+        n.parent = parent
+        n.location = root.location.copy()
+        n.rotation_euler = root.rotation_euler.copy()
+        n.scale = root.scale.copy()
+    out = [n]
+    for ch in root.children:
+        if ch.hide_viewport or ch.hide_render:
+            if ch.type == "MESH" and base_name(ch) in ("pot_shards", "barrel_broken", "fence_broken"):
+                pass                                   # keep the hidden variants: the game swaps them in
+            else:
+                continue
+        out.extend(clone_tree(ch, n))
+    return out
+
+def dynamic_roots_for(ck):
+    a, b = CHUNKS[ck]
+    roots = []
+    seen = set()
+    for ob in scn().objects:
+        if not ob.get("rw_gen") or ob.type not in ("MESH", "EMPTY"):
+            continue
+        if ob.name.startswith("marker_") or (ob.type == "MESH" and ob.hide_viewport and ob.parent is None):
+            continue
+        r = dynamic_root(ob)
+        if r is None or r in seen or layout_child(r):
+            continue
+        if r.parent is not None and dynamic_root(r.parent) is not None:
+            continue
+        seen.add(r)
+        d = obj_d(r)
+        if a <= d <= b:
+            roots.append(r)
+    return roots
+
+def glb_stats(path):
+    data = open(path, "rb").read()
+    jl, jt = struct.unpack("<II", data[12:20])
+    js = json.loads(data[20:20 + jl])
+    tris = 0
+    prims = 0
+    for m in js.get("meshes", []):
+        for pr in m["primitives"]:
+            prims += 1
+    node_tris = 0
+    mesh_tris = []
+    for m in js.get("meshes", []):
+        t = 0
+        for pr in m["primitives"]:
+            if "indices" in pr:
+                t += js["accessors"][pr["indices"]]["count"] // 3
+            else:
+                t += js["accessors"][pr["attributes"]["POSITION"]]["count"] // 3
+        mesh_tris.append(t)
+    mesh_nodes = [n for n in js.get("nodes", []) if "mesh" in n]
+    for n in mesh_nodes:
+        node_tris += mesh_tris[n["mesh"]]
+    return dict(bytes=len(data), nodes=len(js.get("nodes", [])), mesh_nodes=len(mesh_nodes), meshes=len(mesh_tris), triangles_unique=sum(mesh_tris),
+                triangles_rendered=node_tris, materials=[m.get("name") for m in js.get("materials", [])], node_names=sorted({n.get("name", "") for n in js.get("nodes", [])}))
+
+def fix_glb_names(path):
+    """Strip Blender's .001 suffixes from node names so the game finds lid, fire_flame, glow and the rest by their plain names."""
+    data = bytearray(open(path, "rb").read())
+    jl, jt = struct.unpack("<II", data[12:20])
+    js = json.loads(bytes(data[20:20 + jl]))
+    for n in js.get("nodes", []):
+        if "name" in n:
+            nm = re.sub(r"\.\d{3}$", "", n["name"])
+            if nm.startswith("lantern_") and nm != "lantern_frame":
+                nm = "lantern"                                   # every lantern group is a node named lantern (the game sways it)
+            n["name"] = nm
+    for m in js.get("meshes", []):
+        if "name" in m:
+            m["name"] = re.sub(r"\.\d{3}$", "", m["name"])
+    raw = json.dumps(js, separators=(",", ":")).encode("utf-8")
+    raw += b" " * ((4 - len(raw) % 4) % 4)
+    rest = bytes(data[20 + jl:])
+    total = 12 + 8 + len(raw) + len(rest)
+    out = struct.pack("<III", 0x46546C67, 2, total) + struct.pack("<II", len(raw), jt) + raw + rest
+    open(path, "wb").write(out)
+
+def shrink_glb(path):
+    """Store COLOR_0 as normalised bytes (the game's materials read it as before) and repack the buffer tightly.
+    Chunk files are exported without NORMAL, so three.js shades them flat, which is the intended faceted look."""
+    data = open(path, "rb").read()
+    jl, jt = struct.unpack("<II", data[12:20])
+    js = json.loads(data[20:20 + jl])
+    off = 20 + jl
+    bl, bt = struct.unpack("<II", data[off:off + 8])
+    binb = data[off + 8:off + 8 + bl]
+    color_acc = set()
+    for m in js.get("meshes", []):
+        for pr in m["primitives"]:
+            if "COLOR_0" in pr["attributes"]:
+                color_acc.add(pr["attributes"]["COLOR_0"])
+    ncomp = {"SCALAR": 1, "VEC2": 2, "VEC3": 3, "VEC4": 4}
+    csize = {5120: 1, 5121: 1, 5122: 2, 5123: 2, 5125: 4, 5126: 4}
+    newbin = bytearray()
+    views = []
+    for ai, a in enumerate(js["accessors"]):
+        bv = js["bufferViews"][a["bufferView"]]
+        start = bv.get("byteOffset", 0) + a.get("byteOffset", 0)
+        n, cnt = ncomp[a["type"]], a["count"]
+        while len(newbin) % 4:
+            newbin.append(0)
+        pos = len(newbin)
+        if ai in color_acc and a["componentType"] == 5126:
+            for k in range(cnt):
+                vals = struct.unpack_from("<%df" % n, binb, start + k * 4 * n)
+                rgb = [max(0, min(255, int(round(v * 255.0)))) for v in vals[:3]]
+                newbin.extend(bytes(rgb + [255]))
+            a["componentType"] = 5121
+            a["type"] = "VEC4"
+            a["normalized"] = True
+            a.pop("min", None); a.pop("max", None)
+            ln = cnt * 4
+        else:
+            ln = cnt * n * csize[a["componentType"]]
+            newbin.extend(binb[start:start + ln])
+        v = {"buffer": 0, "byteOffset": pos, "byteLength": ln}
+        if "target" in bv:
+            v["target"] = bv["target"]
+        views.append(v)
+        a["bufferView"] = len(views) - 1
+        a.pop("byteOffset", None)
+    while len(newbin) % 4:
+        newbin.append(0)
+    js["bufferViews"] = views
+    js["buffers"] = [{"byteLength": len(newbin)}]
+    raw = json.dumps(js, separators=(",", ":")).encode("utf-8")
+    raw += b" " * ((4 - len(raw) % 4) % 4)
+    total = 12 + 8 + len(raw) + 8 + len(newbin)
+    out = struct.pack("<III", 0x46546C67, 2, total) + struct.pack("<II", len(raw), jt) + raw + struct.pack("<II", len(newbin), bt) + bytes(newbin)
+    open(path, "wb").write(out)
+
+def export_selected(objs, path, normals=True, shrink=False):
+    bpy.ops.object.select_all(action="DESELECT")
+    for o in objs:
+        o.select_set(True)
+    bpy.context.view_layer.objects.active = objs[0]
+    kw = dict(filepath=path, export_format="GLB", use_selection=True, export_yup=True, export_apply=False, export_cameras=False, export_lights=False,
+              export_extras=False, export_materials="EXPORT", export_texcoords=False, export_normals=normals, export_vertex_color="MATERIAL", export_animations=False)
+    try:
+        bpy.ops.export_scene.gltf(**kw)
+    except TypeError:
+        kw.pop("export_animations", None)
+        bpy.ops.export_scene.gltf(**kw)
+    fix_glb_names(path)
+    if shrink:
+        shrink_glb(path)
+
+def cleanup_export():
+    for o in list(coll("90_export").objects):
+        me = o.data if o.type == "MESH" else None
+        bpy.data.objects.remove(o, do_unlink=True)
+        if me is not None and me.users == 0:
+            bpy.data.meshes.remove(me)
+
+def export_chunks(write=True):
+    build_dtab()
+    bpy.context.view_layer.update()
+    os.makedirs(OUT_DIR, exist_ok=True)
+    objs, far = static_objects()
+    report = {}
+    for ck in "abcd":
+        cleanup_export()
+        V, F, C, br = build_chunk_geometry(ck, objs)
+        st = merged_object("chunk_section1_%s" % ck, V, F, C)
+        dyn = dynamic_roots_for(ck)
+        temps = [st]
+        dyn_tris = 0
+        for r in dyn:
+            ts = clone_tree(r)
+            temps.extend(ts)
+            dyn_tris += sum(len(p.vertices) - 2 for t in ts if t.type == "MESH" and not (t.hide_viewport or t.hide_render) for p in t.data.polygons)
+        path = os.path.join(OUT_DIR, CHUNK_FILES[ck])
+        if write:
+            export_selected(temps, path, normals=False, shrink=True)
+            gs = glb_stats(path)
+        else:
+            gs = {}
+        stat_tris = sum(len(f) - 2 for f in F)
+        report[ck] = dict(range=CHUNKS[ck], static_tris=stat_tris, by_category=br, dynamic_roots=len(dyn), dynamic_tris=dyn_tris, glb=gs)
+        cleanup_export()
+    # the far ring (distant mesas, smoke, far ground) as its own file
+    cleanup_export()
+    Vf, Ff, Cf = [], [], []
+    for ob in far:
+        V, F, C = world_geom(ob)
+        base = len(Vf)
+        Vf.extend(V); Ff.extend([tuple(i + base for i in f) for f in F]); Cf.extend(C)
+    st = merged_object("chunk_section1_far_ring", Vf, Ff, Cf)
+    path = os.path.join(OUT_DIR, "chunk_section1_far_ring.glb")
+    if write:
+        export_selected([st], path, normals=False, shrink=True)
+        report["far_ring"] = dict(static_tris=sum(len(f) - 2 for f in Ff), glb=glb_stats(path))
+    cleanup_export()
+    return report
+
+# ---------------------------------------------------------------- kit pieces with their named nodes
+def build_clue_kits():
+    out = {}
+    b = Bld(800)
+    b.box(0, 0, 0, 0.9, 0.6, 0.4, WOOD, planks=0.3)
+    b.box(0, 0, 0.4, 0.74, 0.52, 0.12, PAPER)
+    b.box(0, 0, 0.5, 0.6, 0.4, 0.04, mixc(PAPER, FLAME_T, 0.35))
+    b.box(0.0, -0.18, 0.5, 0.5, 0.05, 0.05, CO_RED)
+    b.beam((0.3, -0.1, 0.4), (0.55, -0.42, 0.34), 0.05, 0.02, CO_RED)            # the ribbon
+    out["clue_manifest"] = b
+    b = Bld(801)
+    b.box(0, 0, 0, 0.5, 0.36, 0.1, mixc(CO_TEAL, WOOD_D, 0.5))
+    b.box(0, 0, 0.1, 0.46, 0.32, 0.03, PAPER)
+    b.box(-0.2, 0, 0, 0.06, 0.36, 0.13, BRASS)
+    out["clue_ledger"] = b
+    b = Bld(802)
+    b.tube((-0.12, 0, 0.02), (-0.12, 0.0, 0.03), 0.07, 0.07, 10, BRASS)
+    b.beam((-0.05, 0, 0.02), (0.22, 0, 0.02), 0.04, 0.03, BRASS)
+    b.beam((0.18, 0, 0.02), (0.18, 0, -0.01), 0.04, 0.05, BRASS) if False else b.box(0.18, 0.0, 0.0, 0.04, 0.05, 0.06, BRASS)
+    b.box(0.12, 0.0, 0.0, 0.04, 0.05, 0.05, BRASS)
+    out["clue_key"] = b
+    return out
+
+def export_kit(fname, parts, root_name):
+    """parts: list of (node_name, template_object_or_Bld_mesh_object, (x, y, z), (rx, ry, rz) radians, hidden)"""
+    cleanup_export()
+    root = bpy.data.objects.new(root_name, None)
+    coll("90_export").objects.link(root)
+    objs = [root]
+    for (nm, tmpl, loc, rot, hid) in parts:
+        o = bpy.data.objects.new(nm, tmpl.data)
+        coll("90_export").objects.link(o)
+        o.parent = root
+        o.location = loc
+        o.rotation_euler = rot
+        if hid:
+            o.hide_render = False
+        objs.append(o)
+    path = os.path.join(OUT_DIR, fname)
+    export_selected(objs, path)
+    gs = glb_stats(path)
+    cleanup_export()
+    return gs
+
+def export_kits():
+    os.makedirs(OUT_DIR, exist_ok=True)
+    K = KITS
+    res = {}
+    res["kit_crate.glb"] = export_kit("kit_crate.glb", [("crate_body", K["crate_body"], (0, 0, 0), (0, 0, 0), False), ("lid", K["crate_lid"], (0, 0.52, 0.92), (0, 0, 0), False)], "prop_crate")
+    res["kit_pot.glb"] = export_kit("kit_pot.glb", [("pot_whole", K["pot_whole"], (0, 0, 0), (0, 0, 0), False), ("pot_shards", K["pot_shards"], (0, 0, 0), (0, 0, 0), True)], "prop_pot")
+    res["kit_campfire.glb"] = export_kit("kit_campfire.glb", [("campfire_stones", K["campfire_stones"], (0, 0, 0), (0, 0, 0), False), ("campfire_logs", K["campfire_logs"], (0, 0, 0), (0, 0, 0), False),
+                                                              ("fire_glow", K["fire_glow"], (0, 0, 0), (0, 0, 0), False), ("fire_flame", K["fire_flame"], (0, 0, 0), (0, 0, 0), False)], "prop_campfire")
+    res["kit_lantern.glb"] = export_kit("kit_lantern.glb", [("lantern_frame", K["lantern_frame"], (0, 0, 0), (0, 0, 0), False), ("glow", K["lantern_glow"], (0, 0, 0), (0, 0, 0), False)], "lantern")
+    res["kit_barrel.glb"] = export_kit("kit_barrel.glb", [("barrel_whole", K["barrel_whole"], (0, 0, 0), (0, 0, 0), False), ("barrel_broken", K["barrel_broken"], (0, 0, 0), (0, 0, 0), True)], "prop_barrel")
+    res["kit_fence_break.glb"] = export_kit("kit_fence_break.glb", [("fence_whole", K["fence_whole"], (0, 0, 0), (0, 0, 0), False), ("fence_broken", K["fence_broken"], (0, 0, 0), (0, 0, 0), True)], "prop_fence")
+    res["kit_shed_doors.glb"] = export_kit("kit_shed_doors.glb", [("door_l", K["shed_door_l"], (-2.7, -2.1, 0), (0, 0, 0), False), ("door_r", K["shed_door_r"], (2.7, -2.1, 0), (0, 0, 0), False)], "prop_shed_doors")
+    hing = tuple(K["door_S2"]["hinge"])
+    res["kit_door.glb"] = export_kit("kit_door.glb", [("door", K["door_S2"], (0, 0, 0), (0, 0, 0), False)], "prop_door")
+    res["kit_lever_gate.glb"] = export_kit("kit_lever_gate.glb", [("gate_posts", K["gate_posts"], (-2.0, 0, 0), (0, 0, 0), False), ("gate_leaf", K["gate_leaf"], (-1.95, 0, 0), (0, 0, 0), False),
+                                                                  ("lever_base", K["lever_base"], (-3.4, -1.0, 0), (0, 0, 0), False), ("lever_arm", K["lever_arm"], (-3.4, -1.0, 1.1), (0, 0, 0), False)], "prop_gate_lever")
+    res["kit_ladder.glb"] = export_kit("kit_ladder.glb", [("ladder", K["ladder"], (0, 0, 0), (0, 0, 0), False)], "prop_ladder")
+    clues = build_clue_kits()
+    for nm, bl in clues.items():
+        ob = bl.finish(nm + "_src", coll("00_reference"))
+        res["kit_%s.glb" % nm] = export_kit("kit_%s.glb" % nm, [(nm, ob, (0, 0, 0), (0, 0, 0), False)], "prop_" + nm)
+        me = ob.data
+        bpy.data.objects.remove(ob, do_unlink=True)
+        bpy.data.meshes.remove(me)
+    cleanup_export()
+    return res
+
+def export_markers_json():
+    rows = []
+    for o in scn().objects:
+        if o.type == "EMPTY" and o.name.startswith("marker_"):
+            rows.append(dict(id=o.get("rw_id"), type=o.get("rw_type"), x=round(o.location.x, 2), z=round(-o.location.y, 2), radius=o.get("rw_radius"), note=o.get("rw_note")))
+    rows.sort(key=lambda r: (str(r["type"]), str(r["id"])))
+    path = os.path.join(OUT_DIR, "pete_section1_markers.json")
+    json.dump(dict(note="Game coordinates (x east, z south), metres. Generated by tools/blender/make_pete_section1.py.", markers=rows), open(path, "w"), indent=1)
+    return len(rows)
+
+# ---------------------------------------------------------------- acceptance checks
+def audit_checks():
+    out = {}
+    rib = bpy.data.objects.get("road_ribbon_s1")
+    out["road_ribbon_max_z"] = round(max(v.co.z for v in rib.data.vertices), 3)
+    walk = bpy.data.objects.get("walkway_planks_s1")
+    out["walkway_max_z"] = round(max(v.co.z for v in walk.data.vertices), 3)
+    br = bpy.data.objects.get("prop_flume_bridge")
+    deck = []
+    for p in br.data.polygons:
+        if p.normal.z > 0.9 and -0.15 < p.center.z < 0.3:
+            deck.append(max(br.data.vertices[i].co.z for i in p.vertices))
+    out["bridge_deck_top_max_z"] = round(max(deck), 3)
+    dec = [o for o in scn().objects if o.name.startswith("decal_")]
+    out["decals_max_z"] = round(max(max(v.co.z for v in o.data.vertices) for o in dec), 3)
+    # walls close every edge
+    G = compute_grid()
+    Z, ds = G["Z"], G["ds"]
+    out["west_plug_min_z"] = round(min(Z[0]), 1)
+    out["east_plug_min_z"] = round(min(Z[-1]), 1)
+    out["north_edge_min_z"] = round(min(Z[i][-1] for i in range(len(ds))), 1)
+    out["south_edge_min_z"] = round(min(Z[i][0] for i in range(len(ds))), 1)
+    south_near = []
+    for i, d in enumerate(ds):
+        if -20 < d < 425:
+            for j, c in enumerate(COLS):
+                if c["k"] == "sw" and c["e"] <= 6.5:
+                    south_near.append(Z[i][j])
+    out["south_wall_max_z_first_terrace_6m"] = round(max(south_near), 1)
+    # props inside the 8 m clear zone and the fight circle (static placed props only)
+    viol, circle = [], []
+    for o in scn().objects:
+        if not o.get("rw_gen") or o.get("rw_cat") not in ("prop",) or o.type not in ("MESH", "EMPTY"):
+            continue
+        if o.parent is not None or o.hide_viewport:
+            continue
+        w = o.matrix_world.translation
+        d = d_of(w.x, w.y)
+        t = tang_at(d); nrm = Vector((-t.y, t.x))
+        u = (Vector((w.x, w.y)) - centre(d)).dot(nrm)
+        if abs(u) < 8.0 and -30 < d < 440 and max(o.dimensions) > 0.6:
+            viol.append((o.name, round(d), round(u, 1)))
+        if in_fight(Vector((w.x, w.y)), 0.0) and not o.name.startswith(("marker_",)):
+            circle.append(o.name)
+    out["props_inside_8m_of_centre_line"] = viol
+    out["props_inside_claims_fight_circle"] = circle
+    # cliff kit repetition
+    insts = [o for o in scn().objects if o.name.startswith("kit_cliff_inst")]
+    best = 1e9
+    for i, a in enumerate(insts):
+        for b in insts[i + 1:]:
+            if a["rw_variant"] == b["rw_variant"]:
+                best = min(best, (a.location - b.location).length)
+    out["cliff_kit_variants"] = len({o["rw_variant"] for o in insts})
+    out["cliff_kit_min_distance_same_variant_m"] = round(best, 1)
+    # palette: darkest and lightest vertex colours on the terrain, props and kit templates
+    lo, hi = 9.0, 0.0
+    for o in scn().objects:
+        if o.type == "MESH" and o.get("rw_gen") and o.data.color_attributes.get("Col") is not None and not o.data.materials[0].name == "M_cloth_glow":
+            a = o.data.color_attributes["Col"]
+            buf = [0.0] * (4 * len(o.data.loops))
+            a.data.foreach_get("color", buf)
+            for k in range(0, len(buf), 4 * 7):
+                lum = 0.2126 * buf[k] + 0.7152 * buf[k + 1] + 0.0722 * buf[k + 2]
+                lo, hi = min(lo, lum), max(hi, lum)
+    out["darkest_linear_luminance"] = round(lo, 4)
+    out["lightest_linear_luminance"] = round(hi, 3)
+    out["textures"] = len(bpy.data.images)
+    return out
+
+def run_s1_7(render=True, export=True):
+    run_s1_6(render=False)
+    chk = audit_checks()
+    print(json.dumps(chk, indent=1))
+    rep = None
+    if export:
+        rep = export_chunks(write=True)
+        kits = export_kits()
+        nm = export_markers_json()
+        print(json.dumps({k: {kk: vv for kk, vv in v.items() if kk != "node_names"} for k, v in kits.items()}, indent=1))
+        print("markers json rows", nm)
+        print(json.dumps(rep, indent=1))
+    if render:
+        s17_renders()
+    return chk, rep
+
+def s17_renders():
+    gc, pc, cc = bpy.data.objects["GameCamera"], bpy.data.objects["PhoneGameCamera"], get_cam("ChaseCamera")
+    for d in (20, 55, 90, 125, 160, 195, 230, 265, 300, 335, 370, 405):
+        place_game_camera(gc, d)
+        render_to(gc, "game_camera_d%03d" % d, (1920, 1080), subdir="s1-7_final")
+        place_game_camera(pc, d, phone=True)
+        render_to(pc, "phone_camera_d%03d" % d, (1080, 1920), subdir="s1-7_final")
+        place_chase_camera(cc, d)
+        render_to(cc, "chase_camera_d%03d" % d, (1920, 1080), subdir="s1-7_final")
+    render_to(bpy.data.objects["ReviewTopCamera"], "top_down", (1920, 1080), subdir="s1-7_final")
+    render_to(bpy.data.objects["ReviewObliqueCamera"], "oblique", (1920, 1080), subdir="s1-7_final")
