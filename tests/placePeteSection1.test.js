@@ -60,3 +60,24 @@ test('landmarks animate the lanterns and flames without errors', async () => {
     landmarks.setBreached(true);
     parts.dispose();
 });
+
+test('doors swing open and the yard gate lifts when the run state says so', async () => {
+    const markers = JSON.parse(readFileSync(new URL('../public/models/pete-area1/pete_section1_markers.json', import.meta.url), 'utf8')).markers;
+    const parts = createSection1Parts({ loader: fileLoader, markers });
+    await parts.ready;
+    const landmarks = parts.buildLandmarks();
+    const door = parts.registry.doors[0];
+    const first = markers.find(m => m.type === 'door');
+    const runState = { s1: { state: { doors: {}, leverPulled: false } } };
+    landmarks.update(0, runState);
+    const closed = door.rotation.y;
+    const id = door.userData.rwMarker;
+    assert.ok(id, 'every door answers to a door marker');
+    runState.s1.state.doors[id] = { open: true };
+    for(let i = 0; i < 80; i++) landmarks.update(i * 0.016, runState);
+    assert.ok(Math.abs(door.rotation.y - closed) > 1, 'the door swung');
+    runState.s1.state.doors[id].open = false;
+    for(let i = 0; i < 80; i++) landmarks.update(i * 0.016, runState);
+    assert.ok(Math.abs(door.rotation.y - closed) < 0.05, 'and closes again');
+    assert.ok(first);
+});

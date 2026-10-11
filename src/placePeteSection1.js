@@ -39,7 +39,36 @@ const plain = name => name.replace(/_\d+$/, '');
 // A root-level node's identity across the 20 m overlap between chunks: the same name at the same spot is the same object.
 function nodeKey(node) { return `${plain(node.name)}@${node.position.x.toFixed(1)},${node.position.z.toFixed(1)}`; }
 
-export function createSection1Parts({ loader = new GLTFLoader(), url = assetUrl, files = SECTION1_CHUNK_FILES, far = SECTION1_FAR_FILE } = {}) {
+// Doors swing open and the yard gate lifts as the run's state says (runState.s1.state: src/stages/section1/runtime.js). Each moving node answers
+// to the nearest door or lever marker, found once.
+const OPEN_ANGLE = 1.6;
+function nearestMarker(list, node) {
+    let best = null, bestD = Infinity;
+    for(const m of list) { const d = Math.hypot(m.x - node.position.x, m.z - node.position.z); if(d < bestD) { bestD = d; best = m; } }
+    return bestD < 40 ? best : null;
+}
+function syncMoving(registry, s1, markers) {
+    if(!s1 || !markers?.length) return;
+    const doorMarks = markers.filter(m => m.type === 'door');
+    for(const node of registry.doors) {
+        if(node.userData.rwMarker === undefined) node.userData.rwMarker = nearestMarker(doorMarks, node)?.id ?? null;
+        const id = node.userData.rwMarker;
+        if(!id) continue;
+        if(node.userData.rwClosedY === undefined) node.userData.rwClosedY = node.rotation.y;
+        const sign = plain(node.name) === 'door_r' ? -1 : 1;
+        const target = node.userData.rwClosedY + (s1.doors[id]?.open ? sign * OPEN_ANGLE : 0);
+        node.rotation.y += (target - node.rotation.y) * 0.18;
+    }
+    const lever = markers.find(m => m.type === 'lever');
+    if(lever) for(const node of registry.gates) {
+        if(node.userData.rwClosedY === undefined) node.userData.rwClosedY = node.rotation.y;
+        if(Math.hypot(lever.x - node.position.x, lever.z - node.position.z) > 40) continue;
+        const target = node.userData.rwClosedY + (s1.leverPulled ? OPEN_ANGLE : 0);
+        node.rotation.y += (target - node.rotation.y) * 0.1;
+    }
+}
+
+export function createSection1Parts({ markers = [], loader = new GLTFLoader(), url = assetUrl, files = SECTION1_CHUNK_FILES, far = SECTION1_FAR_FILE } = {}) {
     const environment = new THREE.Group();
     environment.name = 'pete-section1-environment';
     const landmarks = new THREE.Group();
@@ -98,7 +127,8 @@ export function createSection1Parts({ loader = new GLTFLoader(), url = assetUrl,
         buildLandmarks: () => ({
             group: landmarks,
             setBreached() {},
-            update(t) {
+            update(t, runState = null) {
+                syncMoving(registry, runState?.s1?.state, markers);
                 for(const { node, seed } of registry.lanterns) node.rotation.z = Math.sin(t * 1.7 + seed) * 0.07;
                 registry.flames.forEach((f, i) => f.scale.set(1, 0.85 + 0.25 * Math.sin(t * 9 + i), 1));
             }

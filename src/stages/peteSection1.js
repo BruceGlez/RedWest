@@ -175,7 +175,7 @@ export function createSection1Area({ collision, markers = [], sceneFactory = nul
         enterBanner: 'THE CLAIMS ROAD: THE TRAILHEAD',
         sceneParts() {
             if(!sceneFactory) return null;
-            const parts = sceneFactory();
+            const parts = sceneFactory({ markers });
             return {
                 campfires, crates, pots, bandits, clues: [],
                 itemScale: S,                 // crates, pots and campfires are drawn in the art's scale

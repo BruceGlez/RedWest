@@ -24,7 +24,7 @@ export function section1Enabled(search = globalThis.location?.search ?? '', stor
 
 export async function loadSection1Area(fetchJson = path => fetch(assetUrl(path)).then(r => { if(!r.ok) throw new Error(`${path}: ${r.status}`); return r.json(); })) {
     const [collision, markerFile] = await Promise.all([fetchJson(`${DATA}pete_section1_collision.json`), fetchJson(`${DATA}pete_section1_markers.json`)]);
-    return createSection1Area({ collision, markers: markerFile.markers, sceneFactory: () => createSection1Parts() });
+    return createSection1Area({ collision, markers: markerFile.markers, sceneFactory: opts => createSection1Parts(opts) });
 }
 
 let loading = null;

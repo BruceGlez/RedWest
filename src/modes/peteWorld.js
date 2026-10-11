@@ -20,6 +20,10 @@ import {
 } from '../peteWorldMap.js';
 import { PETE_AREAS, areaIndexForSave } from '../stages/pete.js';
 import { preloadSection1 } from '../stages/section1Preload.js';
+import { createSection1Runtime } from '../stages/section1/runtime.js';
+import { dialogue, mountDialogue } from '../dialogue.js';
+import { setInteractHint } from '../interactButton.js';
+import { keys, touch } from '../input.js';
 import { setWalkMask } from '../physics.js';
 import { setGroundSize } from '../groundSize.js';
 import { arena } from '../arena.js';
@@ -54,7 +58,8 @@ export const peteWorldRun = {
     clearedEncounters: [],       // guard groups that were woken and beaten (an area's exit may need them: exit.clears)
     encounterWokeAt: {},
     announcedZones: [],
-    prompt: null
+    prompt: null,
+    s1: null                     // Section 1's doors, lever and hiding (src/stages/section1/runtime.js), null elsewhere
 };
 
 export function startPeteWorldRun(options = {}, storage = globalThis.localStorage) {
@@ -81,6 +86,9 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
     peteWorldRun.encounterWokeAt = {};
     peteWorldRun.announcedZones = [];
     peteWorldRun.prompt = null;
+    peteWorldRun.s1 = area.isSection ? createSection1Runtime(area.markers) : null;
+    if(playerStats) playerStats.speedMult = 1;
+    dialogue.reset();
 
     if(resumes) {
         peteWorldRun.lastCheckpointId = saved.lastCheckpointId;
@@ -218,6 +226,10 @@ function enterArea(ctx, index, storage) {
 
 export function endPeteWorldRun(victory = false, storage = globalThis.localStorage) {
     peteWorldRun.active = false;
+    peteWorldRun.s1 = null;
+    if(playerStats) playerStats.speedMult = 1;
+    dialogue.reset();
+    setInteractHint(null);
     releaseArea();
     if(victory) {
         clearCheckpoint(storage);
@@ -327,6 +339,21 @@ export const peteWorldMode = {
                 activePrompt = `FOUND ${clue.title.toUpperCase()}`;
                 ctx?.ui?.showWaveBanner?.(`${clue.title}: ${clue.detail}`, 5200);
             }
+        }
+
+        // 4a. Section 1: E / ACT opens doors, pulls the lever, hides, reads notices (src/stages/section1/runtime.js)
+        if(peteWorldRun.s1) {
+            mountDialogue();
+            const pressed = keys.interactRequested;
+            keys.interactRequested = false;
+            const r = peteWorldRun.s1.step({
+                x: playerPos.x, z: playerPos.z, dt, pressed, dialogue,
+                fired: !!(keys.mouse || keys.space || touch.firing),
+                banner: text => ctx?.ui?.showWaveBanner?.(text, 2600)
+            });
+            if(playerStats) playerStats.speedMult = r.speedMult;
+            setInteractHint(r.prompt ? r.prompt.replace(/^E: /, '') : null);
+            if(r.prompt) activePrompt = activePrompt ?? r.prompt;
         }
 
         // 4b. Guards wake as the marshal nears them

@@ -248,7 +248,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
         }
         if(playerGroup.userData.aimTimer > 0) playerGroup.userData.aimTimer -= dt;
 
-        const speed = playerStats.isDashing ? playerStats.dashSpeed : playerStats.speed;
+        const speed = (playerStats.isDashing ? playerStats.dashSpeed : playerStats.speed) * (playerStats.speedMult ?? 1);   // speedMult: hiding (src/stages/section1/hiding.js)
         const move = new THREE.Vector3(0, 0, 0);
         if(keys.w) move.z -= 1;
         if(keys.s) move.z += 1;

@@ -1175,7 +1175,7 @@ export function createPeteWorldScene(area = null) {
 
             // Animate dynamic landmarks (swinging lanterns)
             if(landmarks && landmarks.update) {
-                landmarks.update(timeInSeconds);
+                landmarks.update(timeInSeconds, runState);
             }
         },
 
