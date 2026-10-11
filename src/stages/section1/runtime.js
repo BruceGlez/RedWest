@@ -140,5 +140,8 @@ export function createSection1Runtime(markers = []) {
         return got;
     }
 
-    return { interactables, state, step, tick, reset, beat, grant, breakables, elements, slowAt: (x, z) => slowAt(elements, x, z), summary: () => summary(elements), HIDE };
+    // The tray picks an element (touch): only one that is held.
+    function select(id) { if(elements.slots[id] > 0) elements.selected = id; }
+
+    return { interactables, state, step, tick, reset, beat, grant, select, breakables, elements, slowAt: (x, z) => slowAt(elements, x, z), summary: () => summary(elements), HIDE };
 }

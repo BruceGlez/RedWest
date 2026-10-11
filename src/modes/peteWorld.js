@@ -25,6 +25,7 @@ import { orbitDrag } from '../input.js';
 import { createAwareness, stepAwareness, dueMembers, alarmNear } from '../stages/section1/guards.js';
 import { createSection1Runtime } from '../stages/section1/runtime.js';
 import { dialogue, mountDialogue } from '../dialogue.js';
+import { mountElementTray, renderElementTray, resetElementTray, trayModel } from '../elementTray.js';
 import { setInteractHint } from '../interactButton.js';
 import { keys, touch } from '../input.js';
 import { setWalkMask } from '../physics.js';
@@ -272,6 +273,7 @@ export function endPeteWorldRun(victory = false, storage = globalThis.localStora
     if(playerStats) { playerStats.speedMult = 1; playerStats.hiddenFor = 0; }
     dialogue.reset();
     setInteractHint(null);
+    resetElementTray();
     releaseArea();
     if(victory) {
         clearCheckpoint(storage);
@@ -408,6 +410,8 @@ export const peteWorldMode = {
                 banner: text => ctx?.ui?.showWaveBanner?.(text, 2600)
             });
             if(events.length) withEffects(m => m.applyEvents(ctx, events));
+            mountElementTray(undefined, id => peteWorldRun.s1?.select(id));
+            renderElementTray(trayModel(peteWorldRun.s1.elements, peteWorldRun.s1.state.hiding));
             for(const e of enemies) if(e.userData) e.userData.slowMult = peteWorldRun.s1.slowAt(e.position.x, e.position.z);
             setInteractHint(r.prompt ? r.prompt.replace(/^E: /, '') : null);
             if(r.prompt) activePrompt = activePrompt ?? r.prompt;

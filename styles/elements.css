@@ -1,0 +1,45 @@
+/* The element tray and hiding pip (src/elementTray.js). */
+.element-tray {
+    position: fixed;
+    left: 16px;
+    bottom: 96px;
+    flex-direction: column;
+    gap: 6px;
+    align-items: flex-start;
+    z-index: 54;
+    font-family: inherit;
+}
+.element-slots { display: flex; gap: 6px; }
+.element-slot {
+    background: rgba(32, 20, 12, 0.88);
+    color: #f4eedb;
+    border: 2px solid #8a6a2e;
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 14px;
+    font-weight: 700;
+    touch-action: none;
+}
+.element-slot.selected { border-color: #ffcc33; color: #ffcc33; box-shadow: 0 0 8px rgba(255, 204, 51, 0.6); }
+.element-slot.empty { opacity: 0.4; }
+.element-throw {
+    background: #b5412a;
+    color: #fff;
+    border: 3px solid #f4eedb;
+    border-radius: 999px;
+    padding: 12px 18px;
+    font-size: 15px;
+    font-weight: 700;
+    touch-action: none;
+}
+.element-throw:disabled { opacity: 0.5; }
+.element-pip {
+    background: rgba(47, 111, 115, 0.92);
+    color: #fff;
+    border-radius: 999px;
+    padding: 4px 12px;
+    font-size: 13px;
+    font-weight: 700;
+    letter-spacing: 1px;
+}
+.element-hint { color: #c8a256; font-size: 11px; letter-spacing: 1px; }

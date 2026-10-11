@@ -273,7 +273,10 @@
     "src/dialogue.js",
     "src/interactButton.js",
     "styles/dialogue.css",
-    "tests/dialogue.test.js"
+    "tests/dialogue.test.js",
+    "src/elementTray.js",
+    "styles/elements.css",
+    "tests/elementTray.test.js"
    ],
    "checks": [
     "npm test",
