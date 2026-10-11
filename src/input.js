@@ -1,7 +1,7 @@
 import * as THREE from 'three';
 import { gameState } from './state.js';
 
-export const keys = { w:false, a:false, s:false, d:false, shift:false, space: false, mouse: false, restartRequested: false, confirmYes: false, confirmNo: false, pauseToggleRequested: false, settingsToggleRequested: false, musicToggleRequested: false, sfxToggleRequested: false, weaponSwitchRequested: false, bankRequested: false, rideOnRequested: false, startRequested: false };
+export const keys = { w:false, a:false, s:false, d:false, shift:false, space: false, mouse: false, restartRequested: false, confirmYes: false, confirmNo: false, pauseToggleRequested: false, settingsToggleRequested: false, musicToggleRequested: false, sfxToggleRequested: false, weaponSwitchRequested: false, bankRequested: false, rideOnRequested: false, startRequested: false, interactRequested: false };
 // Analog state from the on-screen sticks (touchControls.js). Unused on desktop.
 export const touch = { enabled: false, moveX: 0, moveY: 0, aiming: false, aimX: 0, aimY: 1, firing: false, quickFireAt: 0, autoFire: false };
 export const mouse = new THREE.Vector2();
@@ -29,6 +29,7 @@ export function setupInputs() {
         if(e.code === 'KeyN') keys.sfxToggleRequested = true;
         if(e.code === 'KeyQ') keys.weaponSwitchRequested = true;
         if(e.code === 'KeyB') keys.bankRequested = true;
+        if(e.code === 'KeyE') keys.interactRequested = true;        // doors, levers, hiding places, the dialogue box (src/dialogue.js)
         if(e.code === 'KeyC') keys.rideOnRequested = true;
         
         // Only allow restart if the input section is hidden (meaning score is saved)
@@ -58,6 +59,7 @@ export function setupInputs() {
         keys.weaponSwitchRequested = false;
         keys.bankRequested = false;
         keys.rideOnRequested = false;
+        keys.interactRequested = false;
         keys.startRequested = false;
         touch.moveX = 0;
         touch.moveY = 0;

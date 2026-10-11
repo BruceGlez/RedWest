@@ -268,7 +268,11 @@
     "tests/mobile-smoke.mjs",
     "src/saloonShiftView.js",
     "src/saloonKitchenView.js",
-    "styles/townSaloon.css"
+    "styles/townSaloon.css",
+    "src/dialogue.js",
+    "src/interactButton.js",
+    "styles/dialogue.css",
+    "tests/dialogue.test.js"
    ],
    "checks": [
     "npm test",
