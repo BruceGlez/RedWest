@@ -216,7 +216,8 @@
     "tests/peteWorld.test.js",
     "src/stages/**",
     "src/groundSize.js",
-    "tests/peteArea1.test.js"
+    "tests/peteArea1.test.js",
+    "tests/peteSection1.test.js"
    ],
    "checks": [
     "npm test",
