@@ -1,0 +1,120 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pete Area 1, Section 1 viewer</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #df925c; overflow: hidden; font-family: system-ui, sans-serif; }
+  #hud { position: fixed; left: 12px; top: 10px; color: #fff; text-shadow: 0 1px 3px #000; font-size: 13px; line-height: 1.5; pointer-events: none; }
+  #bar { position: fixed; left: 12px; bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #bar button { background: #2f6f73; color: #fff; border: 0; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  #pad { position: fixed; right: 14px; bottom: 14px; display: none; }
+  #pad div { width: 120px; height: 120px; border-radius: 60px; background: rgba(0,0,0,.25); touch-action: none; }
+  @media (pointer: coarse) { #pad { display: block; } }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<div id="bar"></div>
+<div id="pad"><div></div></div>
+<script type="module">
+// Standalone test viewer for the Section 1 export. Run `npm run dev` and open /tools/blender/section1_viewer.html
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+
+const BASE = '/models/pete-area1/';
+const scene = new THREE.Scene();
+const FOG = new THREE.Color('#df925c');
+scene.background = FOG;
+scene.fog = new THREE.Fog(FOG, 48, 118);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const cam = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 0.3, 900);
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+
+scene.add(new THREE.HemisphereLight('#ffd9a8', '#a06a48', 1.25));
+const sun = new THREE.DirectionalLight('#ffcb8f', 2.1);
+sun.position.set(-90, 45, -10);                          // low sun from the west, shadows run east
+scene.add(sun);
+
+const loader = new GLTFLoader();
+const load = (f) => new Promise((res, rej) => loader.load(BASE + f, (g) => res(g.scene), undefined, rej));
+
+// ---- the player (a simple stand-in) and its controls
+const player = new THREE.Group();
+const body = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.4, 1.4, 10), new THREE.MeshLambertMaterial({ color: '#b33a2a' }));
+body.position.y = 0.7; player.add(body);
+const hat = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.6, 0.12, 12), new THREE.MeshLambertMaterial({ color: '#48301c' }));
+hat.position.y = 1.9; player.add(hat);
+const head = new THREE.Mesh(new THREE.SphereGeometry(0.3, 10, 8), new THREE.MeshLambertMaterial({ color: '#e0a263' }));
+head.position.y = 1.55; player.add(head);
+scene.add(player);
+
+let yaw = 0, mode = 'chase', speed = 0;
+const keys = new Set();
+addEventListener('keydown', (e) => { keys.add(e.code); if (e.code === 'KeyF') mode = mode === 'chase' ? 'top' : mode === 'top' ? 'side' : 'chase'; });
+addEventListener('keyup', (e) => keys.delete(e.code));
+const pad = document.querySelector('#pad div'); let padVec = { x: 0, y: 0 };
+pad.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') { const r = pad.getBoundingClientRect(); padVec = { x: (e.clientX - r.left - 60) / 60, y: (e.clientY - r.top - 60) / 60 }; } });
+pad.addEventListener('pointerup', () => { padVec = { x: 0, y: 0 }; });
+
+function teleport(x, z, face) { player.position.set(x, 0, z); if (face !== undefined) yaw = face; }
+
+// ---- load the section
+const hud = document.getElementById('hud'), bar = document.getElementById('bar');
+let layout = null, markers = [];
+async function init() {
+  hud.textContent = 'Loading Section 1...';
+  const [a, b, c, d, far] = await Promise.all(['chunk_section1_a.glb', 'chunk_section1_b.glb', 'chunk_section1_c.glb', 'chunk_section1_d.glb', 'chunk_section1_far_ring.glb'].map(load));
+  [a, b, c, d, far].forEach((g) => scene.add(g));
+  layout = await (await fetch('/tools/blender/pete_area1_layout.json')).json();
+  markers = (await (await fetch(BASE + 'pete_section1_markers.json')).json()).markers;
+  // layout crates, pots and campfires are placed by the game from the layout: do the same here with the kit files
+  const [crate, pot, fire] = await Promise.all(['kit_crate.glb', 'kit_pot.glb', 'kit_campfire.glb'].map(load));
+  const flames = [];
+  const inSection = (p) => p.x > -215 && p.x < 215 && p.z < -105;
+  layout.crates.filter(inSection).forEach((p, i) => { const o = crate.clone(true); o.position.set(p.x, 0, p.z); o.rotation.y = i * 0.7; o.traverse((n) => { if (n.name === 'lid') n.rotation.x = 0; }); scene.add(o); });
+  layout.pots.filter(inSection).forEach((p, i) => { const o = pot.clone(true); o.position.set(p.x, 0, p.z); o.rotation.y = i; o.traverse((n) => { if (n.name === 'pot_shards') n.visible = false; }); scene.add(o); });
+  layout.campfires.filter(inSection).forEach((p) => { const o = fire.clone(true); o.position.set(p.x, 0, p.z); o.traverse((n) => { if (n.name === 'fire_flame') flames.push(n); }); scene.add(o); });
+  // buttons: teleport to the places and a few markers
+  const spots = [['Start', layout.start.x, layout.start.z, 0.1], ['Shack Row', -90, -200, 0.12], ['Claims', -8, -181, 0.2], ['Headframe', 40, -176, 0.05], ['Wash', 120, -181, -0.2], ['Bridge', 168, -170, 0.9], ['Stash', 204, -190, 0.9]];
+  spots.forEach(([n, x, z, f]) => { const bt = document.createElement('button'); bt.textContent = n; bt.onclick = () => teleport(x, z, f); bar.appendChild(bt); });
+  const fb = document.createElement('button'); fb.textContent = 'View (F)'; fb.onclick = () => { mode = mode === 'chase' ? 'top' : mode === 'top' ? 'side' : 'chase'; }; bar.appendChild(fb);
+  teleport(layout.start.x, layout.start.z, 0.1);
+  animate.flames = flames;
+}
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  const run = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  let fwd = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) - padVec.y;
+  let turn = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + padVec.x;
+  if (keys.has('KeyE')) turn += 1; if (keys.has('KeyQ')) turn -= 1;
+  yaw += turn * dt * 1.9;                                      // yaw 0 = east; turning right moves toward south (+z)
+  const sp = (run ? 14 : 7) * fwd;
+  const hx = Math.cos(yaw), hz = Math.sin(yaw);
+  player.position.x += hx * sp * dt;
+  player.position.z += hz * sp * dt;
+  player.rotation.y = -yaw;
+  const p = player.position;
+  if (mode === 'chase') {
+    cam.position.set(p.x - hx * 9, 5.2, p.z - hz * 9);
+    cam.lookAt(p.x + hx * 9, 1.4, p.z + hz * 9);
+  } else if (mode === 'side') {
+    cam.position.set(p.x - 6, 3, p.z + 14); cam.lookAt(p.x + hx * 6, 1.5, p.z - 4);
+  } else {
+    cam.position.set(p.x, 42, p.z + 26); cam.lookAt(p.x, 0, p.z);       // the old fixed game camera
+  }
+  (animate.flames || []).forEach((f, i) => { f.scale.set(1, 0.85 + 0.25 * Math.sin(t * 9 + i), 1); });
+  hud.innerHTML = `WASD / arrows move, Shift run, Q E turn, F change view<br>x ${p.x.toFixed(0)}  z ${p.z.toFixed(0)}  (road runs east; the bridge is near x 170, z -165)`;
+  renderer.render(scene, cam);
+}
+init().then(animate).catch((e) => { hud.textContent = 'Could not load: ' + e.message; console.error(e); });
+</script>
+</body>
+</html>
