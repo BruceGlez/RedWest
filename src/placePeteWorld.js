@@ -1065,6 +1065,7 @@ export function createPeteWorldScene(area = null) {
     // 1. Build campfires
     const campfireMeshes = (area?.campfires ?? WORLD_CAMPFIRES).map(c => {
         const item = createCampfireMesh(c.id, c.x, c.z);
+        if(area?.itemScale) item.group.scale.setScalar(area.itemScale);   // a big stage's world is scaled up around the 6-unit marshal
         group.add(item.group);
         return item;
     });
@@ -1072,6 +1073,7 @@ export function createPeteWorldScene(area = null) {
     // 2. Build crates
     const crateMeshes = (area?.crates ?? WORLD_CRATES).map(c => {
         const item = createCrateMesh(c.id, c.x, c.z);
+        if(area?.itemScale) item.group.scale.setScalar(area.itemScale);
         group.add(item.group);
         return item;
     });
@@ -1094,6 +1096,7 @@ export function createPeteWorldScene(area = null) {
     // 6. Build smashable clay pots (Mini Ninjas breakable pottery)
     const potMeshes = (area?.pots ?? WORLD_POTS).map(p => {
         const item = createSmashablePotMesh(p.id, p.x, p.z);
+        if(area?.itemScale) item.group.scale.setScalar(area.itemScale);
         group.add(item.group);
         return item;
     });

@@ -50,7 +50,8 @@
     "tests/characters-smoke.mjs",
     "src/place*.js",
     "src/mineScene.js",
-    "tests/placePeteWorld.test.js"
+    "tests/placePeteWorld.test.js",
+    "tests/placePeteSection1.test.js"
    ],
    "checks": [
     "npm test",
