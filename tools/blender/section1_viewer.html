@@ -1,0 +1,281 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Pete Area 1, Section 1 viewer</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #df925c; overflow: hidden; font-family: system-ui, sans-serif; }
+  #hud { position: fixed; left: 12px; top: 10px; color: #fff; text-shadow: 0 1px 3px #000; font-size: 13px; line-height: 1.5; pointer-events: none; }
+  #bar { position: fixed; left: 12px; bottom: 10px; display: flex; gap: 6px; flex-wrap: wrap; }
+  #bar button { background: #2f6f73; color: #fff; border: 0; border-radius: 6px; padding: 6px 10px; font-size: 13px; cursor: pointer; }
+  #pad { position: fixed; right: 14px; bottom: 14px; display: none; }
+  #pad div { width: 120px; height: 120px; border-radius: 60px; background: rgba(0,0,0,.25); touch-action: none; }
+  @media (pointer: coarse) { #pad { display: block; } }
+</style>
+</head>
+<body>
+<div id="hud"></div>
+<div id="bar"></div>
+<div id="pad"><div></div></div>
+<script type="module">
+// Standalone test viewer for the Section 1 export, in game units (the export is already scaled by 3: the marshal is 6 units tall).
+// Run `npm run dev` and open /tools/blender/section1_viewer.html
+import * as THREE from 'three';
+import { GLTFLoader } from 'three/examples/jsm/loaders/GLTFLoader.js';
+import { clone as cloneSkinned } from 'three/examples/jsm/utils/SkeletonUtils.js';
+
+const S = 3;                                             // WORLD_SCALE of the export; the old layout file is at 1:1
+const BASE = '/models/pete-area1/';
+const scene = new THREE.Scene();
+const FOG = new THREE.Color('#df925c');
+scene.background = FOG;
+// gradient sky dome with the game's Pete sky colours: horizon haze, orange, then blue overhead
+const sky = new THREE.Mesh(new THREE.SphereGeometry(2100, 32, 16), new THREE.ShaderMaterial({
+  side: THREE.BackSide, depthWrite: false, fog: false,
+  vertexShader: 'varying vec3 vP; void main(){ vP = position; gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0); }',
+  fragmentShader: `varying vec3 vP;
+    void main(){
+      float h = normalize(vP).y;
+      vec3 c0 = vec3(0.965, 0.706, 0.408);   // #f6b468 horizon
+      vec3 c1 = vec3(0.929, 0.408, 0.157);   // #ed6828
+      vec3 c2 = vec3(0.875, 0.518, 0.314);   // #df8450
+      vec3 c3 = vec3(0.235, 0.518, 0.769);   // #3c84c4 overhead
+      vec3 c = mix(c0, c1, smoothstep(0.0, 0.08, h));
+      c = mix(c, c2, smoothstep(0.08, 0.25, h));
+      c = mix(c, c3, smoothstep(0.25, 0.7, h));
+      gl_FragColor = vec4(c, 1.0);
+    }`
+}));
+sky.renderOrder = -1;
+scene.add(sky);
+scene.fog = new THREE.Fog(FOG, 48 * S, 118 * S);
+const renderer = new THREE.WebGLRenderer({ antialias: true });
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+renderer.setSize(innerWidth, innerHeight);
+document.body.appendChild(renderer.domElement);
+const cam = new THREE.PerspectiveCamera(58, innerWidth / innerHeight, 1, 3000);
+addEventListener('resize', () => { renderer.setSize(innerWidth, innerHeight); cam.aspect = innerWidth / innerHeight; cam.updateProjectionMatrix(); });
+
+scene.add(new THREE.HemisphereLight('#ffd9a8', '#a06a48', 1.25));
+const sun = new THREE.DirectionalLight('#ffcb8f', 2.1);
+sun.position.set(-90 * S, 45 * S, -10 * S);              // low sun from the west, shadows run east
+scene.add(sun);
+
+const loader = new GLTFLoader();
+const load = (f) => new Promise((res, rej) => loader.load(BASE + f, (g) => res(g.scene), undefined, rej));
+
+// ---- the player and its controls
+const player = new THREE.Group();
+let mixer = null, actions = {}, current = null;
+scene.add(player);
+
+let yaw = 0, mode = 'chase';
+const keys = new Set();
+addEventListener('keydown', (e) => { keys.add(e.code); if (e.code === 'KeyF') mode = mode === 'chase' ? 'top' : mode === 'top' ? 'side' : 'chase'; });
+addEventListener('keyup', (e) => keys.delete(e.code));
+const pad = document.querySelector('#pad div'); let padVec = { x: 0, y: 0 };
+pad.addEventListener('pointermove', (e) => { if (e.buttons || e.pointerType === 'touch') { const r = pad.getBoundingClientRect(); padVec = { x: (e.clientX - r.left - 60) / 60, y: (e.clientY - r.top - 60) / 60 }; } });
+pad.addEventListener('pointerup', () => { padVec = { x: 0, y: 0 }; });
+
+// ---- collision: a walkability grid (terrain over 0.45 m, the gully and the valley wall are blocked; the bridge deck is open) plus obstacle boxes
+let col = null;
+function bitAt(x, z) {
+  const ix = Math.floor((x - col.x0) / col.cell), iy = Math.floor((-z - col.y0) / col.cell);
+  if (ix < 0 || iy < 0 || ix >= col.nx || iy >= col.ny) return true;
+  const k = iy * col.nx + ix;
+  return ((col.bits[k >> 3] >> (k & 7)) & 1) === 1;
+}
+function hitBox(x, z, r) {
+  const by = -z;
+  for (const b of col.boxes) {
+    const dx = x - b[0], dy = by - b[1];
+    if (Math.hypot(dx, dy) > Math.hypot(b[2], b[3]) + r) continue;
+    const c = Math.cos(-b[4]), s = Math.sin(-b[4]);
+    const lx = dx * c - dy * s, ly = dx * s + dy * c;
+    const qx = Math.max(-b[2], Math.min(b[2], lx)), qy = Math.max(-b[3], Math.min(b[3], ly));
+    if ((lx - qx) ** 2 + (ly - qy) ** 2 < r * r) return true;
+  }
+  return false;
+}
+function blockedAt(x, z, r) {
+  if (!col) return false;
+  return bitAt(x, z) || bitAt(x + r, z) || bitAt(x - r, z) || bitAt(x, z + r) || bitAt(x, z - r) || hitBox(x, z, r);
+}
+function moveTo(o, nx, nz, r) {
+  if (!blockedAt(nx, o.position.z, r)) o.position.x = nx;
+  if (!blockedAt(o.position.x, nz, r)) o.position.z = nz;
+}
+function unstick(o, r) {
+  if (!blockedAt(o.position.x, o.position.z, r)) return;
+  const x0 = o.position.x, z0 = o.position.z;
+  for (let rad = 3; rad < 120; rad += 3)
+    for (let a = 0; a < 16; a++) {
+      const x = x0 + Math.cos(a * Math.PI / 8) * rad, z = z0 + Math.sin(a * Math.PI / 8) * rad;
+      if (!blockedAt(x, z, r)) { o.position.x = x; o.position.z = z; return; }
+    }
+}
+const PLAYER_R = 1.3;
+function teleport(x, z, face) { player.position.set(x, 0, z); if (face !== undefined) yaw = face; unstick(player, PLAYER_R); }
+
+// ---- the marshal (the game's own model, 6 units tall, with idle and run clips)
+loader.load('/models/marshal.glb', (g) => {
+  const m = g.scene;
+  m.scale.setScalar(6 / 1.8);
+  m.traverse((n) => { if (n.isMesh) { n.frustumCulled = false; if (n.material) n.material.fog = true; } });
+  player.add(m);
+  mixer = new THREE.AnimationMixer(m);
+  for (const c of g.animations) actions[c.name] = mixer.clipAction(c);
+  current = actions.idle; if (current) current.play();
+});
+function play(name) {
+  const next = actions[name];
+  if (!next || next === current) return;
+  next.reset().play();
+  if (current) current.crossFadeTo(next, 0.2, false);
+  current = next;
+}
+
+// ---- monsters: they stand where the layout spawns them (encounters and sleeping guards); step inside the red wake ring and they come for you
+const MONSTER = {
+  bandit: { file: 'bandit.glb', color: '#e84a3a', speed: 7, height: 5.4, native: 1.8 }, wolf: { file: 'wolf.glb', color: '#c9c9c9', speed: 10, height: 3.4, native: 1.47 },
+  gunslinger: { file: 'gunslinger.glb', color: '#b36bff', speed: 5, hold: 30, height: 5.4, native: 1.8 }, knifer: { file: 'knifer.glb', color: '#ff9a2a', speed: 9, height: 5.4, native: 1.8 },
+  rifleman: { file: 'rifleman.glb', color: '#4aa3ff', speed: 4.5, hold: 36, height: 5.4, native: 1.8 }, brute: { file: 'brute.glb', color: '#444444', speed: 3.5, height: 6.4, native: 1.8 }
+};
+const tplCache = {};
+const loadTpl = (type) => (tplCache[type] ??= new Promise((res, rej) => loader.load('/models/' + MONSTER[type].file, res, undefined, rej)));
+const monsters = [], rings = new THREE.Group();
+scene.add(rings);
+let encounters = [];
+async function spawnAll() {
+  monsters.forEach((m) => scene.remove(m.obj)); monsters.length = 0;
+  rings.clear();
+  for (const e of encounters) {
+    const ring = new THREE.Mesh(new THREE.RingGeometry(e.wake - 1, e.wake, 96), new THREE.MeshBasicMaterial({ color: '#ff3b2a', transparent: true, opacity: 0.55, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+    ring.rotation.x = -Math.PI / 2; ring.position.set(e.x, 0.45, e.z); rings.add(ring);
+    for (const sp of e.spawns) {
+      const g = await loadTpl(sp.type);
+      const cfg = MONSTER[sp.type];
+      const obj = cloneSkinned(g.scene);
+      obj.scale.setScalar(cfg.height / cfg.native);
+      obj.traverse((n) => { if (n.isMesh) { n.frustumCulled = false; if (n.material) n.material.fog = true; } });
+      const root = new THREE.Group(); root.add(obj); root.position.set(sp.x, 0, sp.z); scene.add(root);
+      const dot = new THREE.Mesh(new THREE.RingGeometry(2.1, 3.0, 24), new THREE.MeshBasicMaterial({ color: cfg.color, side: THREE.DoubleSide, depthWrite: false, fog: false }));
+      dot.rotation.x = -Math.PI / 2; dot.position.y = 0.36; root.add(dot);
+      const mx = new THREE.AnimationMixer(obj), acts = {};
+      for (const c of g.animations) acts[c.name] = mx.clipAction(c);
+      const m = { obj: root, mixer: mx, acts, cur: null, type: sp.type, enc: e, home: { x: sp.x, z: sp.z }, state: sp.sleeper ? 'sleep' : 'idle', cfg };
+      if (sp.sleeper && acts.dead) { acts.dead.play(); acts.dead.time = acts.dead.getClip().duration; acts.dead.paused = true; m.cur = acts.dead; }
+      else if (acts.idle) { acts.idle.play(); m.cur = acts.idle; }
+      monsters.push(m);
+    }
+  }
+}
+function mplay(m, name) {
+  const next = m.acts[name];
+  if (!next || next === m.cur) return;
+  next.reset().play(); next.paused = false;
+  if (m.cur) m.cur.crossFadeTo(next, 0.25, false);
+  m.cur = next;
+}
+function updateMonsters(dt) {
+  const p = player.position;
+  for (const m of monsters) {
+    const o = m.obj.position;
+    const dx = p.x - o.x, dz = p.z - o.z, d = Math.hypot(dx, dz);
+    if (m.state === 'sleep') { if (d < m.enc.wake) { m.state = 'chase'; m.enc.awake = true; } }
+    else if (m.state === 'idle' && (m.enc.awake || d < m.enc.wake)) { m.state = 'chase'; m.enc.awake = true; }
+    if (m.state === 'chase') {
+      m.obj.rotation.y = Math.atan2(dx, dz);
+      const hold = m.cfg.hold ?? 5;
+      if (d > hold) { moveTo(m.obj, o.x + dx / d * m.cfg.speed * dt, o.z + dz / d * m.cfg.speed * dt, 1.3); mplay(m, 'run'); }
+      else mplay(m, 'idle');
+    }
+    m.mixer.update(dt);
+  }
+}
+
+// ---- markers (M): coloured pillars by type, from pete_section1_markers.json
+const markerGroup = new THREE.Group(); markerGroup.visible = false; scene.add(markerGroup);
+const MCOL = { hide: '#3cb371', loot: '#ffd700', campfire: '#ff7a1a', door: '#4aa3ff', lever: '#4aa3ff', climb: '#4aa3ff', breakable: '#c46236', lore: '#e8e8e8', vantage: '#e8e8e8', hazard: '#ff3030', spawn: '#ff3030', crossover: '#ffffff', landmark: '#c78bff', guard: '#ff3030' };
+function buildMarkers(list) {
+  for (const m of list) {
+    const c = MCOL[m.type]; if (!c) continue;
+    const mesh = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.36, 9.6, 6), new THREE.MeshBasicMaterial({ color: c, fog: false }));
+    mesh.position.set(m.x, 4.8, m.z); markerGroup.add(mesh);
+  }
+}
+
+// ---- load the section
+const hud = document.getElementById('hud'), bar = document.getElementById('bar');
+let layout = null;
+const button = (label, fn) => { const bt = document.createElement('button'); bt.textContent = label; bt.onclick = fn; bar.appendChild(bt); return bt; };
+const toggleMarkers = () => { markerGroup.visible = !markerGroup.visible; };
+const respawn = () => { encounters.forEach((x) => { x.awake = false; }); spawnAll(); };
+addEventListener('keydown', (e) => { if (e.code === 'KeyM') toggleMarkers(); if (e.code === 'KeyR' && encounters.length) respawn(); });
+async function init() {
+  hud.textContent = 'Loading Section 1...';
+  const [a, b, c, d, far] = await Promise.all(['chunk_section1_a.glb', 'chunk_section1_b.glb', 'chunk_section1_c.glb', 'chunk_section1_d.glb', 'chunk_section1_far_ring.glb'].map(load));
+  [a, b, c, d, far].forEach((g) => scene.add(g));
+  layout = await (await fetch('/tools/blender/pete_area1_layout.json')).json();
+  const mk = (await (await fetch(BASE + 'pete_section1_markers.json')).json()).markers;
+  buildMarkers(mk);
+  const cj = await (await fetch(BASE + 'pete_section1_collision.json')).json();
+  const raw = atob(cj.bits); const bits = new Uint8Array(raw.length); for (let i = 0; i < raw.length; i++) bits[i] = raw.charCodeAt(i);
+  col = { x0: cj.x0, y0: cj.y0, nx: cj.nx, ny: cj.ny, cell: cj.cell, bits, boxes: cj.boxes };
+  // layout crates, pots and campfires are placed by the game from the layout: do the same here with the kit files (already scaled by 3)
+  const [crate, pot, fire] = await Promise.all(['kit_crate.glb', 'kit_pot.glb', 'kit_campfire.glb'].map(load));
+  const flames = [];
+  const inSection = (p) => p.x > -215 && p.x < 215 && p.z < -105;
+  layout.crates.filter(inSection).forEach((p, i) => { const o = crate.clone(true); o.position.set(p.x * S, 0, p.z * S); o.rotation.y = i * 0.7; scene.add(o); });
+  layout.pots.filter(inSection).forEach((p, i) => { const o = pot.clone(true); o.position.set(p.x * S, 0, p.z * S); o.rotation.y = i; o.traverse((n) => { if (n.name === 'pot_shards') n.visible = false; }); scene.add(o); });
+  layout.campfires.filter(inSection).forEach((p) => { const o = fire.clone(true); o.position.set(p.x * S, 0, p.z * S); o.traverse((n) => { if (n.name === 'fire_flame') flames.push(n); }); scene.add(o); });
+  // spawn data: encounters from the layout, plus the sleeping guard by the trail campfire
+  encounters = layout.encounters.filter(inSection).map((e) => ({ id: e.id, x: e.x * S, z: e.z * S, wake: e.wakeRadius * S, awake: false, spawns: e.spawnPoints.map((s) => ({ type: s.type, x: s.x * S, z: s.z * S })) }));
+  for (const g of layout.guardAnchors.filter(inSection)) encounters.push({ id: g.id, x: g.x * S, z: g.z * S, wake: 13.5, awake: false, spawns: [{ type: 'bandit', x: g.x * S, z: g.z * S, sleeper: g.role === 'sleeper' }] });
+  await spawnAll();
+  const spots = [['Start', layout.start.x, layout.start.z, 0.1], ['Shack Row', -90, -200, 0.12], ['Claims', -8, -181, 0.2], ['Headframe', 40, -176, 0.05], ['Wash', 120, -181, -0.2], ['Bridge', 168, -170, 0.9], ['Stash', 204, -190, 0.9]];
+  spots.forEach(([n, x, z, f]) => button(n, () => teleport(x * S, z * S, f)));
+  button('View (F)', () => { mode = mode === 'chase' ? 'top' : mode === 'top' ? 'side' : 'chase'; });
+  button('Markers (M)', toggleMarkers);
+  button('Respawn (R)', respawn);
+  teleport(layout.start.x * S, layout.start.z * S, 0.1);
+  window.__sec1 = { player, blockedAt, teleport, monsters, get col() { return col; } };      // for tests in the console
+  animate.flames = flames;
+}
+
+const clock = new THREE.Clock();
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05), t = clock.elapsedTime;
+  const run = keys.has('ShiftLeft') || keys.has('ShiftRight');
+  let fwd = (keys.has('KeyW') || keys.has('ArrowUp') ? 1 : 0) - (keys.has('KeyS') || keys.has('ArrowDown') ? 1 : 0) - padVec.y;
+  let turn = (keys.has('KeyD') || keys.has('ArrowRight') ? 1 : 0) - (keys.has('KeyA') || keys.has('ArrowLeft') ? 1 : 0) + padVec.x;
+  if (keys.has('KeyE')) turn += 1; if (keys.has('KeyQ')) turn -= 1;
+  yaw += turn * dt * 1.9;                                      // yaw 0 = east; turning right moves toward south (+z)
+  const sp = (run ? 26 : 15) * fwd;                            // the game's marshal speed is 15 units/s
+  const hx = Math.cos(yaw), hz = Math.sin(yaw);
+  moveTo(player, player.position.x + hx * sp * dt, player.position.z + hz * sp * dt, PLAYER_R);
+  player.rotation.y = Math.atan2(hx, hz);                      // the marshal model faces +z
+  if (mixer) { mixer.update(dt); play(Math.abs(fwd) > 0.05 ? 'run' : 'idle'); }
+  updateMonsters(dt);
+  const p = player.position;
+  if (mode === 'chase') {
+    cam.position.set(p.x - hx * 27, 15.6, p.z - hz * 27);       // the proposed chase tag: 27 back, 16 up, 58 degrees
+    cam.lookAt(p.x + hx * 27, 4.2, p.z + hz * 27);
+  } else if (mode === 'side') {
+    cam.position.set(p.x - 18, 9, p.z + 42); cam.lookAt(p.x + hx * 18, 4.5, p.z - 12);
+  } else {
+    cam.position.set(p.x, 35, p.z + 25); cam.lookAt(p.x, 0, p.z);       // the game's current fixed camera
+  }
+  sky.position.copy(cam.position);
+  (animate.flames || []).forEach((f, i) => { f.scale.set(1, 0.85 + 0.25 * Math.sin(t * 9 + i), 1); });
+  const awake = monsters.filter((m) => m.state === 'chase').length;
+  hud.innerHTML = `WASD / arrows move, Shift run, Q E turn, F view, M markers, R respawn<br>x ${p.x.toFixed(0)}  z ${p.z.toFixed(0)}   monsters ${monsters.length}, awake ${awake}` +
+    (markerGroup.visible ? '<br>pillars: green hide, gold loot, orange fire, blue door/lever/climb, brown breakable, white lore/crossover, red spawn/hazard, violet landmark' : '');
+  renderer.render(scene, cam);
+}
+init().then(animate).catch((e) => { hud.textContent = 'Could not load: ' + e.message; console.error(e); });
+</script>
+</body>
+</html>
