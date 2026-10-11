@@ -87,7 +87,8 @@ CHUNKS = {"a": (-35, 105), "b": (85, 210), "c": (190, 315), "d": (295, 447)}   #
 
 # crossovers: gaps in the low berms that join the lanes (centre d, opening width m, kind)
 GAPS_S = [(45, 8, "plank ramp"), (150, 8, "plank ramp (I19)"), (225, 24, "open fight plaza"), (250, 6, "culvert (H09)"), (335, 8, "creek ford")]
-GAPS_N = [(100, 10, "gap in berm"), (183, 22, "claims yard opening"), (235, 22, "ore-bin yard opening (I17 gate)"), (300, 8, "cart shed track"), (368, 14, "Smuggler's Stash path")]
+GAPS_N = [(100, 10, "gap in berm"), (183, 22, "claims yard opening"), (235, 22, "ore-bin yard opening (I17 gate)"), (300, 8, "cart shed track"), (368, 14, "Smuggler's Stash path"),
+          (72, 4, "foot path to shack 1"), (90, 4, "foot path to shack 2 (H03, I15)"), (108, 4, "foot path to shack 3"), (126, 4, "foot path to shack 4")]
 
 GULLY_D = (376, 384, 410, 414)             # ramp in, floor from, floor to, ramp out
 GULLY_DEPTH = 6.4
@@ -407,9 +408,11 @@ def build_terrain(G):
         elif kd in ("road",) and kd2 in ("road",):
             base = mixc(PAL["sand_road"], PAL["sand_ground"], 0.5)
         elif kd in ("lane_n",) and kd2 in ("lane_n", "floor"):
-            base = mixc(mixc(PAL["stone"], PAL["scrub"], 0.4), PAL["sand_ground"], 0.55)
+            base = shade(mixc(mixc(PAL["stone"], PAL["scrub"], 0.4), PAL["sand_ground"], 0.55), 0.86 + 0.26 * (0.5 + 0.5 * N1(i * 0.93, j * 3.1, 6.0)))     # gravel speckle
         elif kd in ("lane_s",) and kd2 in ("lane_s", "bs0"):
             base = mixc(PAL["mud"], PAL["sand_ground"], 0.55)
+            if N1(i * 0.37, j * 1.9, 9.0) > 0.2:
+                base = shade(base, 0.78)                                                                     # dry-mud cracks
         elif berm:
             base = mixc(PAL["scrub"], PAL["sand_ground"], 0.3)
         return shade(base, 0.9 + 0.2 * k)
@@ -779,3 +782,316 @@ def place_chase_camera(cam, d, u=0.0, phone=False, cfg=None):
     cam.rotation_euler = (tgt - pos).to_track_quat("-Z", "Y").to_euler()
     cam.data.type = "PERSP"
     vfov_camera(cam, c["vfov"])
+
+# ================================================================ step S1-2: the road, ground and paths
+# Everything here is flat decoration on the height-0 ground: the road ribbon is 0.03 m high, decals sit at 0.05 to 0.07 m,
+# the plank walkway at 0.07 m. Nothing here blocks walking.
+
+def tang_at(d):
+    return (centre(d + 1.0) - centre(d - 1.0)).normalized()
+
+def du_w(d, u):
+    t = tang_at(d)
+    return centre(d) + Vector((-t.y, t.x)) * u
+
+def world_to_du(p):
+    best = None
+    for k in range(-60, 940):
+        d = k * 0.5
+        q = (p - centre(d)).length
+        if best is None or q < best[0]:
+            best = (q, d)
+    d = best[1]
+    t = tang_at(d)
+    return d, (p - centre(d)).dot(Vector((-t.y, t.x)))
+
+def add_poly(V, F, pts, z):
+    area = sum(pts[k][0] * pts[(k + 1) % len(pts)][1] - pts[(k + 1) % len(pts)][0] * pts[k][1] for k in range(len(pts)))
+    if area < 0:
+        pts = list(reversed(pts))
+    base = len(V)
+    for (x, y) in pts:
+        V.append((x, y, z))
+    F.append(tuple(range(base, base + len(pts))))
+
+def strip_mesh(V, F, COL, pts, width, z_mid, z_edge, colfn, step=1.5, meander=0.0, seed=0, ncross=5):
+    """A ribbon of quads along a world polyline; colfn(across 0=centre..1=edge, along index) gives each cell's colour."""
+    pts = [Vector(p) for p in pts]
+    pl = [pts[0]]
+    for a, b in zip(pts, pts[1:]):
+        seg = (b - a).length
+        n = max(1, int(seg / step))
+        for k in range(1, n + 1):
+            pl.append(a + (b - a) * (k / n))
+    rows = []
+    for i, p in enumerate(pl):
+        q = pl[min(i + 1, len(pl) - 1)] - pl[max(i - 1, 0)]
+        t = q.normalized() if q.length > 1e-6 else Vector((1, 0))
+        n_ = Vector((-t.y, t.x))
+        off = meander * N1(i * 0.35, seed * 3.1, 0.5)
+        rows.append((p + n_ * off, n_))
+    xs = [(-1 + 2 * k / (ncross - 1)) for k in range(ncross)]
+    base = len(V)
+    for (p, n_) in rows:
+        for x in xs:
+            w = p + n_ * (x * width / 2.0)
+            z = z_edge if abs(x) > 0.99 else z_mid
+            V.append((w.x, w.y, z))
+    for i in range(len(rows) - 1):
+        for k in range(ncross - 1):
+            a = base + i * ncross + k
+            F.append((a, a + ncross, a + ncross + 1, a + 1))
+            COL.append(colfn(abs(xs[k] + xs[k + 1]) / 2.0, i))
+
+def flat_obj(name, V, F, COL, collection, tag="s1_2"):
+    return make_obj(name, V, F, lambda pi, *a: COL[pi], collection, tag)
+
+RIB_U = [-13.0, -12.1, -9.5, -6.5, -4.6, -2.4, -1.7, 0.0, 1.7, 2.4, 4.6, 6.5, 9.5, 12.1, 13.0]
+RIB_SEGS = [(-26.0, 374.0), (416.0, 434.0)]          # the 376 to 414 m gap is the bridge span (S1-5)
+PAPER = hexc("#f4eedb")
+
+def road_colour(d, um, i, j):
+    light = mixc(PAL["sand_ground"], PAPER, 0.30)
+    a = abs(um)
+    mid = mixc(light, PAL["sand_ground"], 0.55)
+    outer = mixc(PAL["sand_ground"], PAL["sand_road"], 0.5)
+    c = mixc(light, mid, sstep(3.0, 6.0, a))
+    c = mixc(c, outer, sstep(8.0, 10.5, a))
+    c = mixc(c, shade(PAL["sand_road"], 0.88), sstep(11.2, 12.6, a))      # darker worn edge
+    if 1.7 <= a <= 2.4:
+        c = mixc(PAL["sand_road"], PAL["cliff_dark"], 0.3)                 # wheel ruts
+    gravel = sstep(130, 150, d) * (1 - sstep(268, 282, d))
+    mud = sstep(268, 282, d) * (1 - sstep(352, 366, d))
+    wet = sstep(352, 366, d)
+    sp = 0.5 + 0.5 * N1(i * 0.8, j * 2.1, 2.0)
+    if gravel > 0:
+        g = shade(mixc(c, mixc(PAL["stone"], PAL["scrub"], 0.35), 0.55), 0.82 + 0.3 * sp)
+        c = mixc(c, g, gravel)
+    if mud > 0:
+        m = shade(mixc(c, PAL["mud"], 0.55), 0.85 + 0.15 * sp)
+        c = mixc(c, m, mud)
+    if wet > 0:
+        w = shade(mixc(mixc(c, PAL["mud"], 0.6), PAL["cool_mid"], 0.3), 0.8 + 0.12 * sp)
+        c = mixc(c, w, wet)
+    return shade(c, 0.95 + 0.1 * sp)
+
+def build_road_ribbon():
+    V, F, COL = [], [], []
+    ncol = len(RIB_U)
+    for (a, b) in RIB_SEGS:
+        ds = [a + 2.0 * k for k in range(int(round((b - a) / 2.0)) + 1)]
+        base = len(V)
+        for d in ds:
+            P, t = centre(d), tang_at(d)
+            n_ = Vector((-t.y, t.x))
+            for j, u in enumerate(RIB_U):
+                z = 0.03
+                uu = u
+                if j in (0, ncol - 1):
+                    z = 0.0
+                    sgn = 1 if u > 0 else -1
+                    bite = max(0.0, N1(d * 0.12, sgn * 4.0, 1.0)) * 2.4          # crumbling edge: bites and bays
+                    uu = u - sgn * (bite + 0.5 * N1(d * 0.5, sgn, 2.0))
+                elif j in (1, ncol - 2):
+                    uu = u + (0.4 * N1(d * 0.3, j, 3.0))
+                elif 5 <= j <= 9 and j != 7:
+                    z = 0.012                                                      # ruts dip
+                elif j == 7:
+                    z = 0.036
+                w = P + n_ * uu
+                V.append((w.x, w.y, z))
+        for i in range(len(ds) - 1):
+            for j in range(ncol - 1):
+                p0 = base + i * ncol + j
+                F.append((p0, p0 + ncol, p0 + ncol + 1, p0 + 1))
+                COL.append(road_colour(ds[i], (RIB_U[j] + RIB_U[j + 1]) / 2.0, i, j))
+    return flat_obj("road_ribbon_s1", V, F, COL, coll("30_road"))
+
+# six shack slots for S1-3 (distance along the road, offset north) and the foot-path network that serves them
+SHACK_SLOTS = [("S1", 72, 31), ("S2", 90, 31), ("S3", 108, 31), ("S4", 126, 31), ("S5", 82, 47), ("S6", 117, 47)]
+WALKWAY = (62.0, 140.0, 24.0, 2.2)           # d from, d to, offset north, width
+
+def foot_paths():
+    paths = []
+    camp = Vector((_L["campfires"][0]["x"], -_L["campfires"][0]["z"]))
+    cd, cu = world_to_du(camp)
+    paths.append(("trailhead_gate_to_fire", [du_w(2, 0.5), du_w(cd - 8, cu + 3), du_w(cd - 3, cu + 1.5), camp + Vector((-1.4, 0.8))], 1.7))
+    paths.append(("trailhead_fire_to_rail", [camp + Vector((1.5, -0.6)), du_w(cd + 8, cu - 3), du_w(cd + 17, -9.5)], 1.5))
+    for (sid, d, u) in SHACK_SLOTS[:4]:
+        paths.append(("shack_%s_path" % sid, [du_w(d, 10.5), du_w(d + 0.4, 17.5), du_w(d - 0.3, 24.0), du_w(d, u - 5.0)], 1.6))
+    for (sid, d, u) in SHACK_SLOTS[4:]:
+        paths.append(("shack_%s_path" % sid, [du_w(d, WALKWAY[2] + 1.0), du_w(d + 0.8, 33), du_w(d - 0.5, 40), du_w(d, u - 5.0)], 1.5))
+    paths.append(("shack_back_lane", [du_w(60, 36), du_w(80, 38.5), du_w(98, 37), du_w(118, 39), du_w(140, 36.5)], 1.8))
+    paths.append(("headframe_yard_path", [du_w(240, 10.5), du_w(241, 18), du_w(238, 26), du_w(236, 38), du_w(244, 46)], 2.0))
+    paths.append(("sluice_field_path", [du_w(150, -10.5), du_w(152, -19), du_w(148, -28), du_w(160, -31)], 1.6))
+    paths.append(("stash_trail", [Vector(q) for q in STASH], 3.2))
+    return paths
+
+def build_paths():
+    V, F, COL = [], [], []
+    for name, pts, w in foot_paths():
+        def cf(edge, i, w=w):
+            k = 0.5 + 0.5 * N1(i * 0.6, w, 4.0)
+            if edge > 0.7:
+                return shade(mixc(PAL["sand_road"], PAL["sand_ground"], 0.5), 0.9)
+            return shade(mixc(PAL["sand_ground"], PAPER, 0.22), 0.94 + 0.1 * k)
+        strip_mesh(V, F, COL, pts, w, 0.034, 0.012, cf, step=1.4, meander=0.35, seed=len(F))
+    return flat_obj("paths_s1", V, F, COL, coll("30_road"))
+
+def build_walkway():
+    rng = random.Random(21)
+    d0, d1, off, wd = WALKWAY
+    V, F, COL = [], [], []
+    wood, dark = hexc("#6e4a2c"), hexc("#48301c")
+    d = d0
+    n = 0
+    while d < d1:
+        n += 1
+        d += 0.34
+        if n % 23 == 0:
+            continue                                         # a missing board
+        P, t = du_w(d, off), tang_at(d)
+        n_ = Vector((-t.y, t.x))
+        L = wd * rng.uniform(0.97, 1.03)
+        bw = 0.28
+        z = 0.07 + (0.015 if n % 17 == 0 else 0.0)           # a few lifted boards
+        c = shade(mixc(wood, dark, rng.uniform(0.0, 0.55)), rng.uniform(0.9, 1.08))
+        shift = rng.uniform(-0.05, 0.05)
+        a = P + n_ * (-L / 2 + shift)
+        b = P + n_ * (L / 2 + shift)
+        corners = (a - t * (bw / 2), a + t * (bw / 2), b + t * (bw / 2), b - t * (bw / 2))
+        base = len(V)
+        for q in corners:
+            V.append((q.x, q.y, z))
+        for q in corners:
+            V.append((q.x, q.y, 0.0))
+        add = lambda f, col: (F.append(f), COL.append(col))
+        add((base, base + 1, base + 2, base + 3), c)                       # top
+        add((base, base + 4, base + 5, base + 1), shade(c, 0.6))           # long sides
+        add((base + 2, base + 6, base + 7, base + 3), shade(c, 0.6))
+    return flat_obj("walkway_planks_s1", V, F, COL, coll("30_road"))
+
+def build_cobbles():
+    V, F, COL = [], [], []
+    rng = random.Random(31)
+    camp = Vector((_L["campfires"][0]["x"], -_L["campfires"][0]["z"]))
+    plazas = [("trailhead", camp, 7.0), ("claims", Vector((_L["places"][1]["x"], -_L["places"][1]["z"])), 9.5)]
+    for name, c0, R in plazas:
+        ring = [(c0.x + (R + 0.6) * math.cos(a), c0.y + (R + 0.6) * math.sin(a)) for a in [k * math.tau / 24 for k in range(24)]]
+        add_poly(V, F, ring, 0.04)
+        COL.append(shade(mixc(PAL["mud"], PAL["cliff_dark"], 0.4), 0.8))      # dark under-layer: the gaps read as mortar
+        sp = 0.7
+        q = int(R / sp) + 2
+        for iy in range(-q, q + 1):
+            for ix in range(-q, q + 1):
+                x = c0.x + sp * (ix + 0.5 * (iy % 2)) + rng.uniform(-0.1, 0.1)
+                y = c0.y + sp * 0.87 * iy + rng.uniform(-0.1, 0.1)
+                rr = math.hypot(x - c0.x, y - c0.y)
+                if rr > R * (1 + 0.1 * N1(x * 0.3, y * 0.3, 3.0)):
+                    continue
+                r = rng.uniform(0.29, 0.34)
+                rot = rng.uniform(0, math.pi)
+                hexp = [(x + r * math.cos(rot + k * math.pi / 3), y + r * math.sin(rot + k * math.pi / 3)) for k in range(6)]
+                add_poly(V, F, hexp, 0.055 + rng.uniform(0, 0.025))
+                COL.append(shade(mixc(PAL["stone"], mixc(PAL["sand_road"], PAL["scrub"], 0.3), rng.uniform(0.15, 0.7)), rng.uniform(0.85, 1.1)))
+    return flat_obj("cobbles_s1", V, F, COL, coll("30_road"))
+
+def build_decals():
+    rng = random.Random(55)
+    out = {}
+    # wheel ruts: dark strips in short runs along the road
+    V, F, COL = [], [], []
+    for side in (-1, 1):
+        d = -20.0
+        while d < 372:
+            run = rng.uniform(6, 16)
+            if rng.random() < 0.8:
+                pts = [du_w(d + k * 2.0, side * 2.05 + 0.15 * N1((d + k * 2.0) * 0.1, side, 1.0)) for k in range(int(run / 2.0) + 1)]
+                strip_mesh(V, F, COL, pts, 0.5, 0.058, 0.052, lambda e, i: shade(mixc(PAL["sand_road"], PAL["cliff_dark"], 0.45), 0.9 + 0.1 * (i % 2)), step=1.8, ncross=3)
+            d += run + rng.uniform(2, 8)
+    out["decal_ruts_s1"] = (V, F, COL)
+    # boot-sole footprints (soles only, no bodies)
+    V, F, COL = [], [], []
+    trails = [[(8, -4), (26, 4)], [(98, 9), (103, 27)], [(176, -8), (206, 4)], [(284, 7), (330, -5)], [(142, 24), (118, 27)]]
+    sole = [(0.16, 0.0), (0.12, 0.065), (-0.02, 0.065), (-0.05, 0.045), (-0.05, -0.045), (-0.02, -0.065), (0.12, -0.065)]
+    heel = [(-0.17, -0.048), (-0.08, -0.048), (-0.08, 0.048), (-0.17, 0.048)]
+    for tr in trails:
+        a, b = du_w(*tr[0]), du_w(*tr[1])
+        L = (b - a).length
+        hd = (b - a).normalized()
+        nd = Vector((-hd.y, hd.x))
+        k = 0
+        while k * 0.72 < L:
+            p = a + hd * (k * 0.72) + nd * (0.17 if k % 2 else -0.17) + nd * 0.2 * N1(k * 0.3, 3.3, 0.1)
+            ang = math.atan2(hd.y, hd.x) + rng.uniform(-0.12, 0.12)
+            ca, sa = math.cos(ang), math.sin(ang)
+            for shape in (sole, heel):
+                add_poly(V, F, [(p.x + x * ca - y * sa, p.y + x * sa + y * ca) for (x, y) in shape], 0.06)
+                COL.append(shade(mixc(PAL["sand_road"], PAL["cliff_dark"], 0.4), 0.9))
+            k += 1
+    out["decal_footprints_s1"] = (V, F, COL)
+    # puddle stains
+    V, F, COL = [], [], []
+    spots = [(45, -8), (98, -4), (150, 9), (176, -6), (205, 7), (262, -9), (282, 5), (296, -6), (310, 8), (322, -3), (338, 6), (352, -8), (366, 5),
+             (88, 25), (126, 28), (300, -28), (330, -30), (240, 30), (180, 27), (60, -29), (118, 41), (200, -26)]
+    for (d, u) in spots:
+        c0 = du_w(d, u)
+        rr = rng.uniform(0.5, 1.4)
+        pts = [(c0.x + rr * (1 + 0.3 * N1(k * 1.3, d, 0.2)) * math.cos(k * math.tau / 11) * 1.4, c0.y + rr * (1 + 0.3 * N1(k * 1.3, d, 0.7)) * math.sin(k * math.tau / 11)) for k in range(11)]
+        add_poly(V, F, pts, 0.057)
+        COL.append(shade(mixc(PAL["cool_mid"], PAL["mud"], 0.4), 0.9))
+    out["decal_puddles_s1"] = (V, F, COL)
+    # pebble scatter (small low prisms in clusters)
+    V, F, COL = [], [], []
+    for n in range(120):
+        d = rng.uniform(-22, 372)
+        u = rng.choice([-1, 1]) * rng.uniform(6, 13) if rng.random() < 0.7 else rng.uniform(-34, 34)
+        c0 = du_w(d, u)
+        for k in range(3):
+            r = rng.uniform(0.07, 0.2)
+            before = len(F)
+            prism(V, F, c0.x + rng.uniform(-0.7, 0.7), c0.y + rng.uniform(-0.7, 0.7), 0.04, 0.04 + r * rng.uniform(0.5, 0.9), r, r * 0.6, 4, rng, jit=0.2, mid=False)
+            c = shade(mixc(PAL["stone"], PAL["scrub"], rng.uniform(0.0, 0.6)), rng.uniform(0.8, 1.1))
+            for _ in range(len(F) - before):
+                COL.append(c)
+    out["decal_pebbles_s1"] = (V, F, COL)
+    # hay straw: thin sticks crossing, at the trailhead rail, shack row and sluice field
+    V, F, COL = [], [], []
+    bundles = [(24, -9.5), (26, -10.5), (70, 12), (86, 12.5), (104, 11), (120, 12), (150, -12), (170, 11), (196, -11), (228, 11.5)]
+    for (d, u) in bundles:
+        c0 = du_w(d, u)
+        for k in range(9):
+            ang = rng.uniform(0, math.pi)
+            l = rng.uniform(0.5, 1.0)
+            p = c0 + Vector((rng.uniform(-0.6, 0.6), rng.uniform(-0.6, 0.6)))
+            hd = Vector((math.cos(ang), math.sin(ang)))
+            nd = Vector((-hd.y, hd.x)) * 0.025
+            a, b = p - hd * l / 2, p + hd * l / 2
+            add_poly(V, F, [(a.x - nd.x, a.y - nd.y), (b.x - nd.x, b.y - nd.y), (b.x + nd.x, b.y + nd.y), (a.x + nd.x, a.y + nd.y)], 0.062 + 0.002 * k)
+            COL.append(shade(mixc(PAL["scrub"], PAPER, rng.uniform(0.0, 0.35)), rng.uniform(0.9, 1.1)))
+    out["decal_straw_s1"] = (V, F, COL)
+    objs = []
+    for name, (V, F, COL) in out.items():
+        objs.append(flat_obj(name, V, F, COL, coll("30_road")))
+    return objs
+
+def run_s1_2(render=False):
+    run_s1_1(render=False)                         # keeps the relief current (adds the foot-path gaps in the berms)
+    clear_generated("s1_2")
+    objs = [build_road_ribbon(), build_paths(), build_walkway(), build_cobbles()] + build_decals()
+    for (sid, d, u) in SHACK_SLOTS:
+        p = du_w(d, u)
+        m = add_marker("marker_slot_shack_%s" % sid, (p.x, p.y, 0.3), "slot", "SLOT_" + sid, 4.5, "Shack %s goes here (S1-3), door faces the road" % sid, 1.0)
+        m["rw_gen"] = "s1_2"
+    stats = {o.name: tris_of(o) for o in objs}
+    stats["total_tris"] = sum(stats.values())
+    print(json.dumps(stats, indent=1))
+    if render:
+        gc, cc = bpy.data.objects["GameCamera"], get_cam("ChaseCamera")
+        for d in (45, 100, 183, 300):
+            place_chase_camera(cc, d)
+            render_to(cc, "s1-2_chase_d%03d" % d, (1920, 1080))
+        place_game_camera(gc, 110)
+        render_to(gc, "s1-2_game_camera_d110", (1920, 1080))
+        render_to(bpy.data.objects["ReviewTopCamera"], "s1-2_top_down", (1920, 1080))
+    return stats
