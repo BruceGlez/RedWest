@@ -213,7 +213,10 @@
     "src/bossPete.js",
     "src/modes/peteWorld.js",
     "tests/bossPete.test.js",
-    "tests/peteWorld.test.js"
+    "tests/peteWorld.test.js",
+    "src/stages/**",
+    "src/groundSize.js",
+    "tests/peteArea1.test.js"
    ],
    "checks": [
     "npm test",

@@ -15,7 +15,10 @@ import {
     STRONGHOLD_GATE_Z
 } from './peteWorldMap.js';
 
-const COLORS = {
+// How far from the centre line the canyon walls stand. The trail, crates, clues and camps all sit inside it.
+const CANYON_WALL_X = 44;
+
+export const COLORS = {
     wood: 0x6e4a2c,
     woodDark: 0x48301c,
     stone: 0x75716b,
@@ -41,7 +44,7 @@ const COLORS = {
     lanternGlow: 0xffaa22
 };
 
-function paint(geometry, hex) {
+export function paint(geometry, hex) {
     const g = geometry.index ? geometry.toNonIndexed() : geometry;
     g.deleteAttribute('uv');
     const color = new THREE.Color(hex);
@@ -52,7 +55,7 @@ function paint(geometry, hex) {
     return g;
 }
 
-function box(w, h, d, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+export function box(w, h, d, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     const g = new THREE.BoxGeometry(w, h, d);
     if(rx || ry || rz) {
         g.rotateX(rx);
@@ -63,7 +66,7 @@ function box(w, h, d, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     return paint(g, hex);
 }
 
-function cylinder(rt, rb, h, segs, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+export function cylinder(rt, rb, h, segs, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     const g = new THREE.CylinderGeometry(rt, rb, h, segs);
     if(rx || ry || rz) {
         g.rotateX(rx);
@@ -74,7 +77,7 @@ function cylinder(rt, rb, h, segs, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz 
     return paint(g, hex);
 }
 
-function dodecahedron(radius, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
+export function dodecahedron(radius, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) {
     const g = new THREE.DodecahedronGeometry(radius, 0);
     if(rx || ry || rz) {
         g.rotateX(rx);
@@ -85,14 +88,14 @@ function dodecahedron(radius, hex, x = 0, y = 0, z = 0, rx = 0, ry = 0, rz = 0) 
     return paint(g, hex);
 }
 
-function sharedVertexMaterial() {
+export function sharedVertexMaterial() {
     return new THREE.MeshLambertMaterial({
         vertexColors: true,
         reflectivity: 0.1
     });
 }
 
-function glowMaterial(hex = COLORS.emberGlow) {
+export function glowMaterial(hex = COLORS.emberGlow) {
     return new THREE.MeshBasicMaterial({
         color: hex,
         transparent: true,
@@ -103,7 +106,7 @@ function glowMaterial(hex = COLORS.emberGlow) {
 }
 
 // Builds one campfire site (stone circle + logs + flame + glow halo + animated cartoon smoke puffs)
-function createCampfireMesh(id, x, z) {
+export function createCampfireMesh(id, x, z) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.name = `campfire-${id}`;
@@ -207,7 +210,7 @@ function createCampfireMesh(id, x, z) {
 }
 
 // Builds one loot crate (wooden chest with hinged lid + dynamic splinter burst & loot pop)
-function createCrateMesh(id, x, z) {
+export function createCrateMesh(id, x, z) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.name = `crate-${id}`;
@@ -417,7 +420,7 @@ export const WORLD_POTS = [
     { id: 'pot-c2', x: 4.5, z: 40 }
 ];
 
-function createSmashablePotMesh(id, x, z) {
+export function createSmashablePotMesh(id, x, z) {
     const group = new THREE.Group();
     group.position.set(x, 0, z);
     group.name = `smashable-pot-${id}`;
@@ -598,7 +601,7 @@ function getPlayerPos(sceneGroup, runState) {
     return null;
 }
 
-function createCampBandit(def) {
+export function createCampBandit(def) {
     const group = new THREE.Group();
     group.position.set(def.x, 0, def.z);
     group.rotation.y = def.rotY;
@@ -800,7 +803,7 @@ function createCampBandit(def) {
 }
 
 // Builds one investigation clue prop
-function createClueMesh(clueDef) {
+export function createClueMesh(clueDef) {
     const group = new THREE.Group();
     group.position.set(clueDef.x, 0, clueDef.z);
     group.name = `clue-${clueDef.id}`;
@@ -855,7 +858,7 @@ function createClueMesh(clueDef) {
 }
 
 // Builds canyon architectural accents: mine arches, rail spur segments, stronghold gate, and hanging lanterns
-function createCanyonLandmarks() {
+export function createCanyonLandmarks() {
     const group = new THREE.Group();
     group.name = 'pete-world-landmarks';
 
@@ -970,7 +973,7 @@ function createCanyonLandmarks() {
 }
 
 // Builds stylized canyon cliffs, natural rock arches, blooming flora, and abandoned camp clutter
-function createCanyonEnvironment() {
+export function createCanyonEnvironment() {
     const group = new THREE.Group();
     group.name = 'pete-canyon-environment';
 
@@ -984,32 +987,22 @@ function createCanyonEnvironment() {
         const seed = Math.sin(i * 1.7);
         const seed2 = Math.cos(i * 2.3);
 
-        // West cliff formation (X ~ -16 to -22)
-        const wx = -17 - Math.abs(seed) * 3;
+        // West cliff formation (well back from the trail, so the valley reads as open country)
+        const wx = -CANYON_WALL_X - Math.abs(seed) * 6;
         const wh = 6 + Math.abs(seed2) * 3.5;
         cliffParts.push(box(9, wh, 14, COLORS.cliffBase, wx, wh / 2, cz));
         cliffParts.push(box(6, wh * 0.4, 9, COLORS.cliffLight, wx - 1.5, wh + (wh * 0.2), cz + 1));
         cliffParts.push(dodecahedron(3.2, COLORS.cliffDark, wx + 3.2, 2.5, cz - 3, 0.2, 0.4, 0.1));
         cliffParts.push(box(7, 0.8, 12, COLORS.cliffRim, wx + 1, wh - 0.4, cz));
 
-        // East cliff formation (X ~ 16 to 22)
-        const ex = 17 + Math.abs(seed2) * 3;
+        // East cliff formation
+        const ex = CANYON_WALL_X + Math.abs(seed2) * 6;
         const eh = 6 + Math.abs(seed) * 3.5;
         cliffParts.push(box(9, eh, 14, COLORS.cliffBase, ex, eh / 2, cz));
         cliffParts.push(box(6, eh * 0.4, 9, COLORS.cliffLight, ex + 1.5, eh + (eh * 0.2), cz - 1));
         cliffParts.push(dodecahedron(3.2, COLORS.cliffDark, ex - 3.2, 2.5, cz + 3, -0.2, -0.3, 0.1));
         cliffParts.push(box(7, 0.8, 12, COLORS.cliffRim, ex - 1, eh - 0.4, cz));
     }
-
-    // High natural rock arch spanning over the canyon at Z = -48 (Zone A to B entrance)
-    cliffParts.push(box(38, 3.5, 6, COLORS.cliffBase, 0, 10.5, -48));
-    cliffParts.push(box(24, 2.0, 5, COLORS.cliffRim, 0, 12.0, -48));
-    cliffParts.push(dodecahedron(3.8, COLORS.cliffLight, -6, 12.5, -48));
-
-    // High natural rock arch spanning over the canyon at Z = 52 (Zone C to D entrance)
-    cliffParts.push(box(38, 3.5, 6, COLORS.cliffBase, 0, 11.5, 52));
-    cliffParts.push(box(22, 2.0, 5, COLORS.cliffRim, 0, 13.0, 52));
-    cliffParts.push(dodecahedron(3.8, COLORS.cliffLight, 5, 13.5, 52));
 
     const cliffsMesh = new THREE.Mesh(mergeGeometries(cliffParts, false), sharedVertexMaterial());
     group.add(cliffsMesh);
@@ -1064,48 +1057,49 @@ function createCanyonEnvironment() {
 }
 
 // Master factory for Pete's Open-World 3D Scene
-export function createPeteWorldScene() {
+// `area` (src/stages/pete.js) says what stands in it; with none, the original canyon (Area 2) is built.
+export function createPeteWorldScene(area = null) {
     const group = new THREE.Group();
     group.name = 'pete-world-scene';
 
     // 1. Build campfires
-    const campfireMeshes = WORLD_CAMPFIRES.map(c => {
+    const campfireMeshes = (area?.campfires ?? WORLD_CAMPFIRES).map(c => {
         const item = createCampfireMesh(c.id, c.x, c.z);
         group.add(item.group);
         return item;
     });
 
     // 2. Build crates
-    const crateMeshes = WORLD_CRATES.map(c => {
+    const crateMeshes = (area?.crates ?? WORLD_CRATES).map(c => {
         const item = createCrateMesh(c.id, c.x, c.z);
         group.add(item.group);
         return item;
     });
 
     // 3. Build clue props
-    const clueMeshes = INVESTIGATION_CLUES.map(c => {
+    const clueMeshes = (area?.clues ?? INVESTIGATION_CLUES).map(c => {
         const item = createClueMesh(c);
         group.add(item.group);
         return item;
     });
 
     // 4. Build canyon landmarks & stronghold gate
-    const landmarks = createCanyonLandmarks();
+    const landmarks = area?.buildLandmarks ? area.buildLandmarks() : createCanyonLandmarks();
     group.add(landmarks.group);
 
     // 5. Build canyon cliffs, rock arches, flora, and environment
-    const environment = createCanyonEnvironment();
+    const environment = area?.buildEnvironment ? area.buildEnvironment() : createCanyonEnvironment();
     group.add(environment.group);
 
     // 6. Build smashable clay pots (Mini Ninjas breakable pottery)
-    const potMeshes = WORLD_POTS.map(p => {
+    const potMeshes = (area?.pots ?? WORLD_POTS).map(p => {
         const item = createSmashablePotMesh(p.id, p.x, p.z);
         group.add(item.group);
         return item;
     });
 
     // 7. Build bandit camp sentries & sleeping guards (Mini Ninjas camp life)
-    const banditMeshes = CAMP_BANDITS.map(def => {
+    const banditMeshes = (area?.bandits ?? CAMP_BANDITS).map(def => {
         const item = createCampBandit(def);
         group.add(item.group);
         return item;
@@ -1173,7 +1167,7 @@ export function createPeteWorldScene() {
 
             // Sync stronghold gate
             if(landmarks && landmarks.setBreached) {
-                landmarks.setBreached(!!runState.gateBreached);
+                landmarks.setBreached(area?.isGateOpen ? !!area.isGateOpen(runState) : !!runState.gateBreached);
             }
 
             // Animate dynamic landmarks (swinging lanterns)

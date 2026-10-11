@@ -1,4 +1,5 @@
 import * as THREE from 'three';
+import { registerGround } from './groundSize.js';
 import { createRock, createDeadTree, createCrate, createCactus, createFence, createBarrel, createTombstone, createHaystack, createSpire, createWall, clearScenery } from './scenery.js';
 import { createGroundTexture, createSkyTexture } from './textures.js';
 import { atmosphereFor, soundFor, DEFAULT_ATMOSPHERE, FENCE_GROUP } from './atmosphere.js';
@@ -15,6 +16,7 @@ import { clearMineFloor } from './mineScene.js';
 let sunLight = null;
 let hemiLight = null;
 let groundMaterial = null;
+let groundMesh = null;
 let appliedAtmosphere = null;
 let currentSurface = 'sand';
 let currentHero = DEFAULT_ATMOSPHERE.hero;
@@ -46,7 +48,13 @@ export function setupScene(scene, camera, renderer) {
     scene.add(sunLight.target);
 
     groundMaterial = new THREE.MeshLambertMaterial({ map: groundTextureFor(DEFAULT_ATMOSPHERE.terrain) });
-    const groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), groundMaterial);
+    groundMesh = new THREE.Mesh(new THREE.PlaneGeometry(300, 300), groundMaterial);
+    // A big stage (src/stages/) lays more sand under itself; 300 is the usual arena. The texture stretches in step so the grain keeps its size.
+    registerGround(size => {
+        const k = size / 300;
+        groundMesh.scale.set(k, k, 1);
+        groundMaterial.map?.repeat.set(9 * k, 9 * k);
+    });
     groundMesh.rotation.x = -Math.PI / 2;
     groundMesh.receiveShadow = true;
     scene.add(groundMesh);

@@ -20,6 +20,7 @@
 //   updateScene(ctx, t)     the mode's own scenery, once a frame while fighting
 //   reinforcements()        false to stop the director sending anyone but what the mode spawns itself
 //   invincible()            true to refill the hearts every frame
+//   cameraBias(playerPos, dt)  { scale, lookX, lookZ } or null: stand further back (scale) and look ahead (a stage's camera director)
 //   afterOutlawDown(ctx)    the outlaw has fallen and the slow-motion beat is over
 //   resultText(result)      [title, detail] for the result screen, or null for the default wording
 //   reset()                 the run is over and the home screen is back: forget this mode's run state

@@ -72,3 +72,4 @@ Anything else is another lane's file or a shared file (see `AGENTS.md`). Run `no
 - Stylized canyon atmosphere and environment: warm golden canyon sunset (`src/atmosphere.js`), stepped terracotta rock bluffs and natural rock arches, blooming saguaro flora, swinging mine arch brass lanterns, and cartoon puffy campfire smoke with ember motes (`src/placePeteWorld.js`).
 
 
+- Pete Area 1 art brief and image prompts for Antigravity + Blender: `docs/design/pete-area1-art-brief.md`, `docs/design/pete-area1-image-prompts.md`; layout data `tools/blender/pete_area1_layout.json` (`node tools/blender/export_area1_layout.mjs`). `src/placePeteArea.js` is the code-built placeholder scene until the modelled chunks replace it.
