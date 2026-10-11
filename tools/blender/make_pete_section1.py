@@ -3163,7 +3163,7 @@ def s15_place():
     lad = C + Vector((-0.62, 0.78)) * 12.4
     ld, lu = world_to_du(Vector((lad.x, lad.y)))
     inst("rope_ladder", "prop_rope_ladder", Vector((lad.x, lad.y, max(0.0, terrain_z(G, ld, lu)))), face_dir(0.62, -0.78), d=wd)
-    marker("rope-ladder", Vector((lad.x, lad.y, 0)), "climb", "I22_ladder", 2.0, "Rope ladder up to a rim ledge above the Stash.")
+    marker("rope-ladder", Vector((lad.x, lad.y, 0)), "climb", "I22_ladder", 3.5, "Rope ladder up to a rim ledge above the Stash.")
     camp = C + Vector((-3.4, -2.8))
     camp3 = Vector((camp.x, camp.y, 0))
     inst("bedroll", "prop_bedroll", camp3 + Vector((0.2, 0.2, 0)), 0.6, d=wd)
