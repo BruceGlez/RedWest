@@ -636,7 +636,7 @@ def run_s1_1(render=False):
 
     # 2. far ground below the valley rim, so nothing ever looks open
     gv = [(-700, -300, -0.45), (700, -300, -0.45), (700, 800, -0.45), (-700, 800, -0.45)]
-    far = make_obj("terrain_far_ground", gv, [(0, 1, 2, 3)], lambda *a: mixc(PAL["stone"], PAL["sand_ground"], 0.3), coll("10_terrain"), "s1_1")
+    far = make_obj("terrain_far_ground", gv, [(0, 1, 2, 3)], lambda *a: mixc(PAL["sand_ground"], PAL["stone"], 0.12), coll("10_terrain"), "s1_1")
 
     # 3. cliff kit instances along the terraces (12 variants, rotation, mirroring, scale 0.8 to 1.3)
     kit = build_kit_meshes()
@@ -3280,3 +3280,358 @@ def s15_renders():
     place_game_camera(gc, 330)
     render_to(gc, "s1-5_game_camera_d330", (1920, 1080))
     render_to(bpy.data.objects["ReviewTopCamera"], "s1-5_top_down", (1920, 1080))
+
+# ================================================================ step S1-6: foliage, light and atmosphere, vertex-colour AO, distant ring
+from mathutils.bvhtree import BVHTree
+
+FOG_HEX = "#df925c"
+FOG = hexc(FOG_HEX)
+_FA = next(e for e in _L["encounters"] if e["place"] == "flume")
+FLUME_C = Vector((_FA["x"], -_FA["z"]))
+
+def build_kits_s16():
+    r = random.Random(160)
+    agave_col = mixc(mixc(CAC, PAL["stone"], 0.35), CAC_H, 0.25)
+    for v in range(2):
+        b = Bld(700 + v)
+        for k in range(13):
+            a = math.tau * k / 13 + r.uniform(-0.1, 0.1)
+            ln = r.uniform(0.75, 1.15)
+            tilt = r.uniform(0.45, 0.8)
+            b.beam((0.05 * math.cos(a), 0.05 * math.sin(a), 0.05), (ln * math.cos(a) * tilt, ln * math.sin(a) * tilt, 0.05 + ln * (1 - tilt) * 0.9), 0.17, 0.05, shade(agave_col, r.uniform(0.85, 1.1)))
+        if v == 1:
+            b.tube((0, 0, 0.2), (0.05, 0.03, 2.4), 0.05, 0.03, 5, mixc(PAL["scrub"], WOOD, 0.4))
+            for k in range(6):
+                z = 1.6 + k * 0.14
+                a = k * 2.2
+                b.cyl(0.22 * math.cos(a), 0.22 * math.sin(a), z, 0.07, 0.04, 0.12, 5, FL_YEL)
+        kit("agave_" + "ab"[v], b)
+    for v, (segs, bend) in enumerate(((4, 0.5), (5, -0.4))):
+        b = Bld(710 + v)
+        col = mixc(PAPER, PAL["stone"], 0.4 + 0.05 * v)
+        p = Vector((0, 0, 0))
+        d = Vector((0.1 * bend, 0.0, 1.0)).normalized()
+        rad = 0.24
+        for s in range(segs):
+            q = p + d * 1.0
+            b.tube(p, q, rad, rad * 0.78, 6, col, caps=(False, s == segs - 1))
+            if s >= 1:
+                side = Vector((math.cos(s * 2.1), math.sin(s * 2.1), 0.5)).normalized()
+                b.tube(q, q + side * (1.2 - 0.1 * s), rad * 0.45, rad * 0.12, 5, col)
+            p = q
+            d = (d + Vector((0.45 * bend * math.cos(s), 0.45 * bend * math.sin(s), 0.0))).normalized()
+            rad *= 0.78
+        kit("dead_tree_" + "bc"[v], b)
+    for v in range(3):
+        b = Bld(720 + v)
+        for k in range(3 + v):
+            a = math.tau * k / (3 + v) + r.uniform(0, 1)
+            rr = r.uniform(0.45, 1.0)
+            b.rock(1.0 * math.cos(a) * (0 if k == 0 else 1), 0.9 * math.sin(a) * (0 if k == 0 else 1), 0, rr, rr * r.uniform(0.6, 1.0), mixc(PAL["stone"], PAL["cliff_base"], r.uniform(0.0, 0.45)), n=6)
+        kit("rock_cluster_" + "abc"[v], b)
+    # distant smoke: a column of soft puffs that fades into the haze
+    b = Bld(730)
+    for k in range(9):
+        rr = 3.2 + k * 0.7
+        z = k * 5.4
+        c = mixc(mixc(PAL["stone"], PAL["mud"], 0.35), FOG, 0.18 + 0.075 * k)
+        b.rock(1.6 * k + 0.8 * math.sin(k * 1.7), 0.6 * math.cos(k), z, rr, rr * 1.15, c, n=7)
+    kit("smoke_column", b)
+
+def distant_mesa(name, seed, w, dp, h, x, y, ang):
+    b = Bld(seed)
+    r = random.Random(seed)
+    tiers = [(1.0, 0.42, mixc(PAL["cliff_dark"], FOG, 0.52)), (0.78, 0.36, mixc(PAL["cliff_base"], FOG, 0.5)), (0.52, 0.26, mixc(PAL["cliff_light"], FOG, 0.48))]
+    z = 0.0
+    for (sc, th, c) in tiers:
+        b.box(r.uniform(-w * 0.04, w * 0.04), r.uniform(-dp * 0.04, dp * 0.04), z, w * sc, dp * sc, h * th, c, rot=r.uniform(-0.12, 0.12), top=0.92)
+        z += h * th
+    ob = b.finish(name, coll("20_cliffs"))
+    ob.location = (x, y, -0.45)
+    ob.rotation_euler = (0, 0, ang)
+    ob["rw_cat"] = "far"
+    return ob, b.tris()
+
+def build_distant_ring():
+    cx, cy = 20.0, 195.0
+    out = []
+    tr = 0
+    rng = random.Random(161)
+    for k in range(14):
+        th = math.tau * k / 14 + rng.uniform(-0.1, 0.1)
+        rx, ry = 560.0 + rng.uniform(-40, 70), 360.0 + rng.uniform(-30, 60)
+        x, y = cx + rx * math.cos(th), cy + ry * math.sin(th)
+        w, dp, h = rng.uniform(110, 260), rng.uniform(70, 150), rng.uniform(34, 80)
+        ob, t = distant_mesa("far_mesa_%02d" % k, 740 + k, w, dp, h, x, y, th + math.pi / 2)
+        tr += t
+        out.append(ob)
+    for k, (x, y, s) in enumerate(((420, 20, 2.0), (-130, 500, 1.8), (260, 540, 2.0))):
+        inst("smoke_column", "far_smoke_%d" % k, Vector((x, y, -0.45)), 0.0, s, cat="prop", d=None, count=False)
+        tr += KIT_TRIS.get("smoke_column", 0)
+    return out, tr
+
+def scatter_ok16(d, u, extra=3.0):
+    p = frame(d, u)[0]
+    if in_fight(p, 3.0):
+        return False
+    if FLUME_C is not None and (Vector((p.x, p.y)) - FLUME_C).length < 22.0:
+        return False
+    if (Vector((p.x, p.y)) - STASH_C).length < 17.0:
+        return False
+    if 372.0 < d < 417.0 and abs(u) < 40:
+        return False                                           # the gully and the bridge span
+    return abs(u) >= 9.0
+
+def occupied_points():
+    pts = []
+    for o in bpy.data.objects:
+        if o.get("rw_gen") == "s1_3" and not o.hide_viewport and o.type in ("MESH", "EMPTY") and (o.type == "EMPTY" or o.parent is None):
+            w = o.matrix_world.translation
+            pts.append(Vector((w.x, w.y)))
+    return pts
+
+def s16_place():
+    rng = random.Random(1606)
+    build_kits_s16()
+    occ = occupied_points()
+    def free(p, rad=3.2):
+        q = Vector((p.x, p.y))
+        return all((q - o).length > rad for o in occ)
+    added = 0
+    # extra dressing clusters (dumps, piles, signposts) along the whole section; each item counts as a placed prop
+    themes = ("crates", "barrels", "timber", "junk", "sign", "fence", "rocks")
+    tries = 0
+    while added < 118 and tries < 2500:
+        tries += 1
+        d = rng.uniform(-18, 432)
+        u = rng.choice([-1, 1]) * rng.uniform(11, 40)
+        if not scatter_ok16(d, u):
+            continue
+        p, a = frame(d, u)
+        if not free(p, 4.5):
+            continue
+        th = rng.choice(themes)
+        items = []
+        if th == "crates":
+            items = [("crate_body", 0, 0, 0, 0.1), ("crate_body", 1.2, 0.3, 0, 0.5), ("crate_body", 0.5, 0.1, 0.92, 0.9)]
+        elif th == "barrels":
+            items = [("barrel_whole", 0, 0, 0, 0), ("barrel_whole", 0.8, 0.2, 0, 1), ("barrel_whole", 0.3, 0.9, 0, 2), ("barrel_broken", -0.9, -0.5, 0, 0.5)][: rng.randint(3, 4)]
+        elif th == "timber":
+            items = [("lumber_stack", 0, 0, 0, 0.1), ("lumber_stack", 0.4, 1.4, 0, 0.2), ("tie_pile", 3.0, 0.2, 0, 0.8)]
+        elif th == "junk":
+            items = [("wheelbarrow", 0, 0, 0, rng.uniform(0, 6)), ("washtub", 1.8, 0.8, 0, 0), ("bucket", 2.4, -0.4, 0, 0), ("cable_spool", -1.8, 0.4, 0, 0)][: rng.randint(3, 4)]
+        elif th == "sign":
+            items = [(rng.choice(("hanging_sign", "notice_board")), 0, 0, 0, 0), ("stump_pick", 2.0, 0.6, 0, 1.0), ("bucket", 2.6, -0.3, 0, 0.0)]
+        elif th == "fence":
+            items = [("fence_whole", 0, 0, 0, 0), ("fence_whole", 3.0, 0.2, 0, 0.1), ("fence_broken", 6.0, 0.6, 0, 0.2)]
+        else:
+            items = [("tailings_" + rng.choice("abc"), 0, 0, 0, 0), ("boulder_" + rng.choice("abcd"), 3.2, 1.0, 0, 1.0), ("rock_cluster_" + rng.choice("abc"), -2.6, 0.2, 0, 0)]
+        for (k, x, y, z, rot) in items:
+            if k not in KITS:
+                continue
+            q, aa = frame(d, u, x, y)
+            inst(k, "prop_dress_" + th, Vector((q.x, q.y, z)), aa + rot, d=d)
+            occ.append(Vector((q.x, q.y)))
+            added += 1
+    # foliage: agave, twisted dead trees, rock clusters (kept off the road centre, the fight circles and the bridge)
+    nf = 0
+    for k in range(26):
+        d = rng.uniform(-20, 430); u = rng.choice([-1, 1]) * rng.uniform(10, 46)
+        if scatter_ok16(d, u):
+            p, a = frame(d, u)
+            inst("agave_" + rng.choice("ab"), "foliage_agave", p, rng.uniform(0, 6), rng.uniform(0.9, 1.5), cat="foliage", d=d); nf += 1
+    for k in range(4):
+        d = rng.uniform(0, 420); u = rng.choice([-1, 1]) * rng.uniform(22, 48)
+        if scatter_ok16(d, u):
+            p, a = frame(d, u)
+            inst("dead_tree_" + rng.choice("bc"), "foliage_dead_tree", p, rng.uniform(0, 6), rng.uniform(0.9, 1.3), cat="foliage", d=d); nf += 1
+    for k in range(20):
+        d = rng.uniform(-20, 430); u = rng.choice([-1, 1]) * rng.uniform(10, 50)
+        if scatter_ok16(d, u):
+            p, a = frame(d, u)
+            inst("rock_cluster_" + rng.choice("abc"), "foliage_rock_cluster", p, rng.uniform(0, 6), rng.uniform(0.8, 1.7), cat="foliage", d=d); nf += 1
+    ring, rtris = build_distant_ring()
+    return added, nf, rtris
+
+def setup_light_s16():
+    sc = scn()
+    if sc.world is None:
+        sc.world = bpy.data.worlds.new("PeteWorld")
+    w = sc.world
+    w.use_nodes = True
+    nt = w.node_tree
+    nt.nodes.clear()
+    out = nt.nodes.new("ShaderNodeOutputWorld")
+    bg = nt.nodes.new("ShaderNodeBackground")
+    tc = nt.nodes.new("ShaderNodeTexCoord")
+    sep = nt.nodes.new("ShaderNodeSeparateXYZ")
+    mr = nt.nodes.new("ShaderNodeMapRange")
+    ramp = nt.nodes.new("ShaderNodeValToRGB")
+    nt.links.new(tc.outputs["Generated"], sep.inputs["Vector"])
+    nt.links.new(sep.outputs["Z"], mr.inputs["Value"])
+    mr.inputs["From Min"].default_value = -0.05
+    mr.inputs["From Max"].default_value = 0.85
+    nt.links.new(mr.outputs["Result"], ramp.inputs["Fac"])
+    stops = ((0.0, "#f6b468"), (0.07, "#ed6828"), (0.2, "#df8450"), (0.55, "#3c84c4"))
+    el = ramp.color_ramp.elements
+    el[0].position, el[0].color = stops[0][0], hexc(stops[0][1])
+    el[1].position, el[1].color = stops[-1][0], hexc(stops[-1][1])
+    for (pos, hx) in stops[1:-1]:
+        e = el.new(pos)
+        e.color = hexc(hx)
+    nt.links.new(ramp.outputs["Color"], bg.inputs["Color"])
+    bg.inputs["Strength"].default_value = 1.15
+    nt.links.new(bg.outputs["Background"], out.inputs["Surface"])
+    # Fog: an EEVEE world volume turns this scene black, so fog is not rendered here. The game applies its own fog;
+    # the values are kept on the scene for reference and the far mesas and smoke are tinted toward the fog colour.
+    sc["rw_fog_color"] = FOG_HEX
+    sc["rw_fog_near"] = 48.0
+    sc["rw_fog_far"] = 118.0
+    sun = bpy.data.objects.get("GoldenHourSun")
+    if sun:
+        direction = Vector((0.9, 0.10, -0.46)).normalized()          # low late-afternoon sun from the west: long soft shadows run east
+        sun.rotation_euler = direction.to_track_quat("-Z", "Y").to_euler()
+        sun.data.energy = 4.8
+        sun.data.color = (1.0, 0.8, 0.56)
+        try:
+            sun.data.angle = math.radians(3.0)
+        except Exception:
+            pass
+    sky = bpy.data.objects.get("SkyFill")
+    if sky:
+        sky.data.energy = 0.0
+    try:
+        sc.view_settings.view_transform = "Standard"
+        sc.view_settings.look = "None"
+    except Exception:
+        pass
+
+# ---------------------------------------------------------------- vertex-colour ambient occlusion (no baked cast shadows)
+def _hemi(n=14):
+    out = []
+    for i in range(n):
+        z = math.sqrt((i + 0.5) / n)
+        rr = math.sqrt(max(0.0, 1 - z * z))
+        phi = i * 2.399963
+        out.append(Vector((rr * math.cos(phi), rr * math.sin(phi), z)))
+    return out
+
+HEMI = _hemi(14)
+
+def bvh_from(world_meshes, ground_z=None, ground_half=60.0):
+    V, P = [], []
+    for (ob, M) in world_meshes:
+        base = len(V)
+        for v in ob.data.vertices:
+            w = M @ v.co
+            V.append((w.x, w.y, w.z))
+        for p in ob.data.polygons:
+            P.append(tuple(base + i for i in p.vertices))
+    if ground_z is not None:
+        base = len(V)
+        V.extend([(-ground_half, -ground_half, ground_z), (ground_half, -ground_half, ground_z), (ground_half, ground_half, ground_z), (-ground_half, ground_half, ground_z)])
+        P.append((base, base + 1, base + 2, base + 3))
+    return BVHTree.FromPolygons(V, P)
+
+def bake_ao(ob, M, bvh, maxd, strength=0.42):
+    me = ob.data
+    attr = me.color_attributes.get("Col")
+    if attr is None:
+        return 0
+    base = me.color_attributes.get("Col_base")
+    if base is None:
+        base = me.color_attributes.new("Col_base", "FLOAT_COLOR", "CORNER")
+        buf = [0.0] * (4 * len(me.loops))
+        attr.data.foreach_get("color", buf)
+        base.data.foreach_set("color", buf)
+    buf = [0.0] * (4 * len(me.loops))
+    base.data.foreach_get("color", buf)
+    rot = M.to_3x3()
+    vao = []
+    for v in me.vertices:
+        p = M @ v.co
+        n = (rot @ v.normal).normalized()
+        ref = Vector((0, 0, 1)) if abs(n.z) < 0.9 else Vector((1, 0, 0))
+        t = n.cross(ref).normalized()
+        bt = n.cross(t)
+        occ = 0.0
+        for h in HEMI:
+            dvec = t * h.x + bt * h.y + n * h.z
+            hit = bvh.ray_cast(p + n * 0.04, dvec, maxd)
+            if hit[0] is not None:
+                occ += 1.0 - hit[3] / maxd
+        vao.append(1.0 - occ / len(HEMI))
+    for li, lp in enumerate(me.loops):
+        k = (1.0 - strength) + strength * vao[lp.vertex_index]
+        buf[4 * li] *= k
+        buf[4 * li + 1] *= k
+        buf[4 * li + 2] *= k
+    attr.data.foreach_set("color", buf)
+    return len(vao)
+
+def bake_all_ao():
+    sc = scn()
+    n = 0
+    terr = bpy.data.objects.get("terrain_section1")
+    world_set = [(terr, terr.matrix_world)]
+    for o in bpy.data.objects:
+        if o.get("rw_gen") == "s1_1" and o.type == "MESH" and (o.name.startswith("kit_cliff_inst") or o.name.startswith("mesa_")):
+            world_set.append((o, o.matrix_world))
+    bvh = bvh_from(world_set)
+    n += bake_ao(terr, terr.matrix_world, bvh, 6.0, 0.5)
+    for o in bpy.data.objects:
+        if o.get("rw_gen") == "s1_1" and o.type == "MESH" and o.name.startswith("mesa_"):
+            b2 = bvh_from([(o, o.matrix_world)], ground_z=o.location.z + 3.0)
+            n += bake_ao(o, o.matrix_world, b2, 8.0, 0.4)
+    templ = [o for o in bpy.data.objects if o.type == "MESH" and o.name.startswith("kit_") and "_inst" not in o.name and o.get("rw_gen") in ("s1_1", "s1_3")]
+    for o in templ:
+        b2 = bvh_from([(o, Matrix.Identity(4))], ground_z=0.0, ground_half=40.0)
+        n += bake_ao(o, Matrix.Identity(4), b2, 2.4 if not o.name.startswith("kit_cliff") else 3.5, 0.45)
+    return n
+
+def run_s1_6(render=False):
+    run_s1_2(render=False)
+    clear_generated("s1_3")
+    run_s1_3_place()
+    s14_place()
+    s15_place()
+    added, nf, rtris = s16_place()
+    setup_light_s16()
+    nao = bake_all_ao()
+    ranges = {"a": (-35, 105), "b": (85, 210), "c": (190, 315), "d": (295, 447)}
+    tri_by_chunk = {ck: sum(t for (d, t) in S13["tris"] if a <= d <= b) for ck, (a, b) in ranges.items()}
+    foliage_tris = {ck: 0 for ck in ranges}
+    stats = dict(props=S13["count_prop"], foliage=S13["count_foliage"], added_dressing=added, added_foliage=nf, hiding_places=S13["hides"], interactables=S13["inter"],
+                 far_ring_tris=rtris, ao_vertices=nao, tris_by_chunk_instanced=tri_by_chunk)
+    print(json.dumps(stats, indent=1))
+    if render:
+        s16_renders()
+    return stats
+
+def s16_renders():
+    cc, cp = get_cam("ChaseCamera"), get_cam("ChaseCameraPhone")
+    for d in (20, 62, 105, 160, 205, 248, 300, 345):
+        place_chase_camera(cc, d)
+        render_to(cc, "s1-6_chase_d%03d" % d, (1920, 1080))
+    place_chase_camera(cc, 372)
+    render_to(cc, "s1-6_chase_bridge_start_d372", (1920, 1080))
+    place_chase_camera(cc, 396)
+    render_to(cc, "s1-6_chase_bridge_d396", (1920, 1080))
+    place_chase_camera(cp, 120, phone=True)
+    render_to(cp, "s1-6_chase_phone_d120", (1080, 1920))
+    place_chase_camera(cp, 330, phone=True)
+    render_to(cp, "s1-6_chase_phone_d330", (1080, 1920))
+    gc = bpy.data.objects["GameCamera"]
+    place_game_camera(gc, 100); render_to(gc, "s1-6_game_camera_d100", (1920, 1080))
+    aerial("s1-6_aerial_trailhead", 14, 0, (-6, -34), 26)
+    aerial("s1-6_aerial_shack_row", 100, 28, (-14, -48), 28)
+    aerial("s1-6_aerial_wash", 310, -10, (-14, -50), 30)
+    obl = bpy.data.objects["ReviewObliqueCamera"]
+    render_to(obl, "s1-6_oblique_overview", (1920, 1080))
+    render_to(bpy.data.objects["ReviewTopCamera"], "s1-6_top_down", (1920, 1080))
+    # the ring and the sky from a low wide view
+    c = get_cam("ReviewCloseCamera")
+    c.data.type = "PERSP"; c.data.sensor_fit = "AUTO"; c.data.lens = 24; c.data.clip_end = 4000
+    pos = Vector((30, 120, 55)); tgt = Vector((20, 330, 40))
+    c.location = pos; c.rotation_euler = (tgt - pos).to_track_quat("-Z", "Y").to_euler()
+    render_to(c, "s1-6_far_ring_north", (1920, 1080))
