@@ -237,3 +237,26 @@ Each later outlaw repeats steps like 16: stage data (`town`), look and props (`a
 Answer D1 to D6 above (a one-word answer for each is enough), and say whether Phase A should start now.
 Recommended answers: D1 yes, D2 corridor with forks, D3 first visit only, D4 NPC with dialogue, D5 six elements and two slots,
 D6 remove carry-capacity upgrades so power is purely found.
+
+## 9. Owner answers, round 2 (these override sections 2.2 and 5 where they differ)
+
+Research read first. Mini Ninjas is linear with no hub: big, wide levels with optional shrines and collectibles on side paths,
+and a castle level before each major boss. Magicka's adventure is 12 chapters, each split into sub-areas, with forced
+checkpoints (automatic on entering an area) and activated ones (runestones); once you move on you cannot return.
+Sources: gamespot.com/reviews/mini-ninjas-review/1900-6231284, magicka.fandom.com/wiki/Adventure_Walkthrough_(Magicka).
+
+What the owner decided:
+1. **Shape:** a chapter per outlaw made of 5 to 8 **big areas**. Each area is a finished level that feels like a Mini Ninjas
+   stage inside (one road with side paths), and areas are joined by gates. The outlaw is in the last area.
+2. **Length:** 45 to 60 minutes per outlaw, about 6 to 9 minutes per area. This replaces the 8 to 12 minutes in section 2.2.
+   An area is therefore roughly 600 to 900 units on its own, not the whole stage.
+3. **Clues still open the final gate.** The find-the-clues rule stays, spread across the areas (for example one required clue
+   or key per area, the last one opens the outlaw's gate). Side-path secrets are optional.
+4. **Gate and checkpoint, no going back** (Magicka style): a forced checkpoint on entering each area, activated campfires
+   inside it. Because nothing is revisited, only the current area needs to be loaded, which is good for phones.
+5. **To confirm:** the answer was "a mix of 1 and 4". I read it as: Magicka-style chapter of gated areas (1), with Mini Ninjas
+   style big, open, side-path-rich areas inside each (the feel of 4). If it means something else, say so.
+
+Effect on the build plan: stage data gets an `areas[]` list, each with its own road, guards, required clue and gate. Pete grows
+from one 220-unit trail into 5 to 8 areas. The stage runner saves per area, not per campfire only. Phase B (road and camera)
+now happens inside one area first, then is repeated, so build one finished area as the template before making the rest.
