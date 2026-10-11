@@ -122,3 +122,43 @@ test('runtime: hiding slows the marshal and a press with a door in reach opens t
     assert.equal(r.speedMult, 1);
     assert.equal(r.revealed, true);
 });
+
+import { createAwareness, stepAwareness, dueMembers, alarmNear, GUARD, losesTrack } from '../src/stages/section1/guards.js';
+
+const grp = (id, x = 0) => ({ id, x, z: 0, radius: 30, enemies: [{}, {}, {}] });
+
+test('guards: sight makes a group suspicious, then alerted; leaving calms it', () => {
+    const g = grp('a1-claims-guards'), a = createAwareness(g);
+    assert.equal(stepAwareness(a, g, 0.1, { dist: 100 }), null);
+    assert.equal(stepAwareness(a, g, 0.1, { dist: 20 }), 'suspicious');
+    let ev = null;
+    for(let t = 0; t < GUARD.SUSPICIOUS_SECONDS + 0.2 && ev !== 'alerted'; t += 0.1) ev = stepAwareness(a, g, 0.1, { dist: 20 });
+    assert.equal(ev, 'alerted');
+    const b = createAwareness(g);
+    stepAwareness(b, g, 0.1, { dist: 20 });
+    let calmed = null;
+    for(let t = 0; t < 4 && !calmed; t += 0.1) calmed = stepAwareness(b, g, 0.1, { dist: 90 });
+    assert.equal(calmed, 'calmed');
+});
+
+test('guards: a hidden marshal is not seen, a shot is heard, and the alarm speeds up neighbours', () => {
+    const g = grp('a1-claims-guards'), a = createAwareness(g);
+    for(let i = 0; i < 100; i++) stepAwareness(a, g, 0.1, { dist: 5, hidden: true });
+    assert.equal(a.state, 'idle');
+    assert.equal(stepAwareness(a, g, 0.1, { dist: 40, hidden: true, shot: true }), 'alerted');
+    assert.equal(a.alarm, true);
+    const n = grp('a1-flume-ambush', 100), b = createAwareness(n);
+    assert.equal(alarmNear([a], [g, n], n), true);
+    assert.equal(stepAwareness(b, n, 0.1, { dist: 50, alarmNear: true }), 'suspicious');
+});
+
+test('guards: the flank comes later, and hiding long enough loses them', () => {
+    const g = grp('a1-flume-ambush'), a = createAwareness(g);
+    assert.deepEqual(dueMembers(a, g), []);
+    stepAwareness(a, g, 0.1, { dist: 10, shot: true });
+    assert.deepEqual(dueMembers(a, g), [0, 1]);
+    stepAwareness(a, g, GUARD.FLANK_DELAY + 0.1, {});
+    assert.deepEqual(dueMembers(a, g), [0, 1, 2]);
+    assert.equal(losesTrack(2.9), false);
+    assert.equal(losesTrack(3), true);
+});

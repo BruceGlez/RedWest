@@ -84,6 +84,8 @@ test('a Section 1 run: guards wake as the marshal walks up, the bridge exit wait
     const claims = section.encounters.find(g => g.id === 'a1-claims-guards');
     Object.assign(position, { x: claims.x, z: claims.z });
     peteWorldMode.update(ctx, 0.1, storage);
+    assert.deepEqual(spawned, [], 'they have only noticed him: suspicious first');
+    for(let i = 0; i < 20; i++) peteWorldMode.update(ctx, 0.1, storage);
     assert.deepEqual(spawned.map(s => s[0]).sort(), ['bandit', 'bandit', 'wolf']);
     assert.ok(banners.some(b => b.includes('Company guards')));
 
@@ -96,8 +98,10 @@ test('a Section 1 run: guards wake as the marshal walks up, the bridge exit wait
 
     // wake the ambush, keep someone alive near it: still not beaten
     Object.assign(position, { x: flume.x, z: flume.z });
-    peteWorldMode.update(ctx, 0.1, storage);
-    assert.equal(spawned.filter(s => s[0] === 'gunslinger').length, 1);
+    for(let i = 0; i < 20; i++) peteWorldMode.update(ctx, 0.1, storage);
+    assert.equal(spawned.filter(s => s[0] === 'gunslinger').length, 0, 'the flank is not there yet');
+    for(let i = 0; i < 70; i++) peteWorldMode.update(ctx, 0.1, storage);
+    assert.equal(spawned.filter(s => s[0] === 'gunslinger').length, 1, 'the flank arrives later');
     for(let i = 0; i < 4; i++) peteWorldMode.cameraBias(position, 1);        // the stage clock runs on
     enemies.push({ position: { x: flume.x + 5, z: flume.z + 5 } });
     Object.assign(position, { x: section.exit.x, z: section.exit.z });

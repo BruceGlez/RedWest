@@ -20,6 +20,7 @@ import {
 } from '../peteWorldMap.js';
 import { PETE_AREAS, areaIndexForSave } from '../stages/pete.js';
 import { preloadSection1 } from '../stages/section1Preload.js';
+import { createAwareness, stepAwareness, dueMembers, alarmNear } from '../stages/section1/guards.js';
 import { createSection1Runtime } from '../stages/section1/runtime.js';
 import { dialogue, mountDialogue } from '../dialogue.js';
 import { setInteractHint } from '../interactButton.js';
@@ -59,6 +60,7 @@ export const peteWorldRun = {
     encounterWokeAt: {},
     announcedZones: [],
     prompt: null,
+    guards: null,                // Section 1's guard awareness per group (src/stages/section1/guards.js)
     s1: null                     // Section 1's doors, lever and hiding (src/stages/section1/runtime.js), null elsewhere
 };
 
@@ -87,6 +89,7 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
     peteWorldRun.announcedZones = [];
     peteWorldRun.prompt = null;
     peteWorldRun.s1 = area.isSection ? createSection1Runtime(area.markers) : null;
+    peteWorldRun.guards = area.isSection ? { aware: area.encounters.map(createAwareness), spawned: {} } : null;
     if(playerStats) playerStats.speedMult = 1;
     dialogue.reset();
 
@@ -146,6 +149,33 @@ function wakeEncounters(ctx, playerPos) {
         for(const enemy of group.enemies) ctx?.spawn?.(enemy.type, { x: group.x + enemy.dx, z: group.z + enemy.dz });
         line = group.line;
     }
+    return line;
+}
+
+// Section 1: groups notice the marshal in steps (idle, suspicious, alerted) instead of all waking at a line, and a flank comes later.
+function stepGuards(ctx, playerPos, dt, hidden, shot) {
+    const g = peteWorldRun.guards;
+    const groups = peteWorldRun.area.encounters;
+    let line = null;
+    groups.forEach((group, i) => {
+        const a = g.aware[i];
+        if(peteWorldRun.triggeredEncounters.includes(group.id) && a.state === 'idle') { a.state = 'alerted'; a.sinceAlert = 99; }
+        const dist = Math.hypot(group.x - playerPos.x, group.z - playerPos.z);
+        const event = stepAwareness(a, group, dt, { dist, hidden, shot, alarmNear: alarmNear(g.aware, groups, group) });
+        if(event === 'suspicious') line = line ?? 'They have noticed something...';
+        if(event === 'alerted') {
+            if(!peteWorldRun.triggeredEncounters.includes(group.id)) peteWorldRun.triggeredEncounters.push(group.id);
+            peteWorldRun.encounterWokeAt[group.id] = camera.clock;
+            line = group.line;
+        }
+        const done = g.spawned[group.id] ?? (g.spawned[group.id] = new Set());
+        for(const k of dueMembers(a, group)) {
+            if(done.has(k)) continue;
+            done.add(k);
+            const m = group.enemies[k];
+            ctx?.spawn?.(m.type, { x: group.x + m.dx, z: group.z + m.dz });
+        }
+    });
     return line;
 }
 
@@ -227,7 +257,8 @@ function enterArea(ctx, index, storage) {
 export function endPeteWorldRun(victory = false, storage = globalThis.localStorage) {
     peteWorldRun.active = false;
     peteWorldRun.s1 = null;
-    if(playerStats) playerStats.speedMult = 1;
+    peteWorldRun.guards = null;
+    if(playerStats) { playerStats.speedMult = 1; playerStats.hiddenFor = 0; }
     dialogue.reset();
     setInteractHint(null);
     releaseArea();
@@ -357,7 +388,10 @@ export const peteWorldMode = {
         }
 
         // 4b. Guards wake as the marshal nears them
-        const alarm = wakeEncounters(ctx, playerPos);
+        const alarm = peteWorldRun.guards
+            ? stepGuards(ctx, playerPos, dt, peteWorldRun.s1.state.hiding.hidden, !!(keys.mouse || keys.space || touch.firing))
+            : wakeEncounters(ctx, playerPos);
+        if(playerStats) playerStats.hiddenFor = peteWorldRun.s1?.state.hiding.hiddenFor ?? 0;
         if(alarm) {
             activePrompt = alarm.toUpperCase();
             ctx?.ui?.showWaveBanner?.(alarm, 2200);

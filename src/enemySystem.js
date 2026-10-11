@@ -12,6 +12,8 @@ import { mine } from './mine.js';
 import { MINE_MONSTERS, mineHpBonus, mineRoster, senseRadius, leashRadius, eaterSpeed, eaterReach, eatSeconds } from './mineMonsters.js';
 import { nearestLitTorch, putOutTorch } from './mineLight.js';
 import { createSense, senseStep } from './combatMath.js';
+import { HIDE } from './stages/section1/hiding.js';
+const HIDE_LOSE_TRACK = HIDE.LOSE_TRACK;
 import { ENEMY_MODELS, rosterFor } from './enemyTypes.js';
 import { DEMO } from './demo.js';
 import { playSound } from './audio.js';
@@ -756,6 +758,9 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
                 if(state === 'returning') faceDir = moveDir.clone();
             }
         }
+
+        // Section 1: guards lose track of a marshal who has stayed hidden for a few seconds (src/stages/section1/guards.js, losesTrack)
+        if(!held && playerStats.hiddenFor >= HIDE_LOSE_TRACK) { held = true; moveDir = null; }
 
         switch(held ? 'held' : u.behavior) {
         case 'held': break;
