@@ -2780,3 +2780,503 @@ def s14_renders():
     place_game_camera(gc, 235)
     render_to(gc, "s1-4_game_camera_d235", (1920, 1080))
     render_to(bpy.data.objects["ReviewTopCamera"], "s1-4_top_down", (1920, 1080))
+
+# ================================================================ step S1-5: the Tailings Wash (275 to 345 m), the Smuggler's Stash and the Flume Bridge (345 to 420 m)
+COOL_ROCK = mixc(PAL["cool_light"], PAL["stone"], 0.4)
+EARTH = mixc(PAL["scrub"], PAL["cliff_base"], 0.35)
+VIOLET = mixc(PAL["cool_mid"], CO_TEAL, 0.25)
+
+def terrain_z(G, d, u):
+    i = max(0, min(len(G["ds"]) - 1, int(round((d - D0) / DSTEP))))
+    U, Z = G["U"][i], G["Z"][i]
+    if u <= U[0]:
+        return Z[0]
+    for j in range(len(U) - 1):
+        if U[j] <= u <= U[j + 1]:
+            t = (u - U[j]) / max(U[j + 1] - U[j], 1e-6)
+            return Z[j] + (Z[j + 1] - Z[j]) * t
+    return Z[-1]
+
+def face_dir(vx, vy):
+    """Rotation about z that makes a prop's front (-y) point along (vx, vy)."""
+    return math.atan2(vx, -vy)
+
+def build_kits_s15():
+    r = random.Random(150)
+    # culvert: a walkable wooden-lined pipe (axis along y), with stone headwalls, and the earth mound that covers it
+    b = Bld(500)
+    L, n = 9.0, 12
+    for k in range(n):
+        a0, a1 = math.tau * k / n, math.tau * (k + 1) / n
+        for (R, inward, col) in ((1.75, False, mixc(WOOD, GREY_WOOD, 0.3 * (k % 2))), (1.5, True, mixc(WOOD_D, WOOD, 0.4 * (k % 2)))):
+            A0 = (R * math.cos(a0), -L / 2, 1.5 + R * math.sin(a0))
+            A1 = (R * math.cos(a1), -L / 2, 1.5 + R * math.sin(a1))
+            B1 = (A1[0], L / 2, A1[2])
+            B0 = (A0[0], L / 2, A0[2])
+            b.face((A0, A1, B1, B0) if inward else (A0, B0, B1, A1), shade(col, 0.8 if inward else 1.0))
+    b.box(0, 0, 0, 2.6, L - 0.4, 0.14, WOOD_D)
+    for y in (-L / 2 + 0.2, L / 2 - 0.2):
+        for k in range(14):
+            a = math.tau * k / 14
+            b.rock(2.2 * math.cos(a) * 1.0, y, 1.5 + 2.0 * math.sin(a) if math.sin(a) > -0.3 else 0.0, 0.5, 0.5, PAL["stone"], n=5) if (math.sin(a) > -0.3) else None
+    for x in (-2.6, 2.6):
+        b.rock(x, -L / 2 + 0.2, 0, 0.7, 1.2, PAL["stone"], n=6)
+        b.rock(x, L / 2 - 0.2, 0, 0.7, 1.2, PAL["stone"], n=6)
+    kit("culvert", b)
+    b = Bld(501)
+    b.rock(0, 0, 0, 4.6, 3.3, EARTH, n=10, sq=(1.15, 1.25))
+    b.rock(0, 0, 0, 5.0, 1.6, mixc(EARTH, PAL["scrub"], 0.4), n=10, sq=(1.15, 1.2))
+    kit("culvert_mound", b)
+    # cut banks (earth wedges with strata) and cool boulders for the wash
+    for v in range(2):
+        b = Bld(510 + v)
+        L = (6.5, 5.0)[v]
+        for k, (z0, h, ov, c) in enumerate(((0.0, 0.7, 0.0, mixc(EARTH, PAL["mud"], 0.4)), (0.7, 0.6, 0.15, EARTH), (1.3, 0.7, 0.45, mixc(EARTH, PAL["cliff_light"], 0.35)), (2.0, 0.4, 0.7, PAL["scrub"]))):
+            b.box(0, ov * 0.5, z0, L - 0.3 * k, 1.5 + ov, h, c, planks=0.0, var=0.08)
+        kit("cutbank_" + "ab"[v], b)
+    for v in range(3):
+        b = Bld(520 + v)
+        rr = (1.3, 1.7, 1.1)[v]
+        b.rock(0, 0, 0, rr, rr * (0.85 + 0.2 * (v % 2)), mixc(COOL_ROCK, PAL["cliff_base"], 0.12 * v), n=7, sq=(1.1, 0.95))
+        b.rock(rr * 0.7, rr * 0.3, 0, rr * 0.45, rr * 0.4, COOL_ROCK, n=6)
+        kit("boulder_cool_" + "abc"[v], b)
+    b = Bld(525)
+    b.rock(0, 0, 0, 0.45, 0.35, COOL_ROCK, n=6)
+    b.rock(0, 0, 0.3, 0.3, 0.1, mixc(CAC, COOL_ROCK, 0.5), n=6)
+    kit("mossy_stone", b)
+    # mesquite: a small tree and a dense low bush
+    mesq = mixc(CAC, PAL["scrub"], 0.35)
+    b = Bld(530)
+    b.tube((0, 0, 0), (0.25, 0.1, 1.7), 0.17, 0.12, 6, WOOD_D)
+    b.tube((0.2, 0.1, 1.2), (-0.9, 0.2, 2.4), 0.09, 0.05, 5, WOOD_D)
+    b.tube((0.25, 0.1, 1.6), (1.2, -0.2, 2.6), 0.09, 0.05, 5, WOOD_D)
+    for (x, y, z, rr) in ((0.1, 0.1, 3.0, 1.5), (-1.0, 0.2, 2.6, 1.1), (1.3, -0.2, 2.8, 1.2), (0.3, 0.5, 2.3, 1.0)):
+        b.rock(x, y, z - 0.5, rr, rr * 0.8, mixc(mesq, CAC_H, 0.2 * r.random()), n=7, sq=(1.1, 1.0))
+    kit("mesquite_tree", b)
+    b = Bld(531)
+    for k in range(5):
+        a = math.tau * k / 5
+        b.rock(0.6 * math.cos(a), 0.6 * math.sin(a), 0, r.uniform(0.7, 1.0), r.uniform(0.9, 1.3), mixc(mesq, CAC_H, 0.15 * (k % 3)), n=6)
+    b.rock(0, 0, 0, 0.9, 1.5, mesq, n=6)
+    kit("mesquite_bush", b)
+    # three-sided cart shed with a sagging roof; its double doors are separate parts with hinge pivots (door_l, door_r)
+    b = Bld(540)
+    w, d, h = 5.2, 4.2, 2.8
+    b.box(0, d / 2 - 0.1, 0, w, 0.2, h, GREY_WOOD, planks=0.5)
+    for sx in (-1, 1):
+        b.box(sx * (w / 2 - 0.1), 0, 0, 0.2, d, h - 0.2 * (sx == 1), GREY_WOOD, planks=0.5)
+        b.box(sx * (w / 2 + 0.05), -d / 2 + 0.1, 0, 0.3, 0.3, h + 0.1, WOOD_D)
+    s0 = len(b.V)
+    b.slab((-w / 2 - 0.5, -d / 2 - 0.6, h), (w / 2 + 0.5, -d / 2 - 0.6, h - 0.3), (w / 2 + 0.5, d / 2 + 0.5, h + 0.55), (-w / 2 - 0.5, d / 2 + 0.5, h + 0.65), 0.12, ROOF_RUST)
+    b.beam((-w / 2, -d / 2 - 0.2, h - 0.1), (w / 2, -d / 2 - 0.2, h - 0.25), 0.2, 0.2, WOOD_D)
+    b.box(0, 0, 0, w - 0.5, d - 0.4, 0.06, mixc(WOOD_D, DARK_IN, 0.5))
+    kit("shed_body", b)
+    for nm, sgn in (("l", 1), ("r", -1)):
+        b = Bld(541 if nm == "l" else 542)
+        b.box(sgn * 1.15, 0, 0, 2.3, 0.1, 2.4, mixc(WOOD, GREY_WOOD, 0.4), planks=0.4)
+        b.beam((0.05, 0, 0.2), (sgn * 2.2, 0, 2.3), 0.12, 0.06, WOOD_D)
+        kit("shed_door_" + nm, b)
+    # lookout platform on posts with a ladder
+    b = Bld(550)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            b.beam((sx * 2.0, sy * 2.0, 0), (sx * 1.8, sy * 1.8, 4.6), 0.3, 0.3, WOOD_D)
+    for z in (1.4, 3.0):
+        for (a, c) in (((-1.9, -1.9), (1.9, -1.9)), ((1.9, -1.9), (1.9, 1.9)), ((1.9, 1.9), (-1.9, 1.9)), ((-1.9, 1.9), (-1.9, -1.9))):
+            b.beam((a[0], a[1], z), (c[0], c[1], z), 0.14, 0.14, WOOD)
+    b.beam((-1.9, -1.9, 0.2), (1.8, -1.8, 3.0), 0.1, 0.1, GREY_WOOD)
+    b.box(0, 0, 4.5, 4.6, 4.6, 0.18, mixc(WOOD, GREY_WOOD, 0.3), planks=0.4)
+    for sx in (-1, 1):
+        for sy in (-1, 1):
+            b.beam((sx * 2.2, sy * 2.2, 4.68), (sx * 2.2, sy * 2.2, 5.7), 0.12, 0.12, WOOD_D)
+    for (a, c) in (((-2.2, -2.2), (2.2, -2.2)), ((2.2, -2.2), (2.2, 2.2)), ((2.2, 2.2), (-2.2, 2.2)), ((-2.2, 2.2), (-2.2, -2.2))):
+        if (a, c) == ((-2.2, -2.2), (2.2, -2.2)):
+            b.beam((a[0], a[1], 5.6), (-0.6, -2.2, 5.6), 0.1, 0.1, WOOD)
+            b.beam((0.6, -2.2, 5.6), (c[0], c[1], 5.6), 0.1, 0.1, WOOD)
+        else:
+            b.beam((a[0], a[1], 5.6), (c[0], c[1], 5.6), 0.1, 0.1, WOOD)
+            b.beam((a[0], a[1], 5.1), (c[0], c[1], 5.1), 0.08, 0.08, WOOD)
+    kit("lookout", b)
+    # dry waterwheel on two A-frames
+    b = Bld(555)
+    R = 1.9
+    zc = R + 0.4
+    for k in range(12):
+        a0, a1 = math.tau * k / 12, math.tau * (k + 1) / 12
+        b.beam((0, R * math.cos(a0), zc + R * math.sin(a0)), (0, R * math.cos(a1), zc + R * math.sin(a1)), 0.5, 0.12, mixc(WOOD, COOL_ROCK, 0.25))
+        b.beam((0, 0.1 * math.cos(a0), zc + 0.1 * math.sin(a0)), (0, R * math.cos(a0), zc + R * math.sin(a0)), 0.1, 0.1, WOOD_D)
+        b.beam((-0.4, (R + 0.2) * math.cos(a0), zc + (R + 0.2) * math.sin(a0)), (0.4, (R + 0.2) * math.cos(a0), zc + (R + 0.2) * math.sin(a0)), 0.1, 0.4, WOOD_D)
+    b.tube((-1.2, 0, zc), (1.2, 0, zc), 0.14, 0.14, 6, IRON)
+    for sx in (-1, 1):
+        b.beam((sx * 1.1, -1.3, 0), (sx * 1.1, 0, zc), 0.16, 0.16, WOOD_D)
+        b.beam((sx * 1.1, 1.3, 0), (sx * 1.1, 0, zc), 0.16, 0.16, WOOD_D)
+    kit("waterwheel", b)
+    # Stash: cave mouth, rope ladder, tarp bundle, map rock
+    b = Bld(560)
+    for sx in (-1, 1):
+        b.rock(sx * 3.1, 0.3, 0, 1.5, 5.4, mixc(PAL["cliff_dark"], PAL["cliff_base"], 0.3), n=7)
+        b.rock(sx * 2.6, -0.6, 0, 1.0, 3.2, PAL["cliff_base"], n=6)
+    b.rock(0, 0.3, 3.7, 2.4, 1.6, mixc(PAL["cliff_dark"], PAL["cliff_base"], 0.5), n=8, sq=(1.9, 0.9))
+    b.box(0, 1.6, 0, 4.4, 3.0, 3.6, DARK_IN)
+    for sx in (-1, 1):
+        b.box(sx * 2.1, -0.6, 0, 0.3, 0.3, 3.7, WOOD_D)
+    b.box(0, -0.6, 3.6, 4.8, 0.3, 0.3, WOOD)
+    b.beam((-2.1, -0.7, 3.0), (-1.4, -0.7, 3.6), 0.2, 0.2, WOOD_D)
+    b.beam((2.1, -0.7, 3.0), (1.4, -0.7, 3.6), 0.2, 0.2, WOOD_D)
+    kit("cave_mouth", b)
+    b = Bld(561)
+    for sx in (-0.28, 0.28):
+        b.tube((sx, 0, 0), (sx, 0, 5.2), 0.03, 0.03, 4, CREAM)
+    for k in range(14):
+        b.beam((-0.28, 0, 0.3 + k * 0.36), (0.28, 0, 0.3 + k * 0.36), 0.06, 0.06, WOOD)
+    b.box(0, 0.5, 5.1, 1.6, 1.2, 0.18, WOOD)
+    kit("rope_ladder", b)
+    for v, col in enumerate((CO_TEAL, VIOLET, mixc(CREAM, COOL_ROCK, 0.4))):
+        b = Bld(570 + v)
+        b.box(0, 0, 0, 1.1, 1.1, 0.8, WOOD, planks=0.4)
+        for sx in (-1, 1):
+            b.face_out([(sx * 0.58, -0.58, 0.0), (sx * 0.58, 0.58, 0.0), (sx * 0.58, 0.58, 0.82), (sx * 0.58, -0.58, 0.82)], shade(col, 0.85), (sx, 0, 0))
+        b.slab((-0.62, -0.62, 0.84), (0.62, -0.62, 0.84), (0.62, 0.62, 0.95), (-0.62, 0.62, 0.95), 0.05, col)
+        b.face_out([(-0.62, -0.62, 0.0), (0.62, -0.62, 0.0), (0.62, -0.62, 0.84), (-0.62, -0.62, 0.84)], shade(col, 0.8), (0, -1, 0))
+        b.beam((-0.7, -0.64, 0.45), (0.7, -0.64, 0.45), 0.05, 0.03, CREAM)
+        kit("tarp_bundle_" + "abc"[v], b)
+    b = Bld(575)
+    b.rock(0, 0, 0, 1.0, 2.3, PAL["stone"], n=6, sq=(1.5, 0.55))
+    b.face([(-0.7, -0.5, 1.0), (0.7, -0.5, 1.0), (0.7, -0.5, 1.8), (-0.7, -0.5, 1.8)], PAPER)
+    ink = IRON
+    for (x0, z0, x1, z1) in ((-0.55, 1.1, -0.2, 1.3), (-0.2, 1.3, 0.1, 1.2), (0.1, 1.2, 0.35, 1.5), (0.35, 1.5, 0.55, 1.6)):
+        b.beam((x0, -0.515, z0), (x1, -0.515, z1), 0.05, 0.01, ink)
+    b.face([(0.5, -0.516, 1.58), (0.62, -0.516, 1.58), (0.62, -0.516, 1.7), (0.5, -0.516, 1.7)], CO_RED)
+    b.beam((-0.4, -0.515, 1.6), (-0.4, -0.515, 1.7), 0.08, 0.01, ink)
+    b.beam((-0.6, -0.515, 1.6), (-0.2, -0.515, 1.6), 0.03, 0.01, ink)
+    kit("map_rock", b)
+
+def build_bridge(G):
+    """The Flume Bridge: planks over the dry gully (deck top at +0.05), stringers, trestle bents and rope-and-post rails."""
+    rng = random.Random(77)
+    b = Bld(600)
+    d0, d1 = 375.0, 416.0
+    deck_col = lambda: mixc(WOOD, GREY_WOOD, rng.uniform(0.0, 0.6))
+    d = d0
+    n = 0
+    while d < d1:
+        n += 1
+        d += 0.34
+        if n in (23, 24, 61, 62, 63, 97):
+            continue                                              # broken planks (visual only: the stringers stay)
+        P, t = centre(d), tang_at(d)
+        ang = math.atan2(t.y, t.x)
+        lift = 0.0
+        tilt = 0.0
+        if n % 29 == 0:
+            lift, tilt = 0.06, 0.10
+        b.box(P.x, P.y, -0.05 + lift, 0.30, 11.0 * rng.uniform(0.985, 1.0), 0.10, deck_col(), rot=ang + tilt, var=0.06)
+    for u in (-4.2, 0.0, 4.2):
+        for d in [d0 + 2.0 * k for k in range(int((d1 - d0) / 2.0))]:
+            a, c = du_w(d, u), du_w(d + 2.0, u)
+            b.beam((a.x, a.y, -0.5), (c.x, c.y, -0.5), 0.34, 0.32, GREY_WOOD)
+    for d in range(380, 416, 5):
+        for u in (-4.6, 0.0, 4.6):
+            P = du_w(d, u)
+            zb = terrain_z(G, d, u) - 0.3
+            b.beam((P.x, P.y, -0.6), (P.x, P.y, zb), 0.4, 0.4, WOOD_D)
+        for (u0, u1) in ((-4.6, 0.0), (0.0, 4.6)):
+            A, C = du_w(d, u0), du_w(d, u1)
+            za, zc_ = terrain_z(G, d, u0), terrain_z(G, d, u1)
+            zl = max(za, zc_) + 3.3
+            b.beam((A.x, A.y, zl), (C.x, C.y, zl), 0.2, 0.2, WOOD)
+            b.beam((A.x, A.y, -0.8), (C.x, C.y, zl - 0.2), 0.14, 0.14, GREY_WOOD)
+            b.beam((C.x, C.y, -0.8), (A.x, A.y, zl - 0.2), 0.14, 0.14, GREY_WOOD)
+    for dd in range(380, 411, 10):
+        for u in (-4.6, 0.0, 4.6):
+            A, C = du_w(dd, u), du_w(dd + 10, u)
+            za = min(terrain_z(G, dd, u), terrain_z(G, dd + 10, u)) + 1.2
+            b.beam((A.x, A.y, za + 1.5), (C.x, C.y, za + 1.5), 0.14, 0.14, GREY_WOOD)
+    for side in (-1, 1):
+        prev = None
+        for k in range(int((d1 - d0) / 3.4) + 1):
+            d = d0 + k * 3.4
+            P = du_w(d, side * 5.35)
+            b.box(P.x, P.y, 0.05, 0.14, 0.14, 1.2, WOOD_D)
+            if prev is not None:
+                for z, sag in ((1.0, 0.1), (0.55, 0.14)):
+                    mid = (prev + Vector((P.x, P.y))) * 0.5
+                    b.beam((prev.x, prev.y, z + 0.05), (mid.x, mid.y, z - sag), 0.045, 0.045, CREAM, caps=False)
+                    b.beam((mid.x, mid.y, z - sag), (P.x, P.y, z + 0.05), 0.045, 0.045, CREAM, caps=False)
+            prev = Vector((P.x, P.y))
+    ob = b.finish("prop_flume_bridge", coll("40_places"))
+    ob["rw_d"] = 395; ob["rw_cat"] = "prop"
+    S13["count_prop"] += 1
+    S13["tris"].append((395, b.tris()))
+    return ob, b.tris()
+
+def build_aqueduct(G):
+    """B05: a distant wooden flume on tall trestles along the north skyline (a silhouette for the Flume approach)."""
+    b = Bld(610)
+    zt = 30.0
+    pts = []
+    for d in range(326, 442, 4):
+        u = B_of(d) + 52.0
+        pts.append((d, u, du_w(d, u)))
+    for k, (d, u, P) in enumerate(pts):
+        if k % 2 == 0:
+            for sgn in (-1, 1):
+                t = tang_at(d)
+                n_ = Vector((-t.y, t.x))
+                Q = P + n_ * (sgn * 1.2)
+                zb = terrain_z(G, d, u + sgn * 1.2) - 0.5
+                b.beam((Q.x, Q.y, zb), (Q.x, Q.y, zt - 0.4), 0.55, 0.55, WOOD_D)
+            za, zb2 = terrain_z(G, d, u) + 3.0, zt - 4.0
+            for sgn in (-1, 1):
+                Q = P + Vector((-tang_at(d).y, tang_at(d).x)) * (sgn * 1.2)
+                R2 = P + Vector((-tang_at(d).y, tang_at(d).x)) * (-sgn * 1.2)
+                b.beam((Q.x, Q.y, za), (R2.x, R2.y, zb2), 0.25, 0.25, GREY_WOOD)
+            A = P + Vector((-tang_at(d).y, tang_at(d).x)) * 1.6
+            C = P - Vector((-tang_at(d).y, tang_at(d).x)) * 1.6
+            b.beam((A.x, A.y, zt - 0.4), (C.x, C.y, zt - 0.4), 0.4, 0.4, WOOD)
+        if k + 1 < len(pts):
+            P2 = pts[k + 1][2]
+            for sgn in (-1, 1):
+                nn = Vector((-tang_at(d).y, tang_at(d).x)) * (sgn * 1.15)
+                b.beam((P.x + nn.x, P.y + nn.y, zt + 0.0), (P2.x + nn.x, P2.y + nn.y, zt + 0.0), 0.12, 1.1, mixc(WOOD, GREY_WOOD, 0.4))
+            b.beam((P.x, P.y, zt - 0.1), (P2.x, P2.y, zt - 0.1), 2.4, 0.15, WOOD_D)
+    ob = b.finish("prop_flume_aqueduct_B05", coll("40_places"))
+    ob["rw_d"] = 385; ob["rw_cat"] = "prop"
+    S13["count_prop"] += 1
+    S13["tris"].append((385, b.tris()))
+    return ob
+
+def s15_place():
+    rng = random.Random(1505)
+    G = compute_grid()
+    build_kits_s15()
+    P = lambda d, u, x=0.0, y=0.0: frame(d, u, x, y)
+    # ---------------- Tailings Wash (275 to 345 m)
+    # H09 culvert: a walkable pipe under an earth bank across the south berm line
+    p, a = P(250, -19.5)
+    inst("culvert_mound", "prop_culvert_mound", p, a, d=250)
+    inst("culvert", "prop_culvert", p, a, d=250)
+    marker("H09", p, "hide", "H09", 3.0, "Big wooden-lined culvert under an earth bank: walk through it (lane crossover). Open at both ends.")
+    # H10 boulder pocket: a ring of boulders with one gap toward the road
+    c0 = P(285, -15)[0]
+    for k in range(8):
+        ang = math.radians(25 + k * 40)                          # gap faces north (the road)
+        off = Vector((3.3 * math.cos(ang), 3.3 * math.sin(ang)))
+        pp, aa = P(285, -15, off.x, off.y * -1)
+        inst("boulder_cool_" + "abc"[k % 3], "prop_boulder_fort", pp, rng.uniform(0, 6), rng.uniform(1.0, 1.5), d=285)
+    marker("H10", c0, "hide", "H10", 3.0, "Boulder pocket: boulders form a fort with one gap on the road side.")
+    # H11 cart shed with double doors (I16)
+    p, a = P(300, 30)
+    g = make_group("prop_cart_shed_H11", p, a, 300)
+    inst("shed_body", "shed_body", Vector((0, 0, 0)), parent=g, d=300)
+    inst("shed_door_l", "door_l", Vector((-2.7, -2.1, 0)), rotz=math.radians(-70), parent=g, d=300)
+    inst("shed_door_r", "door_r", Vector((2.7, -2.1, 0)), rotz=math.radians(70), parent=g, d=300)
+    inst("ore_cart", "prop_ore_cart", P(300, 30, -0.4, 0.6)[0], a + 0.3, d=300)
+    S13["count_prop"] += 1
+    marker("H11", p, "hide", "H11", 3.0, "Three-sided cart shed with a sagging roof (open front).")
+    marker("I16", P(300, 30, 0, -2.2)[0], "door", "I16", 3.0, "Shed double doors: door_l and door_r pivot at their hinges.")
+    # H12 mesquite thicket: a dense ring with a hollow inside
+    c1 = P(330, -13)[0]
+    for k in range(9):
+        ang = math.radians(k * 40 + 10)
+        pp, aa = P(330, -13, 2.3 * math.cos(ang), 2.3 * math.sin(ang) * -1)
+        inst("mesquite_bush", "foliage_mesquite", pp, rng.uniform(0, 6), rng.uniform(0.9, 1.3), cat="foliage", d=330)
+    inst("mesquite_tree", "foliage_mesquite_tree", P(330, -13, -3.8, -2.5)[0], 0.5, 1.2, cat="foliage", d=330)
+    marker("H12", c1, "hide", "H12", 2.4, "Dense mesquite thicket with a hollow inside.")
+    # I21 lookout over the bridge approach
+    p, a = P(335, 22)
+    inst("lookout", "prop_lookout", p, a, d=335)
+    inst("ladder", "ladder", P(335, 22, 2.35, 0)[0], a + math.pi / 2 + 3.14159, scale=0.85, d=335)
+    marker("I21", p, "vantage", "I21", 3.5, "Wooden lookout platform over the bridge approach (a high look at the Flume Bridge).")
+    # dry waterwheel in the creek bed, cut banks, big cool boulders, mossy stones
+    p, a = P(318, -29)
+    inst("waterwheel", "prop_waterwheel_dry", p, a + math.pi / 2, d=318)
+    for k, (d, u) in enumerate(((282, -41), (292, -44), (303, -40), (312, -43), (322, -41), (333, -44), (344, -40), (290, -22), (306, -23), (324, -22), (338, -23))):
+        p, a = P(d, u)
+        inst("cutbank_" + "ab"[k % 2], "prop_cutbank", p, a + (math.pi if u > -30 else 0) + rng.uniform(-0.15, 0.15), d=d)
+    for k in range(18):
+        d = rng.uniform(278, 346)
+        u = rng.choice([-1, 1]) * rng.uniform(14, 44)
+        p, a = P(d, u)
+        if abs(u) > 11:
+            inst("boulder_cool_" + rng.choice("abc"), "prop_boulder_wash", p, rng.uniform(0, 6), rng.uniform(0.9, 2.1), d=d)
+    for k in range(14):
+        d = rng.uniform(276, 346)
+        u = rng.choice([-1, 1]) * rng.uniform(12, 36)
+        p, a = P(d, u)
+        inst("mossy_stone", "prop_mossy_stone", p, rng.uniform(0, 6), rng.uniform(0.8, 1.5), d=d)
+    # layout items in this stretch: pot-5 cluster and crate-4
+    dxy = _L["pots"][4]
+    pp = Vector((dxy["x"], -dxy["z"], 0)); dd, _ = world_to_du(Vector((pp.x, pp.y)))
+    pot_group("a1-pot-5", pp, 0.5, dd)
+    for (x, y) in ((0.8, 0.4), (-0.5, 0.9)):
+        pot_group("a1-pot-5_x%d" % int(x * 10), Vector((pp.x + x, pp.y + y, 0)), rng.uniform(0, 6), dd)
+    marker("a1-pot-5", pp, "breakable", "I06", 1.8, "Clay pot cluster (layout a1-pot-5).")
+    cx, cy = _L["crates"][3]["x"], -_L["crates"][3]["z"]
+    cd, _ = world_to_du(Vector((cx, cy)))
+    crate_group("a1-crate-4", Vector((cx, cy, 0)), 0.2, cd)
+    marker("a1-crate-4", Vector((cx, cy, 0)), "loot", "I11", 1.5, "Layout crate a1-crate-4 (ammo).")
+    # telegraph poles continue to the bridge, with wire
+    poles = [frame(276, -12.6)[0]]
+    for dd in (304, 332, 360):
+        pp, aa = frame(dd, -12.6)
+        inst("telegraph_pole", "prop_telegraph_pole", pp, aa + math.pi / 2, d=dd)
+        poles.append(Vector((pp.x, pp.y, 0)))
+    wire_mesh(poles)
+    # bridge sign and the eviction boards' last one
+    p, a = P(360, 11.5)
+    inst("hanging_sign", "prop_hanging_sign", p, a, d=360)
+    marker("I25", p, "lore", "I25", 2.0, "Flume bridge sign (pictogram: a bucket and a pick). The sign node is hanging_sign.")
+    # ---------------- the Smuggler's Stash (path leaves just before the bridge)
+    s0, s1, s2 = STASH[0], STASH[1], STASH[2]
+    pdir = (s2 - s0).normalized()
+    pn = Vector((-pdir.y, pdir.x))
+    scr = [(s1 + pdir * 0.5 + pn * -2.9, 2.5), (s1 + pdir * 5.0 + pn * 3.2, 2.3), (s1 + pdir * 9.5 + pn * -2.8, 2.4), (s1 + pdir * 1.5 + pn * 5.2, 2.0), (s1 + pdir * 7.0 + pn * -5.0, 1.9)]
+    for k, (pp, sc) in enumerate(scr):
+        inst("boulder_cool_" + "abc"[k % 3], "prop_stash_screen", Vector((pp.x, pp.y, 0)), rng.uniform(0, 6), sc, d=368)
+    hm = s1 + pdir * 5.5
+    marker("H14", Vector((hm.x, hm.y, 0)), "hide", "H14", 3.0, "Boulder screen that hides the Stash path: a staggered chicane (also the secret).")
+    C = STASH_C
+    wd, wu = world_to_du(Vector((C.x, C.y)))
+    toN = Vector((0.28, 0.96))
+    cm = C + toN * 14.2
+    zc = terrain_z(G, *world_to_du(Vector((cm.x, cm.y)))) - 0.1
+    inst("cave_mouth", "prop_cave_mouth", Vector((cm.x, cm.y, max(0.0, zc))), face_dir(-toN.x, -toN.y), d=wd)
+    marker("cave", Vector((cm.x, cm.y, 0)), "lore", "B17", 4.0, "Cave mouth carved into the cliff behind the Stash clearing (dark, with a hanging lantern hook).")
+    lad = C + Vector((-0.62, 0.78)) * 14.0
+    ld, lu = world_to_du(Vector((lad.x, lad.y)))
+    inst("rope_ladder", "prop_rope_ladder", Vector((lad.x, lad.y, max(0.0, terrain_z(G, ld, lu)))), face_dir(0.62, -0.78), d=wd)
+    marker("rope-ladder", Vector((lad.x, lad.y, 0)), "climb", "I22_ladder", 2.0, "Rope ladder up to a rim ledge above the Stash.")
+    camp = C + Vector((-3.4, -2.8))
+    camp3 = Vector((camp.x, camp.y, 0))
+    inst("bedroll", "prop_bedroll", camp3 + Vector((0.2, 0.2, 0)), 0.6, d=wd)
+    inst("coffee_pot", "prop_coffee_pot", camp3 + Vector((1.6, -0.4, 0)), 0.0, d=wd)
+    for k in range(2):
+        inst("tin_cup", "prop_tin_cup", camp3 + Vector((1.9 + 0.3 * k, -0.7 + 0.2 * k, 0)), 0.0, d=wd)
+    inst("lantern_frame", "prop_old_lantern", camp3 + Vector((-1.4, 1.0, 0)), 0.7, d=wd)       # the old unlit lantern
+    lantern_group("stash_lit", Vector((C.x + 1.0, C.y + 6.8, 1.45)), wd)
+    inst("log_seat", "prop_log_seat", camp3 + Vector((0.6, -1.8, 0)), 0.4, 0.7, d=wd)
+    for k, cid in enumerate(("a1-secret-1a", "a1-secret-1b")):
+        cr = next(x for x in _L["crates"] if x["id"] == cid)
+        pc = Vector((cr["x"], -cr["z"], 0))
+        crate_group(cid, pc, 0.4 + k, wd)
+        marker(cid, pc, "loot", "I22" if k == 0 else "I22b", 1.5, "Smuggler's contraband crate (richer loot): layout %s." % cid)
+    for k, (dx, dy) in enumerate(((2.2, 1.0), (4.4, -1.6), (-0.4, 3.4), (5.0, 2.6))):
+        inst("tarp_bundle_" + "abc"[k % 3], "prop_tarp_bundle", Vector((C.x + dx, C.y + dy, 0)), rng.uniform(0, 6), d=wd)
+    ps = next(x for x in _L["pots"] if x["id"] == "a1-pot-s1")
+    pp = Vector((ps["x"], -ps["z"], 0))
+    pot_group("a1-pot-s1", pp, 0.3, wd)
+    pot_group("a1-pot-s1_x", Vector((pp.x - 0.9, pp.y - 0.3, 0)), 1.1, wd)
+    marker("a1-pot-s1", pp, "breakable", "I22_pots", 1.5, "Two clay pots in the Stash (layout a1-pot-s1).")
+    mp = C + Vector((-5.0, 9.8))
+    inst("map_rock", "prop_map_rock", Vector((mp.x, mp.y, max(0.0, terrain_z(G, *world_to_du(Vector((mp.x, mp.y))))))), face_dir(0.45, -0.9), d=wd)
+    marker("map", Vector((mp.x, mp.y, 0)), "lore", "I22_map", 2.0, "Hand-drawn map pinned to a standing stone (pictograms only).")
+    marker("stash-clearing", Vector((C.x, C.y, 0)), "note", "STASH", STASH_CLR["r"], "Smuggler's Stash clearing (layout, radius 13): cooler, darker, one lit lantern.")
+    # ---------------- the Flume Bridge (345 to 420 m)
+    bridge, btris = build_bridge(G)
+    build_aqueduct(G)
+    for dd, side in ((372.5, -1), (372.5, 1), (418.5, -1), (418.5, 1)):
+        pp, aa = frame(dd, side * 6.3)
+        inst("lamp_post", "prop_lamp_post", pp, aa + (0 if dd < 400 else math.pi), d=dd)
+        lantern_group("bridge_%d_%d" % (dd * 10, side), Vector((pp.x + math.cos(aa) * (0.6 if dd < 400 else -0.6), pp.y + math.sin(aa) * (0.6 if dd < 400 else -0.6), 2.3)), dd)
+    marker("bridge", frame(395, 0)[0], "landmark", "LM_BRIDGE", 12.0, "Flume Bridge: 11 m x 40 m plank deck over a 6.4 m dry gully, deck top at +0.05.")
+    marker("aqueduct", frame(385, B_of(385) + 52)[0], "landmark", "B05", 10.0, "Distant wooden flume aqueduct on trestles (skyline silhouette).")
+    # under the bridge: a rusted cart, a dry waterwheel, cool stones; H13 a timber ledge under the near end
+    pz = lambda d, u: Vector((du_w(d, u).x, du_w(d, u).y, terrain_z(G, d, u)))
+    inst("ore_cart_tipped", "prop_ore_cart_rusted", pz(400, -9), 0.9, 1.2, d=400)
+    inst("waterwheel", "prop_waterwheel_gully", pz(394, 7), a + 0.3, 1.1, d=394)
+    for k in range(12):
+        d = rng.uniform(386, 408)
+        u = rng.uniform(-30, 8)
+        inst(rng.choice(("mossy_stone", "boulder_cool_c", "mossy_stone")), "prop_gully_stone", pz(d, u), rng.uniform(0, 6), rng.uniform(0.6, 1.4), d=d)
+    ledge = Bld(620)
+    ledge.box(0, 0, 0, 4.0, 2.6, 0.2, mixc(WOOD, GREY_WOOD, 0.35), planks=0.4)
+    for sx in (-1, 1):
+        ledge.beam((sx * 1.8, 1.0, 0), (sx * 1.8, 1.0, 2.9), 0.2, 0.2, WOOD_D)
+        ledge.beam((sx * 1.8, -1.0, 0), (sx * 1.8, -1.0, 2.9), 0.2, 0.2, WOOD_D)
+    for k in range(8):
+        ledge.box(-3.6 - k * 0.5, 0, -k * 0.2 + 0.0, 0.5, 1.4, 0.14, WOOD)           # a timber stair down from the south side
+    lp = pz(381.5, -6)
+    lo = ledge.finish("prop_timber_ledge_H13", coll("50_props"))
+    lo.location = (lp.x, lp.y, lp.z + 0.05)
+    lo.rotation_euler = (0, 0, math.atan2(tang_at(381.5).y, tang_at(381.5).x))
+    lo["rw_gen"] = "s1_3"; lo["rw_d"] = 381; lo["rw_cat"] = "prop"
+    S13["count_prop"] += 1; S13["tris"].append((381, ledge.tris()))
+    marker("H13", Vector((lp.x, lp.y, 0)), "hide", "H13", 2.6, "Timber ledge under the bridge's near end, in cool shade; reached by a stair from the south bank.")
+    # the flume ambush: markers only (the game spawns the bandits and the gunslinger)
+    fa = next(e for e in _L["encounters"] if e["place"] == "flume")
+    marker("flume-ambush", Vector((fa["x"], -fa["z"], 0)), "encounter", "a1-flume-ambush", fa["wakeRadius"] * 0.5, "Layout ambush on the bridge. Wake radius %d." % fa["wakeRadius"])
+    for k, sp_ in enumerate(fa["spawnPoints"]):
+        marker("flume-spawn%d" % k, Vector((sp_["x"], -sp_["z"], 0)), "spawn", "a1-flume-spawn-%s%d" % (sp_["type"], k), 1.5, "Layout spawn point (%s). Marker only." % sp_["type"])
+    # scatter over 276 to 420 m
+    for k in range(60):
+        d = rng.uniform(276, 372)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 44)
+        p, a = P(d, u)
+        inst(rng.choice(("tuft_dry", "tuft_green", "tuft_dry")), "foliage_tuft", p, rng.uniform(0, 6), rng.uniform(0.9, 1.5), cat="foliage", d=d)
+    for k in range(24):
+        d = rng.uniform(276, 372)
+        u = rng.choice([-1, 1]) * rng.uniform(10, 46)
+        p, a = P(d, u)
+        inst(rng.choice(("sage", "barrel_cactus", "prickly_pear", "mesquite_bush")), "foliage_scrub", p, rng.uniform(0, 6), rng.uniform(0.8, 1.3), cat="foliage", d=d)
+    for (d, u, v) in ((296, 34, "a"), (342, -33, "c"), (356, 28, "b")):
+        p, a = P(d, u)
+        inst("saguaro_" + v, "foliage_saguaro", p, rng.uniform(0, 6), 1.0, cat="foliage", d=d)
+    for k in range(10):
+        d = rng.uniform(420, 432)
+        u = rng.choice([-1, 1]) * rng.uniform(8, 20)
+        p, a = P(d, u)
+        inst("mossy_stone", "prop_landing_stone", p, rng.uniform(0, 6), rng.uniform(0.8, 1.6), d=d)
+    return btris
+
+def run_s1_5(render=False):
+    run_s1_2(render=False)
+    clear_generated("s1_3")
+    run_s1_3_place()
+    s14_place()
+    btris = s15_place()
+    ranges = {"a": (-35, 105), "b": (85, 210), "c": (190, 315), "d": (295, 447)}
+    tri_by_chunk = {ck: sum(t for (d, t) in S13["tris"] if a <= d <= b) for ck, (a, b) in ranges.items()}
+    kt = {k: v for k, v in KIT_TRIS.items() if k in ("culvert", "culvert_mound", "cave_mouth", "lookout", "waterwheel", "shed_body", "mesquite_tree", "map_rock")}
+    stats = dict(props=S13["count_prop"], foliage=S13["count_foliage"], hiding_places=S13["hides"], interactables=S13["inter"], bridge_tris=btris, tris_by_chunk_instanced=tri_by_chunk, kit_tris=kt)
+    print(json.dumps(stats, indent=1))
+    for m in S13["markers"]:
+        if m[0] in ("H09", "H10", "H11", "H12", "H13", "H14", "I16", "I21", "I22", "I22b", "I25", "I06", "I11", "B17", "LM_BRIDGE", "B05"):
+            print("MARKER", m)
+    if render:
+        s15_renders()
+    return stats
+
+def s15_renders():
+    cc, cp = get_cam("ChaseCamera"), get_cam("ChaseCameraPhone")
+    for d in (285, 305, 325, 350, 366):
+        place_chase_camera(cc, d)
+        render_to(cc, "s1-5_chase_d%03d" % d, (1920, 1080))
+    place_chase_camera(cc, 372)
+    render_to(cc, "s1-5_chase_bridge_start_d372", (1920, 1080))
+    place_chase_camera(cc, 402)
+    render_to(cc, "s1-5_chase_bridge_middle_d402", (1920, 1080))
+    place_chase_camera(cp, 395, phone=True)
+    render_to(cp, "s1-5_chase_phone_bridge_d395", (1080, 1920))
+    aerial("s1-5_aerial_culvert_H09", 250, -19.5, (-8, -26), 18)
+    aerial("s1-5_aerial_wash_boulder_fort_H10", 290, -20, (-10, -34), 24)
+    aerial("s1-5_aerial_shed_lookout", 316, 28, (-12, -40), 26)
+    aerial("s1-5_aerial_mesquite_H12", 330, -13, (-8, -28), 18)
+    aerial("s1-5_aerial_waterwheel_creek_bed", 318, -30, (-8, -30), 20)
+    aerial("s1-5_aerial_bridge_south_west", 396, 0, (-30, -46), 34, lens=28)
+    aerial("s1-5_aerial_bridge_north_east", 396, 0, (36, 30), 30, lens=28)
+    aerial("s1-5_aerial_under_bridge_H13", 388, -4, (-8, -20), 10)
+    aerial("s1-5_aerial_aqueduct_B05", 385, 36, (-30, -60), 46, lens=24)
+    aerial("s1-5_aerial_stash_screen_H14", 372, 8, (-6, -22), 16)
+    c = STASH_C
+    cam = get_cam("ReviewCloseCamera")
+    tgt = Vector((c.x, c.y - 2.0, 0.0)); pos = Vector((c.x - 6, c.y - 26, 18))
+    cam.location = pos; cam.rotation_euler = (tgt - pos).to_track_quat("-Z", "Y").to_euler(); cam.data.type = "PERSP"; cam.data.lens = 30
+    render_to(cam, "s1-5_stash_clearing_from_south", (1920, 1080))
+    pos = Vector((c.x + 4, c.y - 11, 4.5)); tgt = Vector((c.x - 1, c.y + 9, 2.2))
+    cam.location = pos; cam.rotation_euler = (tgt - pos).to_track_quat("-Z", "Y").to_euler(); cam.data.lens = 24
+    render_to(cam, "s1-5_stash_clearing_eye_level", (1920, 1080))
+    gc = bpy.data.objects["GameCamera"]
+    place_game_camera(gc, 330)
+    render_to(gc, "s1-5_game_camera_d330", (1920, 1080))
+    render_to(bpy.data.objects["ReviewTopCamera"], "s1-5_top_down", (1920, 1080))
