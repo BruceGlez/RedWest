@@ -968,8 +968,8 @@ export function updateEnemies(dt, scene, playerGroup, callbacks) {
 
         // --- MOVEMENT ---
         if(moveDir && (dist > 2.0 || u.behavior === 'eater')) { // (a light eater walks to its torch even when the marshal stands beside it)
-            const moveX = moveDir.x * speed * dt;
-            const moveZ = moveDir.z * speed * dt;
+            const moveX = moveDir.x * speed * (u.slowMult ?? 1) * dt;   // slowMult: a whiskey puddle (src/stages/section1/elements.js)
+            const moveZ = moveDir.z * speed * (u.slowMult ?? 1) * dt;
             const colRad = (u.type === 'boss' || u.heavy) ? 1.2 : 0.5;
             if(!checkCollision(e.position.x + moveX, e.position.z + moveZ, colRad)) {
                 e.position.x += moveX;

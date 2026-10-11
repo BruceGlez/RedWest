@@ -3,12 +3,12 @@
 
 export const KIND_BY_TYPE = { hide: 'hide', door: 'door', lever: 'lever', lore: 'lore', climb: 'climb', vantage: 'vantage' };
 // When several are in reach, the first kind in this list wins (a door beside a hiding place opens the door).
-const PRIORITY = ['door', 'lever', 'climb', 'lore', 'vantage', 'hide'];
+const PRIORITY = ['door', 'lever', 'stack', 'climb', 'lore', 'vantage', 'hide'];
 export const MIN_REACH = 6;           // units: even a small marker can be used from a step away
 
 export function buildInteractables(markers = []) {
-    return markers.filter(m => KIND_BY_TYPE[m.type]).map(m => ({
-        id: m.id, kind: KIND_BY_TYPE[m.type], x: m.x, z: m.z, r: Math.max(m.radius || 0, MIN_REACH), note: m.note ?? ''
+    return markers.filter(m => KIND_BY_TYPE[m.type] || m.id === 'DYNAMITE').map(m => ({
+        id: m.id, kind: m.id === 'DYNAMITE' ? 'stack' : KIND_BY_TYPE[m.type], x: m.x, z: m.z, r: Math.max(m.radius || 0, MIN_REACH), note: m.note ?? ''
     }));
 }
 
@@ -32,6 +32,7 @@ export function promptFor(item, state) {
     case 'door': return state?.doors?.[item.id]?.open ? 'E: CLOSE DOOR' : 'E: OPEN DOOR';
     case 'lever': return state?.leverPulled ? 'LEVER PULLED' : 'E: PULL LEVER';
     case 'hide': return state?.hiding?.hidden && state.hiding.hideId === item.id ? 'HIDDEN (E: STEP OUT)' : 'E: HIDE';
+    case 'stack': return state?.stackTaken ? null : 'E: TAKE DYNAMITE';
     case 'lore': return 'E: LOOK';
     case 'climb': return 'E: CLIMB';
     case 'vantage': return 'E: LOOK OUT';

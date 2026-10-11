@@ -162,3 +162,122 @@ test('guards: the flank comes later, and hiding long enough loses them', () => {
     assert.equal(losesTrack(2.9), false);
     assert.equal(losesTrack(3), true);
 });
+
+import { ELEMENTS, createElements, give, cycle, throwSelected, step as stepEl, slowAt, comboHint, holding, inFire } from '../src/stages/section1/elements.js';
+import { createBreakables, shoot, blastAt, step as stepBr, takeStack, BREAK } from '../src/stages/section1/breakables.js';
+
+const run = (fn, seconds, dt = 0.1) => { const out = []; for(let t = 0; t < seconds; t += dt) out.push(...fn(dt)); return out; };
+
+test('elements: two slots with limits, swap, and found-only', () => {
+    const el = createElements();
+    assert.equal(give(el, 'dynamite', 5), 2);
+    assert.equal(give(el, 'dynamite', 1), 0);
+    assert.equal(give(el, 'whiskey', 1), 1);
+    assert.deepEqual(holding(el), ['dynamite', 'whiskey']);
+    assert.equal(cycle(el), 'whiskey');
+});
+
+test('elements: dynamite blasts after its fuse for 2 damage in 24 units', () => {
+    const el = createElements();
+    give(el, 'dynamite', 1);
+    const t = throwSelected(el, 0, 0, 0, 1);
+    assert.equal(t.ok, true);
+    assert.equal(t.z, ELEMENTS.THROW_RANGE);
+    assert.equal(el.slots.dynamite, 0);
+    assert.equal(throwSelected(el, 0, 0, 0, 1).ok, false, 'nothing left');
+    const ev = run(d => stepEl(el, d), 1.0);
+    assert.equal(ev.length, 0, 'still fusing');
+    const blast = run(d => stepEl(el, d), 1).find(e => e.kind === 'blast');
+    assert.deepEqual([blast.radius, blast.damage], [24, 2]);
+});
+
+test('elements: whiskey leaves a slowing puddle for 12 s', () => {
+    const el = createElements();
+    give(el, 'whiskey', 1);
+    const t = throwSelected(el, 0, 0, 1, 0);
+    assert.equal(slowAt(el, t.x, t.z), 0.6);
+    assert.equal(slowAt(el, t.x + 100, t.z), 1);
+    run(d => stepEl(el, d), 12.5);
+    assert.equal(slowAt(el, t.x, t.z), 1);
+});
+
+test('elements: dynamite into a whiskey puddle makes a 28 unit fire pool that burns 1 a second for 6 s', () => {
+    const el = createElements();
+    give(el, 'whiskey', 1); give(el, 'dynamite', 1);
+    assert.equal(comboHint(el), 'WHISKEY AND DYNAMITE MAKE A FIRE POOL');
+    assert.equal(comboHint(el), null, 'only once');
+    const w = throwSelected(el, 0, 0, 0, 1);
+    el.cooldown = 0;
+    cycle(el);
+    throwSelected(el, 0, 0, 0, 1);
+    const ev = run(d => stepEl(el, d), 2);
+    assert.ok(ev.some(e => e.kind === 'combo'));
+    assert.equal(inFire(el, w.x, w.z + 20), true);
+    const burns = run(d => stepEl(el, d), 6.5).filter(e => e.kind === 'burn');
+    assert.ok(burns.length >= 5 && burns.length <= 6, `${burns.length} ticks`);
+    assert.equal(burns[0].damage, 1);
+    assert.equal(inFire(el, w.x, w.z), false, 'it burns out');
+});
+
+const mk = [
+    { id: 'I23', type: 'breakable', x: 0, z: 0, radius: 4 },
+    { id: 'I23b', type: 'breakable', x: 10, z: 0, radius: 4 },
+    { id: 'I14_1', type: 'breakable', x: 200, z: 0, radius: 5 },
+    { id: 'DYNAMITE', type: 'hazard', x: 400, z: 0, radius: 9 }
+];
+
+test('breakables: a shot blows a whiskey barrel, which gives whiskey and chains to the next barrel', () => {
+    const b = createBreakables(mk);
+    assert.deepEqual(shoot(b, 100, 100), []);
+    const first = shoot(b, 0.5, 0, { x: 5, z: 0 });
+    assert.ok(first.some(e => e.kind === 'blast' && e.radius === BREAK.BARREL_RADIUS && e.damage === 1));
+    assert.ok(first.some(e => e.kind === 'puddle'));
+    assert.ok(first.some(e => e.kind === 'give' && e.element === 'whiskey'));
+    const later = run(d => stepBr(b, d), 1);
+    assert.ok(later.some(e => e.kind === 'break' && e.id === 'I23b'), 'the second barrel went 0.6 s later');
+});
+
+test('breakables: no whiskey is given from out of reach, and a fence breaks quietly', () => {
+    const b = createBreakables(mk);
+    assert.ok(!shoot(b, 0, 0, { x: 100, z: 0 }).some(e => e.kind === 'give'));
+    const f = shoot(b, 200, 0);
+    assert.deepEqual(f.map(e => e.kind), ['break']);
+});
+
+test('breakables: a chain stops after 3 barrels', () => {
+    const row = [0, 1, 2, 3, 4, 5].map(i => ({ id: `I23${'abcdef'[i]}`, type: 'breakable', x: i * 10, z: 0, radius: 4 }));
+    const b = createBreakables(row);
+    shoot(b, 0, 0);
+    run(d => stepBr(b, d), 10);
+    assert.equal(b.items.filter(i => i.broken).length, 1 + BREAK.CHAIN_MAX);
+});
+
+test('breakables: the dynamite stack can be taken once, then it cannot blow; a shot at a full stack blows 2 damage in 24', () => {
+    const b = createBreakables(mk);
+    assert.equal(takeStack(b), 2);
+    assert.equal(takeStack(b), 0);
+    assert.deepEqual(shoot(b, 400, 0), []);
+    const c = createBreakables(mk);
+    const ev = shoot(c, 400, 0);
+    const blast = ev.find(e => e.kind === 'blast');
+    assert.deepEqual([blast.radius, blast.damage], [24, 2]);
+});
+
+test('breakables: a dynamite blast sets off barrels inside it', () => {
+    const b = createBreakables(mk);
+    blastAt(b, 5, 0, 24, 'dynamite');
+    const ev = run(d => stepBr(b, d), 2);
+    assert.equal(ev.filter(e => e.kind === 'break').length, 2);
+});
+
+test('runtime: E at the stack gives dynamite, F throws, V swaps', () => {
+    const rt = createSection1Runtime([{ id: 'DYNAMITE', type: 'hazard', x: 0, z: 0, radius: 9 }]);
+    assert.equal(rt.step({ x: 0, z: 0, dt: 0.1 }).prompt, 'E: TAKE DYNAMITE');
+    rt.step({ x: 0, z: 0, dt: 0.1, pressed: true });
+    assert.equal(rt.elements.slots.dynamite, 2);
+    assert.equal(rt.step({ x: 0, z: 0, dt: 0.1 }).prompt, null);
+    const ev = rt.tick({ dt: 0.1, x: 0, z: 0, throwPressed: true, facing: { x: 0, z: 1 } });
+    assert.ok(ev.some(e => e.kind === 'throw'));
+    assert.equal(rt.elements.slots.dynamite, 1);
+    assert.match(rt.summary(), /DYNAMITE 1/);
+});

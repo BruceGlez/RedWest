@@ -3,11 +3,15 @@
 // The state it keeps (`state`) is what the scene reads to swing a door or lift a gate (src/placePeteSection1.js).
 
 import { HIDE, createHidingState, stepHiding, speedScale, resetHiding } from './hiding.js';
+import { createBreakables, shoot, blastAt, step as stepBreakables, takeStack } from './breakables.js';
+import { createElements, resetElements, give, cycle, throwSelected, step as stepElements, slowAt, comboHint, summary, addPuddle } from './elements.js';
 import { buildInteractables, nearestInteractable, promptFor, LORE } from './interactables.js';
 
 export function createSection1Runtime(markers = []) {
     const interactables = buildInteractables(markers);
-    const state = { doors: {}, leverPulled: false, hiding: createHidingState(), seen: {}, near: null, prompt: null };
+    const breakables = createBreakables(markers);
+    const elements = createElements();
+    const state = { doors: {}, leverPulled: false, hiding: createHidingState(), seen: {}, near: null, prompt: null, broken: {}, stackTaken: false };
 
     function reset() {
         state.doors = {};
@@ -16,6 +20,11 @@ export function createSection1Runtime(markers = []) {
         state.seen = {};
         state.near = null;
         state.prompt = null;
+        state.broken = {};
+        state.stackTaken = false;
+        breakables.items = createBreakables(markers).items;
+        breakables.pending = [];
+        resetElements(elements);
     }
 
     // Returns { prompt, speedMult, revealed, said } for this frame. `pressed`: E (or ACT) this frame. `fired`: he is shooting.
@@ -61,6 +70,14 @@ export function createSection1Runtime(markers = []) {
             if(card && dialogue) dialogue.open({ speaker: card.speaker, lines: card.lines, closeAt: { x: item.x, z: item.z, r: item.r + 6 }, id: item.id });
             return card ? 'lore' : null;
         }
+        case 'stack': {
+            const n = takeStack(breakables);
+            if(!n) return null;
+            state.stackTaken = true;
+            const got = give(elements, 'dynamite', n);
+            banner?.(got ? `DYNAMITE x${got}. F throws it, V swaps.` : 'You cannot carry more dynamite.');
+            return 'stack';
+        }
         case 'vantage':
             state.seen[item.id] = true;
             banner?.('The Flume Bridge lies ahead. Smoke, and men on the deck.');
@@ -70,5 +87,32 @@ export function createSection1Runtime(markers = []) {
         }
     }
 
-    return { interactables, state, step, reset, HIDE };
+    // Breakables and elements for one frame. `bullets`: [{ x, z }] of the marshal's bullets in flight. `throwPressed`/`cyclePressed`: F / V.
+    // `facing`: where he looks. Returns the events for the mode to apply: blast, burn, puddle, fire, combo, break, give-banners are handled here.
+    function tick({ dt, x, z, bullets = [], throwPressed = false, cyclePressed = false, facing = { x: 0, z: 1 }, banner = null }) {
+        const events = [];
+        const at = { x, z };
+        const take = list => {
+            for(const e of list) {
+                if(e.kind === 'break') state.broken[e.id] = true;
+                else if(e.kind === 'give') { if(give(elements, e.element, e.n)) { const hint = comboHint(elements); banner?.(hint ?? `WHISKEY x${elements.slots.whiskey}. F throws it, V swaps.`); } }
+                else if(e.kind === 'puddle') addPuddle(elements, e.x, e.z);
+                else if(e.kind === 'blast') blastAt(breakables, e.x, e.z, e.radius, e.source);
+                events.push(e);
+            }
+        };
+        for(const b of bullets) take(shoot(breakables, b.x, b.z, at));
+        take(stepBreakables(breakables, dt, at));
+        if(cyclePressed) cycle(elements);
+        if(throwPressed) {
+            const t = throwSelected(elements, x, z, facing.x, facing.z);
+            if(t.ok) events.push({ kind: 'throw', type: t.type, x: t.x, z: t.z });
+        }
+        take(stepElements(elements, dt));
+        const hint = comboHint(elements);
+        if(hint) banner?.(hint);
+        return events;
+    }
+
+    return { interactables, state, step, tick, reset, breakables, elements, slowAt: (x, z) => slowAt(elements, x, z), summary: () => summary(elements), HIDE };
 }

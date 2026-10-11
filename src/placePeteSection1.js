@@ -59,6 +59,20 @@ function syncMoving(registry, s1, markers) {
         const target = node.userData.rwClosedY + (s1.doors[id]?.open ? sign * OPEN_ANGLE : 0);
         node.rotation.y += (target - node.rotation.y) * 0.18;
     }
+    // Barrels and the breakable fences swap to their broken look once the rules say they broke.
+    const broken = s1.broken ?? {};
+    const breakMarks = markers.filter(m => m.type === 'breakable' && /^I(23|14)/.test(m.id));
+    for(const node of [...registry.barrels, ...registry.fences]) {
+        if(node.userData.rwBreak === undefined) node.userData.rwBreak = nearestMarker(breakMarks, node)?.id ?? null;
+        const id = node.userData.rwBreak;
+        if(!id || node.userData.rwShown === !!broken[id]) continue;
+        node.userData.rwShown = !!broken[id];
+        node.traverse(n => {
+            const base = plain(n.name);
+            if(base === 'barrel_whole' || base === 'fence_whole') n.visible = !broken[id];
+            if(base === 'barrel_broken' || base === 'fence_broken') n.visible = !!broken[id];
+        });
+    }
     const lever = markers.find(m => m.type === 'lever');
     if(lever) for(const node of registry.gates) {
         if(node.userData.rwClosedY === undefined) node.userData.rwClosedY = node.rotation.y;

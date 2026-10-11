@@ -3,7 +3,7 @@
 // open the gate to the next area, and at the end of the last one face Pete. Campfire checkpoints, supply crates with finite
 // ammo, and a forced checkpoint on entering each area (no going back). docs/design/stage-world-framework.md.
 
-import { gameState, playerStats } from '../state.js';
+import { gameState, playerStats, bullets } from '../state.js';
 import { enemies } from '../state.js';
 import { createAmmoState, lootCrate, isNearCrate } from '../ammoEconomy.js';
 import {
@@ -152,6 +152,13 @@ function wakeEncounters(ctx, playerPos) {
     return line;
 }
 
+// The blast and fire effects touch the scene and the sound (src/stages/section1/effects.js), so they load when the browser needs them, not in a node test.
+let effects = null;
+function withEffects(use) {
+    if(effects) use(effects);
+    else import('../stages/section1/effects.js').then(m => { effects = m; use(m); });
+}
+
 // Section 1: groups notice the marshal in steps (idle, suspicious, alerted) instead of all waking at a line, and a flank comes later.
 function stepGuards(ctx, playerPos, dt, hidden, shot) {
     const g = peteWorldRun.guards;
@@ -290,7 +297,8 @@ export const peteWorldMode = {
             const clues = peteWorldRun.collectedClues.length;
             const prompt = peteWorldRun.prompt ? ` | [ ${peteWorldRun.prompt} ]` : '';
             const goal = peteWorldRun.prompt ? '' : ` | ${peteWorldRun.area.objective(peteWorldRun.collectedClues, peteWorldRun.bossSpawned)}`;
-            return peteWorldRun.area.isSection ? `AMMO ${ammo}${prompt}${goal}` : `CLUES ${clues}/3 | AMMO ${ammo}${prompt}${goal}`;
+            const found = peteWorldRun.s1?.summary() ? ` | ${peteWorldRun.s1.summary()}` : '';
+            return peteWorldRun.area.isSection ? `AMMO ${ammo}${found}${prompt}${goal}` : `CLUES ${clues}/3 | AMMO ${ammo}${prompt}${goal}`;
         }
     },
 
@@ -383,6 +391,18 @@ export const peteWorldMode = {
                 banner: text => ctx?.ui?.showWaveBanner?.(text, 2600)
             });
             if(playerStats) playerStats.speedMult = r.speedMult;
+            // breakables, found elements and what they do to the enemies
+            const throwPressed = keys.throwRequested, cyclePressed = keys.cycleRequested;
+            keys.throwRequested = false; keys.cycleRequested = false;
+            const yaw = ctx?.playerSystem?.playerGroup?.rotation?.y ?? 0;
+            const events = peteWorldRun.s1.tick({
+                dt, x: playerPos.x, z: playerPos.z, throwPressed, cyclePressed,
+                bullets: bullets.filter(b => b.userData?.owner === 'player').map(b => ({ x: b.position.x, z: b.position.z })),
+                facing: { x: Math.sin(yaw), z: Math.cos(yaw) },
+                banner: text => ctx?.ui?.showWaveBanner?.(text, 2600)
+            });
+            if(events.length) withEffects(m => m.applyEvents(ctx, events));
+            for(const e of enemies) if(e.userData) e.userData.slowMult = peteWorldRun.s1.slowAt(e.position.x, e.position.z);
             setInteractHint(r.prompt ? r.prompt.replace(/^E: /, '') : null);
             if(r.prompt) activePrompt = activePrompt ?? r.prompt;
         }
@@ -490,3 +510,4 @@ export const peteWorldMode = {
 
 // Section 1 is behind a switch while it is finished (src/stages/section1Preload.js): this starts fetching its data at start-up when it is on.
 preloadSection1();
+if(typeof window !== 'undefined') withEffects(() => {});         // fetch the effects early in a browser

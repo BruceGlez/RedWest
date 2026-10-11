@@ -166,6 +166,26 @@ function isFrontalHit(enemy, bullet) {
     return facing.dot(travel) < -0.35;
 }
 
+// An enemy whose hit points ran out leaves the fight: effects, loot, the tumble, the run's counts. `index` is its place in `enemies`
+// (blasts from src/stages/section1/elements.js use this too).
+export function killEnemy(scene, e, index, callbacks = {}) {
+    const runStats = gameState.runStats;
+    createImpact(scene, e.position, 'poof');
+    flashEnemy(e);
+    spawnLoot(scene, e.position.x, e.position.z);
+    startFall(scene, e); // it tumbles and pops away; it is already out of the fight
+    enemies.splice(index, 1);
+    runStats.enemiesKilled++;
+    if(e.userData.type === 'bandit') runStats.banditsKilled++;
+    else if(e.userData.type === 'gunslinger') runStats.gunslingersKilled++;
+    else if(e.userData.type === 'wolf') runStats.wolvesKilled++;
+    else if(e.userData.type === 'boss') runStats.bossesKilled++;
+    runStats.kills[e.userData.type] = (runStats.kills[e.userData.type] || 0) + 1;
+    callbacks.onEnemyKilled?.(e.userData.type, e.position);
+    // Several outlaws (the Calloways) only count as beaten when the last one falls.
+    if(e.userData.type === 'boss' && !enemies.some(other => other.userData.type === 'boss')) callbacks.onBossDefeated?.();
+}
+
 export function updateBullets(dt, scene, playerGroup, callbacks) {
     const runStats = gameState.runStats;
     rebuildEnemyGrid(enemies);
@@ -270,20 +290,7 @@ export function updateBullets(dt, scene, playerGroup, callbacks) {
                 
                 if(e.userData.hp <= 0) { 
                     // Enemy Dead
-                    createImpact(scene, e.position, 'poof');
-                    flashEnemy(e);
-                    spawnLoot(scene, e.position.x, e.position.z); 
-                    startFall(scene, e); // it tumbles and pops away; it is already out of the fight
-                    enemies.splice(j,1); 
-                    runStats.enemiesKilled++;
-                    if(e.userData.type === 'bandit') runStats.banditsKilled++;
-                    else if(e.userData.type === 'gunslinger') runStats.gunslingersKilled++;
-                    else if(e.userData.type === 'wolf') runStats.wolvesKilled++;
-                    else if(e.userData.type === 'boss') runStats.bossesKilled++;
-                    runStats.kills[e.userData.type] = (runStats.kills[e.userData.type] || 0) + 1;
-                    callbacks.onEnemyKilled?.(e.userData.type, e.position);
-                    // Several outlaws (the Calloways) only count as beaten when the last one falls.
-                    if(e.userData.type === 'boss' && !enemies.some(other => other.userData.type === 'boss')) callbacks.onBossDefeated?.();
+                    killEnemy(scene, e, j, callbacks);
                 } else { 
                     // Enemy Hit
                     playSound('hit'); 
