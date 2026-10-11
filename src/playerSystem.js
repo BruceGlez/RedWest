@@ -1,3 +1,4 @@
+import { chase, rotateToWorld } from './stages/chaseCamera.js';
 import * as THREE from 'three';
 import { keys, mouse, touch } from './input.js';
 import { createPlayerMesh } from './assets.js';
@@ -258,6 +259,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             move.x += touch.moveX;
             move.z += touch.moveY;
         }
+        if(chase.enabled && (move.x !== 0 || move.z !== 0)) { const w = rotateToWorld(move.x, move.z); move.x = w.x; move.z = w.z; }   // the chase camera (src/stages/chaseCamera.js): up the screen is where the camera looks
         const beforePos = playerGroup.position.clone();
         if(move.length() > 0) {
             // Keys give full speed; a partly tilted stick gives proportionally less.
@@ -316,8 +318,7 @@ export function createPlayerSystem(scene, camera, gameState, playerStats) {
             const quickFire = quickFireLeft > 0;
             quickFireLeft = Math.max(0, quickFireLeft - dt);
             if(touch.aiming) {
-                faceX = touch.aimX;
-                faceZ = touch.aimY;
+                { const a = rotateToWorld(touch.aimX, touch.aimY); faceX = a.x; faceZ = a.z; }
                 target = TOUCH_AIM_SNAP ? pickTarget(pos, enemies, { dirX: faceX, dirZ: faceZ }) : null;
                 touchWantsFire = touch.firing;
             } else if(quickFire) {

@@ -20,6 +20,8 @@ import {
 } from '../peteWorldMap.js';
 import { PETE_AREAS, areaIndexForSave } from '../stages/pete.js';
 import { preloadSection1 } from '../stages/section1Preload.js';
+import { chase, setChase, stepChase, chaseOffset, chaseForward, CHASE } from '../stages/chaseCamera.js';
+import { orbitDrag } from '../input.js';
 import { createAwareness, stepAwareness, dueMembers, alarmNear } from '../stages/section1/guards.js';
 import { createSection1Runtime } from '../stages/section1/runtime.js';
 import { dialogue, mountDialogue } from '../dialogue.js';
@@ -92,6 +94,7 @@ export function startPeteWorldRun(options = {}, storage = globalThis.localStorag
     peteWorldRun.guards = area.isSection ? { aware: area.encounters.map(createAwareness), spawned: {} } : null;
     if(playerStats) playerStats.speedMult = 1;
     dialogue.reset();
+    setChase(area.camera === 'chase');
 
     if(resumes) {
         peteWorldRun.lastCheckpointId = saved.lastCheckpointId;
@@ -265,6 +268,7 @@ export function endPeteWorldRun(victory = false, storage = globalThis.localStora
     peteWorldRun.active = false;
     peteWorldRun.s1 = null;
     peteWorldRun.guards = null;
+    setChase(false);
     if(playerStats) { playerStats.speedMult = 1; playerStats.hiddenFor = 0; }
     dialogue.reset();
     setInteractHint(null);
@@ -478,6 +482,14 @@ export const peteWorldMode = {
         if(!peteWorldRun.active) return null;
         camera.clock += dt;
         const area = peteWorldRun.area;
+        if(chase.enabled) {
+            // Chase camera (Spyro style): Z and X or a right-button drag swing it round, A and D follow him round by themselves.
+            const dx = orbitDrag.dx, dy = orbitDrag.dy;
+            orbitDrag.dx = 0; orbitDrag.dy = 0;
+            stepChase(chase, dt, { orbit: (keys.orbitRight ? 1 : 0) - (keys.orbitLeft ? 1 : 0), dragX: dx, dragY: dy, lateral: (keys.d ? 1 : 0) - (keys.a ? 1 : 0) + (touch.enabled ? Math.sign(touch.moveX) : 0) });
+            const f = chaseForward(chase);
+            return { offset: chaseOffset(chase), scale: 1, lookX: f.x * CHASE.LOOK_AHEAD, lookZ: f.z * CHASE.LOOK_AHEAD };
+        }
         const place = area.places?.find(p => Math.hypot(p.x - playerPos.x, p.z - playerPos.z) <= p.r + 8);
         let scale = 1;
         if(camera.clock < camera.revealUntil) scale = 1.6;

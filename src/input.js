@@ -1,7 +1,10 @@
 import * as THREE from 'three';
 import { gameState } from './state.js';
+import { chase } from './stages/chaseCamera.js';
 
-export const keys = { w:false, a:false, s:false, d:false, shift:false, space: false, mouse: false, restartRequested: false, confirmYes: false, confirmNo: false, pauseToggleRequested: false, settingsToggleRequested: false, musicToggleRequested: false, sfxToggleRequested: false, weaponSwitchRequested: false, bankRequested: false, rideOnRequested: false, startRequested: false, interactRequested: false, throwRequested: false, cycleRequested: false };
+export const keys = { w:false, a:false, s:false, d:false, shift:false, space: false, mouse: false, restartRequested: false, confirmYes: false, confirmNo: false, pauseToggleRequested: false, settingsToggleRequested: false, musicToggleRequested: false, sfxToggleRequested: false, weaponSwitchRequested: false, bankRequested: false, rideOnRequested: false, startRequested: false, interactRequested: false, throwRequested: false, cycleRequested: false, orbitLeft: false, orbitRight: false };
+// Right-button drag for the chase camera: pixels dragged since the camera last read them (src/stages/chaseCamera.js).
+export const orbitDrag = { active: false, dx: 0, dy: 0 };
 // Analog state from the on-screen sticks (touchControls.js). Unused on desktop.
 export const touch = { enabled: false, moveX: 0, moveY: 0, aiming: false, aimX: 0, aimY: 1, firing: false, quickFireAt: 0, autoFire: false };
 export const mouse = new THREE.Vector2();
@@ -29,6 +32,8 @@ export function setupInputs() {
         if(e.code === 'KeyN') keys.sfxToggleRequested = true;
         if(e.code === 'KeyQ') keys.weaponSwitchRequested = true;
         if(e.code === 'KeyB') keys.bankRequested = true;
+        if(e.code === 'KeyZ') keys.orbitLeft = true;                // swing the chase camera round
+        if(e.code === 'KeyX' && !gameState.isConfirming) keys.orbitRight = true;
         if(e.code === 'KeyF') keys.throwRequested = true;           // throw the selected element (Section 1: dynamite, whiskey)
         if(e.code === 'KeyV') keys.cycleRequested = true;           // swap to the next element
         if(e.code === 'KeyE') keys.interactRequested = true;        // doors, levers, hiding places, the dialogue box (src/dialogue.js)
@@ -47,6 +52,8 @@ export function setupInputs() {
         if(e.code === 'KeyD' || e.code === 'ArrowRight') keys.d = false;
         if(e.code === 'ShiftLeft' || e.code === 'ShiftRight') keys.shift = false;
         if(e.code === 'Space') keys.space = false;
+        if(e.code === 'KeyZ') keys.orbitLeft = false;
+        if(e.code === 'KeyX') keys.orbitRight = false;
     });
 
     window.addEventListener('blur', () => {
@@ -80,10 +87,12 @@ export function setupInputs() {
             ch.style.left = x + 'px';
             ch.style.top = y + 'px';
         }
+        if(orbitDrag.active) { orbitDrag.dx += e.movementX || 0; orbitDrag.dy += e.movementY || 0; }
         mouse.x = (x / window.innerWidth) * 2 - 1;
         mouse.y = -(y / window.innerHeight) * 2 + 1;
     });
 
-    window.addEventListener('mousedown', () => { keys.mouse = true; });
-    window.addEventListener('mouseup', () => { keys.mouse = false; });
+    window.addEventListener('mousedown', e => { if(e.button === 2 && chase.enabled) { orbitDrag.active = true; return; } keys.mouse = true; });
+    window.addEventListener('mouseup', e => { if(e.button === 2 && chase.enabled) { orbitDrag.active = false; return; } keys.mouse = false; });
+    window.addEventListener('contextmenu', e => { if(chase.enabled) e.preventDefault(); });
 }

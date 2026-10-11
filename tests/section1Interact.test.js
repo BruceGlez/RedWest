@@ -281,3 +281,34 @@ test('runtime: E at the stack gives dynamite, F throws, V swaps', () => {
     assert.equal(rt.elements.slots.dynamite, 1);
     assert.match(rt.summary(), /DYNAMITE 1/);
 });
+
+import * as cc from '../src/stages/chaseCamera.js';
+const { CHASE } = cc;
+
+test('chase camera: W walks where the camera looks, whatever the orbit', () => {
+    const c = cc.setChase(true, { enabled: false, yaw: 0, height: 0, idle: 0 });
+    let w = cc.rotateToWorld(0, -1, c);
+    assert.ok(Math.abs(w.x) < 1e-9 && Math.abs(w.z + 1) < 1e-9, 'at yaw 0 W is north, as the old camera');
+    c.yaw = Math.PI / 2;                              // camera swung to the east side, looking west
+    const off = cc.chaseOffset(c), fwd = cc.chaseForward(c);
+    assert.ok(off.x > 20 && Math.abs(off.z) < 1e-6);
+    w = cc.rotateToWorld(0, -1, c);
+    assert.ok(Math.abs(w.x - fwd.x) < 1e-9 && Math.abs(w.z - fwd.z) < 1e-9, 'W is the camera forward');
+    c.enabled = false;
+    assert.deepEqual(cc.rotateToWorld(3, 4, c), { x: 3, z: 4 }, 'off: nothing turns');
+});
+
+test('chase camera: Z and X swing it, a drag lifts it within limits, sideways walking follows after a pause', () => {
+    const c = cc.setChase(true, { enabled: false, yaw: 0, height: 0, idle: 0 });
+    cc.stepChase(c, 0.5, { orbit: 1 });
+    assert.ok(c.yaw > 0.9);
+    const yaw = c.yaw;
+    cc.stepChase(c, 0.1, { lateral: 1 });
+    assert.equal(c.yaw, yaw, 'no recentring right after manual input');
+    for(let i = 0; i < 20; i++) cc.stepChase(c, 0.1, { lateral: 1 });
+    assert.ok(c.yaw > yaw, 'then it follows him round');
+    cc.stepChase(c, 0.1, { dragY: 100000 });
+    assert.equal(c.height, CHASE.HEIGHT_MAX);
+    cc.stepChase(c, 0.1, { dragY: -100000 });
+    assert.equal(c.height, CHASE.HEIGHT_MIN);
+});

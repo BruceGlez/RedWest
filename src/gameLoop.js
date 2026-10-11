@@ -674,7 +674,7 @@ export function createGameLoop(scene, camera, renderer, playerSystem, ui, progre
         const playerPos = playerSystem.playerGroup.position;
         // A mode may steer the camera (src/modes/registry.js, cameraBias): stand further back and look ahead down the road.
         const bias = mode.cameraBias?.(playerPos, realDt);
-        const camOffset = cameraOffset().clone();
+        const camOffset = bias?.offset ? new THREE.Vector3(bias.offset.x, bias.offset.y, bias.offset.z) : cameraOffset().clone();   // a mode may hang the camera anywhere (the chase camera)
         if(bias?.scale) camOffset.multiplyScalar(bias.scale);
         const lookX = bias?.lookX ?? 0, lookZ = bias?.lookZ ?? 0;
         camera.position.lerp(playerPos.clone().add(camOffset).add(new THREE.Vector3(lookX, 0, lookZ)), 5 * realDt);

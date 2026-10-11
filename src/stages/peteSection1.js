@@ -140,6 +140,7 @@ export function createSection1Area({ collision, markers = [], sceneFactory = nul
         id: SECTION1_ID,
         name: 'The Claims Road',
         isSection: true,
+        camera: 'chase',               // the chase camera: Z and X or a right-drag swing it, W walks where it looks (src/stages/chaseCamera.js)
         mapSize: 1000,                 // |x| and |z| stay under this (the export spans about 720 to 840 by 190 to 990)
         groundSize: 8,                 // the art has its own ground
         start,
