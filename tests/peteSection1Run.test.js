@@ -13,14 +13,16 @@ const storageFor = () => {
     return { getItem: k => store.get(k) ?? null, setItem: (k, v) => store.set(k, String(v)), removeItem: k => store.delete(k), clear: () => store.clear() };
 };
 
-test('the switch: off by default, ?section1=1 turns it on and remembers, ?section1=0 turns it off', () => {
+test('the switch: on by default, ?section1=0 turns it off and remembers, ?section1=1 turns it on again', () => {
     const storage = storageFor();
-    assert.equal(section1Enabled('', storage), false);
+    assert.equal(section1Enabled('', storage), true);
     assert.equal(section1Enabled('?section1=1', storage), true);
     assert.equal(storage.getItem(SECTION1_SWITCH_KEY), '1');
-    assert.equal(section1Enabled('', storage), true, 'remembered');
     assert.equal(section1Enabled('?section1=0', storage), false);
-    assert.equal(section1Enabled('', storage), false);
+    assert.equal(storage.getItem(SECTION1_SWITCH_KEY), '0');
+    assert.equal(section1Enabled('', storage), false, 'remembered');
+    assert.equal(section1Enabled('?section1=1', storage), true);
+    assert.equal(section1Enabled('', storage), true);
 });
 
 test('installing Section 1 makes the chapter Section 1, the old road from the bridge, then the canyon', async () => {
